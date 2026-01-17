@@ -650,7 +650,28 @@ let currentStationDetails = [];
 function updateGehwegList(stopIds, gehwegValues, stationDetails) {
   const container = document.getElementById('gehwegList');
   currentStopIds = stopIds || [];
-  currentStationDetails = stationDetails || [];
+  
+  // Details übernehmen wenn neue übergeben wurden
+  if (stationDetails && stationDetails.length > 0) {
+    currentStationDetails = stationDetails;
+    console.log('Neue Details übernommen:', currentStationDetails);
+  }
+  // Falls KEINE neuen Details und KEINE bestehenden Details, aus localStorage laden
+  else if (currentStationDetails.length === 0) {
+    const pendingDetails = localStorage.getItem('straba_pending_details');
+    if (pendingDetails) {
+      try {
+        currentStationDetails = JSON.parse(pendingDetails);
+        console.log('Details aus localStorage geladen:', currentStationDetails);
+      } catch (e) {
+        console.error('Fehler beim Parsen der Station Details:', e);
+      }
+    }
+  }
+  // Ansonsten: Behalte bestehende currentStationDetails (nicht überschreiben!)
+  
+  console.log('updateGehwegList - stopIds:', currentStopIds);
+  console.log('updateGehwegList - details:', currentStationDetails);
   
   if (currentStopIds.length === 0 && currentStationDetails.length === 0) {
     container.innerHTML = `
@@ -670,15 +691,23 @@ function updateGehwegList(stopIds, gehwegValues, stationDetails) {
   if (currentStationDetails.length > 0) {
     container.innerHTML = currentStationDetails.map((station, i) => {
       const val = values[i] !== undefined ? values[i] : 0;
-      const linesDisplay = station.lines ? station.lines.map(l => 
-        `<span class="line-badge-small">${l.name}</span> → ${l.direction}`
-      ).join('<br>') : '';
+      
+      // Linien-Anzeige erstellen
+      let linesDisplay = '';
+      if (station.lines && station.lines.length > 0) {
+        linesDisplay = station.lines.map(l => 
+          `<span class="line-badge-small">${l.name}</span> → ${l.direction}`
+        ).join('<br>');
+      }
+      
+      // Station-Name (mit Fallback)
+      const stationName = station.name || station.stationName || `Haltestelle ${i + 1}`;
       
       return `
         <div class="gehweg-item">
           <div class="stop-info">
-            <div class="stop-name">${station.name}</div>
-            <div class="stop-lines">${linesDisplay}</div>
+            <div class="stop-name">${stationName}</div>
+            ${linesDisplay ? `<div class="stop-lines">${linesDisplay}</div>` : `<div class="stop-id">RBL ${station.id || currentStopIds[i] || '?'}</div>`}
           </div>
           <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
           <span class="unit">Min</span>
