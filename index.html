@@ -600,6 +600,11 @@
 </div>
 
 <script>
+// ==================== GLOBALE VARIABLEN ====================
+let pendingRbl = '';
+let pendingFilter = '';
+let currentConfig = {};
+
 // ==================== EXPAND TOGGLE ====================
 function toggleExpand() {
   const header = document.getElementById('expandHeader');
@@ -647,18 +652,6 @@ function updateGehwegList(stopIds, gehwegValues, stationDetails) {
   currentStopIds = stopIds || [];
   currentStationDetails = stationDetails || [];
   
-  // Prüfe ob pending Details aus localStorage vorhanden
-  if (currentStationDetails.length === 0) {
-    const pendingDetails = localStorage.getItem('straba_pending_details');
-    if (pendingDetails) {
-      try {
-        currentStationDetails = JSON.parse(pendingDetails);
-      } catch (e) {
-        console.error('Fehler beim Parsen der Station Details:', e);
-      }
-    }
-  }
-  
   if (currentStopIds.length === 0 && currentStationDetails.length === 0) {
     container.innerHTML = `
       <div class="gehweg-item">
@@ -677,9 +670,9 @@ function updateGehwegList(stopIds, gehwegValues, stationDetails) {
   if (currentStationDetails.length > 0) {
     container.innerHTML = currentStationDetails.map((station, i) => {
       const val = values[i] !== undefined ? values[i] : 0;
-      const linesDisplay = station.lines.map(l => 
+      const linesDisplay = station.lines ? station.lines.map(l => 
         `<span class="line-badge-small">${l.name}</span> → ${l.direction}`
-      ).join('<br>');
+      ).join('<br>') : '';
       
       return `
         <div class="gehweg-item">
@@ -758,7 +751,7 @@ function updateUI() {
   if (sortHint) {
     sortHint.textContent = sortMode === '1' 
       ? 'Statisch = Feste Reihenfolge der Linien' 
-      : 'Zeit = Nächste Abfahrt immer oben';
+      : 'Nach Zeit = Nächste Abfahrt zuerst';
   }
   
   updatePreview();
@@ -871,135 +864,173 @@ function setSegmentValue(name, value) {
   });
 }
 
-// ==================== CONFIG LADEN ====================
-async function loadConfig() {
-  try {
-    const resp = await fetch('/debug');
-    const text = await resp.text();
-    const config = JSON.parse(text);
-    
-    console.log('Config geladen:', config);
-    
-    // Anzeige
-    setSegmentValue('anzeige', config.lines_count || '2');
-    setSegmentValue('sortmode', config.sort_mode || '1');
-    
-    // Barrierefreiheit
-    setSegmentValue('chopper', config.chopper || '1');
-    setSegmentValue('silberpfeil', config.silberpfeil || '1');
-    
-    // Design
-    setSegmentValue('colour', config.colour || '1');
-    setSegmentValue('displaylight', config.displaylight || '3');
-    
-    // Nachtmodus
-    if (config.night_mode_enabled) {
-      document.getElementById('nightmodeToggle').classList.add('on');
-    }
-    document.getElementById('nightstart').value = config.night_mode_start || '22';
-    document.getElementById('nightend').value = config.night_mode_end || '7';
-    
-    // Erweiterte Einstellungen
-    setSegmentValue('displaymode', config.display_mode || '1');
-    setSegmentValue('stopinterval', config.stop_interval || '10');
-    
-    // Gehweg
-    const stopIds = (config.rbl_id || '').split(',').map(s => s.trim()).filter(s => s);
-    const gehwegValues = (config.gehweg || '0').split('|').map(v => parseInt(v) || 0);
-    updateGehwegList(stopIds, gehwegValues);
-    
-    if (config.gehweg && config.gehweg !== '0' && config.gehweg !== '') {
-      const hasValue = gehwegValues.some(v => v > 0);
-      if (hasValue) {
-        document.getElementById('gehwegToggle').classList.add('on');
-      }
-    }
-    
-    updateUI();
-    
-  } catch (e) {
-    console.error('Config laden fehlgeschlagen:', e);
-    updateGehwegList([], []);
-    updateUI();
-  }
-}
-
-// ==================== SPEICHERN ====================
-document.getElementById('saveBtn').addEventListener('click', async () => {
-  document.getElementById('loading').classList.add('show');
-  
-  const formData = new FormData();
-  
-  // Stop-IDs von localmainpage (falls vorhanden)
-  const pendingRbl = localStorage.getItem('straba_pending_rbl');
-  const pendingFilter = localStorage.getItem('straba_pending_filter');
-  
-  if (pendingRbl) {
-    formData.append('rbl', pendingRbl);
-    formData.append('filter', pendingFilter || '');
-    // Nach dem Senden löschen
-    localStorage.removeItem('straba_pending_rbl');
-    localStorage.removeItem('straba_pending_filter');
-    localStorage.removeItem('straba_pending_details');
-  }
+// ==================== CONFIG LADEN (vom Parent via postMessage) ====================
+function applyConfig(config) {
+  console.log('Config anwenden:', config);
+  currentConfig = config;
   
   // Anzeige
-  formData.append('anzeige', getSegmentValue('anzeige'));
-  formData.append('sortmode', getSegmentValue('sortmode'));
+  setSegmentValue('anzeige', config.lines_count || '2');
+  setSegmentValue('sortmode', config.sort_mode || '1');
   
   // Barrierefreiheit
-  formData.append('chopper', getSegmentValue('chopper'));
-  formData.append('silberpfeil', getSegmentValue('silberpfeil'));
+  setSegmentValue('chopper', config.chopper || '1');
+  setSegmentValue('silberpfeil', config.silberpfeil || '1');
   
   // Design
-  formData.append('colour', getSegmentValue('colour'));
-  formData.append('displaylight', getSegmentValue('displaylight'));
+  setSegmentValue('colour', config.colour || '1');
+  setSegmentValue('displaylight', config.displaylight || '3');
   
   // Nachtmodus
-  const nightOn = document.getElementById('nightmodeToggle').classList.contains('on');
-  formData.append('nightmode', nightOn ? '1' : '0');
-  formData.append('nightstart', document.getElementById('nightstart').value);
-  formData.append('nightend', document.getElementById('nightend').value);
+  if (config.night_mode_enabled) {
+    document.getElementById('nightmodeToggle').classList.add('on');
+  }
+  document.getElementById('nightstart').value = config.night_mode_start || '22';
+  document.getElementById('nightend').value = config.night_mode_end || '7';
   
-  // Erweiterte: Anzeige-Modus
-  formData.append('displaymode', getSegmentValue('displaymode'));
-  formData.append('stopinterval', getSegmentValue('stopinterval'));
+  // Erweiterte Einstellungen
+  setSegmentValue('displaymode', config.display_mode || '1');
+  setSegmentValue('stopinterval', config.stop_interval || '10');
   
-  // Erweiterte: Gehweg
-  const gehwegOn = document.getElementById('gehwegToggle').classList.contains('on');
-  formData.append('gehweg', gehwegOn ? getGehwegString() : '0');
+  // Gehweg
+  const stopIds = (config.rbl_id || '').split(',').map(s => s.trim()).filter(s => s);
+  const gehwegValues = (config.gehweg || '0').split('|').map(v => parseInt(v) || 0);
+  updateGehwegList(stopIds, gehwegValues);
   
-  console.log('Speichere Einstellungen...');
-  
-  try {
-    await fetch('/config', { method: 'POST', body: formData });
-  } catch (e) {
-    // Verbindung bricht ab wegen Neustart
+  if (config.gehweg && config.gehweg !== '0' && config.gehweg !== '') {
+    const hasValue = gehwegValues.some(v => v > 0);
+    if (hasValue) {
+      document.getElementById('gehwegToggle').classList.add('on');
+    }
   }
   
+  updateUI();
+}
+
+// ==================== SPEICHERN (via postMessage an Parent/ESP32) ====================
+document.getElementById('saveBtn').addEventListener('click', () => {
+  document.getElementById('loading').classList.add('show');
+  
+  // Config-Daten sammeln
+  const configData = {
+    type: 'setRBL',
+    
+    // Stop-IDs (entweder pending oder bestehende)
+    rbl: pendingRbl || currentConfig.rbl_id || '',
+    filter: pendingFilter || currentConfig.lines_filter || '',
+    
+    // Anzeige
+    zeilen: getSegmentValue('anzeige'),
+    sortmode: getSegmentValue('sortmode'),
+    
+    // Barrierefreiheit
+    chopper: getSegmentValue('chopper'),
+    silberpfeil: getSegmentValue('silberpfeil'),
+    
+    // Design
+    colour: getSegmentValue('colour'),
+    displaylight: getSegmentValue('displaylight'),
+    
+    // Nachtmodus
+    nightmode: document.getElementById('nightmodeToggle').classList.contains('on') ? '1' : '0',
+    nightstart: document.getElementById('nightstart').value,
+    nightend: document.getElementById('nightend').value,
+    
+    // Erweiterte
+    displaymode: getSegmentValue('displaymode'),
+    stopinterval: getSegmentValue('stopinterval'),
+    
+    // Gehweg
+    gehweg: document.getElementById('gehwegToggle').classList.contains('on') ? getGehwegString() : '0'
+  };
+  
+  console.log('Sende Config an ESP32:', configData);
+  
+  // Sende an Parent (ESP32-Seite)
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage(configData, '*');
+  } else {
+    console.error('Nicht in iframe - kann nicht speichern!');
+    alert('Fehler: Diese Seite muss im Straba-Interface geöffnet werden.');
+    document.getElementById('loading').classList.remove('show');
+    return;
+  }
+  
+  // Status-Updates
   setTimeout(() => {
     document.querySelector('.loading-text').textContent = 'Neustart läuft...';
   }, 2000);
   
   setTimeout(() => {
-    document.querySelector('.loading-text').textContent = 'Seite wird neu geladen...';
-    location.reload();
-  }, 6000);
+    document.querySelector('.loading-text').textContent = 'Fertig! Seite wird neu geladen...';
+  }, 5000);
+});
+
+// ==================== KOMMUNIKATION MIT ESP32 (PARENT) ====================
+window.addEventListener('message', function(event) {
+  console.log('Nachricht empfangen:', event.data);
+  
+  // ESP32 sendet bestehende Konfiguration
+  if (event.data && event.data.type === 'loadExistingConfig') {
+    console.log('Bestehende Config vom ESP32 erhalten');
+    
+    // Speichere RBL/Filter für später
+    if (event.data.rbl) {
+      currentConfig.rbl_id = event.data.rbl;
+      currentConfig.lines_filter = event.data.filter || '';
+      
+      // Gehweg-Liste aktualisieren
+      const stopIds = event.data.rbl.split(',').map(s => s.trim()).filter(s => s);
+      updateGehwegList(stopIds, []);
+    }
+  }
+  
+  // Empfange volle Config (JSON) vom ESP32
+  if (event.data && event.data.type === 'loadFullConfig') {
+    applyConfig(event.data.config);
+  }
+  
+  // Pending Stations von localmainpage
+  if (event.data && event.data.type === 'pendingStations') {
+    pendingRbl = event.data.rbl || '';
+    pendingFilter = event.data.filter || '';
+    
+    if (pendingRbl) {
+      const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
+      
+      // Zeige Banner
+      document.getElementById('pendingBanner').style.display = 'block';
+      document.getElementById('pendingText').textContent = 
+        `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
+      
+      // Aktualisiere Gehweg-Liste
+      updateGehwegList(stopIds, [], event.data.details || []);
+    }
+  }
 });
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
-  loadConfig();
   updatePreview();
+  updateUI();
   
-  // Prüfe ob neue Stationen von localmainpage übertragen wurden
-  const pendingRbl = localStorage.getItem('straba_pending_rbl');
-  const pendingDetails = localStorage.getItem('straba_pending_details');
+  // Frage Parent nach bestehender Config
+  if (window.parent && window.parent !== window) {
+    console.log('In iframe - frage Parent nach Config');
+    window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
+    window.parent.postMessage({ type: 'requestFullConfig' }, '*');
+  }
   
-  if (pendingRbl) {
+  // Fallback: Prüfe localStorage (für lokales Testen)
+  const localPendingRbl = localStorage.getItem('straba_pending_rbl');
+  if (localPendingRbl) {
+    pendingRbl = localPendingRbl;
+    pendingFilter = localStorage.getItem('straba_pending_filter') || '';
+    
     const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
     let details = [];
     
+    const pendingDetails = localStorage.getItem('straba_pending_details');
     if (pendingDetails) {
       try {
         details = JSON.parse(pendingDetails);
@@ -1013,8 +1044,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('pendingText').textContent = 
       `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
     
-    // Aktualisiere Gehweg-Liste mit pending Daten
+    // Aktualisiere Gehweg-Liste
     updateGehwegList(stopIds, [], details);
+    
+    // Lösche localStorage nach dem Laden
+    localStorage.removeItem('straba_pending_rbl');
+    localStorage.removeItem('straba_pending_filter');
+    localStorage.removeItem('straba_pending_details');
   }
 });
 </script>
