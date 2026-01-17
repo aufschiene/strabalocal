@@ -373,7 +373,7 @@
     <div class="control-row">
       <div class="control-label">
         <span>Sortierung</span>
-        <small>Zeit = Nächste Abfahrt immer oben</small>
+        <small id="sortmodeHint">Statisch = Feste Reihenfolge der Linien</small>
       </div>
       <div class="segmented" data-name="sortmode">
         <div class="seg-btn active" data-value="1">Statisch</div>
@@ -389,7 +389,6 @@
     <div class="control-row">
       <div class="control-label">
         <span>Hochflurer markieren</span>
-        <small>Straßenbahnen ohne Niederflur blau anzeigen</small>
       </div>
       <div class="segmented" data-name="chopper">
         <div class="seg-btn" data-value="0">Aus</div>
@@ -400,7 +399,6 @@
     <div class="control-row">
       <div class="control-label">
         <span>U-Bahnen mit Klimaanlage</span>
-        <small>Moderne V-Züge mit * markieren</small>
       </div>
       <div class="segmented" data-name="silberpfeil">
         <div class="seg-btn" data-value="0">Aus</div>
@@ -426,8 +424,8 @@
       <div class="control-label"><span>Helligkeit</span></div>
       <div class="segmented" data-name="displaylight">
         <div class="seg-btn" data-value="1">Dunkel</div>
-        <div class="seg-btn active" data-value="2">Mittel</div>
-        <div class="seg-btn" data-value="3">Hell</div>
+        <div class="seg-btn" data-value="2">Mittel</div>
+        <div class="seg-btn active" data-value="3">Hell</div>
       </div>
     </div>
   </div>
@@ -519,7 +517,7 @@
           <div class="control-row">
             <div class="control-label">
               <span>Gehweg-Filter aktivieren</span>
-              <small>Blendet unerreichbare Abfahrten aus</small>
+              <small>Blendet unerreichbare Abfahrten aus.<br>Die Gehzeit kann bis zu 15 Minuten eingestellt werden.</small>
             </div>
             <div class="toggle" id="gehwegToggle"></div>
           </div>
@@ -655,6 +653,15 @@ function updateUI() {
   const nightOn = document.getElementById('nightmodeToggle').classList.contains('on');
   document.getElementById('nightSettings').classList.toggle('disabled', !nightOn);
   
+  // Sortmode Hint
+  const sortMode = getSegmentValue('sortmode');
+  const sortHint = document.getElementById('sortmodeHint');
+  if (sortHint) {
+    sortHint.textContent = sortMode === '1' 
+      ? 'Statisch = Feste Reihenfolge der Linien' 
+      : 'Zeit = Nächste Abfahrt immer oben';
+  }
+  
   updatePreview();
 }
 
@@ -709,7 +716,7 @@ async function loadConfig() {
     
     // Design
     setSegmentValue('colour', config.colour || '1');
-    setSegmentValue('displaylight', config.displaylight || '2');
+    setSegmentValue('displaylight', config.displaylight || '3');
     
     // Nachtmodus
     if (config.night_mode_enabled) {
