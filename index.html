@@ -244,6 +244,9 @@
       font-size:15px;
     }
     .gehweg-item input:focus{outline:none;border-color:#ffd700}
+    .gehweg-item input:invalid{border-color:#ff453a}
+    .gehweg-error{font-size:11px;color:#ff453a;margin-top:4px;display:none}
+    .gehweg-error.show{display:block}
     .gehweg-item .unit{color:#888;font-size:13px;margin-left:8px}
     
     /* Number inputs */
@@ -342,18 +345,9 @@
   
   <!-- ==================== VORSCHAU ==================== -->
   <div class="card">
-    <h2>📺 Vorschau</h2>
+    <h2>📺 Vorschau <span style="font-weight:400;font-size:12px;color:#888;text-transform:none;letter-spacing:0">– Beispiel Linien</span></h2>
     <div class="preview-box" id="preview">
-      <div class="preview-row" style="color:#ffb340">
-        <span class="line-num">U2</span>
-        <span class="destination">Seestadt</span>
-        <span class="countdown">3</span>
-      </div>
-      <div class="preview-row" style="color:#ffb340">
-        <span class="line-num">U2</span>
-        <span class="destination">Schottentor</span>
-        <span class="countdown">5</span>
-      </div>
+      <!-- Wird dynamisch generiert -->
     </div>
   </div>
   
@@ -620,7 +614,7 @@ function updateGehwegList(stopIds, gehwegValues) {
           <div class="stop-name">Haltestelle ${i + 1}</div>
           <div class="stop-id">RBL ${id}</div>
         </div>
-        <input type="number" min="0" max="15" value="${val}" data-index="${i}">
+        <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
         <span class="unit">Min</span>
       </div>
     `;
@@ -630,6 +624,22 @@ function updateGehwegList(stopIds, gehwegValues) {
 function getCurrentGehwegValues() {
   const inputs = document.querySelectorAll('#gehwegList input[type="number"]');
   return Array.from(inputs).map(inp => parseInt(inp.value) || 0);
+}
+
+function validateGehweg(input) {
+  let val = parseFloat(input.value);
+  
+  // Keine Kommazahlen - nur ganze Zahlen
+  if (!Number.isInteger(val)) {
+    val = Math.floor(val);
+  }
+  
+  // Begrenzen auf 0-15
+  if (val < 0) val = 0;
+  if (val > 15) val = 15;
+  
+  // Wert setzen
+  input.value = val;
 }
 
 function getGehwegString() {
@@ -672,11 +682,86 @@ function updatePreview() {
     '2': '#ffffff',
     '3': '#ff9500'
   };
-  const color = colors[colourVal] || '#ffb340';
+  const textColor = colors[colourVal] || '#ffb340';
   
-  document.querySelectorAll('#preview .preview-row').forEach(row => {
-    row.style.color = color;
-  });
+  // Helligkeit
+  const brightness = getSegmentValue('displaylight');
+  const opacityMap = { '1': 0.4, '2': 0.7, '3': 1.0 };
+  const brightnessOpacity = opacityMap[brightness] || 1.0;
+  
+  const zeilenCount = parseInt(getSegmentValue('anzeige')) || 2;
+  const sortMode = getSegmentValue('sortmode');
+  const hochflurerOn = getSegmentValue('chopper') === '1';
+  const klimaanlageOn = getSegmentValue('silberpfeil') === '1';
+  
+  // Nachtmodus Check
+  const nightOn = document.getElementById('nightmodeToggle').classList.contains('on');
+  const nightStart = parseInt(document.getElementById('nightstart').value) || 22;
+  const nightEnd = parseInt(document.getElementById('nightend').value) || 7;
+  const currentHour = new Date().getHours();
+  
+  const preview = document.getElementById('preview');
+  
+  // Nachtmodus aktiv?
+  let isNightTime = false;
+  if (nightOn) {
+    if (nightStart > nightEnd) {
+      isNightTime = currentHour >= nightStart || currentHour < nightEnd;
+    } else {
+      isNightTime = currentHour >= nightStart && currentHour < nightEnd;
+    }
+  }
+  
+  if (isNightTime) {
+    preview.innerHTML = '<div style="text-align:center;color:#444;padding:20px;font-size:13px;">💤 Display ist im Nachtmodus aus</div>';
+    preview.style.opacity = '0.5';
+    return;
+  }
+  
+  preview.style.opacity = brightnessOpacity;
+  
+  // Beispiel-Linien Daten
+  let lines = [
+    { line: 'U6', dest: 'Floridsdorf', time: 4, isHochflurer: false, hasKlima: true },
+    { line: '2', dest: 'Dornbach', time: 6, isHochflurer: true, hasKlima: false },
+    { line: '13A', dest: 'Hauptbahnhof', time: 8, isHochflurer: false, hasKlima: false }
+  ];
+  
+  // Sortierung
+  if (sortMode === '1') {
+    // Statisch: 13A, U6, 2
+    lines = [lines[2], lines[0], lines[1]];
+  } else {
+    // Zeit: Nach Countdown sortiert
+    lines.sort((a, b) => a.time - b.time);
+  }
+  
+  // Nur gewünschte Anzahl Zeilen
+  lines = lines.slice(0, zeilenCount);
+  
+  // HTML generieren
+  preview.innerHTML = lines.map(l => {
+    let lineDisplay = l.line;
+    let rowColor = textColor;
+    
+    // Klimaanlage: * bei U-Bahnen
+    if (klimaanlageOn && l.hasKlima) {
+      lineDisplay = l.line + '*';
+    }
+    
+    // Hochflurer: Blaue Schrift
+    if (hochflurerOn && l.isHochflurer) {
+      rowColor = '#87ceeb';
+    }
+    
+    return `
+      <div class="preview-row" style="color:${rowColor}">
+        <span class="line-num">${lineDisplay}</span>
+        <span class="destination">${l.dest}</span>
+        <span class="countdown">${l.time}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 function getSegmentValue(name) {
@@ -746,6 +831,7 @@ async function loadConfig() {
   } catch (e) {
     console.error('Config laden fehlgeschlagen:', e);
     updateGehwegList([], []);
+    updateUI();
   }
 }
 
@@ -802,6 +888,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
   loadConfig();
+  updatePreview();
 });
 </script>
 </body>
