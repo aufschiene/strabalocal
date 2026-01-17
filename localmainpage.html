@@ -1363,51 +1363,15 @@ window.addEventListener('message', function(event) {
     const filter = event.data.filter || '';
     
     if (rbl && rbl.trim().length > 0) {
-      // Zeige Banner dass bestehende Stationen geladen werden
-      const banner = document.getElementById('existingBanner');
-      if (banner) {
-        banner.classList.add('show');
+      // Verwende die loadExistingConfig Funktion die die echten Namen von der API holt
+      // Falls API-Daten noch nicht geladen, speichere für später
+      if (stationData.length > 0) {
+        loadExistingConfig(rbl, filter);
+      } else {
+        // Speichere für später wenn API-Daten geladen sind
+        pendingConfig = { rbl: rbl, filter: filter };
+        console.log('Config gespeichert für später (API-Daten noch nicht geladen)');
       }
-      
-      // Parse bestehende Stop-IDs und Filter
-      const stopIds = rbl.split(',').map(s => s.trim()).filter(s => s);
-      const filters = filter.split('|');
-      
-      console.log('Bestehende Stops:', stopIds);
-      console.log('Bestehende Filter:', filters);
-      
-      // Füge bestehende Stationen als "existing" hinzu
-      stopIds.forEach((stopId, idx) => {
-        const stopFilter = filters[idx] || '';
-        const lines = stopFilter.split(',').map(l => l.trim()).filter(l => l);
-        
-        lines.forEach(lineName => {
-          addedStations.push({
-            stationId: parseInt(stopId),
-            stationName: 'Station ' + stopId,  // Name wird beim Laden aktualisiert
-            lineName: lineName,
-            lineId: 0,
-            patternId: 0,
-            direction: 'Richtung',
-            isExisting: true
-          });
-        });
-        
-        // Falls keine Filter, einen Platzhalter hinzufügen
-        if (lines.length === 0) {
-          addedStations.push({
-            stationId: parseInt(stopId),
-            stationName: 'Station ' + stopId,
-            lineName: 'Alle',
-            lineId: 0,
-            patternId: 0,
-            direction: 'Alle Richtungen',
-            isExisting: true
-          });
-        }
-      });
-      
-      updateStationsList();
     }
   }
   
