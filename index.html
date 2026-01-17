@@ -29,6 +29,20 @@
     .intro-box a:hover{
       text-decoration:underline;
     }
+    .back-link{
+      display:inline-block;
+      margin-top:12px;
+      padding:10px 20px;
+      background:rgba(255,255,255,0.1);
+      border-radius:10px;
+      color:#fff !important;
+      font-weight:500;
+      transition:all 0.2s;
+    }
+    .back-link:hover{
+      background:rgba(255,255,255,0.2);
+      text-decoration:none !important;
+    }
     
     /* Cards */
     .card{background:rgba(255,255,255,0.08);border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.1)}
@@ -330,6 +344,25 @@
     }
     @keyframes spin{to{transform:rotate(360deg)}}
     .loading-text{font-size:16px;color:#fff}
+    
+    /* Pending Stations Banner */
+    .pending-banner{
+      background:linear-gradient(135deg,rgba(56,239,125,0.2),rgba(17,153,142,0.2));
+      border:1px solid rgba(56,239,125,0.4);
+      border-radius:12px;
+      padding:14px 16px;
+      margin-bottom:16px;
+    }
+    .pending-title{
+      font-weight:600;
+      color:#38ef7d;
+      margin-bottom:4px;
+      font-size:14px;
+    }
+    .pending-text{
+      color:#aaa;
+      font-size:12px;
+    }
   </style>
 </head>
 <body>
@@ -340,7 +373,13 @@
   <!-- ==================== INTRO ==================== -->
   <div class="intro-box">
     Nun kannst du dein Straba ganz nach deinen Wünschen einstellen.<br>
-    Falls du eine genaue Beschreibung brauchst <a href="https://example.com" target="_blank">drücke hier</a>.
+    <a href="localmainpage.html" class="back-link">← Zurück zu Linien einstellen</a>
+  </div>
+  
+  <!-- Banner für neue Stationen -->
+  <div class="pending-banner" id="pendingBanner" style="display:none;">
+    <div class="pending-title">✓ Neue Stationen bereit</div>
+    <div class="pending-text" id="pendingText">Deine ausgewählten Stationen werden beim Speichern übernommen.</div>
   </div>
   
   <!-- ==================== VORSCHAU ==================== -->
@@ -841,6 +880,18 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   
   const formData = new FormData();
   
+  // Stop-IDs von localmainpage (falls vorhanden)
+  const pendingRbl = localStorage.getItem('straba_pending_rbl');
+  const pendingFilter = localStorage.getItem('straba_pending_filter');
+  
+  if (pendingRbl) {
+    formData.append('rbl', pendingRbl);
+    formData.append('filter', pendingFilter || '');
+    // Nach dem Senden löschen
+    localStorage.removeItem('straba_pending_rbl');
+    localStorage.removeItem('straba_pending_filter');
+  }
+  
   // Anzeige
   formData.append('anzeige', getSegmentValue('anzeige'));
   formData.append('sortmode', getSegmentValue('sortmode'));
@@ -889,6 +940,15 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 document.addEventListener('DOMContentLoaded', () => {
   loadConfig();
   updatePreview();
+  
+  // Prüfe ob neue Stationen von localmainpage übertragen wurden
+  const pendingRbl = localStorage.getItem('straba_pending_rbl');
+  if (pendingRbl) {
+    const stopCount = pendingRbl.split(',').length;
+    document.getElementById('pendingBanner').style.display = 'block';
+    document.getElementById('pendingText').textContent = 
+      `${stopCount} Station${stopCount > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
+  }
 });
 </script>
 </body>

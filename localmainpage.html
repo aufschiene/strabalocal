@@ -531,6 +531,7 @@
       background: rgba(255, 255, 255, 0.1);
       color: #fff;
       margin-top: 12px;
+      text-decoration: none;
     }
     
     .btn-secondary:hover {
@@ -1313,24 +1314,12 @@ function continueSetup() {
   console.log('Stop IDs:', stopIdString);
   console.log('Filter (per-stop):', filterString);
   
-  const data = {
-    type: 'setRBL',
-    rbl: stopIdString,
-    filter: filterString,
-    zeilen: '3'
-  };
+  // Speichere in localStorage für index.html
+  localStorage.setItem('straba_pending_rbl', stopIdString);
+  localStorage.setItem('straba_pending_filter', filterString);
   
-  window.parent.postMessage(data, '*');
-  
-  document.body.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px;">
-      <div style="font-size:64px;margin-bottom:20px;">✅</div>
-      <h1 style="margin-bottom:12px;">Konfiguration gesendet!</h1>
-      <p style="color:#aaa;margin-bottom:8px;">Stop IDs: ${stopIdString}</p>
-      <p style="color:#aaa;">Filter: ${filterString}</p>
-      <p style="color:#666;margin-top:20px;">Dein Straba wird gleich neu gestartet...</p>
-    </div>
-  `;
+  // Weiterleiten zu index.html
+  window.location.href = 'index.html';
 }
 
 document.addEventListener('click', function(e) {
