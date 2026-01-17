@@ -1330,13 +1330,40 @@ function continueSetup() {
   console.log('Filter (per-stop):', filterString);
   console.log('Station Details:', stationDetails);
   
-  // Speichere in localStorage für index.html
-  localStorage.setItem('straba_pending_rbl', stopIdString);
-  localStorage.setItem('straba_pending_filter', filterString);
-  localStorage.setItem('straba_pending_details', JSON.stringify(stationDetails));
+  // WICHTIG: Sende via postMessage an den Parent (ESP32-Seite)
+  // Der ESP32 erwartet eine Nachricht mit type: 'setRBL'
+  const configData = {
+    type: 'setRBL',
+    rbl: stopIdString,
+    filter: filterString,
+    zeilen: '2',           // Standard: 2 Zeilen
+    sortmode: '1',         // Standard: statisch
+    chopper: '1',          // Standard: Hochflurer anzeigen
+    silberpfeil: '1',      // Standard: V-Wagen markieren
+    colour: '1',           // Standard: gelb
+    displaylight: '2',     // Standard: mittel
+    nightmode: '0',        // Standard: Nachtmodus aus
+    nightstart: '22',
+    nightend: '7'
+  };
   
-  // Weiterleiten zu index.html
-  window.location.href = 'index.html';
+  console.log('Sende Config an ESP32:', configData);
+  
+  // Sende an parent window (ESP32-Seite die den iframe hostet)
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage(configData, '*');
+    
+    // Zeige Bestätigung
+    continueBtn.disabled = true;
+    continueBtn.innerHTML = '<span style="margin-right:8px">⏳</span> Wird gespeichert...';
+  } else {
+    // Fallback: Falls nicht in iframe, localStorage verwenden
+    console.log('Nicht in iframe - verwende localStorage Fallback');
+    localStorage.setItem('straba_pending_rbl', stopIdString);
+    localStorage.setItem('straba_pending_filter', filterString);
+    localStorage.setItem('straba_pending_details', JSON.stringify(stationDetails));
+    window.location.href = 'index.html';
+  }
 }
 
 document.addEventListener('click', function(e) {
@@ -1347,6 +1374,80 @@ document.addEventListener('click', function(e) {
     stationDropdown.classList.remove('show');
   }
 });
+
+// ==================== KOMMUNIKATION MIT ESP32 (PARENT) ====================
+
+// Empfange bestehende Config vom ESP32
+window.addEventListener('message', function(event) {
+  console.log('Nachricht empfangen:', event.data);
+  
+  // ESP32 sendet bestehende Konfiguration
+  if (event.data && event.data.type === 'loadExistingConfig') {
+    console.log('Bestehende Config erhalten:', event.data);
+    
+    const rbl = event.data.rbl || '';
+    const filter = event.data.filter || '';
+    
+    if (rbl && rbl.trim().length > 0) {
+      // Zeige Banner dass bestehende Stationen geladen werden
+      const banner = document.getElementById('existingBanner');
+      if (banner) {
+        banner.classList.add('show');
+      }
+      
+      // Parse bestehende Stop-IDs und Filter
+      const stopIds = rbl.split(',').map(s => s.trim()).filter(s => s);
+      const filters = filter.split('|');
+      
+      console.log('Bestehende Stops:', stopIds);
+      console.log('Bestehende Filter:', filters);
+      
+      // Füge bestehende Stationen als "existing" hinzu
+      stopIds.forEach((stopId, idx) => {
+        const stopFilter = filters[idx] || '';
+        const lines = stopFilter.split(',').map(l => l.trim()).filter(l => l);
+        
+        lines.forEach(lineName => {
+          addedStations.push({
+            stationId: parseInt(stopId),
+            stationName: 'Station ' + stopId,  // Name wird beim Laden aktualisiert
+            lineName: lineName,
+            lineId: 0,
+            patternId: 0,
+            direction: 'Richtung',
+            isExisting: true
+          });
+        });
+        
+        // Falls keine Filter, einen Platzhalter hinzufügen
+        if (lines.length === 0) {
+          addedStations.push({
+            stationId: parseInt(stopId),
+            stationName: 'Station ' + stopId,
+            lineName: 'Alle',
+            lineId: 0,
+            patternId: 0,
+            direction: 'Alle Richtungen',
+            isExisting: true
+          });
+        }
+      });
+      
+      updateStationsList();
+    }
+  }
+  
+  // ESP32 fragt nach bestehender Config (für den Fall dass wir sie haben)
+  if (event.data && event.data.type === 'requestRBL') {
+    console.log('ESP32 fragt nach RBL - wir haben noch keine');
+  }
+});
+
+// Beim Laden: Frage Parent nach bestehender Config
+if (window.parent && window.parent !== window) {
+  console.log('In iframe - frage Parent nach bestehender Config');
+  window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
+}
 </script>
 
 </body>
