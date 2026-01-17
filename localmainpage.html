@@ -1330,40 +1330,14 @@ function continueSetup() {
   console.log('Filter (per-stop):', filterString);
   console.log('Station Details:', stationDetails);
   
-  // WICHTIG: Sende via postMessage an den Parent (ESP32-Seite)
-  // Der ESP32 erwartet eine Nachricht mit type: 'setRBL'
-  const configData = {
-    type: 'setRBL',
-    rbl: stopIdString,
-    filter: filterString,
-    zeilen: '2',           // Standard: 2 Zeilen
-    sortmode: '1',         // Standard: statisch
-    chopper: '1',          // Standard: Hochflurer anzeigen
-    silberpfeil: '1',      // Standard: V-Wagen markieren
-    colour: '1',           // Standard: gelb
-    displaylight: '2',     // Standard: mittel
-    nightmode: '0',        // Standard: Nachtmodus aus
-    nightstart: '22',
-    nightend: '7'
-  };
+  // Speichere in localStorage für index.html (erweiterte Einstellungen)
+  localStorage.setItem('straba_pending_rbl', stopIdString);
+  localStorage.setItem('straba_pending_filter', filterString);
+  localStorage.setItem('straba_pending_details', JSON.stringify(stationDetails));
   
-  console.log('Sende Config an ESP32:', configData);
-  
-  // Sende an parent window (ESP32-Seite die den iframe hostet)
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage(configData, '*');
-    
-    // Zeige Bestätigung
-    continueBtn.disabled = true;
-    continueBtn.innerHTML = '<span style="margin-right:8px">⏳</span> Wird gespeichert...';
-  } else {
-    // Fallback: Falls nicht in iframe, localStorage verwenden
-    console.log('Nicht in iframe - verwende localStorage Fallback');
-    localStorage.setItem('straba_pending_rbl', stopIdString);
-    localStorage.setItem('straba_pending_filter', filterString);
-    localStorage.setItem('straba_pending_details', JSON.stringify(stationDetails));
-    window.location.href = 'index.html';
-  }
+  // Navigiere zu index.html (erweiterte Einstellungen)
+  // Beide Seiten sind auf GitHub Pages, also funktioniert die Navigation direkt
+  window.location.href = 'index.html';
 }
 
 document.addEventListener('click', function(e) {
