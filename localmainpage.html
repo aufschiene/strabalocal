@@ -1294,18 +1294,33 @@ function continueSetup() {
       stationGroups[s.stationId] = {
         stationId: s.stationId,
         stationName: s.stationName,
-        lines: new Set()
+        lines: []
       };
     }
-    stationGroups[s.stationId].lines.add(s.lineName);
+    // Prüfe ob Linie+Richtung schon existiert
+    const exists = stationGroups[s.stationId].lines.some(l => 
+      l.name === s.lineName && l.direction === s.direction
+    );
+    if (!exists) {
+      stationGroups[s.stationId].lines.push({
+        name: s.lineName,
+        direction: s.direction
+      });
+    }
   });
   
   const stopIds = [];
   const filters = [];
+  const stationDetails = [];
   
   Object.values(stationGroups).forEach(group => {
     stopIds.push(group.stationId);
-    filters.push(Array.from(group.lines).join(','));
+    filters.push(group.lines.map(l => l.name).join(','));
+    stationDetails.push({
+      id: group.stationId,
+      name: group.stationName,
+      lines: group.lines
+    });
   });
   
   const stopIdString = stopIds.join(',');
@@ -1313,10 +1328,12 @@ function continueSetup() {
   
   console.log('Stop IDs:', stopIdString);
   console.log('Filter (per-stop):', filterString);
+  console.log('Station Details:', stationDetails);
   
   // Speichere in localStorage für index.html
   localStorage.setItem('straba_pending_rbl', stopIdString);
   localStorage.setItem('straba_pending_filter', filterString);
+  localStorage.setItem('straba_pending_details', JSON.stringify(stationDetails));
   
   // Weiterleiten zu index.html
   window.location.href = 'index.html';

@@ -240,13 +240,25 @@
       display:flex;
       align-items:center;
       justify-content:space-between;
-      padding:10px 0;
+      padding:12px 0;
       border-bottom:1px solid rgba(255,255,255,0.06);
+      gap:12px;
     }
     .gehweg-item:last-child{border-bottom:none}
-    .gehweg-item .stop-info{flex:1}
-    .gehweg-item .stop-name{font-size:14px;color:#fff;font-weight:500}
+    .gehweg-item .stop-info{flex:1;min-width:0}
+    .gehweg-item .stop-name{font-size:14px;color:#fff;font-weight:600;margin-bottom:4px}
     .gehweg-item .stop-id{font-size:12px;color:#888;margin-top:2px}
+    .gehweg-item .stop-lines{font-size:12px;color:#aaa;line-height:1.6}
+    .line-badge-small{
+      display:inline-block;
+      background:rgba(255,215,0,0.2);
+      color:#ffd700;
+      padding:2px 6px;
+      border-radius:4px;
+      font-weight:600;
+      font-size:11px;
+      margin-right:4px;
+    }
     .gehweg-item input{
       width:70px;
       text-align:center;
@@ -256,12 +268,13 @@
       color:#fff;
       border-radius:10px;
       font-size:15px;
+      flex-shrink:0;
     }
     .gehweg-item input:focus{outline:none;border-color:#ffd700}
     .gehweg-item input:invalid{border-color:#ff453a}
     .gehweg-error{font-size:11px;color:#ff453a;margin-top:4px;display:none}
     .gehweg-error.show{display:block}
-    .gehweg-item .unit{color:#888;font-size:13px;margin-left:8px}
+    .gehweg-item .unit{color:#888;font-size:13px;margin-left:8px;flex-shrink:0}
     
     /* Number inputs */
     input[type="number"]{
@@ -627,16 +640,31 @@ document.querySelectorAll('.toggle').forEach(toggle => {
 
 // ==================== GEHWEG LISTE ====================
 let currentStopIds = [];
+let currentStationDetails = [];
 
-function updateGehwegList(stopIds, gehwegValues) {
+function updateGehwegList(stopIds, gehwegValues, stationDetails) {
   const container = document.getElementById('gehwegList');
   currentStopIds = stopIds || [];
+  currentStationDetails = stationDetails || [];
   
-  if (currentStopIds.length === 0) {
+  // Prüfe ob pending Details aus localStorage vorhanden
+  if (currentStationDetails.length === 0) {
+    const pendingDetails = localStorage.getItem('straba_pending_details');
+    if (pendingDetails) {
+      try {
+        currentStationDetails = JSON.parse(pendingDetails);
+      } catch (e) {
+        console.error('Fehler beim Parsen der Station Details:', e);
+      }
+    }
+  }
+  
+  if (currentStopIds.length === 0 && currentStationDetails.length === 0) {
     container.innerHTML = `
       <div class="gehweg-item">
         <div class="stop-info">
           <div class="stop-name" style="color:#888">Keine Haltestellen konfiguriert</div>
+          <div class="stop-id" style="color:#666">Bitte zuerst Linien einstellen</div>
         </div>
       </div>
     `;
@@ -645,19 +673,41 @@ function updateGehwegList(stopIds, gehwegValues) {
   
   const values = gehwegValues || [];
   
-  container.innerHTML = currentStopIds.map((id, i) => {
-    const val = values[i] !== undefined ? values[i] : 0;
-    return `
-      <div class="gehweg-item">
-        <div class="stop-info">
-          <div class="stop-name">Haltestelle ${i + 1}</div>
-          <div class="stop-id">RBL ${id}</div>
+  // Wenn wir Details haben, zeige diese an
+  if (currentStationDetails.length > 0) {
+    container.innerHTML = currentStationDetails.map((station, i) => {
+      const val = values[i] !== undefined ? values[i] : 0;
+      const linesDisplay = station.lines.map(l => 
+        `<span class="line-badge-small">${l.name}</span> → ${l.direction}`
+      ).join('<br>');
+      
+      return `
+        <div class="gehweg-item">
+          <div class="stop-info">
+            <div class="stop-name">${station.name}</div>
+            <div class="stop-lines">${linesDisplay}</div>
+          </div>
+          <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
+          <span class="unit">Min</span>
         </div>
-        <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
-        <span class="unit">Min</span>
-      </div>
-    `;
-  }).join('');
+      `;
+    }).join('');
+  } else {
+    // Fallback: Nur Stop-IDs anzeigen
+    container.innerHTML = currentStopIds.map((id, i) => {
+      const val = values[i] !== undefined ? values[i] : 0;
+      return `
+        <div class="gehweg-item">
+          <div class="stop-info">
+            <div class="stop-name">Haltestelle ${i + 1}</div>
+            <div class="stop-id">RBL ${id}</div>
+          </div>
+          <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
+          <span class="unit">Min</span>
+        </div>
+      `;
+    }).join('');
+  }
 }
 
 function getCurrentGehwegValues() {
@@ -890,6 +940,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     // Nach dem Senden löschen
     localStorage.removeItem('straba_pending_rbl');
     localStorage.removeItem('straba_pending_filter');
+    localStorage.removeItem('straba_pending_details');
   }
   
   // Anzeige
@@ -943,11 +994,27 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Prüfe ob neue Stationen von localmainpage übertragen wurden
   const pendingRbl = localStorage.getItem('straba_pending_rbl');
+  const pendingDetails = localStorage.getItem('straba_pending_details');
+  
   if (pendingRbl) {
-    const stopCount = pendingRbl.split(',').length;
+    const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
+    let details = [];
+    
+    if (pendingDetails) {
+      try {
+        details = JSON.parse(pendingDetails);
+      } catch (e) {
+        console.error('Fehler beim Parsen der Station Details:', e);
+      }
+    }
+    
+    // Zeige Banner
     document.getElementById('pendingBanner').style.display = 'block';
     document.getElementById('pendingText').textContent = 
-      `${stopCount} Station${stopCount > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
+      `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
+    
+    // Aktualisiere Gehweg-Liste mit pending Daten
+    updateGehwegList(stopIds, [], details);
   }
 });
 </script>
