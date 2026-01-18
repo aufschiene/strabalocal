@@ -195,7 +195,7 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 12px;
       margin-top: 4px;
-      max-height: 250px;
+      max-height: 60vh;
       overflow-y: auto;
       z-index: 100;
       display: none;
@@ -888,24 +888,44 @@ function showLineDropdown(query) {
     );
   }
   
-  // Sortiere so, dass exakte Treffer zuerst kommen
+  // Sortierung: U-Bahnen zuerst, dann Tram/Bus gemischt, Nachtbusse zuletzt
   filtered.sort((a, b) => {
-    const aExact = a.lineName.toLowerCase() === query;
-    const bExact = b.lineName.toLowerCase() === query;
+    const aName = a.lineName;
+    const bName = b.lineName;
+    
+    // Exakte Treffer ganz oben
+    const aExact = aName.toLowerCase() === query;
+    const bExact = bName.toLowerCase() === query;
     if (aExact && !bExact) return -1;
     if (!aExact && bExact) return 1;
     
-    const aNum = parseInt(a.lineName);
-    const bNum = parseInt(b.lineName);
-    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
-    return a.lineName.localeCompare(b.lineName, 'de');
+    // Kategorie bestimmen: 1=U-Bahn, 2=Tram/Bus, 3=Nachtbus
+    const getCategory = (name) => {
+      if (name.startsWith('U')) return 1;  // U-Bahnen
+      if (name.startsWith('N')) return 3;  // Nachtbusse
+      return 2;  // Tram und Bus gemischt
+    };
+    
+    const aCat = getCategory(aName);
+    const bCat = getCategory(bName);
+    
+    // Erst nach Kategorie sortieren
+    if (aCat !== bCat) return aCat - bCat;
+    
+    // Innerhalb der Kategorie: Numerisch sortieren
+    const aNum = parseInt(aName.replace(/\D/g, '')) || 999;
+    const bNum = parseInt(bName.replace(/\D/g, '')) || 999;
+    if (aNum !== bNum) return aNum - bNum;
+    
+    // Bei gleicher Nummer alphabetisch (z.B. 46A vor 46B)
+    return aName.localeCompare(bName, 'de');
   });
   
   // Bei exakter Übereinstimmung nur diesen einen anzeigen
   if (query.length > 0 && filtered.length > 0 && filtered[0].lineName.toLowerCase() === query) {
     filtered = filtered.slice(0, 1);
   } else {
-    filtered = filtered.slice(0, 50);
+    filtered = filtered.slice(0, 200);
   }
   
   if (filtered.length === 0) {
