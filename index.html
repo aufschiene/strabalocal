@@ -709,7 +709,7 @@ function updateGehwegList(stopIds, gehwegValues, stationDetails) {
             <div class="stop-name">${stationName}</div>
             ${linesDisplay ? `<div class="stop-lines">${linesDisplay}</div>` : `<div class="stop-id">RBL ${station.id || currentStopIds[i] || '?'}</div>`}
           </div>
-          <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
+          <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" data-stop-id="${station.id || currentStopIds[i] || ''}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
           <span class="unit">Min</span>
         </div>
       `;
@@ -724,7 +724,7 @@ function updateGehwegList(stopIds, gehwegValues, stationDetails) {
             <div class="stop-name">Haltestelle ${i + 1}</div>
             <div class="stop-id">RBL ${id}</div>
           </div>
-          <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
+          <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" data-stop-id="${id}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
           <span class="unit">Min</span>
         </div>
       `;
@@ -754,9 +754,22 @@ function validateGehweg(input) {
 }
 
 function getGehwegString() {
-  const values = getCurrentGehwegValues();
-  if (values.length === 0) return '0';
-  return values.join('|');
+  // Neues Format: "stopId:gehzeit|stopId:gehzeit"
+  // z.B. "5903:5|5939:0" statt "5|0"
+  const inputs = document.querySelectorAll('#gehwegList input[type="number"]');
+  if (inputs.length === 0) return '0';
+  
+  const entries = [];
+  inputs.forEach(inp => {
+    const stopId = inp.dataset.stopId;
+    const value = parseInt(inp.value) || 0;
+    if (stopId) {
+      entries.push(`${stopId}:${value}`);
+    }
+  });
+  
+  if (entries.length === 0) return '0';
+  return entries.join('|');
 }
 
 // ==================== UI UPDATES ====================
@@ -921,9 +934,30 @@ function applyConfig(config) {
   setSegmentValue('displaymode', config.display_mode || '1');
   setSegmentValue('stopinterval', config.stop_interval || '10');
   
-  // Gehweg
+  // Gehweg - neues Format: "stopId:gehzeit|stopId:gehzeit"
   const stopIds = (config.rbl_id || '').split(',').map(s => s.trim()).filter(s => s);
-  const gehwegValues = (config.gehweg || '0').split('|').map(v => parseInt(v) || 0);
+  const gehwegString = config.gehweg || '0';
+  
+  // Parse gehweg - unterstützt altes ("|" only) und neues Format ("stopId:value|")
+  let gehwegValues = [];
+  if (gehwegString.indexOf(':') !== -1) {
+    // Neues Format: "5903:5|5939:0"
+    const gehwegMap = {};
+    gehwegString.split('|').forEach(entry => {
+      const colonPos = entry.indexOf(':');
+      if (colonPos !== -1) {
+        const stopId = entry.substring(0, colonPos).trim();
+        const value = parseInt(entry.substring(colonPos + 1)) || 0;
+        gehwegMap[stopId] = value;
+      }
+    });
+    // In Reihenfolge der stopIds umwandeln
+    gehwegValues = stopIds.map(id => gehwegMap[id] || 0);
+  } else {
+    // Altes Format: "5|0" (Abwärtskompatibilität)
+    gehwegValues = gehwegString.split('|').map(v => parseInt(v) || 0);
+  }
+  
   updateGehwegList(stopIds, gehwegValues);
   
   if (config.gehweg && config.gehweg !== '0' && config.gehweg !== '') {
