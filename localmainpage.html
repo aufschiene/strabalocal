@@ -195,7 +195,7 @@
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 12px;
       margin-top: 4px;
-      max-height: 60vh;
+      max-height: 250px;
       overflow-y: auto;
       z-index: 100;
       display: none;
@@ -221,6 +221,9 @@
       cursor: pointer;
       transition: all 0.15s;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
     
     .dropdown-item:last-child {
@@ -234,12 +237,16 @@
     .dropdown-item .line-name {
       font-weight: 600;
       font-size: 15px;
+      min-width: 40px;
     }
     
     .dropdown-item .line-info {
       color: #888;
-      font-size: 12px;
-      margin-top: 2px;
+      font-size: 13px;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     
     .dropdown-item.selected {
@@ -936,8 +943,8 @@ function showLineDropdown(query) {
       
       return `
         <div class="dropdown-item" onclick="selectLine(${line.lineID}, '${line.lineName}')">
-          <div class="line-name">${line.lineName}</div>
-          ${endpoints ? `<div class="line-info">${endpoints}</div>` : ''}
+          <span class="line-name">${line.lineName}</span>
+          ${endpoints ? `<span class="line-info">${endpoints}</span>` : ''}
         </div>
       `;
     }).join('');
@@ -1028,8 +1035,8 @@ function showStationDropdown(inputValue) {
   } else {
     stationList.innerHTML = stations.map(station => `
       <div class="dropdown-item" onclick='selectStation(${JSON.stringify(station).replace(/'/g, "&#39;")})'>
-        <div class="line-name">${station.name}</div>
-        <div class="line-info">${station.directions.length} Richtung(en)</div>
+        <span class="line-name">${station.name}</span>
+        <span class="line-info">${station.directions.length} Richtung${station.directions.length > 1 ? 'en' : ''}</span>
       </div>
     `).join('');
   }
