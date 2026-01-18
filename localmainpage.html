@@ -846,6 +846,35 @@ lineInput.addEventListener('click', function() {
   showLineDropdown(this.value);
 });
 
+// ========== FIX 1: Echte Endstationen anzeigen ==========
+function getLineEndpoints(line) {
+  if (!Array.isArray(line.lineStation) || line.lineStation.length === 0) {
+    return '';
+  }
+  
+  // Finde alle einzigartigen Pattern-IDs (Richtungen)
+  const patternIds = [...new Set(line.lineStation.map(s => s.patternID))];
+  
+  // Hole die Endstation jeder Richtung
+  const endStations = patternIds.map(patternId => {
+    const stationsOfPattern = line.lineStation.filter(s => s.patternID === patternId);
+    if (stationsOfPattern.length > 0) {
+      return stationsOfPattern[stationsOfPattern.length - 1]?.station?.stationName || '';
+    }
+    return '';
+  }).filter(name => name !== '');
+  
+  // Zeige die zwei unterschiedlichen Endstationen
+  const uniqueEndStations = [...new Set(endStations)];
+  if (uniqueEndStations.length >= 2) {
+    return `${uniqueEndStations[0]} ↔ ${uniqueEndStations[1]}`;
+  } else if (uniqueEndStations.length === 1) {
+    return `→ ${uniqueEndStations[0]}`;
+  }
+  
+  return '';
+}
+
 function showLineDropdown(query) {
   query = query.toLowerCase().trim();
   
@@ -883,14 +912,7 @@ function showLineDropdown(query) {
     lineList.innerHTML = '<div class="no-results">Keine Linie gefunden</div>';
   } else {
     lineList.innerHTML = filtered.map(line => {
-      let endpoints = '';
-      if (Array.isArray(line.lineStation) && line.lineStation.length > 0) {
-        const first = line.lineStation[0]?.station?.stationName || '';
-        const last = line.lineStation[line.lineStation.length - 1]?.station?.stationName || '';
-        if (first && last && first !== last) {
-          endpoints = `${first} ↔ ${last}`;
-        }
-      }
+      const endpoints = getLineEndpoints(line);
       
       return `
         <div class="dropdown-item" onclick="selectLine(${line.lineID}, '${line.lineName}')">
@@ -904,6 +926,7 @@ function showLineDropdown(query) {
   lineDropdown.classList.add('show');
 }
 
+// ========== FIX 2: Station-Dropdown automatisch öffnen ==========
 function selectLine(lineID, lineName) {
   selectedLine = stationData.find(l => l.lineID === lineID);
   lineInput.value = lineName;
@@ -919,7 +942,14 @@ function selectLine(lineID, lineName) {
   stationCard.style.opacity = '1';
   stationCard.style.pointerEvents = 'auto';
   stationInput.disabled = false;
+  
+  // Fokus setzen UND Dropdown automatisch öffnen
   stationInput.focus();
+  
+  // Kurze Verzögerung damit der DOM-Update abgeschlossen ist
+  setTimeout(() => {
+    showStationDropdown('');
+  }, 50);
 }
 
 stationInput.addEventListener('input', function() {
