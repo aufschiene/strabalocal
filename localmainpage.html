@@ -984,25 +984,53 @@ stationInput.addEventListener('input', function() {
   showStationDropdown(this.value);
 });
 
+// Normalisiert Stationsnamen für Vergleich: 
+// "Neubaugasse / Westbahnstraße" und "Neubaugasse, Westbahnstraße" werden gleich behandelt
+function normalizeStationName(name) {
+  return name
+    .replace(/\s*[\/,]\s*/g, ' ') // Ersetze / oder , (mit umgebenden Leerzeichen) durch einzelnes Leerzeichen
+    .replace(/\s+/g, ' ')          // Mehrfache Leerzeichen zu einem
+    .trim()
+    .toLowerCase();
+}
+
+// Findet den "schönsten" Namen aus einer Liste (bevorzugt Schrägstrich-Variante)
+function getBestStationName(names) {
+  // Bevorzuge Namen mit Schrägstrich, da diese offizieller aussehen
+  const withSlash = names.find(n => n.includes('/'));
+  if (withSlash) return withSlash;
+  return names[0];
+}
+
 function showStationDropdown(inputValue) {
   const query = inputValue.toLowerCase().trim();
   
-  // Gruppiere nach Stationsname (nicht ID), um Steige zusammenzufassen
-  const stationsByName = new Map();
+  // Gruppiere nach NORMALISIERTEM Stationsname, um Varianten zusammenzufassen
+  // z.B. "Neubaugasse / Westbahnstraße" und "Neubaugasse, Westbahnstraße"
+  const stationsByNormalizedName = new Map();
   
   if (Array.isArray(selectedLine.lineStation)) {
     selectedLine.lineStation.forEach(item => {
       const station = item.station;
       if (station && station.stationName && station.stationID) {
-        const name = station.stationName;
-        if (!stationsByName.has(name)) {
-          stationsByName.set(name, {
-            name: name,
+        const originalName = station.stationName;
+        const normalizedName = normalizeStationName(originalName);
+        
+        if (!stationsByNormalizedName.has(normalizedName)) {
+          stationsByNormalizedName.set(normalizedName, {
+            originalNames: [originalName],
             stopIds: new Set(),
             directions: []
           });
         }
-        const entry = stationsByName.get(name);
+        
+        const entry = stationsByNormalizedName.get(normalizedName);
+        
+        // Sammle alle Original-Namen für diese normalisierte Station
+        if (!entry.originalNames.includes(originalName)) {
+          entry.originalNames.push(originalName);
+        }
+        
         entry.stopIds.add(station.stationID);
         
         const towards = getDirectionName(selectedLine, item.patternID);
@@ -1019,26 +1047,38 @@ function showStationDropdown(inputValue) {
     });
   }
   
-  let stations = Array.from(stationsByName.values()).map(s => ({
-    ...s,
-    stopIds: Array.from(s.stopIds)
+  let stations = Array.from(stationsByNormalizedName.values()).map(s => ({
+    name: getBestStationName(s.originalNames),
+    originalNames: s.originalNames,
+    stopIds: Array.from(s.stopIds),
+    directions: s.directions
   })).sort((a, b) => a.name.localeCompare(b.name, 'de'));
   
   if (query.length > 0) {
     stations = stations.filter(s => 
-      s.name.toLowerCase().includes(query)
+      s.name.toLowerCase().includes(query) ||
+      s.originalNames.some(n => n.toLowerCase().includes(query))
     );
   }
   
   if (stations.length === 0) {
     stationList.innerHTML = '<div class="no-results">Keine Station gefunden</div>';
   } else {
-    stationList.innerHTML = stations.map(station => `
+    stationList.innerHTML = stations.map(station => {
+      // Richtungsanzeige verbessern: Bei 1 Richtung den Zielnamen zeigen
+      let directionInfo;
+      if (station.directions.length === 1) {
+        directionInfo = `→ ${station.directions[0].towards}`;
+      } else {
+        directionInfo = `${station.directions.length} Richtungen`;
+      }
+      
+      return `
       <div class="dropdown-item" onclick='selectStation(${JSON.stringify(station).replace(/'/g, "&#39;")})'>
         <span class="line-name">${station.name}</span>
-        <span class="line-info">${station.directions.length} Richtung${station.directions.length > 1 ? 'en' : ''}</span>
+        <span class="line-info">${directionInfo}</span>
       </div>
-    `).join('');
+    `}).join('');
   }
   
   stationDropdown.classList.add('show');
@@ -1085,7 +1125,7 @@ function selectStation(station) {
     directionOptions.innerHTML = `
       <div class="direction-option selected">
         <input type="checkbox" checked disabled>
-        <span>Richtung ${uniqueDirections[0].towards}</span>
+        <span>→ ${uniqueDirections[0].towards}</span>
       </div>
     `;
     // Bei nur einer Richtung gleich andere Linien anzeigen
@@ -1094,7 +1134,7 @@ function selectStation(station) {
     directionOptions.innerHTML = uniqueDirections.map((dir, idx) => `
       <div class="direction-option">
         <input type="checkbox" id="dir${idx}" onchange="toggleDirection(this, ${idx}, ${dir.patternID}, ${dir.stopId}, '${dir.towards.replace(/'/g, "\\'")}')">
-        <label for="dir${idx}">Richtung ${dir.towards}</label>
+        <label for="dir${idx}">→ ${dir.towards}</label>
       </div>
     `).join('');
     
