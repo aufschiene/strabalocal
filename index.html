@@ -584,6 +584,23 @@
           </div>
         </div>
         
+        <!-- INFOTAINMENT -->
+        <div class="inner-section">
+          <h3>💡 Infotainment</h3>
+          
+          <div class="feature-desc">
+            Dein Straba sagt dir "Frohe Weihnachten" oder "Alles Gute zum Öffi-Jahrestag" ;)
+          </div>
+          
+          <div class="control-row">
+            <div class="control-label">
+              <span>Infotainment aktivieren</span>
+              <small>Störungstexte werden immer angezeigt</small>
+            </div>
+            <div class="toggle on" id="funMessagesToggle"></div>
+          </div>
+        </div>
+        
       </div>
     </div>
   </div>
@@ -930,6 +947,13 @@ function applyConfig(config) {
   document.getElementById('nightstart').value = config.night_mode_start || '22';
   document.getElementById('nightend').value = config.night_mode_end || '7';
   
+  // Fun-Nachrichten
+  if (config.show_fun_messages === false || config.show_fun_messages === '0' || config.show_fun_messages === 0) {
+    document.getElementById('funMessagesToggle').classList.remove('on');
+  } else {
+    document.getElementById('funMessagesToggle').classList.add('on');
+  }
+  
   // Erweiterte Einstellungen
   setSegmentValue('displaymode', config.display_mode || '1');
   setSegmentValue('stopinterval', config.stop_interval || '10');
@@ -998,6 +1022,9 @@ document.getElementById('saveBtn').addEventListener('click', () => {
     nightmode: document.getElementById('nightmodeToggle').classList.contains('on') ? '1' : '0',
     nightstart: document.getElementById('nightstart').value,
     nightend: document.getElementById('nightend').value,
+    
+    // Fun-Nachrichten
+    showfunmessages: document.getElementById('funMessagesToggle').classList.contains('on') ? '1' : '0',
     
     // Erweiterte
     displaymode: getSegmentValue('displaymode'),
