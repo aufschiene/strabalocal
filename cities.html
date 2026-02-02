@@ -267,7 +267,7 @@
       background: #f8f8f8;
     }
     .direction-option.selected {
-      background: #e8f5e9;
+      background: #e8f0f8;
     }
     .direction-option .checkbox {
       width: 22px;
@@ -282,8 +282,8 @@
       transition: all 0.15s;
     }
     .direction-option.selected .checkbox {
-      background: #4caf50;
-      border-color: #4caf50;
+      background: #0055a4;
+      border-color: #0055a4;
       color: #fff;
     }
     .direction-option .direction-text {
@@ -383,13 +383,13 @@
       gap: 8px;
     }
     .btn-primary {
-      background: #4caf50;
+      background: #0055a4;
       color: #fff;
     }
     .btn-primary:hover {
-      background: #43a047;
+      background: #004080;
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 85, 164, 0.3);
     }
     .btn-primary:disabled {
       background: #e0e0e0;
@@ -453,28 +453,6 @@
       margin-bottom: 6px;
       font-weight: 600;
     }
-    .journey-station {
-      padding: 14px 16px;
-      border: 2px solid #e0e0e0;
-      border-radius: 12px;
-      background: #fff;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .journey-station:hover {
-      border-color: #0055a4;
-    }
-    .journey-station.selected {
-      border-color: #4caf50;
-      background: #e8f5e9;
-    }
-    .journey-station .placeholder {
-      color: #999;
-    }
-    .journey-station .station-name {
-      font-weight: 600;
-      color: #333;
-    }
     .journey-arrow {
       text-align: center;
       font-size: 24px;
@@ -482,48 +460,88 @@
       padding: 8px 0;
     }
     
-    .journey-search-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: #f5f5f5;
-      z-index: 100;
-      padding: 20px;
-      overflow-y: auto;
-    }
-    .journey-search-header {
+    .journey-selected {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: #e8f0f8;
+      border: 2px solid #0055a4;
+      border-radius: 12px;
+      margin-top: 8px;
     }
-    .journey-search-header span {
+    .journey-selected .station-name {
       font-weight: 600;
-      font-size: 18px;
       color: #333;
+    }
+    .journey-selected .change-btn {
+      background: none;
+      border: none;
+      color: #0055a4;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .journey-selected .change-btn:hover {
+      text-decoration: underline;
     }
     
     /* Product Selection */
+    .journey-products {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e0e0e0;
+    }
+    
+    .product-category {
+      margin-bottom: 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .category-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #f8f9fa;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      color: #333;
+    }
+    .category-header:hover {
+      background: #f0f2f4;
+    }
+    .category-toggle {
+      color: #666;
+      font-size: 12px;
+      transition: transform 0.2s;
+    }
+    .category-content {
+      background: #fff;
+    }
+    .category-content.collapsed {
+      display: none;
+    }
+    
     .product-option {
       display: flex;
       align-items: center;
       gap: 12px;
       padding: 14px 16px;
       background: #fff;
-      border: 2px solid #e0e0e0;
-      border-radius: 12px;
-      margin-bottom: 10px;
+      border-bottom: 1px solid #f0f0f0;
       cursor: pointer;
       transition: all 0.15s;
     }
+    .product-option:last-child {
+      border-bottom: none;
+    }
     .product-option:hover {
-      border-color: #0055a4;
+      background: #f8f9fa;
     }
     .product-option.selected {
-      border-color: #4caf50;
-      background: #e8f5e9;
+      background: #f0f5fa;
     }
     .product-option .checkbox {
       width: 24px;
@@ -537,8 +555,8 @@
       flex-shrink: 0;
     }
     .product-option.selected .checkbox {
-      background: #4caf50;
-      border-color: #4caf50;
+      background: #0055a4;
+      border-color: #0055a4;
       color: #fff;
     }
     .product-option .product-badge {
@@ -629,55 +647,54 @@
     
     <div class="journey-field">
       <label>Von:</label>
-      <div class="journey-station" id="journeyFromDisplay" onclick="startJourneySearch('from')">
-        <span class="placeholder">Station wählen...</span>
+      <div class="search-container">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="journeyFromInput" placeholder="Abfahrtsstation..." autocomplete="off">
+        <div class="search-spinner" id="journeyFromSpinner"></div>
       </div>
+      <div class="search-results" id="journeyFromResults"></div>
+      <div class="journey-selected hidden" id="journeyFromSelected"></div>
     </div>
     
     <div class="journey-arrow">↓</div>
     
     <div class="journey-field">
       <label>Nach:</label>
-      <div class="journey-station" id="journeyToDisplay" onclick="startJourneySearch('to')">
-        <span class="placeholder">Station wählen...</span>
-      </div>
-    </div>
-    
-    <div class="journey-search-overlay hidden" id="journeySearchOverlay">
-      <div class="journey-search-header">
-        <button class="back-btn" onclick="closeJourneySearch()">← Zurück</button>
-        <span id="journeySearchTitle">Station suchen</span>
-      </div>
       <div class="search-container">
         <span class="search-icon">🔍</span>
-        <input type="text" class="search-input" id="journeySearchInput" placeholder="Stationsname eingeben..." autocomplete="off">
-        <div class="search-spinner" id="journeySearchSpinner"></div>
+        <input type="text" class="search-input" id="journeyToInput" placeholder="Zielstation..." autocomplete="off">
+        <div class="search-spinner" id="journeyToSpinner"></div>
       </div>
-      <div class="search-results" id="journeySearchResults"></div>
+      <div class="search-results" id="journeyToResults"></div>
+      <div class="journey-selected hidden" id="journeyToSelected"></div>
     </div>
     
-    <button class="btn btn-primary" id="continueToProductsBtn" onclick="showProductSelection()" disabled style="margin-top:20px">
-      Weiter zu Produktauswahl
-    </button>
+    <!-- Zugauswahl erscheint automatisch -->
+    <div class="journey-products hidden" id="journeyProductsSection">
+      <h3 style="color:#0055a4;margin:20px 0 12px;font-size:16px;">Züge auswählen</h3>
+      
+      <div class="product-category">
+        <div class="category-header" onclick="toggleCategory('domestic')">
+          <span>🇩🇪 Deutsche Züge</span>
+          <span class="category-toggle" id="domesticToggle">▼</span>
+        </div>
+        <div class="category-content" id="domesticProducts"></div>
+      </div>
+      
+      <div class="product-category">
+        <div class="category-header" onclick="toggleCategory('international')">
+          <span>🌍 International</span>
+          <span class="category-toggle" id="internationalToggle">▼</span>
+        </div>
+        <div class="category-content" id="internationalProducts"></div>
+      </div>
+      
+      <button class="btn btn-primary" id="addJourneyBtn" onclick="addJourneyStation()" disabled style="margin-top:16px;width:100%">
+        Verbindung hinzufügen
+      </button>
+    </div>
   </div>
   
-  <!-- Step 4: Select Products (für DB) -->
-  <div class="card hidden" id="stepProducts">
-    <button class="back-btn" onclick="goBack('journeySearch')">← Zurück</button>
-    <h2 style="color:#0055a4;" id="journeyTitle">Produkte wählen</h2>
-    <p style="color:#666;font-size:13px;margin-bottom:16px;" id="journeyInfo"></p>
-    
-    <div class="lines-header">
-      <h3>Welche Züge anzeigen?</h3>
-      <button class="select-all-btn" id="selectAllProductsBtn" onclick="toggleSelectAllProducts()">Alle auswählen</button>
-    </div>
-    
-    <div id="productsList"></div>
-    
-    <button class="btn btn-primary" id="addJourneyBtn" onclick="addJourneyStation()" disabled style="margin-top:16px">
-      Verbindung hinzufügen
-    </button>
-  </div>
   
   <!-- Step 4: Select Lines -->
   <div class="card hidden" id="stepLines">
@@ -775,8 +792,31 @@ const NETWORKS = {
     icon: '🚄',
     searchType: 'server_proxy',
     placeholder: 'z.B. München Hbf, Berlin Hbf...',
-    isJourneyBased: true,  // Braucht Start + Ziel
-    products: ['ICE', 'IC', 'EC', 'RJX', 'RJ', 'RE', 'RB', 'S']
+    isJourneyBased: true,
+    productCategories: {
+      domestic: {
+        label: '🇩🇪 Deutsche Züge',
+        products: [
+          { id: 'ICE', name: 'ICE', desc: 'Intercity-Express' },
+          { id: 'IC', name: 'IC', desc: 'Intercity' },
+          { id: 'EC', name: 'EC', desc: 'Eurocity' },
+          { id: 'RE', name: 'RE', desc: 'Regional-Express' },
+          { id: 'RB', name: 'RB', desc: 'Regionalbahn' },
+          { id: 'S', name: 'S', desc: 'S-Bahn' }
+        ]
+      },
+      international: {
+        label: '🌍 International',
+        products: [
+          { id: 'RJX', name: 'RJX', desc: 'Railjet Xpress (ÖBB)' },
+          { id: 'RJ', name: 'RJ', desc: 'Railjet (ÖBB)' },
+          { id: 'NJ', name: 'NJ', desc: 'Nightjet (ÖBB)' },
+          { id: 'TGV', name: 'TGV', desc: 'TGV (SNCF)' },
+          { id: 'THA', name: 'THA', desc: 'Thalys' },
+          { id: 'FLX', name: 'FLX', desc: 'Flixtrain' }
+        ]
+      }
+    }
   },
   BERLIN: {
     name: 'VBB Berlin',
@@ -816,7 +856,6 @@ let searchTimeout = null;
 // Journey-Modus (für DB)
 let journeyFromStop = null;
 let journeyToStop = null;
-let journeySearchingFor = 'from'; // 'from' oder 'to'
 let selectedProducts = new Set();
 
 // ==================== DOM ====================
@@ -848,9 +887,7 @@ function showStep(step) {
   
   // Journey-Modus Steps
   const stepJourneySearch = document.getElementById('stepJourneySearch');
-  const stepProducts = document.getElementById('stepProducts');
   if (stepJourneySearch) stepJourneySearch.classList.toggle('hidden', step !== 'journeySearch');
-  if (stepProducts) stepProducts.classList.toggle('hidden', step !== 'products');
   
   updateBreadcrumb();
 }
@@ -877,11 +914,6 @@ function updateBreadcrumb() {
     html += `<span class="breadcrumb-item active">${selectedStop.name}</span>`;
   }
   
-  if (currentStep === 'products' && journeyFromStop && journeyToStop) {
-    html += `<span class="breadcrumb-sep">›</span>`;
-    html += `<span class="breadcrumb-item active">Produkte</span>`;
-  }
-  
   breadcrumb.innerHTML = html;
 }
 
@@ -892,17 +924,25 @@ function goBack(step) {
     selectedStop = null;
     journeyFromStop = null;
     journeyToStop = null;
+    selectedProducts = new Set();
   } else if (step === 'network') {
     selectedNetwork = null;
     selectedStop = null;
     journeyFromStop = null;
     journeyToStop = null;
+    selectedProducts = new Set();
+    // Hide products section
+    const productsSection = document.getElementById('journeyProductsSection');
+    if (productsSection) productsSection.classList.add('hidden');
   } else if (step === 'search') {
     selectedStop = null;
     searchInput.value = '';
     searchResults.classList.remove('show');
   } else if (step === 'journeySearch') {
     selectedProducts = new Set();
+    // Hide products section when going back
+    const productsSection = document.getElementById('journeyProductsSection');
+    if (productsSection) productsSection.classList.add('hidden');
   }
   showStep(step);
 }
@@ -941,7 +981,32 @@ function selectNetwork(network) {
     journeyFromStop = null;
     journeyToStop = null;
     selectedProducts = new Set();
-    updateJourneyDisplay();
+    
+    // Reset form
+    const fromInput = document.getElementById('journeyFromInput');
+    const toInput = document.getElementById('journeyToInput');
+    const fromSelected = document.getElementById('journeyFromSelected');
+    const toSelected = document.getElementById('journeyToSelected');
+    const fromResults = document.getElementById('journeyFromResults');
+    const toResults = document.getElementById('journeyToResults');
+    const productsSection = document.getElementById('journeyProductsSection');
+    
+    if (fromInput) {
+      fromInput.value = '';
+      fromInput.placeholder = netConfig.placeholder;
+      fromInput.parentElement.classList.remove('hidden');
+    }
+    if (toInput) {
+      toInput.value = '';
+      toInput.placeholder = netConfig.placeholder;
+      toInput.parentElement.classList.remove('hidden');
+    }
+    if (fromSelected) fromSelected.classList.add('hidden');
+    if (toSelected) toSelected.classList.add('hidden');
+    if (fromResults) fromResults.classList.remove('show');
+    if (toResults) toResults.classList.remove('show');
+    if (productsSection) productsSection.classList.add('hidden');
+    
     showStep('journeySearch');
     return;
   }
@@ -1111,9 +1176,6 @@ function extractLines(data) {
   
   availableLines = Array.from(linesMap.values());
   
-  // DEBUG: Zeige was von der API kommt
-  console.log('Linien von API:', availableLines.map(l => ({ name: l.name, type: l.type })));
-  
   availableLines.sort((a, b) => {
     const aNum = parseInt(a.name) || 999;
     const bNum = parseInt(b.name) || 999;
@@ -1178,9 +1240,6 @@ function renderLines() {
 function getLineTypeClass(type, lineName) {
   // Normalize type
   const t = (type || '').toLowerCase();
-  
-  // DEBUG
-  console.log(`Line ${lineName}: type="${type}" -> normalized="${t}"`);
   
   // 1. Wenn API einen klaren Typ liefert, verwende diesen
   
@@ -1382,14 +1441,16 @@ function saveConfig() {
 }
 
 // ==================== LOAD EXISTING ====================
-function loadExistingConfig(rbl, filter) {
+async function loadExistingConfig(rbl, filter) {
   if (!rbl || rbl.trim() === '') return;
   
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
   const filterParts = filter ? filter.split('|') : [];
   
-  rblParts.forEach((part, idx) => {
+  for (let idx = 0; idx < rblParts.length; idx++) {
+    const part = rblParts[idx];
     let network, stopId;
+    
     if (part.includes(':')) {
       [network, stopId] = part.split(':');
     } else {
@@ -1398,7 +1459,7 @@ function loadExistingConfig(rbl, filter) {
     }
     
     const fullId = `${network}:${stopId}`;
-    if (stations.some(s => s.fullId === fullId)) return;
+    if (stations.some(s => s.fullId === fullId)) continue;
     
     // Check if it's a journey (has > in stopId)
     const isJourney = stopId.includes('>');
@@ -1406,7 +1467,16 @@ function loadExistingConfig(rbl, filter) {
     
     if (isJourney) {
       const [fromId, toId] = stopId.split('>');
-      stopName = `${fromId} → ${toId}`;
+      // Try to get names from API
+      const fromName = await resolveStationName(network, fromId) || fromId;
+      const toName = await resolveStationName(network, toId) || toId;
+      stopName = `${fromName} → ${toName}`;
+    } else {
+      // Try to get name from API
+      const resolvedName = await resolveStationName(network, stopId);
+      if (resolvedName) {
+        stopName = resolvedName;
+      }
     }
     
     stations.push({
@@ -1419,96 +1489,138 @@ function loadExistingConfig(rbl, filter) {
       isJourney,
       isExisting: true
     });
-  });
+  }
   
   if (stations.length > 0) {
     updateStationsList();
   }
 }
 
+// Versucht Stationsnamen von API zu holen
+async function resolveStationName(network, stopId) {
+  try {
+    // Für WL können wir die API nicht so einfach nutzen
+    if (network === 'WL') {
+      // Versuche aus wienData wenn geladen
+      if (wienData) {
+        for (const line of wienData) {
+          if (!Array.isArray(line.lineStation)) continue;
+          for (const item of line.lineStation) {
+            if (item.station && String(item.station.stationID) === String(stopId)) {
+              return item.station.stationName;
+            }
+          }
+        }
+      }
+      return null;
+    }
+    
+    // Für externe Netze - Departure API nutzen
+    const response = await fetch(`${DEPARTURES_API}?stopId=${network}:${stopId}`);
+    const data = await response.json();
+    
+    if (data.data?.monitors?.[0]?.locationStop?.properties?.title) {
+      return data.data.monitors[0].locationStop.properties.title;
+    }
+    
+    return null;
+  } catch (e) {
+    console.warn(`Could not resolve name for ${network}:${stopId}`);
+    return null;
+  }
+}
+
 // ==================== ESP32 COMMUNICATION ====================
-window.addEventListener('message', function(event) {
+window.addEventListener('message', async function(event) {
   if (event.data?.type === 'loadExistingConfig') {
-    loadExistingConfig(event.data.rbl, event.data.filter);
+    // Load Wien data first if any WL stations
+    if (event.data.rbl && !event.data.rbl.includes(':')) {
+      await loadWienData();
+    }
+    await loadExistingConfig(event.data.rbl, event.data.filter);
   }
   if (event.data?.type === 'loadFullConfig' && event.data.config?.rbl_id) {
-    loadExistingConfig(event.data.config.rbl_id, event.data.config.lines_filter);
+    // Load Wien data first if any WL stations  
+    if (event.data.config.rbl_id && !event.data.config.rbl_id.includes(':')) {
+      await loadWienData();
+    }
+    await loadExistingConfig(event.data.config.rbl_id, event.data.config.lines_filter);
   }
 });
 
 // ==================== JOURNEY MODE (DB) ====================
-function updateJourneyDisplay() {
-  const fromDisplay = document.getElementById('journeyFromDisplay');
-  const toDisplay = document.getElementById('journeyToDisplay');
-  const continueBtn = document.getElementById('continueToProductsBtn');
+let journeyFromTimeout = null;
+let journeyToTimeout = null;
+
+function showJourneyFromSelected() {
+  const input = document.getElementById('journeyFromInput');
+  const results = document.getElementById('journeyFromResults');
+  const selected = document.getElementById('journeyFromSelected');
   
   if (journeyFromStop) {
-    fromDisplay.innerHTML = `<span class="station-name">${journeyFromStop.name}</span>`;
-    fromDisplay.classList.add('selected');
-  } else {
-    fromDisplay.innerHTML = `<span class="placeholder">Station wählen...</span>`;
-    fromDisplay.classList.remove('selected');
+    input.parentElement.classList.add('hidden');
+    results.classList.remove('show');
+    selected.classList.remove('hidden');
+    selected.innerHTML = `
+      <span class="station-name">${journeyFromStop.name}</span>
+      <button class="change-btn" onclick="clearJourneyFrom()">Ändern</button>
+    `;
   }
+}
+
+function showJourneyToSelected() {
+  const input = document.getElementById('journeyToInput');
+  const results = document.getElementById('journeyToResults');
+  const selected = document.getElementById('journeyToSelected');
   
   if (journeyToStop) {
-    toDisplay.innerHTML = `<span class="station-name">${journeyToStop.name}</span>`;
-    toDisplay.classList.add('selected');
-  } else {
-    toDisplay.innerHTML = `<span class="placeholder">Station wählen...</span>`;
-    toDisplay.classList.remove('selected');
+    input.parentElement.classList.add('hidden');
+    results.classList.remove('show');
+    selected.classList.remove('hidden');
+    selected.innerHTML = `
+      <span class="station-name">${journeyToStop.name}</span>
+      <button class="change-btn" onclick="clearJourneyTo()">Ändern</button>
+    `;
   }
-  
-  continueBtn.disabled = !(journeyFromStop && journeyToStop);
 }
 
-function startJourneySearch(type) {
-  journeySearchingFor = type;
-  const overlay = document.getElementById('journeySearchOverlay');
-  const input = document.getElementById('journeySearchInput');
-  const title = document.getElementById('journeySearchTitle');
-  const results = document.getElementById('journeySearchResults');
+function clearJourneyFrom() {
+  journeyFromStop = null;
+  selectedProducts = new Set();
+  const input = document.getElementById('journeyFromInput');
+  const selected = document.getElementById('journeyFromSelected');
+  const productsSection = document.getElementById('journeyProductsSection');
   
-  title.textContent = type === 'from' ? 'Abfahrtsstation suchen' : 'Zielstation suchen';
+  input.parentElement.classList.remove('hidden');
+  selected.classList.add('hidden');
+  if (productsSection) productsSection.classList.add('hidden');
   input.value = '';
-  input.placeholder = NETWORKS[selectedNetwork].placeholder;
-  results.innerHTML = '';
-  results.classList.remove('show');
+  input.focus();
+}
+
+function clearJourneyTo() {
+  journeyToStop = null;
+  selectedProducts = new Set();
+  const input = document.getElementById('journeyToInput');
+  const selected = document.getElementById('journeyToSelected');
+  const productsSection = document.getElementById('journeyProductsSection');
   
-  overlay.classList.remove('hidden');
-  setTimeout(() => input.focus(), 100);
+  input.parentElement.classList.remove('hidden');
+  selected.classList.add('hidden');
+  if (productsSection) productsSection.classList.add('hidden');
+  input.value = '';
+  input.focus();
 }
 
-function closeJourneySearch() {
-  document.getElementById('journeySearchOverlay').classList.add('hidden');
-}
-
-// Journey Search Input Handler
-document.addEventListener('DOMContentLoaded', () => {
-  const journeyInput = document.getElementById('journeySearchInput');
-  if (journeyInput) {
-    journeyInput.addEventListener('input', function() {
-      const query = this.value.trim();
-      if (searchTimeout) clearTimeout(searchTimeout);
-      
-      if (query.length < 2) {
-        document.getElementById('journeySearchResults').classList.remove('show');
-        return;
-      }
-      
-      searchTimeout = setTimeout(() => performJourneySearch(query), 300);
-    });
-  }
-});
-
-async function performJourneySearch(query) {
-  const spinner = document.getElementById('journeySearchSpinner');
-  const results = document.getElementById('journeySearchResults');
+async function performJourneyFromSearch(query) {
+  const spinner = document.getElementById('journeyFromSpinner');
+  const results = document.getElementById('journeyFromResults');
   
   spinner.classList.add('show');
   
   try {
     const searchResults = await searchViaProxy(selectedNetwork, query);
-    displayJourneySearchResults(searchResults);
+    displayJourneyResults(searchResults, 'from');
   } catch (e) {
     console.error('Journey search error:', e);
     results.innerHTML = '<div class="no-results">Fehler bei der Suche</div>';
@@ -1518,14 +1630,32 @@ async function performJourneySearch(query) {
   }
 }
 
-function displayJourneySearchResults(results) {
-  const container = document.getElementById('journeySearchResults');
+async function performJourneyToSearch(query) {
+  const spinner = document.getElementById('journeyToSpinner');
+  const results = document.getElementById('journeyToResults');
+  
+  spinner.classList.add('show');
+  
+  try {
+    const searchResults = await searchViaProxy(selectedNetwork, query);
+    displayJourneyResults(searchResults, 'to');
+  } catch (e) {
+    console.error('Journey search error:', e);
+    results.innerHTML = '<div class="no-results">Fehler bei der Suche</div>';
+    results.classList.add('show');
+  } finally {
+    spinner.classList.remove('show');
+  }
+}
+
+function displayJourneyResults(results, type) {
+  const container = document.getElementById(type === 'from' ? 'journeyFromResults' : 'journeyToResults');
   
   if (results.length === 0) {
     container.innerHTML = '<div class="no-results">Keine Stationen gefunden</div>';
   } else {
     container.innerHTML = results.map(r => `
-      <div class="search-result-item" onclick="selectJourneyStop('${r.id}', '${r.name.replace(/'/g, "\\'")}')">
+      <div class="search-result-item" onclick="selectJourneyStop('${type}', '${r.id}', '${r.name.replace(/'/g, "\\'")}')">
         <div class="stop-name">${r.name}</div>
         <div class="stop-info">${r.info || `ID: ${r.id}`}</div>
       </div>
@@ -1534,87 +1664,88 @@ function displayJourneySearchResults(results) {
   container.classList.add('show');
 }
 
-function selectJourneyStop(id, name) {
-  if (journeySearchingFor === 'from') {
+function selectJourneyStop(type, id, name) {
+  if (type === 'from') {
     journeyFromStop = { id, name };
+    showJourneyFromSelected();
+    // Focus auf "Nach" Feld
+    if (!journeyToStop) {
+      document.getElementById('journeyToInput').focus();
+    }
   } else {
     journeyToStop = { id, name };
+    showJourneyToSelected();
   }
   
-  closeJourneySearch();
-  updateJourneyDisplay();
+  // Wenn beide Stationen gewählt, zeige Züge
+  if (journeyFromStop && journeyToStop) {
+    showProductsInline();
+  }
 }
 
-function showProductSelection() {
-  if (!journeyFromStop || !journeyToStop) return;
+function showProductsInline() {
+  const section = document.getElementById('journeyProductsSection');
+  section.classList.remove('hidden');
   
   selectedProducts = new Set();
-  
-  document.getElementById('journeyTitle').textContent = `${journeyFromStop.name} → ${journeyToStop.name}`;
-  document.getElementById('journeyInfo').textContent = `${NETWORKS[selectedNetwork].name}`;
-  
-  renderProducts();
-  showStep('products');
+  renderProductCategories();
 }
 
-function renderProducts() {
-  const products = NETWORKS[selectedNetwork].products || [];
-  const container = document.getElementById('productsList');
+function renderProductCategories() {
+  const netConfig = NETWORKS[selectedNetwork];
+  const categories = netConfig.productCategories || {};
   
-  const productInfo = {
-    'ICE': 'Intercity-Express (Hochgeschwindigkeit)',
-    'IC': 'Intercity / Eurocity',
-    'EC': 'Eurocity',
-    'RJX': 'Railjet Xpress',
-    'RJ': 'Railjet',
-    'RE': 'Regional-Express',
-    'RB': 'Regionalbahn',
-    'S': 'S-Bahn'
-  };
+  // Domestic
+  const domesticContainer = document.getElementById('domesticProducts');
+  const domesticProducts = categories.domestic?.products || [];
+  domesticContainer.innerHTML = domesticProducts.map(p => renderProductOption(p)).join('');
   
-  container.innerHTML = products.map(p => {
-    const selected = selectedProducts.has(p);
-    const badgeClass = p.toLowerCase();
-    return `
-      <div class="product-option ${selected ? 'selected' : ''}" onclick="toggleProduct('${p}')">
-        <div class="checkbox">${selected ? '✓' : ''}</div>
-        <div class="product-badge ${badgeClass}">${p}</div>
-        <div class="product-name">${productInfo[p] || p}</div>
-      </div>
-    `;
-  }).join('');
+  // International
+  const intlContainer = document.getElementById('internationalProducts');
+  const intlProducts = categories.international?.products || [];
+  intlContainer.innerHTML = intlProducts.map(p => renderProductOption(p)).join('');
   
   updateAddJourneyButton();
-  updateSelectAllProductsButton();
 }
 
-function toggleProduct(product) {
-  if (selectedProducts.has(product)) {
-    selectedProducts.delete(product);
+function renderProductOption(product) {
+  const selected = selectedProducts.has(product.id);
+  return `
+    <div class="product-option ${selected ? 'selected' : ''}" onclick="toggleProduct('${product.id}')">
+      <div class="checkbox">${selected ? '✓' : ''}</div>
+      <div class="product-badge ${product.id.toLowerCase()}">${product.name}</div>
+      <div class="product-name">${product.desc}</div>
+    </div>
+  `;
+}
+
+function toggleCategory(categoryId) {
+  const content = document.getElementById(categoryId + 'Products');
+  const toggle = document.getElementById(categoryId + 'Toggle');
+  
+  if (content.classList.contains('collapsed')) {
+    content.classList.remove('collapsed');
+    toggle.textContent = '▼';
   } else {
-    selectedProducts.add(product);
+    content.classList.add('collapsed');
+    toggle.textContent = '▶';
   }
-  renderProducts();
 }
 
-function toggleSelectAllProducts() {
-  const products = NETWORKS[selectedNetwork].products || [];
-  if (selectedProducts.size === products.length) {
-    selectedProducts.clear();
+function toggleProduct(productId) {
+  if (selectedProducts.has(productId)) {
+    selectedProducts.delete(productId);
   } else {
-    products.forEach(p => selectedProducts.add(p));
+    selectedProducts.add(productId);
   }
-  renderProducts();
-}
-
-function updateSelectAllProductsButton() {
-  const products = NETWORKS[selectedNetwork].products || [];
-  const btn = document.getElementById('selectAllProductsBtn');
-  btn.textContent = selectedProducts.size === products.length ? 'Alle abwählen' : 'Alle auswählen';
+  renderProductCategories();
 }
 
 function updateAddJourneyButton() {
-  document.getElementById('addJourneyBtn').disabled = selectedProducts.size === 0;
+  const btn = document.getElementById('addJourneyBtn');
+  if (btn) {
+    btn.disabled = selectedProducts.size === 0;
+  }
 }
 
 function addJourneyStation() {
@@ -1645,6 +1776,9 @@ function addJourneyStation() {
   journeyToStop = null;
   selectedProducts = new Set();
   
+  // Hide products section
+  document.getElementById('journeyProductsSection').classList.add('hidden');
+  
   goBack('region');
   updateStationsList();
 }
@@ -1660,7 +1794,52 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
       searchResults.classList.remove('show');
     }
+    
+    // Close journey search results when clicking outside
+    const fromInput = document.getElementById('journeyFromInput');
+    const fromResults = document.getElementById('journeyFromResults');
+    const toInput = document.getElementById('journeyToInput');
+    const toResults = document.getElementById('journeyToResults');
+    
+    if (fromInput && fromResults && !fromInput.contains(e.target) && !fromResults.contains(e.target)) {
+      fromResults.classList.remove('show');
+    }
+    if (toInput && toResults && !toInput.contains(e.target) && !toResults.contains(e.target)) {
+      toResults.classList.remove('show');
+    }
   });
+  
+  // Journey From Input
+  const journeyFromInput = document.getElementById('journeyFromInput');
+  if (journeyFromInput) {
+    journeyFromInput.addEventListener('input', function() {
+      const query = this.value.trim();
+      if (journeyFromTimeout) clearTimeout(journeyFromTimeout);
+      
+      if (query.length < 2) {
+        document.getElementById('journeyFromResults').classList.remove('show');
+        return;
+      }
+      
+      journeyFromTimeout = setTimeout(() => performJourneyFromSearch(query), 300);
+    });
+  }
+  
+  // Journey To Input
+  const journeyToInput = document.getElementById('journeyToInput');
+  if (journeyToInput) {
+    journeyToInput.addEventListener('input', function() {
+      const query = this.value.trim();
+      if (journeyToTimeout) clearTimeout(journeyToTimeout);
+      
+      if (query.length < 2) {
+        document.getElementById('journeyToResults').classList.remove('show');
+        return;
+      }
+      
+      journeyToTimeout = setTimeout(() => performJourneyToSearch(query), 300);
+    });
+  }
 });
 </script>
 
