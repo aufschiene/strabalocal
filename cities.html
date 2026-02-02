@@ -441,6 +441,126 @@
     
     /* Hidden */
     .hidden { display: none !important; }
+    
+    /* Journey Mode Styles */
+    .journey-field {
+      margin-bottom: 12px;
+    }
+    .journey-field label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .journey-station {
+      padding: 14px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      background: #fff;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .journey-station:hover {
+      border-color: #0055a4;
+    }
+    .journey-station.selected {
+      border-color: #4caf50;
+      background: #e8f5e9;
+    }
+    .journey-station .placeholder {
+      color: #999;
+    }
+    .journey-station .station-name {
+      font-weight: 600;
+      color: #333;
+    }
+    .journey-arrow {
+      text-align: center;
+      font-size: 24px;
+      color: #ccc;
+      padding: 8px 0;
+    }
+    
+    .journey-search-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #f5f5f5;
+      z-index: 100;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .journey-search-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .journey-search-header span {
+      font-weight: 600;
+      font-size: 18px;
+      color: #333;
+    }
+    
+    /* Product Selection */
+    .product-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: #fff;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .product-option:hover {
+      border-color: #0055a4;
+    }
+    .product-option.selected {
+      border-color: #4caf50;
+      background: #e8f5e9;
+    }
+    .product-option .checkbox {
+      width: 24px;
+      height: 24px;
+      border: 2px solid #ccc;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .product-option.selected .checkbox {
+      background: #4caf50;
+      border-color: #4caf50;
+      color: #fff;
+    }
+    .product-option .product-badge {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 14px;
+      min-width: 50px;
+      text-align: center;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    .product-option .product-badge.ice { background: #fff; color: #1a1a1a; border: 2px solid #1a1a1a; }
+    .product-option .product-badge.ic { background: #fff; color: #1a1a1a; border: 2px solid #1a1a1a; }
+    .product-option .product-badge.rj { background: #c41e3a; color: #fff; }
+    .product-option .product-badge.re { background: #006e34; color: #fff; }
+    .product-option .product-badge.rb { background: #006e34; color: #fff; }
+    .product-option .product-badge.s { background: #006e34; color: #fff; }
+    .product-option .product-name {
+      font-size: 14px;
+      color: #333;
+    }
   </style>
 </head>
 <body>
@@ -490,7 +610,7 @@
     <div class="selection-grid" id="networkGrid"></div>
   </div>
   
-  <!-- Step 3: Search Station -->
+  <!-- Step 3: Search Station (für normale Netze) -->
   <div class="card hidden" id="stepSearch">
     <button class="back-btn" onclick="goBack('network')">← Zurück</button>
     <h2>Station suchen</h2>
@@ -500,6 +620,63 @@
       <div class="search-spinner" id="searchSpinner"></div>
     </div>
     <div class="search-results" id="searchResults"></div>
+  </div>
+  
+  <!-- Step 3b: Journey Search (für DB) -->
+  <div class="card hidden" id="stepJourneySearch">
+    <button class="back-btn" onclick="goBack('network')">← Zurück</button>
+    <h2>Verbindung wählen</h2>
+    
+    <div class="journey-field">
+      <label>Von:</label>
+      <div class="journey-station" id="journeyFromDisplay" onclick="startJourneySearch('from')">
+        <span class="placeholder">Station wählen...</span>
+      </div>
+    </div>
+    
+    <div class="journey-arrow">↓</div>
+    
+    <div class="journey-field">
+      <label>Nach:</label>
+      <div class="journey-station" id="journeyToDisplay" onclick="startJourneySearch('to')">
+        <span class="placeholder">Station wählen...</span>
+      </div>
+    </div>
+    
+    <div class="journey-search-overlay hidden" id="journeySearchOverlay">
+      <div class="journey-search-header">
+        <button class="back-btn" onclick="closeJourneySearch()">← Zurück</button>
+        <span id="journeySearchTitle">Station suchen</span>
+      </div>
+      <div class="search-container">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="journeySearchInput" placeholder="Stationsname eingeben..." autocomplete="off">
+        <div class="search-spinner" id="journeySearchSpinner"></div>
+      </div>
+      <div class="search-results" id="journeySearchResults"></div>
+    </div>
+    
+    <button class="btn btn-primary" id="continueToProductsBtn" onclick="showProductSelection()" disabled style="margin-top:20px">
+      Weiter zu Produktauswahl
+    </button>
+  </div>
+  
+  <!-- Step 4: Select Products (für DB) -->
+  <div class="card hidden" id="stepProducts">
+    <button class="back-btn" onclick="goBack('journeySearch')">← Zurück</button>
+    <h2 style="color:#0055a4;" id="journeyTitle">Produkte wählen</h2>
+    <p style="color:#666;font-size:13px;margin-bottom:16px;" id="journeyInfo"></p>
+    
+    <div class="lines-header">
+      <h3>Welche Züge anzeigen?</h3>
+      <button class="select-all-btn" id="selectAllProductsBtn" onclick="toggleSelectAllProducts()">Alle auswählen</button>
+    </div>
+    
+    <div id="productsList"></div>
+    
+    <button class="btn btn-primary" id="addJourneyBtn" onclick="addJourneyStation()" disabled style="margin-top:16px">
+      Verbindung hinzufügen
+    </button>
   </div>
   
   <!-- Step 4: Select Lines -->
@@ -579,7 +756,8 @@ const NETWORKS = {
     desc: 'U-Bahn, Straßenbahn, Bus',
     icon: '🚇',
     searchType: 'wien_json',
-    placeholder: 'z.B. Karlsplatz, Stephansplatz...'
+    placeholder: 'z.B. Karlsplatz, Stephansplatz...',
+    isJourneyBased: false
   },
   LINZ: {
     name: 'Linz AG',
@@ -587,15 +765,18 @@ const NETWORKS = {
     desc: 'Straßenbahn, Bus',
     icon: '🚊',
     searchType: 'server_proxy',
-    placeholder: 'z.B. Hauptbahnhof, Taubenmarkt...'
+    placeholder: 'z.B. Hauptbahnhof, Taubenmarkt...',
+    isJourneyBased: false
   },
   DB: {
     name: 'Deutsche Bahn',
     region: 'DE',
-    desc: 'ICE, IC, RE, RB, S-Bahn',
+    desc: 'ICE, IC, RJ, RE, S-Bahn',
     icon: '🚄',
     searchType: 'server_proxy',
-    placeholder: 'z.B. Berlin Hbf, München...'
+    placeholder: 'z.B. München Hbf, Berlin Hbf...',
+    isJourneyBased: true,  // Braucht Start + Ziel
+    products: ['ICE', 'IC', 'EC', 'RJX', 'RJ', 'RE', 'RB', 'S']
   },
   BERLIN: {
     name: 'VBB Berlin',
@@ -603,7 +784,8 @@ const NETWORKS = {
     desc: 'U-Bahn, S-Bahn, Tram, Bus',
     icon: '🚇',
     searchType: 'server_proxy',
-    placeholder: 'z.B. Alexanderplatz...'
+    placeholder: 'z.B. Alexanderplatz...',
+    isJourneyBased: false
   },
   BODO: {
     name: 'BODO',
@@ -611,7 +793,8 @@ const NETWORKS = {
     desc: 'Ulm, Bodensee Region',
     icon: '🚌',
     searchType: 'server_proxy',
-    placeholder: 'z.B. Ulm Hauptbahnhof...'
+    placeholder: 'z.B. Ulm Hauptbahnhof...',
+    isJourneyBased: false
   }
 };
 
@@ -629,6 +812,12 @@ let selectedLines = new Set();
 let stations = [];
 let wienData = null;
 let searchTimeout = null;
+
+// Journey-Modus (für DB)
+let journeyFromStop = null;
+let journeyToStop = null;
+let journeySearchingFor = 'from'; // 'from' oder 'to'
+let selectedProducts = new Set();
 
 // ==================== DOM ====================
 const stepRegion = document.getElementById('stepRegion');
@@ -656,6 +845,13 @@ function showStep(step) {
   stepNetwork.classList.toggle('hidden', step !== 'network');
   stepSearch.classList.toggle('hidden', step !== 'search');
   stepLines.classList.toggle('hidden', step !== 'lines');
+  
+  // Journey-Modus Steps
+  const stepJourneySearch = document.getElementById('stepJourneySearch');
+  const stepProducts = document.getElementById('stepProducts');
+  if (stepJourneySearch) stepJourneySearch.classList.toggle('hidden', step !== 'journeySearch');
+  if (stepProducts) stepProducts.classList.toggle('hidden', step !== 'products');
+  
   updateBreadcrumb();
 }
 
@@ -671,12 +867,19 @@ function updateBreadcrumb() {
   
   if (selectedNetwork) {
     html += `<span class="breadcrumb-sep">›</span>`;
-    html += `<span class="breadcrumb-item ${currentStep === 'search' ? 'active' : ''}" onclick="goBack('search')">${NETWORKS[selectedNetwork].name}</span>`;
+    const isJourney = NETWORKS[selectedNetwork].isJourneyBased;
+    const backStep = isJourney ? 'journeySearch' : 'search';
+    html += `<span class="breadcrumb-item ${currentStep === 'search' || currentStep === 'journeySearch' ? 'active' : ''}" onclick="goBack('${backStep}')">${NETWORKS[selectedNetwork].name}</span>`;
   }
   
   if (selectedStop && currentStep === 'lines') {
     html += `<span class="breadcrumb-sep">›</span>`;
     html += `<span class="breadcrumb-item active">${selectedStop.name}</span>`;
+  }
+  
+  if (currentStep === 'products' && journeyFromStop && journeyToStop) {
+    html += `<span class="breadcrumb-sep">›</span>`;
+    html += `<span class="breadcrumb-item active">Produkte</span>`;
   }
   
   breadcrumb.innerHTML = html;
@@ -687,13 +890,19 @@ function goBack(step) {
     selectedRegion = null;
     selectedNetwork = null;
     selectedStop = null;
+    journeyFromStop = null;
+    journeyToStop = null;
   } else if (step === 'network') {
     selectedNetwork = null;
     selectedStop = null;
+    journeyFromStop = null;
+    journeyToStop = null;
   } else if (step === 'search') {
     selectedStop = null;
     searchInput.value = '';
     searchResults.classList.remove('show');
+  } else if (step === 'journeySearch') {
+    selectedProducts = new Set();
   }
   showStep(step);
 }
@@ -725,7 +934,20 @@ function renderNetworkGrid() {
 // ==================== NETWORK SELECTION ====================
 function selectNetwork(network) {
   selectedNetwork = network;
-  searchInput.placeholder = NETWORKS[network].placeholder;
+  const netConfig = NETWORKS[network];
+  
+  // Journey-basierte Netzwerke (DB)
+  if (netConfig.isJourneyBased) {
+    journeyFromStop = null;
+    journeyToStop = null;
+    selectedProducts = new Set();
+    updateJourneyDisplay();
+    showStep('journeySearch');
+    return;
+  }
+  
+  // Normale Netzwerke
+  searchInput.placeholder = netConfig.placeholder;
   searchInput.value = '';
   searchResults.classList.remove('show');
   
@@ -1118,16 +1340,21 @@ function updateStationsList() {
     saveBtn.disabled = false;
   }
   
-  const chips = stations.map((s, idx) => `
-    <div class="station-chip ${s.isExisting ? 'existing' : ''}">
-      <span class="network-badge">${s.network}</span>
-      <div class="info">
-        <div class="stop-name">${s.stopName}</div>
-        <div class="stop-details">Linien: ${s.filter || 'Alle'}</div>
+  const chips = stations.map((s, idx) => {
+    const icon = s.isJourney ? '🚄' : '';
+    const filterLabel = s.isJourney ? `Produkte: ${s.filter}` : `Linien: ${s.filter || 'Alle'}`;
+    
+    return `
+      <div class="station-chip ${s.isExisting ? 'existing' : ''}">
+        <span class="network-badge">${s.network}</span>
+        <div class="info">
+          <div class="stop-name">${icon} ${s.stopName}</div>
+          <div class="stop-details">${filterLabel}</div>
+        </div>
+        <button class="delete" onclick="removeStation(${idx})">✕</button>
       </div>
-      <button class="delete" onclick="removeStation(${idx})">✕</button>
-    </div>
-  `).join('');
+    `;
+  }).join('');
   
   const existingChips = stationsContainer.querySelectorAll('.station-chip');
   existingChips.forEach(c => c.remove());
@@ -1173,13 +1400,23 @@ function loadExistingConfig(rbl, filter) {
     const fullId = `${network}:${stopId}`;
     if (stations.some(s => s.fullId === fullId)) return;
     
+    // Check if it's a journey (has > in stopId)
+    const isJourney = stopId.includes('>');
+    let stopName = `Station ${stopId}`;
+    
+    if (isJourney) {
+      const [fromId, toId] = stopId.split('>');
+      stopName = `${fromId} → ${toId}`;
+    }
+    
     stations.push({
       network,
       networkName: NETWORKS[network]?.name || network,
       stopId,
-      stopName: `Station ${stopId}`,
+      stopName,
       filter: filterParts[idx] || '',
       fullId,
+      isJourney,
       isExisting: true
     });
   });
@@ -1198,6 +1435,219 @@ window.addEventListener('message', function(event) {
     loadExistingConfig(event.data.config.rbl_id, event.data.config.lines_filter);
   }
 });
+
+// ==================== JOURNEY MODE (DB) ====================
+function updateJourneyDisplay() {
+  const fromDisplay = document.getElementById('journeyFromDisplay');
+  const toDisplay = document.getElementById('journeyToDisplay');
+  const continueBtn = document.getElementById('continueToProductsBtn');
+  
+  if (journeyFromStop) {
+    fromDisplay.innerHTML = `<span class="station-name">${journeyFromStop.name}</span>`;
+    fromDisplay.classList.add('selected');
+  } else {
+    fromDisplay.innerHTML = `<span class="placeholder">Station wählen...</span>`;
+    fromDisplay.classList.remove('selected');
+  }
+  
+  if (journeyToStop) {
+    toDisplay.innerHTML = `<span class="station-name">${journeyToStop.name}</span>`;
+    toDisplay.classList.add('selected');
+  } else {
+    toDisplay.innerHTML = `<span class="placeholder">Station wählen...</span>`;
+    toDisplay.classList.remove('selected');
+  }
+  
+  continueBtn.disabled = !(journeyFromStop && journeyToStop);
+}
+
+function startJourneySearch(type) {
+  journeySearchingFor = type;
+  const overlay = document.getElementById('journeySearchOverlay');
+  const input = document.getElementById('journeySearchInput');
+  const title = document.getElementById('journeySearchTitle');
+  const results = document.getElementById('journeySearchResults');
+  
+  title.textContent = type === 'from' ? 'Abfahrtsstation suchen' : 'Zielstation suchen';
+  input.value = '';
+  input.placeholder = NETWORKS[selectedNetwork].placeholder;
+  results.innerHTML = '';
+  results.classList.remove('show');
+  
+  overlay.classList.remove('hidden');
+  setTimeout(() => input.focus(), 100);
+}
+
+function closeJourneySearch() {
+  document.getElementById('journeySearchOverlay').classList.add('hidden');
+}
+
+// Journey Search Input Handler
+document.addEventListener('DOMContentLoaded', () => {
+  const journeyInput = document.getElementById('journeySearchInput');
+  if (journeyInput) {
+    journeyInput.addEventListener('input', function() {
+      const query = this.value.trim();
+      if (searchTimeout) clearTimeout(searchTimeout);
+      
+      if (query.length < 2) {
+        document.getElementById('journeySearchResults').classList.remove('show');
+        return;
+      }
+      
+      searchTimeout = setTimeout(() => performJourneySearch(query), 300);
+    });
+  }
+});
+
+async function performJourneySearch(query) {
+  const spinner = document.getElementById('journeySearchSpinner');
+  const results = document.getElementById('journeySearchResults');
+  
+  spinner.classList.add('show');
+  
+  try {
+    const searchResults = await searchViaProxy(selectedNetwork, query);
+    displayJourneySearchResults(searchResults);
+  } catch (e) {
+    console.error('Journey search error:', e);
+    results.innerHTML = '<div class="no-results">Fehler bei der Suche</div>';
+    results.classList.add('show');
+  } finally {
+    spinner.classList.remove('show');
+  }
+}
+
+function displayJourneySearchResults(results) {
+  const container = document.getElementById('journeySearchResults');
+  
+  if (results.length === 0) {
+    container.innerHTML = '<div class="no-results">Keine Stationen gefunden</div>';
+  } else {
+    container.innerHTML = results.map(r => `
+      <div class="search-result-item" onclick="selectJourneyStop('${r.id}', '${r.name.replace(/'/g, "\\'")}')">
+        <div class="stop-name">${r.name}</div>
+        <div class="stop-info">${r.info || `ID: ${r.id}`}</div>
+      </div>
+    `).join('');
+  }
+  container.classList.add('show');
+}
+
+function selectJourneyStop(id, name) {
+  if (journeySearchingFor === 'from') {
+    journeyFromStop = { id, name };
+  } else {
+    journeyToStop = { id, name };
+  }
+  
+  closeJourneySearch();
+  updateJourneyDisplay();
+}
+
+function showProductSelection() {
+  if (!journeyFromStop || !journeyToStop) return;
+  
+  selectedProducts = new Set();
+  
+  document.getElementById('journeyTitle').textContent = `${journeyFromStop.name} → ${journeyToStop.name}`;
+  document.getElementById('journeyInfo').textContent = `${NETWORKS[selectedNetwork].name}`;
+  
+  renderProducts();
+  showStep('products');
+}
+
+function renderProducts() {
+  const products = NETWORKS[selectedNetwork].products || [];
+  const container = document.getElementById('productsList');
+  
+  const productInfo = {
+    'ICE': 'Intercity-Express (Hochgeschwindigkeit)',
+    'IC': 'Intercity / Eurocity',
+    'EC': 'Eurocity',
+    'RJX': 'Railjet Xpress',
+    'RJ': 'Railjet',
+    'RE': 'Regional-Express',
+    'RB': 'Regionalbahn',
+    'S': 'S-Bahn'
+  };
+  
+  container.innerHTML = products.map(p => {
+    const selected = selectedProducts.has(p);
+    const badgeClass = p.toLowerCase();
+    return `
+      <div class="product-option ${selected ? 'selected' : ''}" onclick="toggleProduct('${p}')">
+        <div class="checkbox">${selected ? '✓' : ''}</div>
+        <div class="product-badge ${badgeClass}">${p}</div>
+        <div class="product-name">${productInfo[p] || p}</div>
+      </div>
+    `;
+  }).join('');
+  
+  updateAddJourneyButton();
+  updateSelectAllProductsButton();
+}
+
+function toggleProduct(product) {
+  if (selectedProducts.has(product)) {
+    selectedProducts.delete(product);
+  } else {
+    selectedProducts.add(product);
+  }
+  renderProducts();
+}
+
+function toggleSelectAllProducts() {
+  const products = NETWORKS[selectedNetwork].products || [];
+  if (selectedProducts.size === products.length) {
+    selectedProducts.clear();
+  } else {
+    products.forEach(p => selectedProducts.add(p));
+  }
+  renderProducts();
+}
+
+function updateSelectAllProductsButton() {
+  const products = NETWORKS[selectedNetwork].products || [];
+  const btn = document.getElementById('selectAllProductsBtn');
+  btn.textContent = selectedProducts.size === products.length ? 'Alle abwählen' : 'Alle auswählen';
+}
+
+function updateAddJourneyButton() {
+  document.getElementById('addJourneyBtn').disabled = selectedProducts.size === 0;
+}
+
+function addJourneyStation() {
+  if (!journeyFromStop || !journeyToStop || selectedProducts.size === 0) return;
+  
+  const filter = Array.from(selectedProducts).join(',');
+  const fullId = `${selectedNetwork}:${journeyFromStop.id}>${journeyToStop.id}`;
+  
+  // Check duplicate
+  if (stations.some(s => s.fullId === fullId)) {
+    alert('Diese Verbindung ist bereits hinzugefügt!');
+    return;
+  }
+  
+  stations.push({
+    network: selectedNetwork,
+    networkName: NETWORKS[selectedNetwork].name,
+    stopId: `${journeyFromStop.id}>${journeyToStop.id}`,
+    stopName: `${journeyFromStop.name} → ${journeyToStop.name}`,
+    filter: filter,
+    fullId: fullId,
+    isJourney: true,
+    isExisting: false
+  });
+  
+  // Reset
+  journeyFromStop = null;
+  journeyToStop = null;
+  selectedProducts = new Set();
+  
+  goBack('region');
+  updateStationsList();
+}
 
 // ==================== INIT ====================
 window.addEventListener('DOMContentLoaded', () => {
