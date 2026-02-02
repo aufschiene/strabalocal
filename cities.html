@@ -98,106 +98,231 @@
       font-size: 12px;
     }
     
-    /* Input Groups */
-    .input-group {
+    /* Network Grid */
+    .network-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
       margin-bottom: 16px;
     }
     
-    .input-group label {
-      display: block;
-      color: #aaa;
-      font-size: 13px;
-      margin-bottom: 6px;
+    .network-btn {
+      padding: 14px 12px;
+      border-radius: 12px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.2);
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
     }
     
-    .input-group input,
-    .input-group select {
+    .network-btn:hover {
+      border-color: rgba(255, 215, 0, 0.4);
+      background: rgba(255, 215, 0, 0.1);
+    }
+    
+    .network-btn.active {
+      border-color: #ffd700;
+      background: rgba(255, 215, 0, 0.15);
+    }
+    
+    .network-btn .flag {
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    
+    .network-btn .name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+    
+    .network-btn .region {
+      font-size: 11px;
+      color: #888;
+    }
+    
+    /* Search Input */
+    .search-container {
+      position: relative;
+      margin-bottom: 16px;
+    }
+    
+    .search-input {
       width: 100%;
-      padding: 14px 16px;
+      padding: 16px 16px 16px 48px;
       border: 2px solid rgba(255, 255, 255, 0.2);
-      border-radius: 12px;
+      border-radius: 14px;
       background: rgba(0, 0, 0, 0.3);
       color: #fff;
       font-size: 16px;
       transition: all 0.2s;
     }
     
-    .input-group select {
-      cursor: pointer;
-    }
-    
-    .input-group select option {
-      background: #1a1a2e;
-      color: #fff;
-    }
-    
-    .input-group input:focus,
-    .input-group select:focus {
+    .search-input:focus {
       outline: none;
       border-color: #ffd700;
       background: rgba(0, 0, 0, 0.5);
     }
     
-    .input-group input::placeholder {
+    .search-input::placeholder {
       color: #666;
     }
     
-    .input-group .hint {
-      font-size: 11px;
-      color: #888;
-      margin-top: 6px;
+    .search-input:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
     
-    /* Network Info Box */
-    .network-info {
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 20px;
+      color: #666;
+    }
+    
+    .search-spinner {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      border-top-color: #ffd700;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      display: none;
+    }
+    
+    .search-spinner.show {
+      display: block;
+    }
+    
+    @keyframes spin {
+      to { transform: translateY(-50%) rotate(360deg); }
+    }
+    
+    /* Search Results Dropdown */
+    .search-results {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #1e1e3f;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      margin-top: 4px;
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+    
+    .search-results.show {
+      display: block;
+    }
+    
+    .search-result-item {
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .search-result-item:last-child {
+      border-bottom: none;
+    }
+    
+    .search-result-item:hover {
       background: rgba(255, 215, 0, 0.1);
-      border: 1px solid rgba(255, 215, 0, 0.3);
-      border-radius: 10px;
-      padding: 12px;
-      margin-top: 12px;
-      font-size: 13px;
     }
     
-    .network-info .title {
-      color: #ffd700;
+    .search-result-item .stop-name {
       font-weight: 600;
-      margin-bottom: 6px;
+      font-size: 15px;
+      margin-bottom: 4px;
     }
     
-    .network-info .examples {
-      color: #aaa;
+    .search-result-item .stop-info {
+      font-size: 12px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     
-    .network-info code {
-      background: rgba(0, 0, 0, 0.3);
+    .search-result-item .stop-id {
+      background: rgba(255, 255, 255, 0.1);
       padding: 2px 6px;
       border-radius: 4px;
       font-family: monospace;
-      color: #38ef7d;
+      font-size: 11px;
     }
     
-    /* Presets */
-    .presets {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 16px;
+    .no-results {
+      padding: 20px;
+      text-align: center;
+      color: #888;
     }
     
-    .preset-btn {
-      padding: 8px 14px;
-      border-radius: 20px;
+    /* Filter Input */
+    .filter-section {
+      display: none;
+      margin-top: 16px;
+      padding: 16px;
+      background: rgba(255, 215, 0, 0.1);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 215, 0, 0.3);
+    }
+    
+    .filter-section.show {
+      display: block;
+    }
+    
+    .filter-section h3 {
+      font-size: 14px;
+      color: #ffd700;
+      margin-bottom: 8px;
+    }
+    
+    .filter-section .selected-stop {
       font-size: 13px;
-      cursor: pointer;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      color: #fff;
-      transition: all 0.2s;
+      color: #aaa;
+      margin-bottom: 12px;
     }
     
-    .preset-btn:hover {
-      background: rgba(255, 215, 0, 0.2);
+    .filter-section .selected-stop strong {
+      color: #fff;
+    }
+    
+    .filter-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-size: 14px;
+    }
+    
+    .filter-input:focus {
+      outline: none;
       border-color: #ffd700;
+    }
+    
+    .filter-input::placeholder {
+      color: #666;
+    }
+    
+    .filter-hint {
+      font-size: 11px;
+      color: #888;
+      margin-top: 6px;
     }
     
     /* Station Chips */
@@ -236,12 +361,15 @@
       min-width: 0;
     }
     
-    .station-chip .stop-id {
+    .station-chip .stop-name {
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     
-    .station-chip .filter {
+    .station-chip .stop-details {
       font-size: 12px;
       color: #888;
       margin-top: 2px;
@@ -330,16 +458,6 @@
       cursor: not-allowed;
     }
     
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
-      margin-top: 8px;
-    }
-    
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.2);
-    }
-    
     /* Bottom Bar */
     .bottom-bar {
       position: fixed;
@@ -412,7 +530,7 @@
       background: rgba(0, 0, 0, 0.3);
       border-radius: 10px;
       padding: 14px;
-      max-height: 300px;
+      max-height: 250px;
       overflow-y: auto;
     }
     
@@ -450,7 +568,7 @@
       font-size: 15px;
     }
     
-    /* Loading */
+    /* Loading Overlay */
     .loading-overlay {
       position: fixed;
       top: 0;
@@ -469,7 +587,7 @@
       display: flex;
     }
     
-    .spinner {
+    .loading-spinner {
       width: 48px;
       height: 48px;
       border: 3px solid rgba(255, 215, 0, 0.3);
@@ -479,20 +597,35 @@
       margin-bottom: 16px;
     }
     
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
     .loading-text {
       color: #fff;
       font-size: 16px;
+    }
+    
+    /* Info Box */
+    .info-box {
+      background: rgba(255, 215, 0, 0.08);
+      border: 1px solid rgba(255, 215, 0, 0.2);
+      border-radius: 12px;
+      padding: 14px;
+      margin-top: 16px;
+    }
+    
+    .info-box p {
+      color: #aaa;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    
+    .info-box strong {
+      color: #ffd700;
     }
   </style>
 </head>
 <body>
 
 <div class="loading-overlay" id="loadingOverlay">
-  <div class="spinner"></div>
+  <div class="loading-spinner"></div>
   <div class="loading-text" id="loadingText">Speichere...</div>
 </div>
 
@@ -508,49 +641,67 @@
     <div class="text">Du kannst weitere Stationen hinzufügen oder bestehende entfernen.</div>
   </div>
   
-  <!-- Network Selection -->
+  <!-- Step 1: Network Selection -->
   <div class="card">
-    <h2><span class="step">1</span> Netzwerk & Station</h2>
+    <h2><span class="step">1</span> Netzwerk wählen</h2>
     
-    <div class="input-group">
-      <label>Verkehrsnetz</label>
-      <select id="networkSelect" onchange="onNetworkChange()">
-        <option value="">-- Netzwerk wählen --</option>
-        <option value="WL">🇦🇹 Wien - Wiener Linien</option>
-        <option value="LINZ">🇦🇹 Linz - Linz AG</option>
-        <option value="BODO">🇩🇪 Ulm/Bodensee - BODO</option>
-        <option value="BERLIN">🇩🇪 Berlin - VBB</option>
-        <option value="DB">🇩🇪 Deutsche Bahn (ganz DE)</option>
-      </select>
+    <div class="network-grid" id="networkGrid">
+      <button class="network-btn" data-network="WL" onclick="selectNetwork('WL')">
+        <div class="flag">🇦🇹</div>
+        <div class="name">Wiener Linien</div>
+        <div class="region">Wien</div>
+      </button>
+      <button class="network-btn" data-network="LINZ" onclick="selectNetwork('LINZ')">
+        <div class="flag">🇦🇹</div>
+        <div class="name">Linz AG</div>
+        <div class="region">Linz</div>
+      </button>
+      <button class="network-btn" data-network="BODO" onclick="selectNetwork('BODO')">
+        <div class="flag">🇩🇪</div>
+        <div class="name">BODO</div>
+        <div class="region">Ulm / Bodensee</div>
+      </button>
+      <button class="network-btn" data-network="BERLIN" onclick="selectNetwork('BERLIN')">
+        <div class="flag">🇩🇪</div>
+        <div class="name">VBB</div>
+        <div class="region">Berlin</div>
+      </button>
+      <button class="network-btn" data-network="DB" onclick="selectNetwork('DB')">
+        <div class="flag">🇩🇪</div>
+        <div class="name">Deutsche Bahn</div>
+        <div class="region">ganz Deutschland</div>
+      </button>
     </div>
-    
-    <div class="network-info" id="networkInfo" style="display: none;">
-      <div class="title" id="networkTitle"></div>
-      <div class="examples" id="networkExamples"></div>
-    </div>
-    
-    <div class="presets" id="presets" style="display: none;"></div>
-    
-    <div class="input-group">
-      <label>Stop ID</label>
-      <input type="text" id="stopIdInput" placeholder="z.B. 4729 oder 900100003" oninput="updateAddButton()">
-      <div class="hint">Die Stop ID findest du in der jeweiligen Verkehrs-App oder Website</div>
-    </div>
-    
-    <div class="input-group">
-      <label>Linienfilter (optional)</label>
-      <input type="text" id="filterInput" placeholder="z.B. U1,U2,37A oder leer für alle">
-      <div class="hint">Komma-getrennt. Leer = alle Linien anzeigen</div>
-    </div>
-    
-    <button class="btn btn-add" id="addBtn" onclick="addStation()" disabled>
-      ➕ Station hinzufügen
-    </button>
   </div>
   
-  <!-- Added Stations -->
+  <!-- Step 2: Search Station -->
+  <div class="card" id="searchCard" style="opacity: 0.5; pointer-events: none;">
+    <h2><span class="step">2</span> Station suchen</h2>
+    
+    <div class="search-container">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Stationsname eingeben..." disabled autocomplete="off">
+      <div class="search-spinner" id="searchSpinner"></div>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+    
+    <!-- Filter Section (shows after station selected) -->
+    <div class="filter-section" id="filterSection">
+      <h3>Ausgewählte Station:</h3>
+      <div class="selected-stop" id="selectedStopInfo"></div>
+      
+      <input type="text" class="filter-input" id="filterInput" placeholder="z.B. U1,U2,37A oder leer für alle">
+      <div class="filter-hint">Komma-getrennt. Leer = alle Linien anzeigen</div>
+      
+      <button class="btn btn-add" id="addBtn" onclick="addStation()">
+        ➕ Station hinzufügen
+      </button>
+    </div>
+  </div>
+  
+  <!-- Step 3: Added Stations -->
   <div class="card">
-    <h2><span class="step">2</span> Deine Stationen (<span id="stationCount">0</span>)</h2>
+    <h2><span class="step">3</span> Deine Stationen (<span id="stationCount">0</span>)</h2>
     
     <div class="stations-container" id="stationsContainer">
       <div class="empty-state" id="emptyState">
@@ -567,15 +718,10 @@
       <div class="status" id="testStatus"></div>
       <div class="results-box" id="resultsBox"></div>
     </div>
-  </div>
-  
-  <!-- Info -->
-  <div class="card" style="background: rgba(255, 215, 0, 0.08); border-color: rgba(255, 215, 0, 0.2);">
-    <h2 style="color: #ffd700;">💡 Tipp</h2>
-    <p style="color: #aaa; font-size: 13px; line-height: 1.6;">
-      Du kannst Stationen aus verschiedenen Netzen kombinieren!<br>
-      z.B. Wien Karlsplatz + Berlin Alexanderplatz auf einem Display.
-    </p>
+    
+    <div class="info-box">
+      <p>💡 <strong>Tipp:</strong> Du kannst Stationen aus verschiedenen Netzen kombinieren!</p>
+    </div>
   </div>
 </div>
 
@@ -593,68 +739,50 @@
 const NETWORKS = {
   WL: {
     name: 'Wiener Linien',
-    flag: '🇦🇹',
-    examples: [
-      { id: '4729', name: 'Albertgasse' },
-      { id: '269', name: 'Westbahnhof' },
-      { id: '316', name: 'Karlsplatz' },
-      { id: '291', name: 'Ottakring' }
-    ],
-    hint: 'RBL-Nummern (4-5 stellig)'
+    searchType: 'wien_json',
+    placeholder: 'z.B. Karlsplatz, Westbahnhof...'
   },
   LINZ: {
-    name: 'Linz AG Linien',
-    flag: '🇦🇹',
-    examples: [
-      { id: '60501170', name: 'Unionkreuzung' },
-      { id: '60501720', name: 'Hauptbahnhof' },
-      { id: '60500920', name: 'JKU/Universität' }
-    ],
-    hint: 'EFA Stop IDs (8-stellig)'
+    name: 'Linz AG',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Hauptbahnhof, Taubenmarkt...'
   },
   BODO: {
-    name: 'Bodensee-Oberschwaben',
-    flag: '🇩🇪',
-    examples: [
-      { id: '9001011', name: 'Ulm Justizgebäude' },
-      { id: '9001001', name: 'Ulm Hauptbahnhof' }
-    ],
-    hint: 'EFA Stop IDs (7-stellig)'
+    name: 'BODO',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Ulm Hauptbahnhof...'
   },
   BERLIN: {
     name: 'VBB Berlin',
-    flag: '🇩🇪',
-    examples: [
-      { id: '900100003', name: 'Alexanderplatz' },
-      { id: '900100001', name: 'Friedrichstraße' },
-      { id: '900058101', name: 'Hauptbahnhof' }
-    ],
-    hint: 'VBB Stop IDs (9-stellig, beginnt mit 900)'
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Alexanderplatz, Hauptbahnhof...'
   },
   DB: {
     name: 'Deutsche Bahn',
-    flag: '🇩🇪',
-    examples: [
-      { id: '8011160', name: 'Berlin Hbf' },
-      { id: '8000105', name: 'Frankfurt Hbf' },
-      { id: '8000261', name: 'München Hbf' }
-    ],
-    hint: 'DB Station IDs (7-stellig, beginnt mit 80)'
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Berlin Hbf, München...'
   }
 };
 
+// Server proxy URL
+const SEARCH_API = 'https://api.straba.at/api/v1/stops/search';
+const WIEN_DATA_URL = 'https://straba-983965425140.europe-west3.run.app/search/';
+
 // ==================== STATE ====================
+let selectedNetwork = null;
+let selectedStop = null;
 let stations = [];
-let existingConfig = null;
+let searchTimeout = null;
+let wienData = null; // Cache für Wien-Daten
 
 // ==================== DOM ELEMENTS ====================
-const networkSelect = document.getElementById('networkSelect');
-const networkInfo = document.getElementById('networkInfo');
-const networkTitle = document.getElementById('networkTitle');
-const networkExamples = document.getElementById('networkExamples');
-const presets = document.getElementById('presets');
-const stopIdInput = document.getElementById('stopIdInput');
+const searchCard = document.getElementById('searchCard');
+const searchInput = document.getElementById('searchInput');
+const searchSpinner = document.getElementById('searchSpinner');
+const searchResults = document.getElementById('searchResults');
+const filterSection = document.getElementById('filterSection');
 const filterInput = document.getElementById('filterInput');
+const selectedStopInfo = document.getElementById('selectedStopInfo');
 const addBtn = document.getElementById('addBtn');
 const stationsContainer = document.getElementById('stationsContainer');
 const emptyState = document.getElementById('emptyState');
@@ -669,69 +797,216 @@ const loadingOverlay = document.getElementById('loadingOverlay');
 const loadingText = document.getElementById('loadingText');
 
 // ==================== NETWORK SELECTION ====================
-function onNetworkChange() {
-  const network = networkSelect.value;
+function selectNetwork(network) {
+  selectedNetwork = network;
+  selectedStop = null;
   
-  if (network && NETWORKS[network]) {
-    const info = NETWORKS[network];
-    networkTitle.textContent = `${info.flag} ${info.name}`;
-    networkExamples.innerHTML = `
-      <strong>Beispiele:</strong> 
-      ${info.examples.map(e => `<code>${e.id}</code> ${e.name}`).join(', ')}
-      <br><em>${info.hint}</em>
-    `;
-    networkInfo.style.display = 'block';
-    
-    presets.innerHTML = info.examples.map(e => 
-      `<button class="preset-btn" onclick="usePreset('${e.id}')">${e.name}</button>`
-    ).join('');
-    presets.style.display = 'flex';
-  } else {
-    networkInfo.style.display = 'none';
-    presets.style.display = 'none';
+  // Update UI
+  document.querySelectorAll('.network-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.network === network);
+  });
+  
+  // Enable search
+  searchCard.style.opacity = '1';
+  searchCard.style.pointerEvents = 'auto';
+  searchInput.disabled = false;
+  searchInput.placeholder = NETWORKS[network].placeholder;
+  searchInput.value = '';
+  searchInput.focus();
+  
+  // Hide filter section
+  filterSection.classList.remove('show');
+  searchResults.classList.remove('show');
+  
+  // Load Wien data if needed
+  if (network === 'WL' && !wienData) {
+    loadWienData();
+  }
+}
+
+// ==================== WIEN DATA LOADER ====================
+async function loadWienData() {
+  try {
+    const response = await fetch(WIEN_DATA_URL);
+    wienData = await response.json();
+    console.log('Wien data loaded:', wienData.length, 'lines');
+  } catch (e) {
+    console.error('Failed to load Wien data:', e);
+  }
+}
+
+// ==================== SEARCH ====================
+searchInput.addEventListener('input', function() {
+  const query = this.value.trim();
+  
+  // Clear previous timeout
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
   }
   
-  updateAddButton();
-}
-
-function usePreset(id) {
-  stopIdInput.value = id;
-  updateAddButton();
-}
-
-function updateAddButton() {
-  const hasNetwork = networkSelect.value !== '';
-  const hasStopId = stopIdInput.value.trim() !== '';
-  addBtn.disabled = !(hasNetwork && hasStopId);
-}
-
-// ==================== STATION MANAGEMENT ====================
-function addStation() {
-  const network = networkSelect.value;
-  const stopId = stopIdInput.value.trim();
-  const filter = filterInput.value.trim();
+  // Hide results if empty
+  if (query.length < 2) {
+    searchResults.classList.remove('show');
+    return;
+  }
   
-  if (!network || !stopId) return;
+  // Debounce search
+  searchTimeout = setTimeout(() => {
+    performSearch(query);
+  }, 300);
+});
+
+searchInput.addEventListener('focus', function() {
+  if (this.value.trim().length >= 2) {
+    searchResults.classList.add('show');
+  }
+});
+
+async function performSearch(query) {
+  if (!selectedNetwork) return;
+  
+  const config = NETWORKS[selectedNetwork];
+  searchSpinner.classList.add('show');
+  
+  try {
+    let results = [];
+    
+    if (config.searchType === 'wien_json') {
+      results = searchWien(query);
+    } else if (config.searchType === 'server_proxy') {
+      results = await searchViaProxy(selectedNetwork, query);
+    }
+    
+    displaySearchResults(results);
+  } catch (e) {
+    console.error('Search error:', e);
+    searchResults.innerHTML = '<div class="no-results">Fehler bei der Suche</div>';
+    searchResults.classList.add('show');
+  } finally {
+    searchSpinner.classList.remove('show');
+  }
+}
+
+// Search via Server Proxy (LINZ, BODO, BERLIN, DB)
+async function searchViaProxy(network, query) {
+  const params = new URLSearchParams({
+    network: network,
+    q: query
+  });
+  
+  const response = await fetch(`${SEARCH_API}?${params}`);
+  const data = await response.json();
+  
+  if (data.error) {
+    console.error('Proxy error:', data.error);
+    return [];
+  }
+  
+  return (data.stops || []).map(s => ({
+    id: s.id,
+    name: s.name,
+    info: s.info || ''
+  }));
+}
+
+// Wien: Local search in cached data
+function searchWien(query) {
+  if (!wienData) return [];
+  
+  const q = query.toLowerCase();
+  const stationsMap = new Map();
+  
+  wienData.forEach(line => {
+    if (!Array.isArray(line.lineStation)) return;
+    
+    line.lineStation.forEach(item => {
+      const station = item.station;
+      if (!station || !station.stationName || !station.stationID) return;
+      
+      if (station.stationName.toLowerCase().includes(q)) {
+        const id = station.stationID;
+        if (!stationsMap.has(id)) {
+          stationsMap.set(id, {
+            id: String(id),
+            name: station.stationName,
+            lines: new Set()
+          });
+        }
+        stationsMap.get(id).lines.add(line.lineName);
+      }
+    });
+  });
+  
+  return Array.from(stationsMap.values())
+    .map(s => ({
+      id: s.id,
+      name: s.name,
+      info: Array.from(s.lines).slice(0, 5).join(', ') + (s.lines.size > 5 ? '...' : '')
+    }))
+    .slice(0, 15);
+}
+
+function displaySearchResults(results) {
+  if (results.length === 0) {
+    searchResults.innerHTML = '<div class="no-results">Keine Stationen gefunden</div>';
+  } else {
+    searchResults.innerHTML = results.map(r => `
+      <div class="search-result-item" onclick="selectStop('${r.id}', '${r.name.replace(/'/g, "\\'")}')">
+        <div class="stop-name">${r.name}</div>
+        <div class="stop-info">
+          <span class="stop-id">${r.id}</span>
+          ${r.info ? `<span>${r.info}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  searchResults.classList.add('show');
+}
+
+// ==================== STOP SELECTION ====================
+function selectStop(id, name) {
+  selectedStop = { id, name };
+  
+  // Update UI
+  searchInput.value = name;
+  searchResults.classList.remove('show');
+  
+  // Show filter section
+  selectedStopInfo.innerHTML = `<strong>${name}</strong><br>ID: ${id}`;
+  filterInput.value = '';
+  filterSection.classList.add('show');
+}
+
+// ==================== ADD STATION ====================
+function addStation() {
+  if (!selectedNetwork || !selectedStop) return;
+  
+  const filter = filterInput.value.trim();
+  const fullId = `${selectedNetwork}:${selectedStop.id}`;
   
   // Check for duplicates
-  const fullId = `${network}:${stopId}`;
   if (stations.some(s => s.fullId === fullId)) {
     alert('Diese Station ist bereits hinzugefügt!');
     return;
   }
   
   stations.push({
-    network,
-    stopId,
-    filter,
-    fullId,
-    networkName: NETWORKS[network].name,
+    network: selectedNetwork,
+    networkName: NETWORKS[selectedNetwork].name,
+    stopId: selectedStop.id,
+    stopName: selectedStop.name,
+    filter: filter,
+    fullId: fullId,
     isExisting: false
   });
   
-  stopIdInput.value = '';
+  // Reset selection
+  selectedStop = null;
+  searchInput.value = '';
   filterInput.value = '';
-  updateAddButton();
+  filterSection.classList.remove('show');
+  
   updateStationsList();
 }
 
@@ -758,8 +1033,10 @@ function updateStationsList() {
     <div class="station-chip${s.isExisting ? ' existing' : ''}">
       <span class="network-badge">${s.network}</span>
       <div class="info">
-        <div class="stop-id">${s.stopId}</div>
-        ${s.filter ? `<div class="filter">Filter: ${s.filter}</div>` : '<div class="filter">Alle Linien</div>'}
+        <div class="stop-name">${s.stopName}</div>
+        <div class="stop-details">
+          ID: ${s.stopId}${s.filter ? ` · Filter: ${s.filter}` : ''}
+        </div>
       </div>
       <button class="delete" onclick="removeStation(${idx})">✕</button>
     </div>
@@ -770,7 +1047,7 @@ function updateStationsList() {
   existingChips.forEach(c => c.remove());
   emptyState.insertAdjacentHTML('beforebegin', chips);
   
-  // Hide test results when stations change
+  // Hide test results
   testResults.classList.remove('show');
 }
 
@@ -783,7 +1060,6 @@ async function testStations() {
   testStatus.textContent = '⏳ Teste Verbindung...';
   resultsBox.innerHTML = '';
   
-  // Build API URL
   const stopIds = stations.map(s => s.fullId).join(',');
   const url = `https://api.straba.at/api/v1/wl/departures?stopId=${stopIds}`;
   
@@ -793,9 +1069,8 @@ async function testStations() {
     
     if (data.data && data.data.monitors && data.data.monitors.length > 0) {
       testStatus.className = 'status success';
-      testStatus.textContent = `✅ Verbindung OK - ${data.data.monitors.length} Station(en) gefunden`;
+      testStatus.textContent = `✅ OK - ${data.data.monitors.length} Station(en) gefunden`;
       
-      // Show first few departures
       let html = '';
       data.data.monitors.forEach(monitor => {
         const title = monitor.locationStop?.properties?.title || 'Station';
@@ -823,7 +1098,6 @@ async function testStations() {
     } else {
       testStatus.className = 'status error';
       testStatus.textContent = '⚠️ Keine Daten - Stop ID prüfen!';
-      resultsBox.innerHTML = '<pre style="color:#888;font-size:12px;">' + JSON.stringify(data, null, 2) + '</pre>';
     }
   } catch (e) {
     testStatus.className = 'status error';
@@ -835,27 +1109,27 @@ async function testStations() {
 function saveConfig() {
   if (stations.length === 0) return;
   
-  // Build RBL string (format: NETWORK:stopId,NETWORK:stopId)
+  // Build RBL string
   const rblString = stations.map(s => s.fullId).join(',');
   
-  // Build filter string (format: filter1|filter2)
+  // Build filter string
   const filterString = stations.map(s => s.filter || '').join('|');
   
   // Build details for index.html
   const details = stations.map(s => ({
     id: s.fullId,
-    name: `${s.network}: ${s.stopId}`,
+    name: s.stopName,
     lines: s.filter ? s.filter.split(',').map(f => ({ name: f.trim(), direction: '' })) : []
   }));
   
-  console.log('Speichere Config:', { rbl: rblString, filter: filterString, details });
+  console.log('Speichere:', { rbl: rblString, filter: filterString });
   
-  // Save to localStorage for index.html
+  // Save to localStorage
   localStorage.setItem('straba_pending_rbl', rblString);
   localStorage.setItem('straba_pending_filter', filterString);
   localStorage.setItem('straba_pending_details', JSON.stringify(details));
   
-  // Navigate to index.html (extended settings)
+  // Navigate to index.html
   window.location.href = 'index.html';
 }
 
@@ -872,25 +1146,23 @@ function loadExistingConfig(rbl, filter) {
     let network, stopId;
     
     if (part.includes(':')) {
-      // New format: NETWORK:stopId
       [network, stopId] = part.split(':');
     } else {
-      // Old format: just stopId (assume WL)
       network = 'WL';
       stopId = part;
     }
     
     const fullId = `${network}:${stopId}`;
     
-    // Skip if already added
     if (stations.some(s => s.fullId === fullId)) return;
     
     stations.push({
       network,
+      networkName: NETWORKS[network]?.name || network,
       stopId,
+      stopName: `Station ${stopId}`,
       filter: filterParts[idx] || '',
       fullId,
-      networkName: NETWORKS[network]?.name || network,
       isExisting: true
     });
   });
@@ -903,14 +1175,12 @@ function loadExistingConfig(rbl, filter) {
 
 // ==================== ESP32 COMMUNICATION ====================
 window.addEventListener('message', function(event) {
-  console.log('Nachricht vom Parent:', event.data);
+  console.log('Message from parent:', event.data);
   
-  // ESP32 sends existing config
   if (event.data && event.data.type === 'loadExistingConfig') {
     loadExistingConfig(event.data.rbl, event.data.filter);
   }
   
-  // Full config
   if (event.data && event.data.type === 'loadFullConfig') {
     const config = event.data.config;
     if (config && config.rbl_id) {
@@ -919,13 +1189,20 @@ window.addEventListener('message', function(event) {
   }
 });
 
-// Request config from parent on load
+// ==================== INIT ====================
 window.addEventListener('DOMContentLoaded', () => {
+  // Request config from parent
   if (window.parent && window.parent !== window) {
-    console.log('In iframe - frage Parent nach Config');
     window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
     window.parent.postMessage({ type: 'requestFullConfig' }, '*');
   }
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.classList.remove('show');
+    }
+  });
 });
 </script>
 
