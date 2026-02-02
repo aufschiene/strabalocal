@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Straba Städte</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      min-height: 100vh;
+      color: #fff;
+      padding: 20px;
+      padding-bottom: 120px;
+    }
+    
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    
+    .header p {
+      color: #aaa;
+      font-size: 14px;
+    }
+    
+    /* Cards */
+    .card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .card h2 {
+      font-size: 16px;
+      color: #ffd700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .card h2 .step {
+      background: #ffd700;
+      color: #1a1a2e;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    /* Existing Config Banner */
+    .existing-banner {
+      background: linear-gradient(135deg, rgba(56, 239, 125, 0.2), rgba(17, 153, 142, 0.2));
+      border: 1px solid rgba(56, 239, 125, 0.4);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    
+    .existing-banner.show {
+      display: block;
+    }
+    
+    .existing-banner .title {
+      font-weight: 600;
+      color: #38ef7d;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+    
+    .existing-banner .text {
+      color: #aaa;
+      font-size: 12px;
+    }
+    
+    /* Input Groups */
+    .input-group {
+      margin-bottom: 16px;
+    }
+    
+    .input-group label {
+      display: block;
+      color: #aaa;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    
+    .input-group input,
+    .input-group select {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+    
+    .input-group select {
+      cursor: pointer;
+    }
+    
+    .input-group select option {
+      background: #1a1a2e;
+      color: #fff;
+    }
+    
+    .input-group input:focus,
+    .input-group select:focus {
+      outline: none;
+      border-color: #ffd700;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .input-group input::placeholder {
+      color: #666;
+    }
+    
+    .input-group .hint {
+      font-size: 11px;
+      color: #888;
+      margin-top: 6px;
+    }
+    
+    /* Network Info Box */
+    .network-info {
+      background: rgba(255, 215, 0, 0.1);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    
+    .network-info .title {
+      color: #ffd700;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    
+    .network-info .examples {
+      color: #aaa;
+    }
+    
+    .network-info code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #38ef7d;
+    }
+    
+    /* Presets */
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    
+    .preset-btn {
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      transition: all 0.2s;
+    }
+    
+    .preset-btn:hover {
+      background: rgba(255, 215, 0, 0.2);
+      border-color: #ffd700;
+    }
+    
+    /* Station Chips */
+    .stations-container {
+      margin-top: 12px;
+    }
+    
+    .station-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(56, 239, 125, 0.15);
+      border: 1px solid rgba(56, 239, 125, 0.3);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    
+    .station-chip.existing {
+      background: rgba(255, 215, 0, 0.1);
+      border-color: rgba(255, 215, 0, 0.3);
+    }
+    
+    .station-chip .network-badge {
+      background: #ffd700;
+      color: #1a1a2e;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    
+    .station-chip .info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .station-chip .stop-id {
+      font-weight: 600;
+      font-size: 15px;
+    }
+    
+    .station-chip .filter {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+    }
+    
+    .station-chip .delete {
+      background: rgba(255, 107, 107, 0.2);
+      border: none;
+      color: #ff6b6b;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    
+    .station-chip .delete:hover {
+      background: rgba(255, 107, 107, 0.4);
+    }
+    
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 30px;
+      color: #666;
+    }
+    
+    .empty-state .icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    
+    /* Buttons */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn-add {
+      background: linear-gradient(135deg, #11998e, #38ef7d);
+      color: #fff;
+      margin-top: 12px;
+    }
+    
+    .btn-add:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(56, 239, 125, 0.3);
+    }
+    
+    .btn-add:disabled {
+      background: #444;
+      color: #777;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .btn-test {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      margin-top: 12px;
+    }
+    
+    .btn-test:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    
+    .btn-test:disabled {
+      background: #333;
+      color: #666;
+      cursor: not-allowed;
+    }
+    
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      margin-top: 8px;
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Bottom Bar */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(26, 26, 46, 0.98);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 16px 20px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .bottom-bar .container {
+      max-width: 500px;
+    }
+    
+    .btn-primary {
+      background: #ffd700;
+      color: #1a1a2e;
+    }
+    
+    .btn-primary:hover {
+      background: #ffed4a;
+      transform: translateY(-1px);
+    }
+    
+    .btn-primary:disabled {
+      background: #555;
+      color: #888;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    /* Test Results */
+    .test-results {
+      margin-top: 16px;
+      display: none;
+    }
+    
+    .test-results.show {
+      display: block;
+    }
+    
+    .test-results .status {
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    
+    .test-results .status.success {
+      background: rgba(56, 239, 125, 0.2);
+      border: 1px solid rgba(56, 239, 125, 0.4);
+      color: #38ef7d;
+    }
+    
+    .test-results .status.error {
+      background: rgba(255, 107, 107, 0.2);
+      border: 1px solid rgba(255, 107, 107, 0.4);
+      color: #ff6b6b;
+    }
+    
+    .test-results .status.loading {
+      background: rgba(255, 215, 0, 0.2);
+      border: 1px solid rgba(255, 215, 0, 0.4);
+      color: #ffd700;
+    }
+    
+    .results-box {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+      padding: 14px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .departure-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .departure-item:last-child {
+      border-bottom: none;
+    }
+    
+    .departure-item .line {
+      background: #ffd700;
+      color: #1a1a2e;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 14px;
+      min-width: 50px;
+      text-align: center;
+    }
+    
+    .departure-item .towards {
+      flex: 1;
+      color: #aaa;
+      font-size: 13px;
+    }
+    
+    .departure-item .time {
+      font-weight: 600;
+      font-size: 15px;
+    }
+    
+    /* Loading */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(26, 26, 46, 0.95);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 1000;
+    }
+    
+    .loading-overlay.show {
+      display: flex;
+    }
+    
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(255, 215, 0, 0.3);
+      border-top-color: #ffd700;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      color: #fff;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Speichere...</div>
+</div>
+
+<div class="container">
+  <div class="header">
+    <h1>🌍 Städte & Netze</h1>
+    <p>Wähle Stationen aus verschiedenen Verkehrsnetzen</p>
+  </div>
+  
+  <!-- Existing Config Banner -->
+  <div class="existing-banner" id="existingBanner">
+    <div class="title">✓ Bestehende Konfiguration geladen</div>
+    <div class="text">Du kannst weitere Stationen hinzufügen oder bestehende entfernen.</div>
+  </div>
+  
+  <!-- Network Selection -->
+  <div class="card">
+    <h2><span class="step">1</span> Netzwerk & Station</h2>
+    
+    <div class="input-group">
+      <label>Verkehrsnetz</label>
+      <select id="networkSelect" onchange="onNetworkChange()">
+        <option value="">-- Netzwerk wählen --</option>
+        <option value="WL">🇦🇹 Wien - Wiener Linien</option>
+        <option value="LINZ">🇦🇹 Linz - Linz AG</option>
+        <option value="BODO">🇩🇪 Ulm/Bodensee - BODO</option>
+        <option value="BERLIN">🇩🇪 Berlin - VBB</option>
+        <option value="DB">🇩🇪 Deutsche Bahn (ganz DE)</option>
+      </select>
+    </div>
+    
+    <div class="network-info" id="networkInfo" style="display: none;">
+      <div class="title" id="networkTitle"></div>
+      <div class="examples" id="networkExamples"></div>
+    </div>
+    
+    <div class="presets" id="presets" style="display: none;"></div>
+    
+    <div class="input-group">
+      <label>Stop ID</label>
+      <input type="text" id="stopIdInput" placeholder="z.B. 4729 oder 900100003" oninput="updateAddButton()">
+      <div class="hint">Die Stop ID findest du in der jeweiligen Verkehrs-App oder Website</div>
+    </div>
+    
+    <div class="input-group">
+      <label>Linienfilter (optional)</label>
+      <input type="text" id="filterInput" placeholder="z.B. U1,U2,37A oder leer für alle">
+      <div class="hint">Komma-getrennt. Leer = alle Linien anzeigen</div>
+    </div>
+    
+    <button class="btn btn-add" id="addBtn" onclick="addStation()" disabled>
+      ➕ Station hinzufügen
+    </button>
+  </div>
+  
+  <!-- Added Stations -->
+  <div class="card">
+    <h2><span class="step">2</span> Deine Stationen (<span id="stationCount">0</span>)</h2>
+    
+    <div class="stations-container" id="stationsContainer">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">🚏</div>
+        <p>Noch keine Stationen hinzugefügt</p>
+      </div>
+    </div>
+    
+    <button class="btn btn-test" id="testBtn" onclick="testStations()" disabled>
+      🔍 Verbindung testen
+    </button>
+    
+    <div class="test-results" id="testResults">
+      <div class="status" id="testStatus"></div>
+      <div class="results-box" id="resultsBox"></div>
+    </div>
+  </div>
+  
+  <!-- Info -->
+  <div class="card" style="background: rgba(255, 215, 0, 0.08); border-color: rgba(255, 215, 0, 0.2);">
+    <h2 style="color: #ffd700;">💡 Tipp</h2>
+    <p style="color: #aaa; font-size: 13px; line-height: 1.6;">
+      Du kannst Stationen aus verschiedenen Netzen kombinieren!<br>
+      z.B. Wien Karlsplatz + Berlin Alexanderplatz auf einem Display.
+    </p>
+  </div>
+</div>
+
+<!-- Bottom Bar -->
+<div class="bottom-bar">
+  <div class="container">
+    <button class="btn btn-primary" id="saveBtn" onclick="saveConfig()" disabled>
+      Weiter zu den Einstellungen
+    </button>
+  </div>
+</div>
+
+<script>
+// ==================== NETWORK CONFIGS ====================
+const NETWORKS = {
+  WL: {
+    name: 'Wiener Linien',
+    flag: '🇦🇹',
+    examples: [
+      { id: '4729', name: 'Albertgasse' },
+      { id: '269', name: 'Westbahnhof' },
+      { id: '316', name: 'Karlsplatz' },
+      { id: '291', name: 'Ottakring' }
+    ],
+    hint: 'RBL-Nummern (4-5 stellig)'
+  },
+  LINZ: {
+    name: 'Linz AG Linien',
+    flag: '🇦🇹',
+    examples: [
+      { id: '60501170', name: 'Unionkreuzung' },
+      { id: '60501720', name: 'Hauptbahnhof' },
+      { id: '60500920', name: 'JKU/Universität' }
+    ],
+    hint: 'EFA Stop IDs (8-stellig)'
+  },
+  BODO: {
+    name: 'Bodensee-Oberschwaben',
+    flag: '🇩🇪',
+    examples: [
+      { id: '9001011', name: 'Ulm Justizgebäude' },
+      { id: '9001001', name: 'Ulm Hauptbahnhof' }
+    ],
+    hint: 'EFA Stop IDs (7-stellig)'
+  },
+  BERLIN: {
+    name: 'VBB Berlin',
+    flag: '🇩🇪',
+    examples: [
+      { id: '900100003', name: 'Alexanderplatz' },
+      { id: '900100001', name: 'Friedrichstraße' },
+      { id: '900058101', name: 'Hauptbahnhof' }
+    ],
+    hint: 'VBB Stop IDs (9-stellig, beginnt mit 900)'
+  },
+  DB: {
+    name: 'Deutsche Bahn',
+    flag: '🇩🇪',
+    examples: [
+      { id: '8011160', name: 'Berlin Hbf' },
+      { id: '8000105', name: 'Frankfurt Hbf' },
+      { id: '8000261', name: 'München Hbf' }
+    ],
+    hint: 'DB Station IDs (7-stellig, beginnt mit 80)'
+  }
+};
+
+// ==================== STATE ====================
+let stations = [];
+let existingConfig = null;
+
+// ==================== DOM ELEMENTS ====================
+const networkSelect = document.getElementById('networkSelect');
+const networkInfo = document.getElementById('networkInfo');
+const networkTitle = document.getElementById('networkTitle');
+const networkExamples = document.getElementById('networkExamples');
+const presets = document.getElementById('presets');
+const stopIdInput = document.getElementById('stopIdInput');
+const filterInput = document.getElementById('filterInput');
+const addBtn = document.getElementById('addBtn');
+const stationsContainer = document.getElementById('stationsContainer');
+const emptyState = document.getElementById('emptyState');
+const stationCount = document.getElementById('stationCount');
+const testBtn = document.getElementById('testBtn');
+const testResults = document.getElementById('testResults');
+const testStatus = document.getElementById('testStatus');
+const resultsBox = document.getElementById('resultsBox');
+const saveBtn = document.getElementById('saveBtn');
+const existingBanner = document.getElementById('existingBanner');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingText = document.getElementById('loadingText');
+
+// ==================== NETWORK SELECTION ====================
+function onNetworkChange() {
+  const network = networkSelect.value;
+  
+  if (network && NETWORKS[network]) {
+    const info = NETWORKS[network];
+    networkTitle.textContent = `${info.flag} ${info.name}`;
+    networkExamples.innerHTML = `
+      <strong>Beispiele:</strong> 
+      ${info.examples.map(e => `<code>${e.id}</code> ${e.name}`).join(', ')}
+      <br><em>${info.hint}</em>
+    `;
+    networkInfo.style.display = 'block';
+    
+    presets.innerHTML = info.examples.map(e => 
+      `<button class="preset-btn" onclick="usePreset('${e.id}')">${e.name}</button>`
+    ).join('');
+    presets.style.display = 'flex';
+  } else {
+    networkInfo.style.display = 'none';
+    presets.style.display = 'none';
+  }
+  
+  updateAddButton();
+}
+
+function usePreset(id) {
+  stopIdInput.value = id;
+  updateAddButton();
+}
+
+function updateAddButton() {
+  const hasNetwork = networkSelect.value !== '';
+  const hasStopId = stopIdInput.value.trim() !== '';
+  addBtn.disabled = !(hasNetwork && hasStopId);
+}
+
+// ==================== STATION MANAGEMENT ====================
+function addStation() {
+  const network = networkSelect.value;
+  const stopId = stopIdInput.value.trim();
+  const filter = filterInput.value.trim();
+  
+  if (!network || !stopId) return;
+  
+  // Check for duplicates
+  const fullId = `${network}:${stopId}`;
+  if (stations.some(s => s.fullId === fullId)) {
+    alert('Diese Station ist bereits hinzugefügt!');
+    return;
+  }
+  
+  stations.push({
+    network,
+    stopId,
+    filter,
+    fullId,
+    networkName: NETWORKS[network].name,
+    isExisting: false
+  });
+  
+  stopIdInput.value = '';
+  filterInput.value = '';
+  updateAddButton();
+  updateStationsList();
+}
+
+function removeStation(index) {
+  stations.splice(index, 1);
+  updateStationsList();
+}
+
+function updateStationsList() {
+  stationCount.textContent = stations.length;
+  
+  if (stations.length === 0) {
+    emptyState.style.display = 'block';
+    testBtn.disabled = true;
+    saveBtn.disabled = true;
+  } else {
+    emptyState.style.display = 'none';
+    testBtn.disabled = false;
+    saveBtn.disabled = false;
+  }
+  
+  // Render chips
+  const chips = stations.map((s, idx) => `
+    <div class="station-chip${s.isExisting ? ' existing' : ''}">
+      <span class="network-badge">${s.network}</span>
+      <div class="info">
+        <div class="stop-id">${s.stopId}</div>
+        ${s.filter ? `<div class="filter">Filter: ${s.filter}</div>` : '<div class="filter">Alle Linien</div>'}
+      </div>
+      <button class="delete" onclick="removeStation(${idx})">✕</button>
+    </div>
+  `).join('');
+  
+  // Insert before empty state
+  const existingChips = stationsContainer.querySelectorAll('.station-chip');
+  existingChips.forEach(c => c.remove());
+  emptyState.insertAdjacentHTML('beforebegin', chips);
+  
+  // Hide test results when stations change
+  testResults.classList.remove('show');
+}
+
+// ==================== TEST API ====================
+async function testStations() {
+  if (stations.length === 0) return;
+  
+  testResults.classList.add('show');
+  testStatus.className = 'status loading';
+  testStatus.textContent = '⏳ Teste Verbindung...';
+  resultsBox.innerHTML = '';
+  
+  // Build API URL
+  const stopIds = stations.map(s => s.fullId).join(',');
+  const url = `https://api.straba.at/api/v1/wl/departures?stopId=${stopIds}`;
+  
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.data && data.data.monitors && data.data.monitors.length > 0) {
+      testStatus.className = 'status success';
+      testStatus.textContent = `✅ Verbindung OK - ${data.data.monitors.length} Station(en) gefunden`;
+      
+      // Show first few departures
+      let html = '';
+      data.data.monitors.forEach(monitor => {
+        const title = monitor.locationStop?.properties?.title || 'Station';
+        html += `<div style="color:#ffd700;font-weight:600;margin:10px 0 6px 0;">${title}</div>`;
+        
+        const lines = monitor.lines || [];
+        if (lines.length === 0) {
+          html += '<div style="color:#888;font-size:13px;padding:8px 0;">Keine Abfahrten</div>';
+        } else {
+          lines.slice(0, 5).forEach(line => {
+            const dep = line.departures?.departure?.[0];
+            const countdown = dep?.departureTime?.countdown;
+            html += `
+              <div class="departure-item">
+                <span class="line">${line.name || '?'}</span>
+                <span class="towards">${line.towards || ''}</span>
+                <span class="time">${countdown !== undefined ? countdown + "'" : '?'}</span>
+              </div>
+            `;
+          });
+        }
+      });
+      
+      resultsBox.innerHTML = html;
+    } else {
+      testStatus.className = 'status error';
+      testStatus.textContent = '⚠️ Keine Daten - Stop ID prüfen!';
+      resultsBox.innerHTML = '<pre style="color:#888;font-size:12px;">' + JSON.stringify(data, null, 2) + '</pre>';
+    }
+  } catch (e) {
+    testStatus.className = 'status error';
+    testStatus.textContent = '❌ Fehler: ' + e.message;
+  }
+}
+
+// ==================== SAVE CONFIG ====================
+function saveConfig() {
+  if (stations.length === 0) return;
+  
+  // Build RBL string (format: NETWORK:stopId,NETWORK:stopId)
+  const rblString = stations.map(s => s.fullId).join(',');
+  
+  // Build filter string (format: filter1|filter2)
+  const filterString = stations.map(s => s.filter || '').join('|');
+  
+  // Build details for index.html
+  const details = stations.map(s => ({
+    id: s.fullId,
+    name: `${s.network}: ${s.stopId}`,
+    lines: s.filter ? s.filter.split(',').map(f => ({ name: f.trim(), direction: '' })) : []
+  }));
+  
+  console.log('Speichere Config:', { rbl: rblString, filter: filterString, details });
+  
+  // Save to localStorage for index.html
+  localStorage.setItem('straba_pending_rbl', rblString);
+  localStorage.setItem('straba_pending_filter', filterString);
+  localStorage.setItem('straba_pending_details', JSON.stringify(details));
+  
+  // Navigate to index.html (extended settings)
+  window.location.href = 'index.html';
+}
+
+// ==================== LOAD EXISTING CONFIG ====================
+function loadExistingConfig(rbl, filter) {
+  if (!rbl || rbl.trim() === '') return;
+  
+  console.log('Lade bestehende Config:', rbl, filter);
+  
+  const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
+  const filterParts = filter ? filter.split('|') : [];
+  
+  rblParts.forEach((part, idx) => {
+    let network, stopId;
+    
+    if (part.includes(':')) {
+      // New format: NETWORK:stopId
+      [network, stopId] = part.split(':');
+    } else {
+      // Old format: just stopId (assume WL)
+      network = 'WL';
+      stopId = part;
+    }
+    
+    const fullId = `${network}:${stopId}`;
+    
+    // Skip if already added
+    if (stations.some(s => s.fullId === fullId)) return;
+    
+    stations.push({
+      network,
+      stopId,
+      filter: filterParts[idx] || '',
+      fullId,
+      networkName: NETWORKS[network]?.name || network,
+      isExisting: true
+    });
+  });
+  
+  if (stations.length > 0) {
+    existingBanner.classList.add('show');
+    updateStationsList();
+  }
+}
+
+// ==================== ESP32 COMMUNICATION ====================
+window.addEventListener('message', function(event) {
+  console.log('Nachricht vom Parent:', event.data);
+  
+  // ESP32 sends existing config
+  if (event.data && event.data.type === 'loadExistingConfig') {
+    loadExistingConfig(event.data.rbl, event.data.filter);
+  }
+  
+  // Full config
+  if (event.data && event.data.type === 'loadFullConfig') {
+    const config = event.data.config;
+    if (config && config.rbl_id) {
+      loadExistingConfig(config.rbl_id, config.lines_filter);
+    }
+  }
+});
+
+// Request config from parent on load
+window.addEventListener('DOMContentLoaded', () => {
+  if (window.parent && window.parent !== window) {
+    console.log('In iframe - frage Parent nach Config');
+    window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
+    window.parent.postMessage({ type: 'requestFullConfig' }, '*');
+  }
+});
+</script>
+
+</body>
+</html>
