@@ -85,6 +85,40 @@
     .selection-btn .icon { font-size: 32px; margin-bottom: 8px; }
     .selection-btn .name { font-weight: 600; font-size: 15px; margin-bottom: 4px; color: #333; }
     .selection-btn .desc { font-size: 11px; color: #888; }
+    
+    /* Network Brand Colors */
+    .network-badge {
+      display: inline-block;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .network-badge.wl { background: #E20613; color: #fff; }
+    .network-badge.wlb { background: #1E4D8C; color: #fff; }
+    .network-badge.linz { background: #009640; color: #fff; }
+    .network-badge.db { background: #EC0016; color: #fff; }
+    .network-badge.berlin { background: #F0AB00; color: #000; }
+    .network-badge.bodo { background: #005BBB; color: #fff; }
+    
+    /* Region badges */
+    .region-badge {
+      display: inline-block;
+      width: 48px;
+      height: 32px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      line-height: 32px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .region-badge.at { background: linear-gradient(180deg, #ED2939 33%, #fff 33%, #fff 66%, #ED2939 66%); }
+    .region-badge.de { background: linear-gradient(180deg, #000 33%, #D00 33%, #D00 66%, #FC0 66%); }
+    .region-badge.ch { background: #D52B1E; color: #fff; }
+    .region-badge.dk { background: #C8102E; color: #fff; }
+    
     .selection-btn.disabled {
       opacity: 0.4;
       cursor: not-allowed;
@@ -119,8 +153,20 @@
       left: 16px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 20px;
-      color: #999;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #999;
+      border-radius: 50%;
+    }
+    .search-icon::after {
+      content: '';
+      position: absolute;
+      width: 2px;
+      height: 6px;
+      background: #999;
+      bottom: -5px;
+      right: -2px;
+      transform: rotate(-45deg);
     }
     .search-spinner {
       position: absolute;
@@ -326,14 +372,19 @@
       border-color: #ffe082;
     }
     .station-chip .network-badge {
-      background: #333;
-      color: #fff;
       padding: 4px 10px;
       border-radius: 8px;
       font-weight: 700;
       font-size: 12px;
       flex-shrink: 0;
     }
+    /* Network colors - used by station chips */
+    .station-chip .network-badge.wl { background: #E20613; color: #fff; }
+    .station-chip .network-badge.wlb { background: #1E4D8C; color: #fff; }
+    .station-chip .network-badge.linz { background: #009640; color: #fff; }
+    .station-chip .network-badge.db { background: #EC0016; color: #fff; }
+    .station-chip .network-badge.berlin { background: #F0AB00; color: #000; }
+    .station-chip .network-badge.bodo { background: #005BBB; color: #fff; }
     .station-chip .info { flex: 1; min-width: 0; }
     .station-chip .stop-name {
       font-weight: 600;
@@ -437,6 +488,16 @@
       margin-bottom: 16px;
       padding: 8px 0;
     }
+    .back-btn::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-left: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg);
+      margin-right: 4px;
+    }
     .back-btn:hover { color: #0055a4; }
     
     /* Hidden */
@@ -455,9 +516,16 @@
     }
     .journey-arrow {
       text-align: center;
-      font-size: 24px;
-      color: #ccc;
       padding: 8px 0;
+    }
+    .journey-arrow::before {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-right: 3px solid #ccc;
+      border-bottom: 3px solid #ccc;
+      transform: rotate(45deg);
     }
     
     .journey-selected {
@@ -585,7 +653,7 @@
 
 <div class="container">
   <div class="header">
-    <h1>🌍 Städte & Netze</h1>
+    <h1>Städte & Netze</h1>
     <p>Wähle Stationen aus verschiedenen Verkehrsnetzen</p>
   </div>
   
@@ -599,22 +667,22 @@
     <h2>Region wählen</h2>
     <div class="selection-grid">
       <button class="selection-btn" onclick="selectRegion('AT')">
-        <div class="icon">🇦🇹</div>
+        <div class="region-badge at"></div>
         <div class="name">Österreich</div>
-        <div class="desc">Wien, Linz</div>
+        <div class="desc">Wien, Linz, Badner Bahn</div>
       </button>
       <button class="selection-btn" onclick="selectRegion('DE')">
-        <div class="icon">🇩🇪</div>
+        <div class="region-badge de"></div>
         <div class="name">Deutschland</div>
-        <div class="desc">DB, Berlin, Ulm</div>
+        <div class="desc">DB, Berlin, Bodensee</div>
       </button>
       <button class="selection-btn disabled" onclick="selectRegion('CH')">
-        <div class="icon">🇨🇭</div>
+        <div class="region-badge ch">CH</div>
         <div class="name">Schweiz</div>
         <div class="desc">Bald verfügbar</div>
       </button>
       <button class="selection-btn disabled" onclick="selectRegion('DK')">
-        <div class="icon">🇩🇰</div>
+        <div class="region-badge dk">DK</div>
         <div class="name">Dänemark</div>
         <div class="desc">Bald verfügbar</div>
       </button>
@@ -623,17 +691,17 @@
   
   <!-- Step 2: Network -->
   <div class="card hidden" id="stepNetwork">
-    <button class="back-btn" onclick="goBack('region')">← Zurück</button>
+    <button class="back-btn" onclick="goBack('region')">Zurück</button>
     <h2>Netzwerk wählen</h2>
     <div class="selection-grid" id="networkGrid"></div>
   </div>
   
   <!-- Step 3: Search Station (für normale Netze) -->
   <div class="card hidden" id="stepSearch">
-    <button class="back-btn" onclick="goBack('network')">← Zurück</button>
+    <button class="back-btn" onclick="goBack('network')">Zurück</button>
     <h2>Station suchen</h2>
     <div class="search-container">
-      <span class="search-icon">🔍</span>
+      <span class="search-icon"></span>
       <input type="text" class="search-input" id="searchInput" placeholder="Stationsname eingeben..." autocomplete="off">
       <div class="search-spinner" id="searchSpinner"></div>
     </div>
@@ -642,13 +710,13 @@
   
   <!-- Step 3b: Journey Search (für DB) -->
   <div class="card hidden" id="stepJourneySearch">
-    <button class="back-btn" onclick="goBack('network')">← Zurück</button>
+    <button class="back-btn" onclick="goBack('network')">Zurück</button>
     <h2>Verbindung wählen</h2>
     
     <div class="journey-field">
       <label>Von:</label>
       <div class="search-container">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"></span>
         <input type="text" class="search-input" id="journeyFromInput" placeholder="Abfahrtsstation..." autocomplete="off">
         <div class="search-spinner" id="journeyFromSpinner"></div>
       </div>
@@ -656,12 +724,12 @@
       <div class="journey-selected hidden" id="journeyFromSelected"></div>
     </div>
     
-    <div class="journey-arrow">↓</div>
+    <div class="journey-arrow"></div>
     
     <div class="journey-field">
       <label>Nach:</label>
       <div class="search-container">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon"></span>
         <input type="text" class="search-input" id="journeyToInput" placeholder="Zielstation..." autocomplete="off">
         <div class="search-spinner" id="journeyToSpinner"></div>
       </div>
@@ -675,7 +743,7 @@
       
       <div class="product-category">
         <div class="category-header" onclick="toggleCategory('domestic')">
-          <span>🇩🇪 Deutsche Züge</span>
+          <span>Deutsche Züge</span>
           <span class="category-toggle" id="domesticToggle">▼</span>
         </div>
         <div class="category-content" id="domesticProducts"></div>
@@ -683,7 +751,7 @@
       
       <div class="product-category">
         <div class="category-header" onclick="toggleCategory('international')">
-          <span>🌍 International</span>
+          <span>International</span>
           <span class="category-toggle" id="internationalToggle">▼</span>
         </div>
         <div class="category-content" id="internationalProducts"></div>
@@ -698,7 +766,7 @@
   
   <!-- Step 4: Select Lines -->
   <div class="card hidden" id="stepLines">
-    <button class="back-btn" onclick="goBack('search')">← Zurück</button>
+    <button class="back-btn" onclick="goBack('search')">Zurück</button>
     <h2 id="selectedStationName" style="color:#0055a4;">Linien auswählen</h2>
     <p style="color:#666;font-size:13px;margin-bottom:16px;" id="selectedStationInfo"></p>
     
@@ -725,7 +793,6 @@
     <h2>Deine Stationen (<span id="stationCount">0</span>)</h2>
     <div id="stationsContainer">
       <div class="empty-state" id="emptyState">
-        <div class="icon">🚏</div>
         <p>Noch keine Stationen hinzugefügt</p>
       </div>
     </div>
@@ -746,22 +813,18 @@
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    flag: '🇦🇹',
-    networks: ['WL', 'LINZ']
+    networks: ['WL', 'WLB', 'LINZ']
   },
   DE: {
     name: 'Deutschland', 
-    flag: '🇩🇪',
     networks: ['DB', 'BERLIN', 'BODO']
   },
   CH: {
     name: 'Schweiz',
-    flag: '🇨🇭',
     networks: []
   },
   DK: {
     name: 'Dänemark',
-    flag: '🇩🇰',
     networks: []
   }
 };
@@ -769,33 +832,84 @@ const REGIONS = {
 const NETWORKS = {
   WL: {
     name: 'Wiener Linien',
+    shortName: 'WL',
     region: 'AT',
     desc: 'U-Bahn, Straßenbahn, Bus',
-    icon: '🚇',
     searchType: 'wien_json',
     placeholder: 'z.B. Karlsplatz, Stephansplatz...',
     isJourneyBased: false
   },
   LINZ: {
-    name: 'Linz AG',
+    name: 'Linz AG Linien',
+    shortName: 'LINZ',
     region: 'AT', 
     desc: 'Straßenbahn, Bus',
-    icon: '🚊',
     searchType: 'server_proxy',
     placeholder: 'z.B. Hauptbahnhof, Taubenmarkt...',
     isJourneyBased: false
   },
+  WLB: {
+    name: 'Wiener Lokalbahnen',
+    shortName: 'WLB',
+    region: 'AT',
+    desc: 'Badner Bahn (Wien - Baden)',
+    searchType: 'static_list',
+    placeholder: 'Haltestelle auswählen...',
+    isJourneyBased: false,
+    stations: [
+      // Wien
+      { id: '490097507', name: 'Wien Oper/Karlsplatz', info: 'Kärntner Ring' },
+      { id: '490065711', name: 'Wien Karlsplatz', info: '' },
+      { id: '490109401', name: 'Wien Resselgasse', info: '' },
+      { id: '490099601', name: 'Wien Paulanergasse', info: '' },
+      { id: '490085902', name: 'Wien Mayerhofgasse', info: '' },
+      { id: '490060401', name: 'Wien Johann-Strauß-Gasse', info: '' },
+      { id: '490075502', name: 'Wien Laurenzgasse', info: '' },
+      { id: '490068901', name: 'Wien Kliebergasse', info: '' },
+      { id: '490084912', name: 'Wien Matzleinsdorfer Platz', info: '' },
+      { id: '490026705', name: 'Wien Eichenstraße', info: 'Gürtel' },
+      { id: '490084401', name: 'Wien Marx-Meidlinger-Straße', info: '' },
+      { id: '490036801', name: 'Wien Längenfeldgasse', info: 'Flurschützstraße' },
+      { id: '490010301', name: 'Wien Aßmayergasse', info: '' },
+      { id: '490086503', name: 'Wien Dörfelstraße', info: '' },
+      { id: '490101505', name: 'Wien Meidling', info: 'Bahnhof' },
+      { id: '490116002', name: 'Wien Schedifkaplatz', info: 'Meidling' },
+      { id: '490121402', name: 'Wien Schöpfwerk', info: '' },
+      { id: '490044401', name: 'Wien Gutheil-Schoder-Gasse', info: '' },
+      { id: '490058502', name: 'Wien Inzersdorf Lokalbahn', info: '' },
+      { id: '490091801', name: 'Wien Neu Erlaa', info: '' },
+      { id: '490075902', name: 'Wien Schönbrunner Allee', info: '' },
+      // Niederösterreich
+      { id: '430513303', name: 'Vösendorf-Siebenhirten', info: '' },
+      { id: '430513202', name: 'Vösendorf SCS', info: 'Shopping City Süd' },
+      { id: '430416402', name: 'Maria Enzersdorf-Südstadt', info: 'Bahnhof' },
+      { id: '430520106', name: 'Wiener Neudorf Bahnhof', info: '' },
+      { id: '430520001', name: 'Wiener Neudorf Griesfeld', info: '' },
+      { id: '430433104', name: 'Neu-Guntramsdorf', info: 'Lokalbahn' },
+      { id: '430361504', name: 'Guntramsdorf Lokalbahn', info: '' },
+      { id: '430430202', name: 'Eigenheimsiedlung', info: '' },
+      { id: '430430404', name: 'Möllersdorf Lokalbahn', info: '' },
+      { id: '430500104', name: 'Traiskirchen Lokalbahn', info: '' },
+      { id: '430502202', name: 'Tribuswinkel-Josefsthal', info: 'Bahnhof' },
+      { id: '430453602', name: 'Pfaffstätten Rennplatz', info: '' },
+      { id: '430580902', name: 'Baden Melkergründe', info: '' },
+      { id: '430605501', name: 'Baden Landesklinikum', info: '' },
+      { id: '430314203', name: 'Baden Leesdorf', info: '' },
+      { id: '430313402', name: 'Baden Viadukt', info: '' },
+      { id: '430312101', name: 'Baden Josefsplatz', info: 'Endstation' }
+    ]
+  },
   DB: {
     name: 'Deutsche Bahn',
+    shortName: 'DB',
     region: 'DE',
     desc: 'ICE, IC, RJ, RE, S-Bahn',
-    icon: '🚄',
     searchType: 'server_proxy',
     placeholder: 'z.B. München Hbf, Berlin Hbf...',
     isJourneyBased: true,
     productCategories: {
       domestic: {
-        label: '🇩🇪 Deutsche Züge',
+        label: 'Deutsche Züge',
         products: [
           { id: 'ICE', name: 'ICE', desc: 'Intercity-Express' },
           { id: 'IC', name: 'IC', desc: 'Intercity' },
@@ -806,7 +920,7 @@ const NETWORKS = {
         ]
       },
       international: {
-        label: '🌍 International',
+        label: 'International',
         products: [
           { id: 'RJX', name: 'RJX', desc: 'Railjet Xpress (ÖBB)' },
           { id: 'RJ', name: 'RJ', desc: 'Railjet (ÖBB)' },
@@ -820,20 +934,20 @@ const NETWORKS = {
   },
   BERLIN: {
     name: 'VBB Berlin',
+    shortName: 'VBB',
     region: 'DE',
     desc: 'U-Bahn, S-Bahn, Tram, Bus',
-    icon: '🚇',
     searchType: 'server_proxy',
     placeholder: 'z.B. Alexanderplatz...',
     isJourneyBased: false
   },
   BODO: {
     name: 'BODO',
+    shortName: 'BODO',
     region: 'DE',
-    desc: 'Ulm, Bodensee Region',
-    icon: '🚌',
+    desc: 'Bodensee-Oberschwaben',
     searchType: 'server_proxy',
-    placeholder: 'z.B. Ulm Hauptbahnhof...',
+    placeholder: 'z.B. Friedrichshafen...',
     isJourneyBased: false
   }
 };
@@ -899,7 +1013,7 @@ function updateBreadcrumb() {
   
   if (selectedRegion) {
     html += `<span class="breadcrumb-sep">›</span>`;
-    html += `<span class="breadcrumb-item ${currentStep === 'network' ? 'active' : ''}" onclick="goBack('network')">${REGIONS[selectedRegion].flag} ${REGIONS[selectedRegion].name}</span>`;
+    html += `<span class="breadcrumb-item ${currentStep === 'network' ? 'active' : ''}" onclick="goBack('network')">${REGIONS[selectedRegion].name}</span>`;
   }
   
   if (selectedNetwork) {
@@ -961,9 +1075,10 @@ function renderNetworkGrid() {
   
   networkGrid.innerHTML = networks.map(id => {
     const net = NETWORKS[id];
+    const badgeClass = id.toLowerCase();
     return `
       <button class="selection-btn" onclick="selectNetwork('${id}')">
-        <div class="icon">${net.icon}</div>
+        <div class="network-badge ${badgeClass}">${net.shortName || id}</div>
         <div class="name">${net.name}</div>
         <div class="desc">${net.desc}</div>
       </button>
@@ -1039,12 +1154,32 @@ searchInput.addEventListener('input', function() {
   const query = this.value.trim();
   if (searchTimeout) clearTimeout(searchTimeout);
   
+  const netConfig = NETWORKS[selectedNetwork];
+  
+  // Bei static_list: auch bei leerem Query alle anzeigen
+  if (netConfig?.searchType === 'static_list') {
+    if (query.length === 0) {
+      displaySearchResults(netConfig.stations);
+      return;
+    }
+    searchTimeout = setTimeout(() => performSearch(query), 100);
+    return;
+  }
+  
   if (query.length < 2) {
     searchResults.classList.remove('show');
     return;
   }
   
   searchTimeout = setTimeout(() => performSearch(query), 300);
+});
+
+// Bei static_list: Klick ins Suchfeld zeigt alle Stationen
+searchInput.addEventListener('focus', function() {
+  const netConfig = NETWORKS[selectedNetwork];
+  if (netConfig?.searchType === 'static_list' && this.value.trim().length === 0) {
+    displaySearchResults(netConfig.stations);
+  }
 });
 
 async function performSearch(query) {
@@ -1054,9 +1189,12 @@ async function performSearch(query) {
   
   try {
     let results = [];
+    const netConfig = NETWORKS[selectedNetwork];
     
-    if (NETWORKS[selectedNetwork].searchType === 'wien_json') {
+    if (netConfig.searchType === 'wien_json') {
       results = searchWien(query);
+    } else if (netConfig.searchType === 'static_list') {
+      results = searchStaticList(netConfig.stations, query);
     } else {
       results = await searchViaProxy(selectedNetwork, query);
     }
@@ -1069,6 +1207,16 @@ async function performSearch(query) {
   } finally {
     searchSpinner.classList.remove('show');
   }
+}
+
+function searchStaticList(stations, query) {
+  if (!stations) return [];
+  if (!query || query.length === 0) return stations.slice(0, 30); // Alle anzeigen (max 30)
+  
+  const q = query.toLowerCase();
+  return stations
+    .filter(s => s.name.toLowerCase().includes(q) || (s.info && s.info.toLowerCase().includes(q)))
+    .slice(0, 15);
 }
 
 function searchWien(query) {
@@ -1400,17 +1548,17 @@ function updateStationsList() {
   }
   
   const chips = stations.map((s, idx) => {
-    const icon = s.isJourney ? '🚄' : '';
     const filterLabel = s.isJourney ? `Produkte: ${s.filter}` : `Linien: ${s.filter || 'Alle'}`;
+    const badgeClass = s.network.toLowerCase();
     
     return `
-      <div class="station-chip ${s.isExisting ? 'existing' : ''}">
-        <span class="network-badge">${s.network}</span>
+      <div class="station-chip ${s.isExisting ? 'existing' : ''} ${s.isJourney ? 'journey' : ''}">
+        <span class="network-badge ${badgeClass}">${s.network}</span>
         <div class="info">
-          <div class="stop-name">${icon} ${s.stopName}</div>
+          <div class="stop-name">${s.stopName}</div>
           <div class="stop-details">${filterLabel}</div>
         </div>
-        <button class="delete" onclick="removeStation(${idx})">✕</button>
+        <button class="delete" onclick="removeStation(${idx})">×</button>
       </div>
     `;
   }).join('');
