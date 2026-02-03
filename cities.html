@@ -1321,17 +1321,58 @@
   </div>
   
   
-  <!-- Step 4: Select Lines -->
+  <!-- Step 3c: Wien Line Selection (wie localmainpage) -->
+  <div class="card hidden" id="stepWienLine">
+    <button class="back-btn" onclick="goBack('network')">Zurück</button>
+    <h2><span class="network-badge wl">WL</span> Linie wählen</h2>
+    <div class="search-container">
+      <span class="search-icon"></span>
+      <input type="text" class="search-input" id="wienLineInput" placeholder="Linie suchen (z.B. U6, 13A)..." autocomplete="off">
+    </div>
+    <div class="search-results" id="wienLineResults"></div>
+  </div>
+
+  <!-- Step 3d: Wien Station Selection -->
+  <div class="card hidden" id="stepWienStation">
+    <button class="back-btn" onclick="goBack('wienLine')">Zurück</button>
+    <h2 id="wienSelectedLineName" style="color:#E20613;">Station wählen</h2>
+    <div class="search-container">
+      <span class="search-icon"></span>
+      <input type="text" class="search-input" id="wienStationInput" placeholder="Station suchen..." autocomplete="off">
+    </div>
+    <div class="search-results" id="wienStationResults"></div>
+  </div>
+
+  <!-- Step 3e: Wien Direction Selection -->
+  <div class="card hidden" id="stepWienDirection">
+    <button class="back-btn" onclick="goBack('wienStation')">Zurück</button>
+    <h2 id="wienDirectionTitle" style="color:#E20613;">Richtung wählen</h2>
+    <p style="color:#666;font-size:13px;margin-bottom:16px;" id="wienDirectionInfo"></p>
+
+    <div id="wienDirectionList" class="lines-container"></div>
+
+    <!-- Andere Linien an dieser Station -->
+    <div id="wienOtherLinesSection" style="display:none;margin-top:20px;">
+      <h3 style="color:#0055a4;font-size:14px;margin-bottom:12px;">📍 Andere Linien an dieser Station</h3>
+      <div id="wienOtherLinesList"></div>
+    </div>
+
+    <button class="btn btn-primary" id="wienAddStationBtn" onclick="addWienStation()" disabled style="margin-top:16px;">
+      Station hinzufügen
+    </button>
+  </div>
+
+  <!-- Step 4: Select Lines (für andere Netze) -->
   <div class="card hidden" id="stepLines">
     <button class="back-btn" onclick="goBack('search')">Zurück</button>
     <h2 id="selectedStationName" style="color:#0055a4;">Linien auswählen</h2>
     <p style="color:#666;font-size:13px;margin-bottom:16px;" id="selectedStationInfo"></p>
-    
+
     <div class="lines-loading" id="linesLoading">
       <div class="spinner"></div>
       <div>Lade Abfahrten...</div>
     </div>
-    
+
     <div class="lines-container hidden" id="linesContainer">
       <div class="lines-header">
         <h3>Welche Linien anzeigen?</h3>
@@ -1339,7 +1380,7 @@
       </div>
       <div id="linesList"></div>
     </div>
-    
+
     <button class="btn btn-primary" id="addStationBtn" onclick="addStation()" disabled>
       Station hinzufügen
     </button>
@@ -1519,9 +1560,9 @@
           <div class="form-label">Helligkeit</div>
         </div>
         <div class="toggle-row" id="ftBrightnessToggle">
-          <button class="toggle-btn" data-value="1" onclick="setFtBrightness(1)">🌑</button>
-          <button class="toggle-btn" data-value="2" onclick="setFtBrightness(2)">🌓</button>
-          <button class="toggle-btn active" data-value="3" onclick="setFtBrightness(3)">🌕</button>
+          <button class="toggle-btn" data-value="1" onclick="setFtBrightness(1)">Dunkel</button>
+          <button class="toggle-btn" data-value="2" onclick="setFtBrightness(2)">Mittel</button>
+          <button class="toggle-btn active" data-value="3" onclick="setFtBrightness(3)">Hell</button>
         </div>
       </div>
     </div>
@@ -1895,6 +1936,12 @@ let stations = [];
 let wienData = null;
 let searchTimeout = null;
 
+// Wien-Modus (Linie → Station → Richtung)
+let wienSelectedLine = null;
+let wienSelectedStation = null;
+let wienSelectedDirections = [];
+let wienOtherLines = [];
+
 // Journey-Modus (für DB)
 let journeyFromStop = null;
 let journeyToStop = null;
@@ -1926,11 +1973,19 @@ function showStep(step) {
   stepNetwork.classList.toggle('hidden', step !== 'network');
   stepSearch.classList.toggle('hidden', step !== 'search');
   stepLines.classList.toggle('hidden', step !== 'lines');
-  
+
   // Journey-Modus Steps
   const stepJourneySearch = document.getElementById('stepJourneySearch');
   if (stepJourneySearch) stepJourneySearch.classList.toggle('hidden', step !== 'journeySearch');
-  
+
+  // Wien-Modus Steps
+  const stepWienLine = document.getElementById('stepWienLine');
+  const stepWienStation = document.getElementById('stepWienStation');
+  const stepWienDirection = document.getElementById('stepWienDirection');
+  if (stepWienLine) stepWienLine.classList.toggle('hidden', step !== 'wienLine');
+  if (stepWienStation) stepWienStation.classList.toggle('hidden', step !== 'wienStation');
+  if (stepWienDirection) stepWienDirection.classList.toggle('hidden', step !== 'wienDirection');
+
   updateBreadcrumb();
 }
 
@@ -1947,15 +2002,27 @@ function updateBreadcrumb() {
   if (selectedNetwork) {
     html += `<span class="breadcrumb-sep">›</span>`;
     const isJourney = NETWORKS[selectedNetwork].isJourneyBased;
-    const backStep = isJourney ? 'journeySearch' : 'search';
-    html += `<span class="breadcrumb-item ${currentStep === 'search' || currentStep === 'journeySearch' ? 'active' : ''}" onclick="goBack('${backStep}')">${NETWORKS[selectedNetwork].name}</span>`;
+    const isWien = selectedNetwork === 'WL';
+    const backStep = isWien ? 'wienLine' : (isJourney ? 'journeySearch' : 'search');
+    const isActive = currentStep === 'search' || currentStep === 'journeySearch' || currentStep === 'wienLine';
+    html += `<span class="breadcrumb-item ${isActive ? 'active' : ''}" onclick="goBack('${backStep}')">${NETWORKS[selectedNetwork].name}</span>`;
   }
-  
+
+  // Wien: Linie und Station im Breadcrumb
+  if (selectedNetwork === 'WL' && wienSelectedLine) {
+    html += `<span class="breadcrumb-sep">›</span>`;
+    html += `<span class="breadcrumb-item ${currentStep === 'wienStation' ? 'active' : ''}" onclick="goBack('wienStation')">${wienSelectedLine.lineName}</span>`;
+  }
+  if (selectedNetwork === 'WL' && wienSelectedStation && currentStep === 'wienDirection') {
+    html += `<span class="breadcrumb-sep">›</span>`;
+    html += `<span class="breadcrumb-item active">${wienSelectedStation.name}</span>`;
+  }
+
   if (selectedStop && currentStep === 'lines') {
     html += `<span class="breadcrumb-sep">›</span>`;
     html += `<span class="breadcrumb-item active">${selectedStop.name}</span>`;
   }
-  
+
   breadcrumb.innerHTML = html;
 }
 
@@ -1967,12 +2034,20 @@ function goBack(step) {
     journeyFromStop = null;
     journeyToStop = null;
     selectedProducts = new Set();
+    wienSelectedLine = null;
+    wienSelectedStation = null;
+    wienSelectedDirections = [];
+    wienOtherLines = [];
   } else if (step === 'network') {
     selectedNetwork = null;
     selectedStop = null;
     journeyFromStop = null;
     journeyToStop = null;
     selectedProducts = new Set();
+    wienSelectedLine = null;
+    wienSelectedStation = null;
+    wienSelectedDirections = [];
+    wienOtherLines = [];
     // Hide products section
     const productsSection = document.getElementById('journeyProductsSection');
     if (productsSection) productsSection.classList.add('hidden');
@@ -1985,6 +2060,19 @@ function goBack(step) {
     // Hide products section when going back
     const productsSection = document.getElementById('journeyProductsSection');
     if (productsSection) productsSection.classList.add('hidden');
+  } else if (step === 'wienLine') {
+    wienSelectedLine = null;
+    wienSelectedStation = null;
+    wienSelectedDirections = [];
+    wienOtherLines = [];
+    document.getElementById('wienLineInput').value = '';
+    showWienLineDropdown('');
+  } else if (step === 'wienStation') {
+    wienSelectedStation = null;
+    wienSelectedDirections = [];
+    wienOtherLines = [];
+    document.getElementById('wienStationInput').value = '';
+    showWienStationDropdown('');
   }
   showStep(step);
 }
@@ -2018,13 +2106,42 @@ function renderNetworkGrid() {
 function selectNetwork(network) {
   selectedNetwork = network;
   const netConfig = NETWORKS[network];
-  
+
+  // Wien: Eigener Flow (Linie → Station → Richtung)
+  if (network === 'WL') {
+    wienSelectedLine = null;
+    wienSelectedStation = null;
+    wienSelectedDirections = [];
+    wienOtherLines = [];
+
+    // Reset Wien inputs
+    const lineInput = document.getElementById('wienLineInput');
+    const stationInput = document.getElementById('wienStationInput');
+    if (lineInput) lineInput.value = '';
+    if (stationInput) stationInput.value = '';
+    document.getElementById('wienLineResults').classList.remove('show');
+    document.getElementById('wienStationResults').classList.remove('show');
+
+    // Lade Wien-Daten falls noch nicht geladen
+    if (!wienData) {
+      loadWienData().then(() => {
+        showWienLineDropdown('');
+      });
+    } else {
+      setTimeout(() => showWienLineDropdown(''), 50);
+    }
+
+    showStep('wienLine');
+    document.getElementById('wienLineInput').focus();
+    return;
+  }
+
   // Journey-basierte Netzwerke (DB)
   if (netConfig.isJourneyBased) {
     journeyFromStop = null;
     journeyToStop = null;
     selectedProducts = new Set();
-    
+
     // Reset form
     const fromInput = document.getElementById('journeyFromInput');
     const toInput = document.getElementById('journeyToInput');
@@ -2033,7 +2150,7 @@ function selectNetwork(network) {
     const fromResults = document.getElementById('journeyFromResults');
     const toResults = document.getElementById('journeyToResults');
     const productsSection = document.getElementById('journeyProductsSection');
-    
+
     if (fromInput) {
       fromInput.value = '';
       fromInput.placeholder = netConfig.placeholder;
@@ -2049,7 +2166,7 @@ function selectNetwork(network) {
     if (fromResults) fromResults.classList.remove('show');
     if (toResults) toResults.classList.remove('show');
     if (productsSection) productsSection.classList.add('hidden');
-    
+
     showStep('journeySearch');
     return;
   }
@@ -2072,9 +2189,446 @@ async function loadWienData() {
   try {
     const response = await fetch(WIEN_DATA_URL);
     wienData = await response.json();
+    console.log('Wien data loaded:', wienData.length, 'lines');
   } catch (e) {
     console.error('Failed to load Wien data:', e);
   }
+}
+
+// ==================== WIEN FLOW (Linie → Station → Richtung) ====================
+
+// Event Listeners für Wien-Inputs
+document.addEventListener('DOMContentLoaded', () => {
+  const wienLineInput = document.getElementById('wienLineInput');
+  const wienStationInput = document.getElementById('wienStationInput');
+
+  if (wienLineInput) {
+    wienLineInput.addEventListener('input', function() {
+      showWienLineDropdown(this.value);
+    });
+    wienLineInput.addEventListener('focus', function() {
+      showWienLineDropdown(this.value);
+    });
+  }
+
+  if (wienStationInput) {
+    wienStationInput.addEventListener('input', function() {
+      if (wienSelectedLine) showWienStationDropdown(this.value);
+    });
+    wienStationInput.addEventListener('focus', function() {
+      if (wienSelectedLine) showWienStationDropdown(this.value);
+    });
+  }
+});
+
+// Endstationen einer Linie ermitteln
+function getWienLineEndpoints(line) {
+  if (!Array.isArray(line.lineStation) || line.lineStation.length === 0) return '';
+
+  const patternIds = [...new Set(line.lineStation.map(s => s.patternID))];
+  const endStations = patternIds.map(patternId => {
+    const stationsOfPattern = line.lineStation.filter(s => s.patternID === patternId);
+    if (stationsOfPattern.length > 0) {
+      return stationsOfPattern[stationsOfPattern.length - 1]?.station?.stationName || '';
+    }
+    return '';
+  }).filter(name => name !== '');
+
+  const uniqueEndStations = [...new Set(endStations)];
+  if (uniqueEndStations.length >= 2) {
+    return `${uniqueEndStations[0]} ↔ ${uniqueEndStations[1]}`;
+  } else if (uniqueEndStations.length === 1) {
+    return `→ ${uniqueEndStations[0]}`;
+  }
+  return '';
+}
+
+// Linie-Dropdown anzeigen
+function showWienLineDropdown(query) {
+  if (!wienData) return;
+  query = query.toLowerCase().trim();
+
+  let filtered = wienData.filter(line =>
+    Array.isArray(line.lineStation) && line.lineStation.length > 0
+  );
+
+  if (query.length > 0) {
+    filtered = filtered.filter(line =>
+      line.lineName.toLowerCase().includes(query)
+    );
+  }
+
+  // Sortierung: U-Bahnen, dann Tram/Bus, Nachtbusse zuletzt
+  filtered.sort((a, b) => {
+    const aName = a.lineName;
+    const bName = b.lineName;
+
+    // Exakte Treffer oben
+    const aExact = aName.toLowerCase() === query;
+    const bExact = bName.toLowerCase() === query;
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
+
+    // Kategorie: 1=U-Bahn, 2=Tram/Bus, 3=Nachtbus
+    const getCategory = (name) => {
+      if (name.startsWith('U')) return 1;
+      if (name.startsWith('N')) return 3;
+      return 2;
+    };
+
+    const aCat = getCategory(aName);
+    const bCat = getCategory(bName);
+    if (aCat !== bCat) return aCat - bCat;
+
+    // Numerisch sortieren
+    const aNum = parseInt(aName.replace(/\D/g, '')) || 999;
+    const bNum = parseInt(bName.replace(/\D/g, '')) || 999;
+    if (aNum !== bNum) return aNum - bNum;
+
+    return aName.localeCompare(bName, 'de');
+  });
+
+  // Bei exakter Übereinstimmung nur diesen
+  if (query.length > 0 && filtered.length > 0 && filtered[0].lineName.toLowerCase() === query) {
+    filtered = filtered.slice(0, 1);
+  } else {
+    filtered = filtered.slice(0, 100);
+  }
+
+  const resultsList = document.getElementById('wienLineResults');
+
+  if (filtered.length === 0) {
+    resultsList.innerHTML = '<div class="no-results" style="padding:16px;text-align:center;color:#888;">Keine Linie gefunden</div>';
+  } else {
+    resultsList.innerHTML = filtered.map(line => {
+      const endpoints = getWienLineEndpoints(line);
+      const lineType = line.lineName.startsWith('U') ? 'type-metro' : (line.lineName.startsWith('N') ? 'type-bus' : (/^\d+$/.test(line.lineName) || /^\d+[A-Z]$/.test(line.lineName) ? 'type-tram' : 'type-bus'));
+
+      return `
+        <div class="search-result-item" onclick="selectWienLine(${line.lineID})">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="line-badge ${lineType}" style="padding:6px 12px;border-radius:6px;font-weight:700;font-size:14px;min-width:50px;text-align:center;">${line.lineName}</span>
+            <div>
+              <div class="stop-name" style="font-weight:600;">${line.lineName}</div>
+              ${endpoints ? `<div class="stop-info" style="font-size:12px;color:#888;">${endpoints}</div>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  resultsList.classList.add('show');
+}
+
+// Linie auswählen
+function selectWienLine(lineID) {
+  wienSelectedLine = wienData.find(l => l.lineID === lineID);
+  if (!wienSelectedLine) return;
+
+  document.getElementById('wienLineInput').value = wienSelectedLine.lineName;
+  document.getElementById('wienLineResults').classList.remove('show');
+
+  // Titel aktualisieren
+  document.getElementById('wienSelectedLineName').innerHTML = `<span class="line-badge type-${wienSelectedLine.lineName.startsWith('U') ? 'metro' : 'tram'}" style="padding:6px 12px;border-radius:6px;font-weight:700;margin-right:8px;">${wienSelectedLine.lineName}</span> Station wählen`;
+
+  // Reset Station selection
+  wienSelectedStation = null;
+  wienSelectedDirections = [];
+  wienOtherLines = [];
+  document.getElementById('wienStationInput').value = '';
+
+  showStep('wienStation');
+  document.getElementById('wienStationInput').focus();
+  setTimeout(() => showWienStationDropdown(''), 50);
+}
+
+// Stationsnamen normalisieren
+function normalizeStationName(name) {
+  return name.replace(/\s*[\/,]\s*/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+// Station-Dropdown anzeigen
+function showWienStationDropdown(inputValue) {
+  if (!wienSelectedLine) return;
+  const query = inputValue.toLowerCase().trim();
+
+  // Gruppiere Stationen nach normalisiertem Namen
+  const stationsByName = new Map();
+
+  if (Array.isArray(wienSelectedLine.lineStation)) {
+    wienSelectedLine.lineStation.forEach(item => {
+      const station = item.station;
+      if (station && station.stationName && station.stationID) {
+        const normalizedName = normalizeStationName(station.stationName);
+
+        if (!stationsByName.has(normalizedName)) {
+          stationsByName.set(normalizedName, {
+            originalNames: [station.stationName],
+            stopIds: new Set(),
+            directions: []
+          });
+        }
+
+        const entry = stationsByName.get(normalizedName);
+        if (!entry.originalNames.includes(station.stationName)) {
+          entry.originalNames.push(station.stationName);
+        }
+        entry.stopIds.add(station.stationID);
+
+        const towards = getWienDirectionName(wienSelectedLine, item.patternID);
+        const alreadyExists = entry.directions.some(d => d.towards === towards);
+        if (!alreadyExists) {
+          entry.directions.push({
+            patternID: item.patternID,
+            stopId: station.stationID,
+            towards: towards
+          });
+        }
+      }
+    });
+  }
+
+  let stationsList = Array.from(stationsByName.values()).map(s => ({
+    name: s.originalNames.find(n => n.includes('/')) || s.originalNames[0],
+    originalNames: s.originalNames,
+    stopIds: Array.from(s.stopIds),
+    directions: s.directions
+  })).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+
+  if (query.length > 0) {
+    stationsList = stationsList.filter(s =>
+      s.name.toLowerCase().includes(query) ||
+      s.originalNames.some(n => n.toLowerCase().includes(query))
+    );
+  }
+
+  const resultsList = document.getElementById('wienStationResults');
+
+  if (stationsList.length === 0) {
+    resultsList.innerHTML = '<div class="no-results" style="padding:16px;text-align:center;color:#888;">Keine Station gefunden</div>';
+  } else {
+    resultsList.innerHTML = stationsList.map(station => {
+      const dirInfo = station.directions.length === 1
+        ? `→ ${station.directions[0].towards}`
+        : `${station.directions.length} Richtungen`;
+
+      return `
+        <div class="search-result-item" onclick='selectWienStation(${JSON.stringify(station).replace(/'/g, "&#39;")})'>
+          <div class="stop-name">${station.name}</div>
+          <div class="stop-info">${dirInfo}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  resultsList.classList.add('show');
+}
+
+// Richtungsname ermitteln (Endstation)
+function getWienDirectionName(line, patternID) {
+  if (!Array.isArray(line.lineStation)) return 'Unbekannt';
+  const stationsWithPattern = line.lineStation.filter(s => s.patternID === patternID);
+  if (stationsWithPattern.length > 0) {
+    return stationsWithPattern[stationsWithPattern.length - 1]?.station?.stationName || 'Unbekannt';
+  }
+  return 'Unbekannt';
+}
+
+// Station auswählen
+function selectWienStation(station) {
+  wienSelectedStation = station;
+  document.getElementById('wienStationInput').value = station.name;
+  document.getElementById('wienStationResults').classList.remove('show');
+
+  wienSelectedDirections = [];
+  wienOtherLines = [];
+
+  // Titel aktualisieren
+  document.getElementById('wienDirectionTitle').innerHTML = `📍 ${station.name}`;
+  document.getElementById('wienDirectionInfo').textContent = `Linie ${wienSelectedLine.lineName} - Wähle die Richtung(en)`;
+
+  // Richtungen anzeigen
+  const dirList = document.getElementById('wienDirectionList');
+  const uniqueDirections = station.directions;
+
+  if (uniqueDirections.length === 1) {
+    // Nur eine Richtung - automatisch auswählen
+    wienSelectedDirections = [uniqueDirections[0]];
+    dirList.innerHTML = `
+      <div class="line-group">
+        <div class="line-group-header" style="background:#e8f5e9;">
+          <span class="line-badge type-metro" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
+          <span class="line-name">→ ${uniqueDirections[0].towards}</span>
+          <span style="margin-left:auto;color:#4caf50;font-weight:600;">✓ Ausgewählt</span>
+        </div>
+      </div>
+    `;
+    document.getElementById('wienAddStationBtn').disabled = false;
+    showWienOtherLines();
+  } else {
+    // Mehrere Richtungen - Checkboxen
+    dirList.innerHTML = uniqueDirections.map((dir, idx) => `
+      <div class="line-group" id="wienDir_${idx}">
+        <div class="line-group-header" onclick="toggleWienDirection(${idx}, ${dir.patternID}, ${dir.stopId}, '${dir.towards.replace(/'/g, "\\'")}')">
+          <input type="checkbox" id="wienDirCheck_${idx}" style="width:18px;height:18px;">
+          <span class="line-badge type-metro" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
+          <span class="line-name">→ ${dir.towards}</span>
+        </div>
+      </div>
+    `).join('');
+    document.getElementById('wienAddStationBtn').disabled = true;
+  }
+
+  showStep('wienDirection');
+}
+
+// Richtung togglen
+function toggleWienDirection(idx, patternID, stopId, towards) {
+  const checkbox = document.getElementById(`wienDirCheck_${idx}`);
+  const container = document.getElementById(`wienDir_${idx}`);
+  checkbox.checked = !checkbox.checked;
+
+  if (checkbox.checked) {
+    container.querySelector('.line-group-header').style.background = '#e8f5e9';
+    wienSelectedDirections.push({ patternID, stopId, towards });
+  } else {
+    container.querySelector('.line-group-header').style.background = '#f8f8f8';
+    wienSelectedDirections = wienSelectedDirections.filter(d => d.patternID !== patternID);
+  }
+
+  document.getElementById('wienAddStationBtn').disabled = wienSelectedDirections.length === 0;
+
+  // Andere Linien anzeigen wenn mindestens eine Richtung gewählt
+  if (wienSelectedDirections.length > 0) {
+    showWienOtherLines();
+  } else {
+    document.getElementById('wienOtherLinesSection').style.display = 'none';
+  }
+}
+
+// Andere Linien an dieser Station anzeigen
+function showWienOtherLines() {
+  if (!wienSelectedStation || wienSelectedDirections.length === 0) return;
+
+  const stopIds = wienSelectedStation.stopIds;
+  const currentLineName = wienSelectedLine.lineName;
+
+  // Finde andere Linien die an diesen StopIds halten
+  const otherLines = [];
+
+  wienData.forEach(line => {
+    if (line.lineName === currentLineName) return;
+
+    if (Array.isArray(line.lineStation)) {
+      line.lineStation.forEach(item => {
+        if (stopIds.includes(item.station?.stationID)) {
+          const towards = getWienDirectionName(line, item.patternID);
+          const alreadyExists = otherLines.some(ol =>
+            ol.lineName === line.lineName && ol.towards === towards
+          );
+          if (!alreadyExists) {
+            otherLines.push({
+              lineID: line.lineID,
+              lineName: line.lineName,
+              patternID: item.patternID,
+              stopId: item.station.stationID,
+              towards: towards
+            });
+          }
+        }
+      });
+    }
+  });
+
+  const section = document.getElementById('wienOtherLinesSection');
+  const list = document.getElementById('wienOtherLinesList');
+
+  if (otherLines.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+
+  // Sortiere nach Linienname
+  otherLines.sort((a, b) => {
+    const aNum = parseInt(a.lineName.replace(/\D/g, '')) || 999;
+    const bNum = parseInt(b.lineName.replace(/\D/g, '')) || 999;
+    return aNum - bNum;
+  });
+
+  list.innerHTML = otherLines.map((ol, idx) => {
+    const lineType = ol.lineName.startsWith('U') ? 'type-metro' : (/^\d+$/.test(ol.lineName) || /^\d+[A-Z]$/.test(ol.lineName) ? 'type-tram' : 'type-bus');
+    return `
+      <div class="line-group" id="wienOther_${idx}" style="margin-bottom:8px;">
+        <div class="line-group-header" onclick="toggleWienOtherLine(${idx}, ${ol.lineID}, '${ol.lineName}', ${ol.patternID}, ${ol.stopId}, '${ol.towards.replace(/'/g, "\\'")}')">
+          <input type="checkbox" id="wienOtherCheck_${idx}" style="width:18px;height:18px;">
+          <span class="line-badge ${lineType}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${ol.lineName}</span>
+          <span class="line-name">→ ${ol.towards}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  section.style.display = 'block';
+}
+
+// Andere Linie togglen
+function toggleWienOtherLine(idx, lineID, lineName, patternID, stopId, towards) {
+  const checkbox = document.getElementById(`wienOtherCheck_${idx}`);
+  const container = document.getElementById(`wienOther_${idx}`);
+  checkbox.checked = !checkbox.checked;
+
+  if (checkbox.checked) {
+    container.querySelector('.line-group-header').style.background = '#e3f2fd';
+    wienOtherLines.push({ lineID, lineName, patternID, stopId, towards });
+  } else {
+    container.querySelector('.line-group-header').style.background = '#f8f8f8';
+    wienOtherLines = wienOtherLines.filter(ol => !(ol.lineID === lineID && ol.patternID === patternID));
+  }
+}
+
+// Wien Station hinzufügen
+function addWienStation() {
+  if (!wienSelectedLine || !wienSelectedStation || wienSelectedDirections.length === 0) return;
+
+  // Sammle alle Stop-IDs
+  const stopIds = wienSelectedDirections.map(d => d.stopId);
+  wienOtherLines.forEach(ol => {
+    if (!stopIds.includes(ol.stopId)) stopIds.push(ol.stopId);
+  });
+
+  // Liniennamen sammeln
+  const lineNames = [wienSelectedLine.lineName];
+  wienOtherLines.forEach(ol => {
+    if (!lineNames.includes(ol.lineName)) lineNames.push(ol.lineName);
+  });
+
+  const fullId = `WL_${stopIds.join(',')}`;
+
+  // Check ob schon vorhanden
+  if (stations.some(s => s.fullId === fullId)) {
+    alert('Diese Station ist bereits hinzugefügt!');
+    return;
+  }
+
+  stations.push({
+    network: 'WL',
+    networkName: 'Wiener Linien',
+    stopId: stopIds.join(','),
+    stopName: wienSelectedStation.name,
+    filter: lineNames.join(','),
+    fullId: fullId,
+    isExisting: false
+  });
+
+  // Reset und zurück
+  wienSelectedLine = null;
+  wienSelectedStation = null;
+  wienSelectedDirections = [];
+  wienOtherLines = [];
+
+  goBack('region');
+  updateStationsList();
 }
 
 // ==================== SEARCH ====================
@@ -2760,21 +3314,25 @@ function updateRealisticPreview(config) {
 
   const style = displayStyles[colour] || displayStyles[1];
 
-  // Beispieldaten basierend auf ausgewählten Stationen
+  // Echte Daten aus stations extrahieren
   let sampleData = [];
+  let timeCounter = 3;
   if (stations.length > 0) {
-    // Versuche echte Linien aus den Stationen zu nutzen
     stations.forEach(s => {
       if (s.filter) {
         const lines = s.filter.split(',');
-        lines.forEach(line => {
+        lines.forEach(lineName => {
           if (sampleData.length < rows) {
+            const line = lineName.trim();
+            // Hochflurer-Erkennung für Wien (Straßenbahnen ohne ULF)
+            const isHochflurer = s.network === 'WL' && !line.startsWith('U') && /^\d+$/.test(line);
             sampleData.push({
-              line: line.trim(),
+              line: line,
               dest: s.stopName.length > 15 ? s.stopName.substring(0, 14) + '.' : s.stopName,
-              time: Math.floor(Math.random() * 12) + 1,
-              isHighfloor: Math.random() > 0.7
+              time: timeCounter,
+              isHighfloor: isHochflurer
             });
+            timeCounter += 3;
           }
         });
       }
@@ -3118,19 +3676,45 @@ function updateFinetuningPreview() {
   const rows = getFtRows();
   const previewEl = document.getElementById('finetuningPreview');
 
-  // Beispieldaten pro Display-Typ
-  const sampleData = {
-    1: [{ line: 'U6', dest: 'Floridsdorf', time: 3, hf: false }, { line: '2', dest: 'Ottakring', time: 6, hf: true }, { line: '13A', dest: 'Hauptbahnhof', time: 8, hf: false }],
-    2: [{ line: '1', dest: 'Auwiesen', time: 4 }, { line: '3', dest: 'Landgutstr.', time: 7 }, { line: '46', dest: 'Hauptbahnhof', time: 11 }],
-    3: [{ line: 'U6', dest: 'Alt-Tegel', time: 2 }, { line: 'S1', dest: 'Oranienburg', time: 5 }, { line: 'M10', dest: 'Warschauer', time: 8 }],
-    4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden', time: 19 }],
-    5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'S7', dest: 'Ahrensfelde', time: 5 }, { line: 'S5', dest: 'Strausberg', time: 9 }],
-    6: [{ line: 'ICE', dest: 'Berlin Hbf', time: 12 }, { line: 'RJ', dest: 'Wien Hbf', time: 28 }, { line: 'IC', dest: 'Hamburg', time: 45 }],
-    7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
-    8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }]
-  };
+  // Echte Daten aus stations extrahieren
+  let data = [];
+  let timeCounter = 3;
 
-  const data = (sampleData[colour] || sampleData[1]).slice(0, rows);
+  // Durch alle Stationen gehen und Linien sammeln
+  stations.forEach(station => {
+    if (station.filter) {
+      const lines = station.filter.split(',').map(l => l.trim());
+      lines.forEach(lineName => {
+        // Hochflurer-Erkennung für Wien (Niederflur: ULF-Linien)
+        const isHochflurer = station.network === 'WL' && !lineName.startsWith('U') && /^\d+$/.test(lineName);
+        data.push({
+          line: lineName,
+          dest: station.stopName,
+          time: timeCounter,
+          timeStr: `${String(14 + Math.floor(timeCounter / 60)).padStart(2, '0')}:${String(20 + (timeCounter % 60)).padStart(2, '0')}`,
+          hf: isHochflurer
+        });
+        timeCounter += Math.floor(Math.random() * 4) + 2;
+      });
+    }
+  });
+
+  // Fallback wenn keine Daten vorhanden
+  if (data.length === 0) {
+    const fallbackData = {
+      1: [{ line: 'U6', dest: 'Floridsdorf', time: 3, hf: false }, { line: '2', dest: 'Ottakring', time: 6, hf: true }, { line: '13A', dest: 'Hauptbahnhof', time: 8, hf: false }],
+      2: [{ line: '1', dest: 'Auwiesen', time: 4 }, { line: '3', dest: 'Landgutstr.', time: 7 }, { line: '46', dest: 'Hauptbahnhof', time: 11 }],
+      3: [{ line: 'U6', dest: 'Alt-Tegel', time: 2 }, { line: 'S1', dest: 'Oranienburg', time: 5 }, { line: 'M10', dest: 'Warschauer', time: 8 }],
+      4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden', time: 19 }],
+      5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'S7', dest: 'Ahrensfelde', time: 5 }, { line: 'S5', dest: 'Strausberg', time: 9 }],
+      6: [{ line: 'ICE', dest: 'Berlin Hbf', time: 12 }, { line: 'RJ', dest: 'Wien Hbf', time: 28 }, { line: 'IC', dest: 'Hamburg', time: 45 }],
+      7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
+      8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }]
+    };
+    data = fallbackData[colour] || fallbackData[1];
+  }
+
+  data = data.slice(0, rows);
 
   // Render basierend auf Display-Typ
   let html = '';
