@@ -102,6 +102,7 @@
     .network-badge.db { background: #EC0016; color: #fff; }
     .network-badge.berlin { background: #F0AB00; color: #000; }
     .network-badge.bodo { background: #005BBB; color: #fff; }
+    .network-badge.salzburg { background: #E3000F; color: #fff; }
     
     /* Region badges */
     .region-badge {
@@ -385,6 +386,7 @@
     .station-chip .network-badge.db { background: #EC0016; color: #fff; }
     .station-chip .network-badge.berlin { background: #F0AB00; color: #000; }
     .station-chip .network-badge.bodo { background: #005BBB; color: #fff; }
+    .station-chip .network-badge.salzburg { background: #E3000F; color: #fff; }
     .station-chip .info { flex: 1; min-width: 0; }
     .station-chip .stop-name {
       font-weight: 600;
@@ -503,6 +505,153 @@
     /* Hidden */
     .hidden { display: none !important; }
     
+    /* Display Config Step */
+    .config-suggestion {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .suggestion-header {
+      margin-bottom: 15px;
+    }
+    .suggestion-label {
+      font-size: 13px;
+      color: #666;
+    }
+    .suggestion-preview {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      background: #fff;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 15px;
+      border: 2px solid #0055a4;
+    }
+    .preview-image {
+      width: 120px;
+      height: 80px;
+      background: #000;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+    }
+    .preview-image .line-preview {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 100%;
+      padding: 8px;
+    }
+    .preview-image .line-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      animation: slideIn 0.5s ease-out;
+    }
+    .preview-image .line-badge {
+      font-size: 8px;
+      font-weight: bold;
+      padding: 2px 4px;
+      border-radius: 2px;
+      color: #fff;
+    }
+    .preview-image .line-dest {
+      font-size: 7px;
+      color: #fff;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .preview-image .line-time {
+      font-size: 9px;
+      color: #0f0;
+      font-weight: bold;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .preview-info {
+      flex: 1;
+    }
+    .preview-title {
+      font-weight: 600;
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 4px;
+    }
+    .preview-desc {
+      font-size: 13px;
+      color: #666;
+    }
+    .suggestion-details {
+      display: flex;
+      gap: 20px;
+    }
+    .detail-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .detail-label {
+      font-size: 13px;
+      color: #666;
+    }
+    .detail-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+    .config-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .btn-large {
+      padding: 16px 24px;
+      font-size: 16px;
+    }
+    .finetuning-section {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .finetuning-section h3 {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 15px;
+    }
+    .finetuning-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .finetuning-row label {
+      min-width: 120px;
+      font-size: 14px;
+      color: #666;
+    }
+    .finetuning-row select {
+      flex: 1;
+      padding: 10px 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      color: #333;
+    }
+    .finetuning-row select:focus {
+      outline: none;
+      border-color: #0055a4;
+    }
+
     /* Journey Mode Styles */
     .journey-field {
       margin-bottom: 12px;
@@ -789,7 +938,7 @@
   </div>
   
   <!-- Added Stations -->
-  <div class="card">
+  <div class="card" id="stationsCard">
     <h2>Deine Stationen (<span id="stationCount">0</span>)</h2>
     <div id="stationsContainer">
       <div class="empty-state" id="emptyState">
@@ -797,13 +946,88 @@
       </div>
     </div>
   </div>
+  
+  <!-- Step: Display Config -->
+  <div class="card hidden" id="stepDisplayConfig">
+    <button class="back-btn" onclick="backFromDisplayConfig()">Zurück</button>
+    <h2>Display-Einstellungen</h2>
+    
+    <div class="config-suggestion">
+      <div class="suggestion-header">
+        <span class="suggestion-label">Empfohlen für deine Auswahl:</span>
+      </div>
+      
+      <div class="suggestion-preview" id="suggestionPreview">
+        <div class="preview-image" id="previewImage">
+          <!-- Animated preview -->
+        </div>
+        <div class="preview-info">
+          <div class="preview-title" id="previewTitle">Wiener Linien Ansicht</div>
+          <div class="preview-desc" id="previewDesc">2 Zeilen, optimal für U-Bahn und Tram</div>
+        </div>
+      </div>
+      
+      <div class="suggestion-details">
+        <div class="detail-row">
+          <span class="detail-label">Display-Typ:</span>
+          <span class="detail-value" id="suggestedColorName">Wiener Linien</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Zeilen:</span>
+          <span class="detail-value" id="suggestedRows">2</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="config-actions">
+      <button class="btn btn-primary btn-large" onclick="sendWithSuggestion()">
+        Mit Empfehlung senden
+      </button>
+      <button class="btn btn-secondary" onclick="showFinetuning()">
+        Feintuning
+      </button>
+    </div>
+    
+    <!-- Feintuning Section (hidden by default) -->
+    <div class="finetuning-section hidden" id="finetuningSection">
+      <h3>Feintuning</h3>
+      
+      <div class="finetuning-row">
+        <label>Display-Typ:</label>
+        <select id="colorSelect">
+          <option value="1">Wiener Linien (Standard)</option>
+          <option value="2">Linz AG</option>
+          <option value="3">VBB Berlin</option>
+          <option value="4">WLB Badner Bahn</option>
+          <option value="5">DB S-Bahn</option>
+          <option value="6">DB Fernverkehr</option>
+          <option value="7">BODO Bodensee</option>
+          <option value="8">Salzburg AG</option>
+        </select>
+      </div>
+      
+      <div class="finetuning-row">
+        <label>Anzahl Zeilen:</label>
+        <select id="rowsSelect">
+          <option value="1">1 Zeile</option>
+          <option value="2">2 Zeilen</option>
+          <option value="3">3 Zeilen</option>
+          <option value="4">4 Zeilen</option>
+        </select>
+      </div>
+      
+      <button class="btn btn-primary" onclick="sendWithCustomConfig()">
+        Mit Einstellungen senden
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- Bottom Bar -->
 <div class="bottom-bar">
   <div class="container">
-    <button class="btn btn-save" id="saveBtn" onclick="saveConfig()" disabled>
-      Speichern
+    <button class="btn btn-save" id="saveBtn" onclick="goToDisplayConfig()" disabled>
+      Weiter
     </button>
   </div>
 </div>
@@ -813,7 +1037,7 @@
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'LINZ']
+    networks: ['WL', 'WLB', 'LINZ', 'SALZBURG']
   },
   DE: {
     name: 'Deutschland', 
@@ -897,6 +1121,92 @@ const NETWORKS = {
       { id: '430314203', name: 'Baden Leesdorf', info: '' },
       { id: '430313402', name: 'Baden Viadukt', info: '' },
       { id: '430312101', name: 'Baden Josefsplatz', info: 'Endstation' }
+    ]
+  },
+  SALZBURG: {
+    name: 'Salzburg Verkehr (SVV)',
+    shortName: 'SBG',
+    region: 'AT',
+    desc: 'Obus, Lokalbahn, Pinzgauer Bahn, Regionalbusse (Fahrplan)',
+    searchType: 'static_list',
+    placeholder: 'Haltestelle suchen...',
+    isJourneyBased: false,
+    stations: [
+      // === STADT SALZBURG ===
+      { id: 'Salzburg Hauptbahnhof', name: 'Salzburg Hauptbahnhof', info: 'Obus, Lokalbahn, S-Bahn' },
+      { id: 'Mirabellplatz', name: 'Mirabellplatz', info: 'Obus 1,2,5,6' },
+      { id: 'Makartplatz', name: 'Makartplatz', info: 'Obus 3,5,6' },
+      { id: 'Rathaus', name: 'Rathaus', info: 'Obus 3,5,6,8' },
+      { id: 'Hanuschplatz', name: 'Hanuschplatz', info: 'Obus 1,2,4,7' },
+      { id: 'Mozartsteg', name: 'Mozartsteg', info: 'Obus 3,7,8' },
+      { id: 'Theatergasse', name: 'Theatergasse', info: 'Obus' },
+      { id: 'Ferdinand-Hanusch-Platz', name: 'Ferdinand-Hanusch-Platz', info: 'Obus' },
+      { id: 'Salzburg Süd', name: 'Salzburg Süd P+R', info: 'Obus 3,8' },
+      { id: 'Europark', name: 'Europark', info: 'Obus 1,10' },
+      { id: 'Flughafen', name: 'Salzburg Flughafen', info: 'Obus 2,10' },
+      { id: 'Paris-Lodron-Straße', name: 'Universität', info: 'Obus 4,7' },
+      { id: 'Gnigl', name: 'Gnigl', info: 'Obus 5,6' },
+      { id: 'Maxglan West', name: 'Maxglan West', info: 'Obus 1' },
+      { id: 'Itzling', name: 'Itzling', info: 'Obus, S-Bahn' },
+      { id: 'Aiglhof', name: 'Aiglhof', info: 'Lokalbahn' },
+      { id: 'Sam', name: 'Sam', info: 'Lokalbahn' },
+      // === LOKALBAHN S1/S11 ===
+      { id: 'Oberndorf', name: 'Oberndorf bei Salzburg', info: 'Lokalbahn S1/S11' },
+      { id: 'Bürmoos', name: 'Bürmoos', info: 'Lokalbahn S1' },
+      { id: 'Lamprechtshausen', name: 'Lamprechtshausen', info: 'Lokalbahn S1' },
+      { id: 'Trimmelkam', name: 'Trimmelkam', info: 'Lokalbahn S11' },
+      // === FLACHGAU ===
+      { id: 'Seekirchen', name: 'Seekirchen am Wallersee', info: 'S-Bahn, Bus' },
+      { id: 'Eugendorf', name: 'Eugendorf', info: 'S-Bahn, Bus' },
+      { id: 'Mattsee', name: 'Mattsee', info: 'Bus' },
+      { id: 'Straßwalchen', name: 'Straßwalchen', info: 'S-Bahn, Bus' },
+      { id: 'Neumarkt am Wallersee', name: 'Neumarkt am Wallersee', info: 'S-Bahn' },
+      { id: 'Thalgau', name: 'Thalgau', info: 'Bus' },
+      { id: 'Mondsee', name: 'Mondsee', info: 'Bus' },
+      // === TENNENGAU ===
+      { id: 'Hallein', name: 'Hallein', info: 'S-Bahn S3, Bus' },
+      { id: 'Hallein Burgfried', name: 'Hallein Burgfried', info: 'S-Bahn S3' },
+      { id: 'Bad Dürrnberg', name: 'Bad Dürrnberg', info: 'Bus' },
+      { id: 'Golling', name: 'Golling-Abtenau', info: 'S-Bahn S3, Bus' },
+      { id: 'Kuchl', name: 'Kuchl', info: 'S-Bahn S3' },
+      { id: 'Abtenau', name: 'Abtenau', info: 'Bus' },
+      // === PONGAU ===
+      { id: 'St. Johann im Pongau', name: 'St. Johann im Pongau', info: 'S-Bahn, REX, Bus' },
+      { id: 'Bischofshofen', name: 'Bischofshofen', info: 'S-Bahn, REX, IC' },
+      { id: 'Schwarzach-St. Veit', name: 'Schwarzach-St. Veit', info: 'IC, REX, S-Bahn' },
+      { id: 'Werfen', name: 'Werfen', info: 'S-Bahn S3' },
+      { id: 'Pfarrwerfen', name: 'Pfarrwerfen', info: 'S-Bahn S3' },
+      { id: 'Bad Gastein', name: 'Bad Gastein', info: 'IC, REX, Bus' },
+      { id: 'Bad Hofgastein', name: 'Bad Hofgastein', info: 'REX, Bus' },
+      { id: 'Dorfgastein', name: 'Dorfgastein', info: 'REX' },
+      { id: 'Radstadt', name: 'Radstadt', info: 'Bus' },
+      { id: 'Altenmarkt im Pongau', name: 'Altenmarkt im Pongau', info: 'Bus' },
+      { id: 'Wagrain', name: 'Wagrain', info: 'Bus' },
+      { id: 'Flachau', name: 'Flachau', info: 'Bus' },
+      // === PINZGAU ===
+      { id: 'Zell am See', name: 'Zell am See', info: 'IC, REX, Pinzgauer Bahn' },
+      { id: 'Zell am See Postplatz', name: 'Zell am See Postplatz', info: 'Bus' },
+      { id: 'Kaprun', name: 'Kaprun', info: 'Pinzgauer Bahn, Bus' },
+      { id: 'Piesendorf', name: 'Piesendorf', info: 'Pinzgauer Bahn' },
+      { id: 'Niedernsill', name: 'Niedernsill', info: 'Pinzgauer Bahn' },
+      { id: 'Uttendorf-Stubachtal', name: 'Uttendorf-Stubachtal', info: 'Pinzgauer Bahn' },
+      { id: 'Stuhlfelden', name: 'Stuhlfelden', info: 'Pinzgauer Bahn' },
+      { id: 'Mittersill', name: 'Mittersill', info: 'Pinzgauer Bahn, Bus' },
+      { id: 'Bramberg', name: 'Bramberg am Wildkogel', info: 'Pinzgauer Bahn' },
+      { id: 'Neukirchen am Großvenediger', name: 'Neukirchen am Großvenediger', info: 'Pinzgauer Bahn' },
+      { id: 'Wald im Pinzgau', name: 'Wald im Pinzgau', info: 'Pinzgauer Bahn' },
+      { id: 'Krimml', name: 'Krimml', info: 'Pinzgauer Bahn Endstation' },
+      { id: 'Saalfelden', name: 'Saalfelden am Steinernen Meer', info: 'REX, S-Bahn, Bus' },
+      { id: 'Leogang', name: 'Leogang', info: 'Bus' },
+      { id: 'Maria Alm', name: 'Maria Alm', info: 'Bus' },
+      { id: 'Lofer', name: 'Lofer', info: 'Bus' },
+      { id: 'Fieberbrunn', name: 'Fieberbrunn', info: 'REX, Bus' },
+      // === LUNGAU ===
+      { id: 'Tamsweg', name: 'Tamsweg', info: 'Bus' },
+      { id: 'Mauterndorf', name: 'Mauterndorf', info: 'Bus' },
+      { id: 'St. Michael im Lungau', name: 'St. Michael im Lungau', info: 'Bus' },
+      { id: 'Mariapfarr', name: 'Mariapfarr', info: 'Bus' },
+      { id: 'Muhr', name: 'Muhr', info: 'Bus' }
     ]
   },
   DB: {
@@ -1568,7 +1878,225 @@ function updateStationsList() {
   emptyState.insertAdjacentHTML('beforebegin', chips);
 }
 
-// ==================== SAVE ====================
+// ==================== DISPLAY CONFIG ====================
+const NETWORK_COLORS = {
+  WL: { id: 1, name: 'Wiener Linien', color: '#E20613' },
+  WLB: { id: 4, name: 'WLB Badner Bahn', color: '#1E4D8C' },
+  LINZ: { id: 2, name: 'Linz AG', color: '#009640' },
+  SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
+  DB_FERN: { id: 6, name: 'DB Fernverkehr', color: '#EC0016' },
+  DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
+  BERLIN: { id: 3, name: 'VBB Berlin', color: '#F0AB00' },
+  BODO: { id: 7, name: 'BODO Bodensee', color: '#005BBB' }
+};
+
+let suggestedColor = 1;
+let suggestedRows = 2;
+
+function goToDisplayConfig() {
+  if (stations.length === 0) return;
+  
+  // Calculate suggestion
+  const suggestion = suggestDisplayConfig();
+  suggestedColor = suggestion.color;
+  suggestedRows = suggestion.rows;
+  
+  // Update UI
+  document.getElementById('suggestedColorName').textContent = suggestion.colorName;
+  document.getElementById('suggestedRows').textContent = suggestion.rows + ' Zeile' + (suggestion.rows > 1 ? 'n' : '');
+  document.getElementById('previewTitle').textContent = suggestion.colorName + ' Ansicht';
+  document.getElementById('previewDesc').textContent = suggestion.description;
+  
+  // Update selects
+  document.getElementById('colorSelect').value = suggestion.color;
+  document.getElementById('rowsSelect').value = suggestion.rows;
+  
+  // Update preview animation
+  updatePreviewAnimation(suggestion);
+  
+  // Hide finetuning
+  document.getElementById('finetuningSection').classList.add('hidden');
+  
+  // Show config step, hide others
+  document.getElementById('stationsCard').classList.add('hidden');
+  document.getElementById('stepDisplayConfig').classList.remove('hidden');
+  document.querySelector('.bottom-bar').style.display = 'none';
+}
+
+function suggestDisplayConfig() {
+  // Count networks
+  const networkCounts = {};
+  stations.forEach(s => {
+    networkCounts[s.network] = (networkCounts[s.network] || 0) + 1;
+  });
+  
+  // Find dominant network
+  const dominantNetwork = Object.entries(networkCounts)
+    .sort((a, b) => b[1] - a[1])[0][0];
+  
+  // Determine color
+  let colorId, colorName, description;
+  
+  if (dominantNetwork === 'DB') {
+    // Check for S-Bahn vs Fernverkehr
+    const dbStations = stations.filter(s => s.network === 'DB');
+    let hasSBahn = false;
+    let hasFernverkehr = false;
+    
+    dbStations.forEach(s => {
+      const products = s.filter || s.products || '';
+      if (products.includes('S')) hasSBahn = true;
+      if (/ICE|IC|EC|RJ|RJX|NJ|TGV|THA|EN/.test(products)) hasFernverkehr = true;
+    });
+    
+    if (hasFernverkehr && !hasSBahn) {
+      colorId = 6;
+      colorName = 'DB Fernverkehr';
+      description = 'Optimiert für ICE, IC, RJ Anzeige';
+    } else if (hasSBahn && !hasFernverkehr) {
+      colorId = 5;
+      colorName = 'DB S-Bahn';
+      description = 'Optimiert für S-Bahn Anzeige';
+    } else {
+      colorId = 6;
+      colorName = 'DB Fernverkehr';
+      description = 'Gemischte DB-Verbindungen';
+    }
+  } else {
+    const netColor = NETWORK_COLORS[dominantNetwork] || NETWORK_COLORS.WL;
+    colorId = netColor.id;
+    colorName = netColor.name;
+    description = `Optimiert für ${NETWORKS[dominantNetwork]?.name || dominantNetwork}`;
+  }
+  
+  // Count total lines
+  let totalLines = 0;
+  stations.forEach(s => {
+    if (s.filter) {
+      totalLines += s.filter.split(',').length;
+    } else {
+      totalLines += 2; // Default assumption
+    }
+  });
+  
+  // Suggest rows (max 4, min 1)
+  let rows = Math.min(Math.max(Math.ceil(totalLines / stations.length), 1), 4);
+  if (totalLines <= 2) rows = totalLines;
+  if (rows > 4) rows = 4;
+  
+  return { color: colorId, colorName, rows, description };
+}
+
+function updatePreviewAnimation(suggestion) {
+  const previewEl = document.getElementById('previewImage');
+  
+  // Sample data for preview
+  const sampleLines = {
+    WL: [
+      { badge: 'U1', color: '#E20613', dest: 'Leopoldau', time: '3' },
+      { badge: '2', color: '#E20613', dest: 'Ottakring', time: '5' }
+    ],
+    WLB: [
+      { badge: 'WLB', color: '#1E4D8C', dest: 'Baden', time: '4' },
+      { badge: 'WLB', color: '#1E4D8C', dest: 'Wien Oper', time: '12' }
+    ],
+    LINZ: [
+      { badge: '3', color: '#009640', dest: 'Universität', time: '2' },
+      { badge: '1', color: '#009640', dest: 'Auwiesen', time: '6' }
+    ],
+    DB_FERN: [
+      { badge: 'ICE', color: '#EC0016', dest: 'Berlin Hbf', time: '12' },
+      { badge: 'RJ', color: '#EC0016', dest: 'Wien Hbf', time: '28' }
+    ],
+    DB_SBAHN: [
+      { badge: 'S1', color: '#009640', dest: 'Ostbahnhof', time: '3' },
+      { badge: 'S7', color: '#009640', dest: 'Ahrensfelde', time: '8' }
+    ],
+    BERLIN: [
+      { badge: 'U5', color: '#7D5E2A', dest: 'Hönow', time: '2' },
+      { badge: 'S3', color: '#009640', dest: 'Erkner', time: '5' }
+    ],
+    BODO: [
+      { badge: '7', color: '#005BBB', dest: 'Ravensburg', time: '4' },
+      { badge: '1', color: '#005BBB', dest: 'Friedrichshafen', time: '9' }
+    ],
+    SALZBURG: [
+      { badge: '1', color: '#E3000F', dest: 'Maxglan', time: '3' },
+      { badge: 'S1', color: '#E3000F', dest: 'Lamprechtshausen', time: '8' }
+    ]
+  };
+  
+  // Find matching sample
+  let sampleKey = 'WL';
+  if (suggestion.color === 4) sampleKey = 'WLB';
+  else if (suggestion.color === 2) sampleKey = 'LINZ';
+  else if (suggestion.color === 6) sampleKey = 'DB_FERN';
+  else if (suggestion.color === 5) sampleKey = 'DB_SBAHN';
+  else if (suggestion.color === 3) sampleKey = 'BERLIN';
+  else if (suggestion.color === 7) sampleKey = 'BODO';
+  else if (suggestion.color === 8) sampleKey = 'SALZBURG';
+  
+  const lines = sampleLines[sampleKey].slice(0, suggestion.rows);
+  
+  previewEl.innerHTML = `
+    <div class="line-preview">
+      ${lines.map((l, i) => `
+        <div class="line-row" style="animation-delay: ${i * 0.2}s">
+          <span class="line-badge" style="background:${l.color}">${l.badge}</span>
+          <span class="line-dest">${l.dest}</span>
+          <span class="line-time">${l.time}'</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function backFromDisplayConfig() {
+  document.getElementById('stepDisplayConfig').classList.add('hidden');
+  document.getElementById('stationsCard').classList.remove('hidden');
+  document.querySelector('.bottom-bar').style.display = 'block';
+}
+
+function showFinetuning() {
+  document.getElementById('finetuningSection').classList.toggle('hidden');
+}
+
+function sendWithSuggestion() {
+  sendConfigToDevice(suggestedColor, suggestedRows);
+}
+
+function sendWithCustomConfig() {
+  const color = parseInt(document.getElementById('colorSelect').value);
+  const rows = parseInt(document.getElementById('rowsSelect').value);
+  sendConfigToDevice(color, rows);
+}
+
+function sendConfigToDevice(color, rows) {
+  const rblString = stations.map(s => s.fullId).join(',');
+  const filterString = stations.map(s => s.filter || '').join('|');
+  
+  console.log('Sending config:', { rbl: rblString, filter: filterString, color, rows });
+  
+  localStorage.setItem('straba_pending_rbl', rblString);
+  localStorage.setItem('straba_pending_filter', filterString);
+  localStorage.setItem('straba_pending_color', color);
+  localStorage.setItem('straba_pending_rows', rows);
+  
+  // Send to parent (ESP32)
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ 
+      type: 'setConfig', 
+      rbl: rblString, 
+      filter: filterString,
+      color: color,
+      rows: rows
+    }, '*');
+  }
+  
+  window.location.href = 'index.html';
+}
+
+// Keep old saveConfig for compatibility
 function saveConfig() {
   if (stations.length === 0) return;
   
