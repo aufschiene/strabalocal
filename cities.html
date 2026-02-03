@@ -103,6 +103,7 @@
     .network-badge.berlin { background: #F0AB00; color: #000; }
     .network-badge.bodo { background: #005BBB; color: #fff; }
     .network-badge.salzburg { background: #E3000F; color: #fff; }
+    .network-badge.sbg { background: #E3000F; color: #fff; }
     
     /* Region badges */
     .region-badge {
@@ -387,6 +388,7 @@
     .station-chip .network-badge.berlin { background: #F0AB00; color: #000; }
     .station-chip .network-badge.bodo { background: #005BBB; color: #fff; }
     .station-chip .network-badge.salzburg { background: #E3000F; color: #fff; }
+    .station-chip .network-badge.sbg { background: #E3000F; color: #fff; }
     .station-chip .info { flex: 1; min-width: 0; }
     .station-chip .stop-name {
       font-weight: 600;
@@ -504,6 +506,7 @@
     
     /* Hidden */
     .hidden { display: none !important; }
+    .finetuning-step.hidden { display: none !important; }
     
     /* Display Config Step */
     .config-suggestion {
@@ -796,6 +799,411 @@
       font-size: 14px;
       color: #333;
     }
+
+    /* Success Button */
+    .btn-success {
+      background: #28a745 !important;
+    }
+    .btn-success:hover {
+      background: #218838 !important;
+    }
+
+    /* Config Hint */
+    .config-hint {
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+      margin-top: 15px;
+      line-height: 1.5;
+    }
+
+    /* Quick Settings Preview */
+    .quick-settings-preview {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .quick-settings-preview h4 {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+    .settings-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .setting-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #e8f0f8;
+      border: 1px solid #c8d8e8;
+      border-radius: 16px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #333;
+    }
+    .setting-tag.highlight {
+      background: #d4edda;
+      border-color: #a3d9b1;
+    }
+    .setting-tag.inactive {
+      background: #f0f0f0;
+      border-color: #ddd;
+      color: #999;
+    }
+
+    /* Wien Options */
+    .wien-options {
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 12px;
+    }
+    .wien-options h4 {
+      font-size: 12px;
+      color: #f57c00;
+      margin-bottom: 10px;
+    }
+
+    /* Gehweg Quick */
+    .gehweg-quick {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .gehweg-quick h4 {
+      font-size: 13px;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    .gehweg-hint {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 10px;
+    }
+    .gehweg-quick-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      background: #f8f8f8;
+      border-radius: 8px;
+    }
+    .gehweg-quick-item .station-name {
+      flex: 1;
+      font-size: 13px;
+      color: #333;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .gehweg-quick-item input {
+      width: 60px;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      text-align: center;
+    }
+    .gehweg-quick-item .unit {
+      font-size: 12px;
+      color: #888;
+    }
+
+    /* Realistic Display Preview */
+    .realistic-display {
+      font-family: 'Courier New', monospace;
+    }
+    .display-row {
+      transition: all 0.3s ease;
+    }
+
+    /* ==================== FEINTUNING STEP - EINHEITLICHES HELLES DESIGN ==================== */
+    .finetuning-step {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #f5f5f5;
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 20px;
+      padding-bottom: 100px;
+    }
+    .finetuning-step .ft-container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .finetuning-step .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .finetuning-step .header h1 {
+      font-size: 24px;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .finetuning-step .header p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    /* Config Cards - Helles Design wie der Rest */
+    .finetuning-step .config-card {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .finetuning-step .config-card h3 {
+      color: #333;
+      font-size: 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .finetuning-step .config-card h3 .icon {
+      font-size: 20px;
+    }
+
+    /* Form Rows */
+    .finetuning-step .form-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .finetuning-step .form-row:last-child {
+      border-bottom: none;
+    }
+    .finetuning-step .form-label {
+      color: #333;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .finetuning-step .form-hint {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+      font-weight: 400;
+    }
+
+    /* Selects - Helles Design */
+    .finetuning-step select {
+      background: #fff;
+      border: 2px solid #e0e0e0;
+      color: #333;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      min-width: 150px;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 36px;
+    }
+    .finetuning-step select:focus {
+      outline: none;
+      border-color: #0055a4;
+    }
+
+    /* Inputs - Helles Design */
+    .finetuning-step input[type="number"],
+    .finetuning-step input[type="text"] {
+      background: #fff;
+      border: 2px solid #e0e0e0;
+      color: #333;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      width: 70px;
+      text-align: center;
+    }
+    .finetuning-step input:focus {
+      outline: none;
+      border-color: #0055a4;
+    }
+
+    /* Toggle Switches - Helles Design */
+    .finetuning-step .toggle-switch {
+      position: relative;
+      width: 52px;
+      height: 28px;
+      background: #e0e0e0;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .finetuning-step .toggle-switch.active {
+      background: #0055a4;
+    }
+    .finetuning-step .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: #fff;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.3s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .finetuning-step .toggle-switch.active::after {
+      transform: translateX(24px);
+    }
+
+    /* Station Gehweg List */
+    .finetuning-step .gehweg-list {
+      margin-top: 12px;
+    }
+    .finetuning-step .gehweg-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: #f8f8f8;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+    .finetuning-step .gehweg-item .station-name {
+      flex: 1;
+      font-size: 14px;
+      color: #333;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .finetuning-step .gehweg-item input {
+      width: 60px;
+    }
+    .finetuning-step .gehweg-item .unit {
+      color: #888;
+      font-size: 13px;
+    }
+
+    /* Display Preview in Finetuning */
+    .finetuning-step .preview-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .finetuning-step .preview-display {
+      width: 220px;
+      height: 130px;
+      background: #000;
+      border-radius: 12px;
+      border: 4px solid #333;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    /* Bottom Actions - Helles Design */
+    .finetuning-step .bottom-actions {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-top: 1px solid #e0e0e0;
+      padding: 16px 20px;
+      display: flex;
+      gap: 12px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      z-index: 1001;
+    }
+    .finetuning-step .btn-save-finetuning,
+    .finetuning-step .btn-back-finetuning {
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .finetuning-step .btn-save-finetuning {
+      background: #0055a4;
+      color: #fff;
+    }
+    .finetuning-step .btn-save-finetuning:hover {
+      background: #004080;
+      transform: translateY(-1px);
+    }
+    .finetuning-step .btn-back-finetuning {
+      background: #f0f0f0;
+      color: #333;
+    }
+    .finetuning-step .btn-back-finetuning:hover {
+      background: #e0e0e0;
+    }
+
+    /* Wien-specific badge */
+    .finetuning-step .wien-only-badge {
+      background: #E20613;
+      color: #fff;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+    }
+
+    /* Hidden form rows */
+    .finetuning-step .form-row.feature-hidden {
+      display: none;
+    }
+
+    /* Night Mode Times */
+    .finetuning-step .night-times {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .finetuning-step .night-times span {
+      color: #666;
+    }
+
+    /* Toggle Row (Zeilen, Helligkeit) */
+    .finetuning-step .toggle-row {
+      display: flex;
+      background: #f0f0f0;
+      border-radius: 10px;
+      padding: 4px;
+      gap: 4px;
+    }
+    .finetuning-step .toggle-btn {
+      padding: 10px 18px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .finetuning-step .toggle-btn:hover {
+      background: #e0e0e0;
+    }
+    .finetuning-step .toggle-btn.active {
+      background: #0055a4;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -980,22 +1388,112 @@
     </div>
     
     <div class="config-actions">
-      <button class="btn btn-primary btn-large" onclick="sendWithSuggestion()">
-        Mit Empfehlung senden
+      <button class="btn btn-primary btn-large btn-success" onclick="sendWithSuggestion()">
+        ✓ Ja, passt – fertig
       </button>
-      <button class="btn btn-secondary" onclick="showFinetuning()">
-        Feintuning
+      <button class="btn btn-secondary btn-large" onclick="goToFinetuning()">
+        Nein / Feintuning
       </button>
     </div>
-    
-    <!-- Feintuning Section (hidden by default) -->
+
+    <p class="config-hint">
+      "Ja, passt" speichert die Einstellungen direkt auf deinem Straba.<br>
+      "Feintuning" öffnet erweiterte Optionen für individuelle Anpassungen.
+    </p>
+
+    <!-- Quick Preview der gewählten Optionen -->
+    <div class="quick-settings-preview" id="quickSettingsPreview">
+      <h4>Zusammenfassung</h4>
+      <div class="settings-list" id="settingsList">
+        <!-- Wird dynamisch gefüllt -->
+      </div>
+    </div>
+
+    <!-- Kompakter Feintuning-Bereich (optional, versteckt) -->
     <div class="finetuning-section hidden" id="finetuningSection">
-      <h3>Feintuning</h3>
-      
+      <h3>Quick-Anpassung</h3>
+
       <div class="finetuning-row">
         <label>Display-Typ:</label>
-        <select id="colorSelect">
-          <option value="1">Wiener Linien (Standard)</option>
+        <select id="colorSelect" onchange="updateQuickPreview()">
+          <option value="1">Wiener Linien</option>
+          <option value="2">Linz AG</option>
+          <option value="3">VBB Berlin</option>
+          <option value="4">WLB Badner Bahn</option>
+          <option value="5">DB S-Bahn</option>
+          <option value="6">DB Fernverkehr</option>
+          <option value="7">BODO Bodensee</option>
+        </select>
+      </div>
+
+      <div class="finetuning-row">
+        <label>Anzahl Zeilen:</label>
+        <select id="rowsSelect" onchange="updateQuickPreview()">
+          <option value="1">1 Zeile</option>
+          <option value="2">2 Zeilen</option>
+          <option value="3">3 Zeilen</option>
+        </select>
+      </div>
+
+      <!-- Wien-spezifische Optionen (werden dynamisch ein-/ausgeblendet) -->
+      <div class="wien-options" id="wienOptions" style="display:none;">
+        <div class="finetuning-row">
+          <label>Hochflurer markieren:</label>
+          <select id="chopperSelect">
+            <option value="1">An</option>
+            <option value="0">Aus</option>
+          </select>
+        </div>
+        <div class="finetuning-row">
+          <label>Klimaanlage (U-Bahn):</label>
+          <select id="silberpfeilSelect">
+            <option value="1">An</option>
+            <option value="0">Aus</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Gehweg für ALLE Städte -->
+      <div class="gehweg-quick" id="gehwegQuick">
+        <h4>Gehweg zur Haltestelle</h4>
+        <p class="gehweg-hint">Abfahrten unter der Minutenzahl werden ausgeblendet</p>
+        <div id="gehwegQuickList">
+          <!-- Wird dynamisch gefüllt -->
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="applyQuickSettings()">
+        Mit Anpassungen speichern
+      </button>
+    </div>
+  </div>
+</div><!-- Ende .container -->
+
+<!-- Step: Integriertes Feintuning - Full-Screen Overlay (außerhalb Container) -->
+<div class="finetuning-step hidden" id="stepFinetuning">
+  <div class="ft-container">
+    <div class="header">
+      <h1>Feintuning</h1>
+      <p>Passe dein Display individuell an</p>
+    </div>
+
+    <!-- Display Preview -->
+    <div class="preview-container">
+      <div class="preview-display" id="finetuningPreview">
+        <!-- Wird dynamisch gefüllt -->
+      </div>
+    </div>
+
+    <!-- Display Typ -->
+    <div class="config-card">
+      <h3><span class="icon">🎨</span> Anzeige-Stil</h3>
+      <div class="form-row">
+        <div>
+          <div class="form-label">Display-Typ</div>
+          <div class="form-hint">Farbschema des Displays</div>
+        </div>
+        <select id="ftColorSelect" onchange="updateFinetuningPreview()">
+          <option value="1">Wiener Linien</option>
           <option value="2">Linz AG</option>
           <option value="3">VBB Berlin</option>
           <option value="4">WLB Badner Bahn</option>
@@ -1005,23 +1503,102 @@
           <option value="8">Salzburg AG</option>
         </select>
       </div>
-      
-      <div class="finetuning-row">
-        <label>Anzahl Zeilen:</label>
-        <select id="rowsSelect">
-          <option value="1">1 Zeile</option>
-          <option value="2">2 Zeilen</option>
-          <option value="3">3 Zeilen</option>
-          <option value="4">4 Zeilen</option>
-        </select>
+      <div class="form-row">
+        <div>
+          <div class="form-label">Zeilen</div>
+          <div class="form-hint">Anzahl der Abfahrten</div>
+        </div>
+        <div class="toggle-row" id="ftRowsToggle">
+          <button class="toggle-btn" data-value="1" onclick="setFtRows(1)">1</button>
+          <button class="toggle-btn active" data-value="2" onclick="setFtRows(2)">2</button>
+          <button class="toggle-btn" data-value="3" onclick="setFtRows(3)">3</button>
+        </div>
       </div>
-      
-      <button class="btn btn-primary" onclick="sendWithCustomConfig()">
-        Mit Einstellungen senden
-      </button>
+      <div class="form-row">
+        <div>
+          <div class="form-label">Helligkeit</div>
+        </div>
+        <div class="toggle-row" id="ftBrightnessToggle">
+          <button class="toggle-btn" data-value="1" onclick="setFtBrightness(1)">🌑</button>
+          <button class="toggle-btn" data-value="2" onclick="setFtBrightness(2)">🌓</button>
+          <button class="toggle-btn active" data-value="3" onclick="setFtBrightness(3)">🌕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wien-spezifische Optionen -->
+    <div class="config-card" id="ftWienOptions" style="display:none;">
+      <h3><span class="icon">🚋</span> Wien-Optionen <span class="wien-only-badge">WL</span></h3>
+      <div class="form-row" id="ftRowChopper">
+        <div>
+          <div class="form-label">Hochflurer markieren</div>
+          <div class="form-hint">Hebt ältere Garnituren hervor</div>
+        </div>
+        <div class="toggle-switch active" id="ftChopperToggle" onclick="toggleFtSwitch('ftChopperToggle')"></div>
+      </div>
+      <div class="form-row" id="ftRowSilberpfeil">
+        <div>
+          <div class="form-label">Klimaanlage anzeigen</div>
+          <div class="form-hint">U-Bahn Silberpfeil-Warnung</div>
+        </div>
+        <div class="toggle-switch active" id="ftSilberpfeilToggle" onclick="toggleFtSwitch('ftSilberpfeilToggle')"></div>
+      </div>
+    </div>
+
+    <!-- Nachtmodus -->
+    <div class="config-card">
+      <h3><span class="icon">🌙</span> Nachtmodus</h3>
+      <div class="form-row">
+        <div>
+          <div class="form-label">Nachtmodus aktivieren</div>
+          <div class="form-hint">Display nachts dimmen</div>
+        </div>
+        <div class="toggle-switch" id="ftNightModeToggle" onclick="toggleFtSwitch('ftNightModeToggle'); updateNightTimeVisibility()"></div>
+      </div>
+      <div class="form-row" id="ftNightTimesRow" style="display:none;">
+        <div>
+          <div class="form-label">Uhrzeit</div>
+        </div>
+        <div class="night-times">
+          <input type="number" id="ftNightStart" min="0" max="23" value="22"> <span>bis</span>
+          <input type="number" id="ftNightEnd" min="0" max="23" value="6"> <span>Uhr</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gehweg -->
+    <div class="config-card">
+      <h3><span class="icon">🚶</span> Gehweg zur Haltestelle</h3>
+      <p class="form-hint" style="margin-bottom:12px;">Abfahrten unter dieser Minutenzahl werden ausgeblendet</p>
+      <div class="gehweg-list" id="ftGehwegList">
+        <!-- Wird dynamisch gefüllt -->
+      </div>
+    </div>
+
+    <!-- Fun Messages -->
+    <div class="config-card">
+      <h3><span class="icon">🎉</span> Extras</h3>
+      <div class="form-row">
+        <div>
+          <div class="form-label">Spaß-Nachrichten</div>
+          <div class="form-hint">Zeigt witzige Meldungen bei langen Wartezeiten</div>
+        </div>
+        <div class="toggle-switch" id="ftFunMessagesToggle" onclick="toggleFtSwitch('ftFunMessagesToggle')"></div>
+      </div>
+    </div>
+
+    <!-- Spacer für Bottom Actions -->
+    <div style="height: 100px;"></div>
+  </div><!-- Ende ft-container -->
+
+  <!-- Bottom Actions -->
+  <div class="bottom-actions">
+    <div style="max-width:500px;margin:0 auto;display:flex;gap:12px;width:100%;">
+      <button class="btn btn-back-finetuning" onclick="backFromFinetuning()">Zurück</button>
+      <button class="btn btn-save-finetuning" onclick="saveFromFinetuning()">Speichern</button>
     </div>
   </div>
-</div>
+</div><!-- Ende finetuning-step -->
 
 <!-- Bottom Bar -->
 <div class="bottom-bar">
@@ -1040,7 +1617,7 @@ const REGIONS = {
     networks: ['WL', 'WLB', 'LINZ', 'SALZBURG']
   },
   DE: {
-    name: 'Deutschland', 
+    name: 'Deutschland',
     networks: ['DB', 'BERLIN', 'BODO']
   },
   CH: {
@@ -1050,6 +1627,74 @@ const REGIONS = {
   DK: {
     name: 'Dänemark',
     networks: []
+  }
+};
+
+// ==================== CITY CAPABILITIES ====================
+// Definiert welche Features pro Netzwerk verfügbar sind
+const CITY_CAPABILITIES = {
+  WL: {
+    textColorChangeable: true,    // Textfarbe änderbar (Amber/Weiß/Orange)
+    showHighFloor: true,          // Hochflurer-Warnung
+    showAirCondition: true,       // Klimaanlage-Anzeige (U-Bahn Silberpfeil)
+    gehwegFilter: true,           // Gehweg-Filter (ALLE Städte)
+    nightMode: true,              // Nachtmodus (ALLE Städte)
+    defaultColour: 1,             // Wiener Linien Gelb
+    defaultBrightness: 3          // Hell
+  },
+  WLB: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 4,             // WLB Blau
+    defaultBrightness: 3
+  },
+  LINZ: {
+    textColorChangeable: true,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 2,             // Linz AG
+    defaultBrightness: 3
+  },
+  DB: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 6,             // DB Fernverkehr
+    defaultBrightness: 3
+  },
+  BERLIN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 3,             // VBB Berlin
+    defaultBrightness: 3
+  },
+  BODO: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 7,             // BODO
+    defaultBrightness: 3
+  },
+  SALZBURG: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 8,             // Salzburg AG
+    defaultBrightness: 3
   }
 };
 
@@ -1123,92 +1768,6 @@ const NETWORKS = {
       { id: '430312101', name: 'Baden Josefsplatz', info: 'Endstation' }
     ]
   },
-  SALZBURG: {
-    name: 'Salzburg Verkehr (SVV)',
-    shortName: 'SBG',
-    region: 'AT',
-    desc: 'Obus, Lokalbahn, Pinzgauer Bahn, Regionalbusse (Fahrplan)',
-    searchType: 'static_list',
-    placeholder: 'Haltestelle suchen...',
-    isJourneyBased: false,
-    stations: [
-      // === STADT SALZBURG ===
-      { id: 'salzburg-hbf', name: 'Salzburg Hauptbahnhof', info: 'Obus, Lokalbahn, S-Bahn' },
-      { id: 'mirabellplatz', name: 'Mirabellplatz', info: 'Obus 1,2,5,6' },
-      { id: 'makartplatz', name: 'Makartplatz', info: 'Obus 3,5,6' },
-      { id: 'rathaus', name: 'Rathaus', info: 'Obus 3,5,6,8' },
-      { id: 'hanuschplatz', name: 'Hanuschplatz', info: 'Obus 1,2,4,7' },
-      { id: 'mozartsteg', name: 'Mozartsteg', info: 'Obus 3,7,8' },
-      { id: 'theatergasse', name: 'Theatergasse', info: 'Obus' },
-      { id: 'ferdinand-hanusch-platz', name: 'Ferdinand-Hanusch-Platz', info: 'Obus' },
-      { id: 'salzburg-sued', name: 'Salzburg Süd P+R', info: 'Obus 3,8' },
-      { id: 'europark', name: 'Europark', info: 'Obus 1,10' },
-      { id: 'flughafen', name: 'Salzburg Flughafen', info: 'Obus 2,10' },
-      { id: 'paris-lodron-strasse', name: 'Universität', info: 'Obus 4,7' },
-      { id: 'gnigl', name: 'Gnigl', info: 'Obus 5,6' },
-      { id: 'maxglan-west', name: 'Maxglan West', info: 'Obus 1' },
-      { id: 'itzling', name: 'Itzling', info: 'Obus, S-Bahn' },
-      { id: 'aiglhof', name: 'Aiglhof', info: 'Lokalbahn' },
-      { id: 'sam', name: 'Sam', info: 'Lokalbahn' },
-      // === LOKALBAHN S1/S11 ===
-      { id: 'oberndorf', name: 'Oberndorf bei Salzburg', info: 'Lokalbahn S1/S11' },
-      { id: 'buermoos', name: 'Bürmoos', info: 'Lokalbahn S1' },
-      { id: 'lamprechtshausen', name: 'Lamprechtshausen', info: 'Lokalbahn S1' },
-      { id: 'trimmelkam', name: 'Trimmelkam', info: 'Lokalbahn S11' },
-      // === FLACHGAU ===
-      { id: 'seekirchen', name: 'Seekirchen am Wallersee', info: 'S-Bahn, Bus' },
-      { id: 'eugendorf', name: 'Eugendorf', info: 'S-Bahn, Bus' },
-      { id: 'mattsee', name: 'Mattsee', info: 'Bus' },
-      { id: 'strasswalchen', name: 'Straßwalchen', info: 'S-Bahn, Bus' },
-      { id: 'neumarkt-am-wallersee', name: 'Neumarkt am Wallersee', info: 'S-Bahn' },
-      { id: 'thalgau', name: 'Thalgau', info: 'Bus' },
-      { id: 'mondsee', name: 'Mondsee', info: 'Bus' },
-      // === TENNENGAU ===
-      { id: 'hallein', name: 'Hallein', info: 'S-Bahn S3, Bus' },
-      { id: 'hallein-burgfried', name: 'Hallein Burgfried', info: 'S-Bahn S3' },
-      { id: 'bad-duerrnberg', name: 'Bad Dürrnberg', info: 'Bus' },
-      { id: 'golling', name: 'Golling-Abtenau', info: 'S-Bahn S3, Bus' },
-      { id: 'kuchl', name: 'Kuchl', info: 'S-Bahn S3' },
-      { id: 'abtenau', name: 'Abtenau', info: 'Bus' },
-      // === PONGAU ===
-      { id: 'st-johann-im-pongau', name: 'St. Johann im Pongau', info: 'S-Bahn, REX, Bus' },
-      { id: 'bischofshofen', name: 'Bischofshofen', info: 'S-Bahn, REX, IC' },
-      { id: 'schwarzach-st-veit', name: 'Schwarzach-St. Veit', info: 'IC, REX, S-Bahn' },
-      { id: 'werfen', name: 'Werfen', info: 'S-Bahn S3' },
-      { id: 'pfarrwerfen', name: 'Pfarrwerfen', info: 'S-Bahn S3' },
-      { id: 'bad-gastein', name: 'Bad Gastein', info: 'IC, REX, Bus' },
-      { id: 'bad-hofgastein', name: 'Bad Hofgastein', info: 'REX, Bus' },
-      { id: 'dorfgastein', name: 'Dorfgastein', info: 'REX' },
-      { id: 'radstadt', name: 'Radstadt', info: 'Bus' },
-      { id: 'altenmarkt-im-pongau', name: 'Altenmarkt im Pongau', info: 'Bus' },
-      { id: 'wagrain', name: 'Wagrain', info: 'Bus' },
-      { id: 'flachau', name: 'Flachau', info: 'Bus' },
-      // === PINZGAU ===
-      { id: 'zell-am-see', name: 'Zell am See', info: 'IC, REX, Pinzgauer Bahn' },
-      { id: 'zell-am-see-postplatz', name: 'Zell am See Postplatz', info: 'Bus' },
-      { id: 'kaprun', name: 'Kaprun', info: 'Pinzgauer Bahn, Bus' },
-      { id: 'piesendorf', name: 'Piesendorf', info: 'Pinzgauer Bahn' },
-      { id: 'niedernsill', name: 'Niedernsill', info: 'Pinzgauer Bahn' },
-      { id: 'uttendorf-stubachtal', name: 'Uttendorf-Stubachtal', info: 'Pinzgauer Bahn' },
-      { id: 'stuhlfelden', name: 'Stuhlfelden', info: 'Pinzgauer Bahn' },
-      { id: 'mittersill', name: 'Mittersill', info: 'Pinzgauer Bahn, Bus' },
-      { id: 'bramberg', name: 'Bramberg am Wildkogel', info: 'Pinzgauer Bahn' },
-      { id: 'neukirchen-am-grossvenediger', name: 'Neukirchen am Großvenediger', info: 'Pinzgauer Bahn' },
-      { id: 'wald-im-pinzgau', name: 'Wald im Pinzgau', info: 'Pinzgauer Bahn' },
-      { id: 'krimml', name: 'Krimml', info: 'Pinzgauer Bahn Endstation' },
-      { id: 'saalfelden', name: 'Saalfelden am Steinernen Meer', info: 'REX, S-Bahn, Bus' },
-      { id: 'leogang', name: 'Leogang', info: 'Bus' },
-      { id: 'maria-alm', name: 'Maria Alm', info: 'Bus' },
-      { id: 'lofer', name: 'Lofer', info: 'Bus' },
-      { id: 'fieberbrunn', name: 'Fieberbrunn', info: 'REX, Bus' },
-      // === LUNGAU ===
-      { id: 'tamsweg', name: 'Tamsweg', info: 'Bus' },
-      { id: 'mauterndorf', name: 'Mauterndorf', info: 'Bus' },
-      { id: 'st-michael-im-lungau', name: 'St. Michael im Lungau', info: 'Bus' },
-      { id: 'mariapfarr', name: 'Mariapfarr', info: 'Bus' },
-      { id: 'muhr', name: 'Muhr', info: 'Bus' }
-    ]
-  },
   DB: {
     name: 'Deutsche Bahn',
     shortName: 'DB',
@@ -1259,6 +1818,65 @@ const NETWORKS = {
     searchType: 'server_proxy',
     placeholder: 'z.B. Friedrichshafen...',
     isJourneyBased: false
+  },
+  SALZBURG: {
+    name: 'Salzburg Verkehr (SVV)',
+    shortName: 'SBG',
+    region: 'AT',
+    desc: 'Obus, Lokalbahn, Pinzgauer Bahn',
+    searchType: 'static_list',
+    placeholder: 'Haltestelle suchen...',
+    isJourneyBased: false,
+    stations: [
+      // Stadt Salzburg
+      { id: 'salzburg-hbf', name: 'Salzburg Hauptbahnhof', info: 'Obus, Lokalbahn, S-Bahn' },
+      { id: 'mirabellplatz', name: 'Mirabellplatz', info: 'Obus 1,2,5,6' },
+      { id: 'makartplatz', name: 'Makartplatz', info: 'Obus 3,5,6' },
+      { id: 'rathaus', name: 'Rathaus', info: 'Obus 3,5,6,8' },
+      { id: 'hanuschplatz', name: 'Hanuschplatz', info: 'Obus 1,2,4,7' },
+      { id: 'mozartsteg', name: 'Mozartsteg', info: 'Obus 3,7,8' },
+      { id: 'theatergasse', name: 'Theatergasse', info: 'Obus' },
+      { id: 'salzburg-sued', name: 'Salzburg Süd P+R', info: 'Obus 3,8' },
+      { id: 'europark', name: 'Europark', info: 'Obus 1,10' },
+      { id: 'flughafen', name: 'Salzburg Flughafen', info: 'Obus 2,10' },
+      { id: 'paris-lodron-strasse', name: 'Universität', info: 'Obus 4,7' },
+      { id: 'gnigl', name: 'Gnigl', info: 'Obus 5,6' },
+      { id: 'maxglan-west', name: 'Maxglan West', info: 'Obus 1' },
+      { id: 'itzling', name: 'Itzling', info: 'Obus, S-Bahn' },
+      { id: 'aiglhof', name: 'Aiglhof', info: 'Lokalbahn' },
+      // Lokalbahn S1/S11
+      { id: 'oberndorf', name: 'Oberndorf bei Salzburg', info: 'Lokalbahn S1/S11' },
+      { id: 'buermoos', name: 'Bürmoos', info: 'Lokalbahn S1' },
+      { id: 'lamprechtshausen', name: 'Lamprechtshausen', info: 'Lokalbahn S1' },
+      { id: 'trimmelkam', name: 'Trimmelkam', info: 'Lokalbahn S11' },
+      // Flachgau
+      { id: 'seekirchen', name: 'Seekirchen am Wallersee', info: 'S-Bahn, Bus' },
+      { id: 'eugendorf', name: 'Eugendorf', info: 'S-Bahn, Bus' },
+      { id: 'mattsee', name: 'Mattsee', info: 'Bus' },
+      { id: 'strasswalchen', name: 'Straßwalchen', info: 'S-Bahn, Bus' },
+      // Tennengau
+      { id: 'hallein', name: 'Hallein', info: 'S-Bahn S3, Bus' },
+      { id: 'golling', name: 'Golling-Abtenau', info: 'S-Bahn S3, Bus' },
+      { id: 'kuchl', name: 'Kuchl', info: 'S-Bahn S3' },
+      // Pongau
+      { id: 'st-johann-im-pongau', name: 'St. Johann im Pongau', info: 'S-Bahn, REX, Bus' },
+      { id: 'bischofshofen', name: 'Bischofshofen', info: 'S-Bahn, REX, IC' },
+      { id: 'schwarzach-st-veit', name: 'Schwarzach-St. Veit', info: 'IC, REX, S-Bahn' },
+      { id: 'bad-gastein', name: 'Bad Gastein', info: 'IC, REX, Bus' },
+      { id: 'bad-hofgastein', name: 'Bad Hofgastein', info: 'REX, Bus' },
+      // Pinzgau
+      { id: 'zell-am-see', name: 'Zell am See', info: 'IC, REX, Pinzgauer Bahn' },
+      { id: 'kaprun', name: 'Kaprun', info: 'Pinzgauer Bahn, Bus' },
+      { id: 'mittersill', name: 'Mittersill', info: 'Pinzgauer Bahn, Bus' },
+      { id: 'krimml', name: 'Krimml', info: 'Pinzgauer Bahn Endstation' },
+      { id: 'saalfelden', name: 'Saalfelden am Steinernen Meer', info: 'REX, S-Bahn, Bus' },
+      { id: 'leogang', name: 'Leogang', info: 'Bus' },
+      { id: 'lofer', name: 'Lofer', info: 'Bus' },
+      // Lungau
+      { id: 'tamsweg', name: 'Tamsweg', info: 'Bus' },
+      { id: 'mauterndorf', name: 'Mauterndorf', info: 'Bus' },
+      { id: 'st-michael-im-lungau', name: 'St. Michael im Lungau', info: 'Bus' }
+    ]
   }
 };
 
@@ -1883,40 +2501,134 @@ const NETWORK_COLORS = {
   WL: { id: 1, name: 'Wiener Linien', color: '#E20613' },
   WLB: { id: 4, name: 'WLB Badner Bahn', color: '#1E4D8C' },
   LINZ: { id: 2, name: 'Linz AG', color: '#009640' },
-  SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
   DB_FERN: { id: 6, name: 'DB Fernverkehr', color: '#EC0016' },
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
   BERLIN: { id: 3, name: 'VBB Berlin', color: '#F0AB00' },
-  BODO: { id: 7, name: 'BODO Bodensee', color: '#005BBB' }
+  BODO: { id: 7, name: 'BODO Bodensee', color: '#005BBB' },
+  SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' }
 };
 
 let suggestedColor = 1;
 let suggestedRows = 2;
+let recommendedConfig = null;  // Vollständige empfohlene Konfiguration
+
+// ==================== RECOMMENDED CONFIG BERECHNUNG ====================
+function calculateRecommendedConfig() {
+  if (stations.length === 0) return null;
+
+  // Dominantes Netzwerk finden
+  const networkCounts = {};
+  stations.forEach(s => {
+    networkCounts[s.network] = (networkCounts[s.network] || 0) + 1;
+  });
+  const dominantNetwork = Object.entries(networkCounts)
+    .sort((a, b) => b[1] - a[1])[0][0];
+
+  // Capabilities für dominantes Netzwerk
+  const capabilities = CITY_CAPABILITIES[dominantNetwork] || CITY_CAPABILITIES.WL;
+
+  // Display-Typ bestimmen
+  let displayType = capabilities.defaultColour;
+  let displayName = NETWORK_COLORS[dominantNetwork]?.name || 'Wiener Linien';
+  let description = `Optimiert für ${NETWORKS[dominantNetwork]?.name || dominantNetwork}`;
+
+  // Spezialfall DB: S-Bahn vs Fernverkehr
+  if (dominantNetwork === 'DB') {
+    const dbStations = stations.filter(s => s.network === 'DB');
+    let hasSBahn = false, hasFernverkehr = false;
+    dbStations.forEach(s => {
+      const products = s.filter || '';
+      if (products.includes('S')) hasSBahn = true;
+      if (/ICE|IC|EC|RJ|RJX|NJ|TGV|THA|EN/.test(products)) hasFernverkehr = true;
+    });
+    if (hasSBahn && !hasFernverkehr) {
+      displayType = 5;
+      displayName = 'DB S-Bahn';
+      description = 'Optimiert für S-Bahn Anzeige';
+    }
+  }
+
+  // Zeilenanzahl bestimmen
+  let totalLines = 0;
+  stations.forEach(s => {
+    totalLines += s.filter ? s.filter.split(',').length : 2;
+  });
+  let rows = Math.min(Math.max(Math.ceil(totalLines / stations.length), 1), 3);
+  if (totalLines <= 2) rows = totalLines || 2;
+  if (rows > 3) rows = 3;
+
+  // Gehweg-Werte (alle auf 0 als Default)
+  const gehwegValues = stations.map(() => 0);
+
+  return {
+    // Station-Daten
+    rbl: stations.map(s => s.fullId).join(','),
+    filter: stations.map(s => s.filter || '').join('|'),
+    stationDetails: stations.map(s => ({
+      id: s.stopId,
+      name: s.stopName,
+      network: s.network,
+      lines: s.filter ? s.filter.split(',').map(l => ({ name: l, direction: '' })) : []
+    })),
+
+    // Display-Einstellungen
+    colour: displayType,
+    colourName: displayName,
+    description: description,
+    rows: rows,
+    sortMode: 1,           // Statisch als Default
+    displayLight: 3,       // Hell
+
+    // Barrierefreiheit (nur wenn vom Netzwerk unterstützt)
+    chopper: capabilities.showHighFloor ? 1 : 0,
+    silberpfeil: capabilities.showAirCondition ? 1 : 0,
+
+    // Nachtmodus (aus als Default)
+    nightMode: false,
+    nightStart: 22,
+    nightEnd: 7,
+
+    // Erweiterte Einstellungen
+    displayMode: 1,        // Gemischt
+    stopInterval: 10,
+    gehweg: gehwegValues,
+    showFunMessages: true,
+
+    // Capabilities (für UI)
+    capabilities: capabilities,
+    dominantNetwork: dominantNetwork
+  };
+}
 
 function goToDisplayConfig() {
   if (stations.length === 0) return;
-  
-  // Calculate suggestion
-  const suggestion = suggestDisplayConfig();
-  suggestedColor = suggestion.color;
-  suggestedRows = suggestion.rows;
-  
+
+  // Berechne vollständige empfohlene Konfiguration
+  recommendedConfig = calculateRecommendedConfig();
+  if (!recommendedConfig) return;
+
+  suggestedColor = recommendedConfig.colour;
+  suggestedRows = recommendedConfig.rows;
+
   // Update UI
-  document.getElementById('suggestedColorName').textContent = suggestion.colorName;
-  document.getElementById('suggestedRows').textContent = suggestion.rows + ' Zeile' + (suggestion.rows > 1 ? 'n' : '');
-  document.getElementById('previewTitle').textContent = suggestion.colorName + ' Ansicht';
-  document.getElementById('previewDesc').textContent = suggestion.description;
-  
+  document.getElementById('suggestedColorName').textContent = recommendedConfig.colourName;
+  document.getElementById('suggestedRows').textContent = recommendedConfig.rows + ' Zeile' + (recommendedConfig.rows > 1 ? 'n' : '');
+  document.getElementById('previewTitle').textContent = recommendedConfig.colourName + ' Ansicht';
+  document.getElementById('previewDesc').textContent = recommendedConfig.description;
+
   // Update selects
-  document.getElementById('colorSelect').value = suggestion.color;
-  document.getElementById('rowsSelect').value = suggestion.rows;
-  
-  // Update preview animation
-  updatePreviewAnimation(suggestion);
-  
-  // Hide finetuning
+  document.getElementById('colorSelect').value = recommendedConfig.colour;
+  document.getElementById('rowsSelect').value = recommendedConfig.rows;
+
+  // Update realistische Preview
+  updateRealisticPreview(recommendedConfig);
+
+  // Feintuning ausblenden
   document.getElementById('finetuningSection').classList.add('hidden');
-  
+
+  // Quick Preview initialisieren
+  initializeQuickPreview();
+
   // Show config step, hide others
   document.getElementById('stationsCard').classList.add('hidden');
   document.getElementById('stepDisplayConfig').classList.remove('hidden');
@@ -1987,68 +2699,139 @@ function suggestDisplayConfig() {
   return { color: colorId, colorName, rows, description };
 }
 
-function updatePreviewAnimation(suggestion) {
+// ==================== REALISTISCHE DISPLAY-VORSCHAU ====================
+// Basierend auf display_wien.cpp - echtes Wiener Linien Design
+function updateRealisticPreview(config) {
   const previewEl = document.getElementById('previewImage');
-  
-  // Sample data for preview
-  const sampleLines = {
-    WL: [
-      { badge: 'U1', color: '#E20613', dest: 'Leopoldau', time: '3' },
-      { badge: '2', color: '#E20613', dest: 'Ottakring', time: '5' }
-    ],
-    WLB: [
-      { badge: 'WLB', color: '#1E4D8C', dest: 'Baden', time: '4' },
-      { badge: 'WLB', color: '#1E4D8C', dest: 'Wien Oper', time: '12' }
-    ],
-    LINZ: [
-      { badge: '3', color: '#009640', dest: 'Universität', time: '2' },
-      { badge: '1', color: '#009640', dest: 'Auwiesen', time: '6' }
-    ],
-    DB_FERN: [
-      { badge: 'ICE', color: '#EC0016', dest: 'Berlin Hbf', time: '12' },
-      { badge: 'RJ', color: '#EC0016', dest: 'Wien Hbf', time: '28' }
-    ],
-    DB_SBAHN: [
-      { badge: 'S1', color: '#009640', dest: 'Ostbahnhof', time: '3' },
-      { badge: 'S7', color: '#009640', dest: 'Ahrensfelde', time: '8' }
-    ],
-    BERLIN: [
-      { badge: 'U5', color: '#7D5E2A', dest: 'Hönow', time: '2' },
-      { badge: 'S3', color: '#009640', dest: 'Erkner', time: '5' }
-    ],
-    BODO: [
-      { badge: '7', color: '#005BBB', dest: 'Ravensburg', time: '4' },
-      { badge: '1', color: '#005BBB', dest: 'Friedrichshafen', time: '9' }
-    ],
-    SALZBURG: [
-      { badge: '1', color: '#E3000F', dest: 'Maxglan', time: '3' },
-      { badge: 'S1', color: '#E3000F', dest: 'Lamprechtshausen', time: '8' }
-    ]
+  const colour = config.colour;
+  const rows = config.rows;
+
+  // Farben basierend auf Display-Typ (wie in display_wien.cpp / display_factory.h)
+  const displayStyles = {
+    1: { // Wiener Linien
+      bg: '#000500',           // Fast schwarz (rgb(0,5,0))
+      text: '#fff05d',         // Wiener Linien Gelb (rgb(255,240,93))
+      highlight: '#87ceeb',    // Skyblue für Hochflurer
+      name: 'Wiener Linien'
+    },
+    2: { // Linz AG
+      bg: '#000500',
+      text: '#fff05d',
+      highlight: '#87ceeb',
+      name: 'Linz AG'
+    },
+    3: { // VBB Berlin
+      bg: '#000500',
+      text: '#fff05d',
+      highlight: '#87ceeb',
+      name: 'VBB Berlin'
+    },
+    4: { // WLB Badner Bahn
+      bg: '#1E4D8C',
+      text: '#ffffff',
+      highlight: '#ffffff',
+      name: 'WLB'
+    },
+    5: { // DB S-Bahn
+      bg: '#1a1a2e',
+      text: '#00ff00',
+      highlight: '#ffffff',
+      name: 'DB S-Bahn'
+    },
+    6: { // DB Fernverkehr
+      bg: '#1a1a2e',
+      text: '#ffffff',
+      highlight: '#EC0016',
+      name: 'DB Fernverkehr'
+    },
+    7: { // BODO
+      bg: '#005BBB',
+      text: '#ffffff',
+      highlight: '#ffffff',
+      name: 'BODO'
+    },
+    8: { // Salzburg AG
+      bg: '#1a1a1a',
+      text: '#ffffff',
+      highlight: '#E3000F',
+      name: 'Salzburg AG'
+    }
   };
-  
-  // Find matching sample
-  let sampleKey = 'WL';
-  if (suggestion.color === 4) sampleKey = 'WLB';
-  else if (suggestion.color === 2) sampleKey = 'LINZ';
-  else if (suggestion.color === 6) sampleKey = 'DB_FERN';
-  else if (suggestion.color === 5) sampleKey = 'DB_SBAHN';
-  else if (suggestion.color === 3) sampleKey = 'BERLIN';
-  else if (suggestion.color === 7) sampleKey = 'BODO';
-  else if (suggestion.color === 8) sampleKey = 'SALZBURG';
-  
-  const lines = sampleLines[sampleKey].slice(0, suggestion.rows);
-  
+
+  const style = displayStyles[colour] || displayStyles[1];
+
+  // Beispieldaten basierend auf ausgewählten Stationen
+  let sampleData = [];
+  if (stations.length > 0) {
+    // Versuche echte Linien aus den Stationen zu nutzen
+    stations.forEach(s => {
+      if (s.filter) {
+        const lines = s.filter.split(',');
+        lines.forEach(line => {
+          if (sampleData.length < rows) {
+            sampleData.push({
+              line: line.trim(),
+              dest: s.stopName.length > 15 ? s.stopName.substring(0, 14) + '.' : s.stopName,
+              time: Math.floor(Math.random() * 12) + 1,
+              isHighfloor: Math.random() > 0.7
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // Fallback Beispieldaten
+  if (sampleData.length === 0) {
+    const fallbackData = {
+      1: [{ line: 'U6', dest: 'Floridsdorf', time: 3 }, { line: '2', dest: 'Ottakring', time: 6 }, { line: '13A', dest: 'Hauptbahnhof', time: 8 }],
+      4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }],
+      5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'S7', dest: 'Ahrensfelde', time: 5 }],
+      6: [{ line: 'ICE', dest: 'Berlin Hbf', time: 12 }, { line: 'RJ', dest: 'Wien Hbf', time: 28 }],
+      7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }],
+      8: [{ line: '1', dest: 'Hellbrunn', time: 3 }, { line: 'S3', dest: 'Salzburg Hbf', time: 7 }, { line: '22', dest: 'Aigen', time: 11 }]
+    };
+    sampleData = (fallbackData[colour] || fallbackData[1]).slice(0, rows);
+  }
+
+  // Realistische Preview im Stil von display_wien.cpp
+  const rowHeight = Math.floor(80 / rows);
+  previewEl.style.background = style.bg;
+  previewEl.style.borderRadius = '4px';
+  previewEl.style.padding = '0';
+  previewEl.style.overflow = 'hidden';
+
   previewEl.innerHTML = `
-    <div class="line-preview">
-      ${lines.map((l, i) => `
-        <div class="line-row" style="animation-delay: ${i * 0.2}s">
-          <span class="line-badge" style="background:${l.color}">${l.badge}</span>
-          <span class="line-dest">${l.dest}</span>
-          <span class="line-time">${l.time}'</span>
-        </div>
-      `).join('')}
+    <div class="realistic-display" style="width:100%;height:100%;display:flex;flex-direction:column;">
+      ${sampleData.slice(0, rows).map((dep, i) => {
+        const textColor = dep.isHighfloor && config.capabilities?.showHighFloor ? style.highlight : style.text;
+        return `
+          <div class="display-row" style="
+            flex:1;
+            display:flex;
+            align-items:center;
+            padding:2px 4px;
+            border-bottom:${i < rows - 1 ? '1px solid #000' : 'none'};
+            color:${textColor};
+            font-family:'Courier New',monospace;
+          ">
+            <span style="font-weight:bold;font-size:10px;min-width:28px;">${dep.line}</span>
+            <span style="flex:1;font-size:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 4px;">${dep.dest}</span>
+            <span style="font-weight:bold;font-size:11px;color:${style.text};">${dep.time}</span>
+          </div>
+        `;
+      }).join('')}
     </div>
   `;
+}
+
+// Legacy-Funktion für Kompatibilität
+function updatePreviewAnimation(suggestion) {
+  updateRealisticPreview({
+    colour: suggestion.color,
+    rows: suggestion.rows,
+    capabilities: CITY_CAPABILITIES[stations[0]?.network] || CITY_CAPABILITIES.WL
+  });
 }
 
 function backFromDisplayConfig() {
@@ -2058,42 +2841,744 @@ function backFromDisplayConfig() {
 }
 
 function showFinetuning() {
-  document.getElementById('finetuningSection').classList.toggle('hidden');
-}
+  const section = document.getElementById('finetuningSection');
+  section.classList.toggle('hidden');
 
-function sendWithSuggestion() {
-  sendConfigToDevice(suggestedColor, suggestedRows);
-}
-
-function sendWithCustomConfig() {
-  const color = parseInt(document.getElementById('colorSelect').value);
-  const rows = parseInt(document.getElementById('rowsSelect').value);
-  sendConfigToDevice(color, rows);
-}
-
-function sendConfigToDevice(color, rows) {
-  const rblString = stations.map(s => s.fullId).join(',');
-  const filterString = stations.map(s => s.filter || '').join('|');
-  
-  console.log('Sending config:', { rbl: rblString, filter: filterString, color, rows });
-  
-  localStorage.setItem('straba_pending_rbl', rblString);
-  localStorage.setItem('straba_pending_filter', filterString);
-  localStorage.setItem('straba_pending_color', color);
-  localStorage.setItem('straba_pending_rows', rows);
-  
-  // Send to parent (ESP32)
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage({ 
-      type: 'setConfig', 
-      rbl: rblString, 
-      filter: filterString,
-      color: color,
-      rows: rows
-    }, '*');
+  if (!section.classList.contains('hidden')) {
+    // Initialisiere Feintuning-Bereich
+    updateWienOptionsVisibility();
+    populateGehwegQuickList();
   }
-  
-  window.location.href = 'index.html';
+}
+
+// ==================== QUICK PREVIEW & SETTINGS ====================
+function updateQuickPreview() {
+  if (!recommendedConfig) return;
+
+  const settingsList = document.getElementById('settingsList');
+  const colorSelect = document.getElementById('colorSelect');
+  const rowsSelect = document.getElementById('rowsSelect');
+
+  const colour = parseInt(colorSelect.value);
+  const rows = parseInt(rowsSelect.value);
+
+  // Update recommendedConfig mit neuen Werten
+  recommendedConfig.colour = colour;
+  recommendedConfig.rows = rows;
+
+  // Finde das passende Netzwerk für die Capabilities
+  let networkForCapabilities = recommendedConfig.dominantNetwork;
+  if (colour === 1) networkForCapabilities = 'WL';
+  else if (colour === 2) networkForCapabilities = 'LINZ';
+  else if (colour === 4) networkForCapabilities = 'WLB';
+  else if (colour === 5 || colour === 6) networkForCapabilities = 'DB';
+  else if (colour === 3) networkForCapabilities = 'BERLIN';
+  else if (colour === 7) networkForCapabilities = 'BODO';
+
+  const caps = CITY_CAPABILITIES[networkForCapabilities] || CITY_CAPABILITIES.WL;
+
+  // Settings Tags aktualisieren
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO'};
+  settingsList.innerHTML = `
+    <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
+    <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
+    <span class="setting-tag ${caps.showHighFloor ? 'highlight' : 'inactive'}">Hochflurer ${caps.showHighFloor ? '✓' : '✗'}</span>
+    <span class="setting-tag ${caps.showAirCondition ? 'highlight' : 'inactive'}">Klimaanlage ${caps.showAirCondition ? '✓' : '✗'}</span>
+    <span class="setting-tag highlight">Gehweg ✓</span>
+    <span class="setting-tag highlight">Nachtmodus ✓</span>
+  `;
+
+  // Wien-Optionen anzeigen/verstecken
+  updateWienOptionsVisibility();
+
+  // Preview aktualisieren
+  updateRealisticPreview(recommendedConfig);
+}
+
+function updateWienOptionsVisibility() {
+  const wienOptions = document.getElementById('wienOptions');
+  const colorSelect = document.getElementById('colorSelect');
+  if (!wienOptions || !colorSelect) return;
+
+  const colour = parseInt(colorSelect.value);
+
+  // Wien-Optionen nur für Wiener Linien (1) und Linz (2) anzeigen
+  // da diese die gleiche Optik nutzen
+  const showWienOptions = (colour === 1);
+
+  wienOptions.style.display = showWienOptions ? 'block' : 'none';
+}
+
+function populateGehwegQuickList() {
+  const container = document.getElementById('gehwegQuickList');
+  if (!container || !recommendedConfig) return;
+
+  if (recommendedConfig.stationDetails.length === 0) {
+    container.innerHTML = '<p style="color:#888;font-size:12px;">Keine Stationen</p>';
+    return;
+  }
+
+  container.innerHTML = recommendedConfig.stationDetails.map((station, i) => {
+    const value = recommendedConfig.gehweg[i] || 0;
+    return `
+      <div class="gehweg-quick-item">
+        <span class="station-name">${station.name}</span>
+        <input type="number" min="0" max="15" value="${value}"
+               onchange="updateGehwegValue(${i}, this.value)">
+        <span class="unit">Min</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateGehwegValue(index, value) {
+  if (!recommendedConfig) return;
+  const val = Math.max(0, Math.min(15, parseInt(value) || 0));
+  recommendedConfig.gehweg[index] = val;
+}
+
+function applyQuickSettings() {
+  if (!recommendedConfig) return;
+
+  // Werte aus den Selects übernehmen
+  recommendedConfig.colour = parseInt(document.getElementById('colorSelect').value);
+  recommendedConfig.rows = parseInt(document.getElementById('rowsSelect').value);
+
+  // Wien-spezifische Optionen
+  const chopperSelect = document.getElementById('chopperSelect');
+  const silberpfeilSelect = document.getElementById('silberpfeilSelect');
+  if (chopperSelect) recommendedConfig.chopper = parseInt(chopperSelect.value);
+  if (silberpfeilSelect) recommendedConfig.silberpfeil = parseInt(silberpfeilSelect.value);
+
+  // Speichern
+  showSavingOverlay('Speichere Einstellungen...');
+  sendConfigToDeviceDirect(recommendedConfig);
+}
+
+// Initial Quick Preview erstellen wenn Config vorhanden
+function initializeQuickPreview() {
+  if (!recommendedConfig) return;
+
+  const settingsList = document.getElementById('settingsList');
+  if (!settingsList) return;
+
+  const caps = recommendedConfig.capabilities || {};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO'};
+
+  settingsList.innerHTML = `
+    <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
+    <span class="setting-tag">${recommendedConfig.rows} Zeile${recommendedConfig.rows > 1 ? 'n' : ''}</span>
+    <span class="setting-tag ${caps.showHighFloor ? 'highlight' : 'inactive'}">Hochflurer ${caps.showHighFloor ? '✓' : '✗'}</span>
+    <span class="setting-tag ${caps.showAirCondition ? 'highlight' : 'inactive'}">Klimaanlage ${caps.showAirCondition ? '✓' : '✗'}</span>
+    <span class="setting-tag highlight">Gehweg ✓</span>
+    <span class="setting-tag highlight">Nachtmodus ✓</span>
+  `;
+}
+
+// ==================== JA PASST - DIREKT SPEICHERN ====================
+function sendWithSuggestion() {
+  if (!recommendedConfig) {
+    alert('Fehler: Keine Konfiguration berechnet');
+    return;
+  }
+
+  // Zeige Lade-Animation
+  showSavingOverlay('Speichere Einstellungen...');
+
+  // Direkt an das Gerät senden (via postMessage an Parent)
+  sendConfigToDeviceDirect(recommendedConfig);
+}
+
+// ==================== FEINTUNING - INTEGRIERT IN CITIES.HTML ====================
+function goToFinetuning() {
+  if (!recommendedConfig) return;
+
+  // Verstecke Display-Config, zeige Finetuning
+  document.getElementById('stepDisplayConfig').classList.add('hidden');
+  document.getElementById('stepFinetuning').classList.remove('hidden');
+
+  // Initialisiere Finetuning-Felder mit aktueller Config
+  initFinetuningStep();
+}
+
+function initFinetuningStep() {
+  const config = recommendedConfig;
+  if (!config) return;
+
+  // Display-Typ
+  document.getElementById('ftColorSelect').value = config.colour;
+
+  // Zeilen-Toggle setzen
+  setFtRows(config.rows || 2);
+
+  // Helligkeit-Toggle setzen
+  setFtBrightness(config.displayLight || 3);
+
+  // Wien-spezifische Optionen
+  const caps = config.capabilities || {};
+  const wienOptions = document.getElementById('ftWienOptions');
+  if (caps.showHighFloor || caps.showAirCondition) {
+    wienOptions.style.display = 'block';
+    setFtToggle('ftChopperToggle', config.chopper === 1);
+    setFtToggle('ftSilberpfeilToggle', config.silberpfeil === 1);
+  } else {
+    wienOptions.style.display = 'none';
+  }
+
+  // Nachtmodus
+  setFtToggle('ftNightModeToggle', config.nightMode);
+  document.getElementById('ftNightStart').value = config.nightStart || 22;
+  document.getElementById('ftNightEnd').value = config.nightEnd || 6;
+  updateNightTimeVisibility();
+
+  // Fun Messages
+  setFtToggle('ftFunMessagesToggle', config.showFunMessages);
+
+  // Gehweg-Liste
+  populateFtGehwegList();
+
+  // Preview aktualisieren
+  updateFinetuningPreview();
+}
+
+function setFtToggle(id, active) {
+  const el = document.getElementById(id);
+  if (el) {
+    if (active) {
+      el.classList.add('active');
+    } else {
+      el.classList.remove('active');
+    }
+  }
+}
+
+function toggleFtSwitch(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.toggle('active');
+  }
+}
+
+function isFtToggleActive(id) {
+  const el = document.getElementById(id);
+  return el && el.classList.contains('active');
+}
+
+function updateNightTimeVisibility() {
+  const nightRow = document.getElementById('ftNightTimesRow');
+  const isNightMode = isFtToggleActive('ftNightModeToggle');
+  nightRow.style.display = isNightMode ? 'flex' : 'none';
+}
+
+function populateFtGehwegList() {
+  const container = document.getElementById('ftGehwegList');
+  container.innerHTML = '';
+
+  stations.forEach((station, index) => {
+    const gehwegValue = recommendedConfig.gehweg?.[index] || 0;
+    const item = document.createElement('div');
+    item.className = 'gehweg-item';
+    item.innerHTML = `
+      <span class="station-name">${station.stopName}</span>
+      <input type="number" min="0" max="30" value="${gehwegValue}"
+             id="ftGehweg_${index}" onchange="updateFinetuningPreview()">
+      <span class="unit">Min</span>
+    `;
+    container.appendChild(item);
+  });
+}
+
+// Toggle-Buttons für Zeilen
+function setFtRows(value) {
+  document.querySelectorAll('#ftRowsToggle .toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.value) === value);
+  });
+  updateFinetuningPreview();
+}
+
+function getFtRows() {
+  const active = document.querySelector('#ftRowsToggle .toggle-btn.active');
+  return active ? parseInt(active.dataset.value) : 2;
+}
+
+// Toggle-Buttons für Helligkeit
+function setFtBrightness(value) {
+  document.querySelectorAll('#ftBrightnessToggle .toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.value) === value);
+  });
+}
+
+function getFtBrightness() {
+  const active = document.querySelector('#ftBrightnessToggle .toggle-btn.active');
+  return active ? parseInt(active.dataset.value) : 3;
+}
+
+function updateFinetuningPreview() {
+  const colour = parseInt(document.getElementById('ftColorSelect').value);
+  const rows = getFtRows();
+  const previewEl = document.getElementById('finetuningPreview');
+
+  // Beispieldaten pro Display-Typ
+  const sampleData = {
+    1: [{ line: 'U6', dest: 'Floridsdorf', time: 3, hf: false }, { line: '2', dest: 'Ottakring', time: 6, hf: true }, { line: '13A', dest: 'Hauptbahnhof', time: 8, hf: false }],
+    2: [{ line: '1', dest: 'Auwiesen', time: 4 }, { line: '3', dest: 'Landgutstr.', time: 7 }, { line: '46', dest: 'Hauptbahnhof', time: 11 }],
+    3: [{ line: 'U6', dest: 'Alt-Tegel', time: 2 }, { line: 'S1', dest: 'Oranienburg', time: 5 }, { line: 'M10', dest: 'Warschauer', time: 8 }],
+    4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden', time: 19 }],
+    5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'S7', dest: 'Ahrensfelde', time: 5 }, { line: 'S5', dest: 'Strausberg', time: 9 }],
+    6: [{ line: 'ICE', dest: 'Berlin Hbf', time: 12 }, { line: 'RJ', dest: 'Wien Hbf', time: 28 }, { line: 'IC', dest: 'Hamburg', time: 45 }],
+    7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
+    8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }]
+  };
+
+  const data = (sampleData[colour] || sampleData[1]).slice(0, rows);
+
+  // Render basierend auf Display-Typ
+  let html = '';
+
+  if (colour === 1 || colour === 2 || colour === 3) {
+    // Wien/Linz/VBB Style: Gelb auf schwarz
+    const bgColor = '#000500';
+    const textColor = '#fff05d';
+    const hlColor = '#87ceeb';
+    previewEl.style.background = bgColor;
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
+      ${data.map((dep, i) => {
+        const color = dep.hf ? hlColor : textColor;
+        return `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;border-bottom:${i < rows - 1 ? '2px solid #000' : 'none'};color:${color};">
+          <span style="font-weight:bold;font-size:16px;min-width:44px;">${dep.line}</span>
+          <span style="flex:1;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:18px;">${dep.time}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  else if (colour === 4) {
+    // WLB Style: Weiß auf blau gestreift
+    previewEl.style.background = '#0078c8';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+      ${data.map((dep, i) => {
+        const bg = i % 2 === 0 ? '#0078c8' : '#003278';
+        return `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;background:${bg};color:#fff;">
+          <span style="font-weight:bold;font-size:14px;min-width:44px;background:${bg};padding:2px 4px;border-radius:3px;">WLB</span>
+          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:16px;">${dep.time}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  else if (colour === 5 || colour === 6) {
+    // DB Style: Modern dunkel
+    const bgColor = '#0a1628';
+    previewEl.style.background = bgColor;
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+      ${data.map((dep, i) => {
+        const rowBg = i % 2 === 0 ? '#192846' : '#0f1c32';
+        const lineColor = dep.line.startsWith('S') ? '#009640' : (dep.line === 'ICE' || dep.line === 'IC' ? '#c80000' : (dep.line === 'RJ' ? '#c80000' : '#666'));
+        return `<div style="flex:1;display:flex;align-items:center;padding:4px 8px;background:${rowBg};color:#fff;">
+          <span style="font-weight:bold;font-size:12px;min-width:38px;background:${lineColor};color:#fff;padding:3px 6px;border-radius:4px;text-align:center;">${dep.line}</span>
+          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:14px;color:#fff;">${dep.time}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  else if (colour === 7) {
+    // BODO Style: Blau
+    previewEl.style.background = '#005BBB';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+      ${data.map((dep, i) => `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;color:#fff;">
+          <span style="font-weight:bold;font-size:14px;min-width:36px;">${dep.line}</span>
+          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:16px;">${dep.time}</span>
+        </div>`).join('')}
+    </div>`;
+  }
+  else if (colour === 8) {
+    // Salzburg Style: Schwarz/Weiß alternierend mit Uhrzeit
+    previewEl.style.background = '#000';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+      ${data.map((dep, i) => {
+        const bg = i % 2 === 0 ? '#000' : '#fff';
+        const text = i % 2 === 0 ? '#fff' : '#000';
+        const timeDisplay = dep.timeStr || `${String(14 + Math.floor(dep.time / 60)).padStart(2, '0')}:${String(20 + dep.time).padStart(2, '0')}`;
+        return `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;background:${bg};color:${text};">
+          <span style="font-weight:bold;font-size:14px;min-width:32px;">${dep.line}</span>
+          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:14px;">${timeDisplay}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  previewEl.innerHTML = html;
+
+  // Wien-Optionen ein/ausblenden basierend auf Display-Typ
+  const wienOptions = document.getElementById('ftWienOptions');
+  if (colour === 1) {
+    wienOptions.style.display = 'block';
+  } else {
+    wienOptions.style.display = 'none';
+  }
+}
+
+function backFromFinetuning() {
+  document.getElementById('stepFinetuning').classList.add('hidden');
+  document.getElementById('stepDisplayConfig').classList.remove('hidden');
+}
+
+function saveFromFinetuning() {
+  // Sammle alle Finetuning-Werte
+  const colour = parseInt(document.getElementById('ftColorSelect').value);
+  const rows = getFtRows();
+  const displayLight = getFtBrightness();
+  const chopper = isFtToggleActive('ftChopperToggle') ? 1 : 0;
+  const silberpfeil = isFtToggleActive('ftSilberpfeilToggle') ? 1 : 0;
+  const nightMode = isFtToggleActive('ftNightModeToggle');
+  const nightStart = parseInt(document.getElementById('ftNightStart').value) || 22;
+  const nightEnd = parseInt(document.getElementById('ftNightEnd').value) || 6;
+  const showFunMessages = isFtToggleActive('ftFunMessagesToggle');
+
+  // Gehweg-Werte sammeln
+  const gehweg = [];
+  stations.forEach((_, index) => {
+    const input = document.getElementById(`ftGehweg_${index}`);
+    gehweg.push(input ? parseInt(input.value) || 0 : 0);
+  });
+
+  // Update recommendedConfig
+  recommendedConfig.colour = colour;
+  recommendedConfig.rows = rows;
+  recommendedConfig.displayLight = displayLight;
+  recommendedConfig.chopper = chopper;
+  recommendedConfig.silberpfeil = silberpfeil;
+  recommendedConfig.nightMode = nightMode;
+  recommendedConfig.nightStart = nightStart;
+  recommendedConfig.nightEnd = nightEnd;
+  recommendedConfig.showFunMessages = showFunMessages;
+  recommendedConfig.gehweg = gehweg;
+
+  // Speichern
+  showSavingOverlay('Speichere Einstellungen...');
+  sendConfigToDeviceDirect(recommendedConfig);
+}
+
+// Legacy-Funktion - jetzt zu Feintuning umgeleitet
+function sendWithCustomConfig() {
+  goToFinetuning();
+}
+
+// ==================== DIREKT AN GERÄT SENDEN ====================
+let saveRetryCount = 0;
+const MAX_SAVE_RETRIES = 3;
+
+function sendConfigToDeviceDirect(config) {
+  // Baue die Gehweg-String im neuen Format: "stopId:value|stopId:value"
+  let gehwegString = '0';
+  if (config.stationDetails && config.gehweg) {
+    const entries = [];
+    config.stationDetails.forEach((station, i) => {
+      const value = config.gehweg[i] || 0;
+      const stopId = station.id || '';
+      if (stopId) {
+        entries.push(`${stopId}:${value}`);
+      }
+    });
+    if (entries.length > 0) {
+      gehwegString = entries.join('|');
+    }
+  }
+
+  // Config-Daten für ESP32
+  const configData = {
+    type: 'setRBL',
+    rbl: config.rbl,
+    filter: config.filter,
+    zeilen: String(config.rows),
+    sortmode: String(config.sortMode),
+    chopper: String(config.chopper),
+    silberpfeil: String(config.silberpfeil),
+    colour: String(config.colour),
+    displaylight: String(config.displayLight),
+    nightmode: config.nightMode ? '1' : '0',
+    nightstart: String(config.nightStart),
+    nightend: String(config.nightEnd),
+    showfunmessages: config.showFunMessages ? '1' : '0',
+    displaymode: String(config.displayMode),
+    stopinterval: String(config.stopInterval),
+    gehweg: gehwegString
+  };
+
+  console.log('Sende Config direkt an Gerät:', configData);
+
+  // Prüfe ob wir im iframe sind
+  const inIframe = window.parent && window.parent !== window;
+
+  if (inIframe) {
+    // Sende an Parent (ESP32-Seite)
+    window.parent.postMessage(configData, '*');
+
+    // Timeout für Erfolgs-Feedback
+    const saveTimeout = setTimeout(() => {
+      // Falls nach 10 Sekunden keine Antwort, zeige Fehler
+      if (saveRetryCount < MAX_SAVE_RETRIES) {
+        saveRetryCount++;
+        updateSavingOverlay(`Verbindung prüfen... (Versuch ${saveRetryCount}/${MAX_SAVE_RETRIES})`);
+        // Retry nach 2 Sekunden
+        setTimeout(() => {
+          window.parent.postMessage(configData, '*');
+        }, 2000);
+      } else {
+        showSaveError();
+      }
+    }, 10000);
+
+    // Status-Updates
+    setTimeout(() => {
+      updateSavingOverlay('Neustart läuft...');
+    }, 2000);
+
+    setTimeout(() => {
+      updateSavingOverlay('Fertig! Dein Straba startet neu...');
+      clearTimeout(saveTimeout);
+      saveRetryCount = 0;
+    }, 5000);
+
+  } else {
+    // Nicht im iframe - versuche direkt an straba.local zu senden
+    sendConfigDirectToDevice(configData, config);
+  }
+}
+
+// Direkte Kommunikation mit straba.local (Fallback wenn nicht im iframe)
+async function sendConfigDirectToDevice(configData, originalConfig) {
+  updateSavingOverlay('Verbinde mit straba.local...');
+
+  try {
+    // Versuche zuerst zu prüfen ob straba.local erreichbar ist
+    const checkResponse = await fetch('http://straba.local/', {
+      method: 'HEAD',
+      mode: 'no-cors',
+      cache: 'no-store'
+    }).catch(() => null);
+
+    // Baue FormData für POST
+    const formData = new URLSearchParams();
+    formData.append('stop-id', configData.rbl);
+    formData.append('filter', configData.filter);
+    formData.append('anzeige', configData.zeilen);
+    formData.append('sortmode', configData.sortmode);
+    formData.append('chopper', configData.chopper);
+    formData.append('silberpfeil', configData.silberpfeil);
+    formData.append('colour', configData.colour);
+    formData.append('displaylight', configData.displaylight);
+    formData.append('nightmode', configData.nightmode);
+    formData.append('nightstart', configData.nightstart);
+    formData.append('nightend', configData.nightend);
+    formData.append('showfunmessages', configData.showfunmessages);
+    formData.append('displaymode', configData.displaymode);
+    formData.append('stopinterval', configData.stopinterval);
+    formData.append('gehweg', configData.gehweg);
+
+    updateSavingOverlay('Speichere Einstellungen...');
+
+    const response = await fetch('http://straba.local/config', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData.toString()
+    });
+
+    if (response.ok) {
+      updateSavingOverlay('Fertig! Dein Straba startet neu...');
+      setTimeout(() => {
+        hideSavingOverlay();
+        showSuccessMessage();
+      }, 3000);
+    } else {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+  } catch (error) {
+    console.error('Direktes Senden fehlgeschlagen:', error);
+    showSaveError();
+  }
+}
+
+// ==================== FEHLERBEHANDLUNG ====================
+function showSaveError() {
+  hideSavingOverlay();
+
+  const errorOverlay = document.createElement('div');
+  errorOverlay.id = 'errorOverlay';
+  errorOverlay.innerHTML = `
+    <div class="error-content">
+      <div class="error-icon">⚠️</div>
+      <h3>Verbindung fehlgeschlagen</h3>
+      <p>straba.local ist nicht erreichbar.</p>
+      <ul class="error-tips">
+        <li>Stelle sicher, dass dein Straba eingeschaltet ist</li>
+        <li>Prüfe, ob du mit dem Straba-WLAN verbunden bist</li>
+        <li>Versuche die Seite neu zu laden</li>
+      </ul>
+      <div class="error-actions">
+        <button class="btn btn-primary" onclick="retrySave()">Erneut versuchen</button>
+        <button class="btn btn-secondary" onclick="goToFinetuningFromError()">Feintuning öffnen</button>
+      </div>
+    </div>
+  `;
+  errorOverlay.style.cssText = `
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.95);display:flex;
+    align-items:center;justify-content:center;z-index:9999;
+    padding:20px;
+  `;
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .error-content{background:#fff;border-radius:16px;padding:30px;max-width:400px;text-align:center;}
+    .error-icon{font-size:48px;margin-bottom:15px;}
+    .error-content h3{color:#d32f2f;margin-bottom:10px;}
+    .error-content p{color:#666;margin-bottom:15px;}
+    .error-tips{text-align:left;color:#666;font-size:13px;margin:15px 0;padding-left:20px;}
+    .error-tips li{margin-bottom:8px;}
+    .error-actions{display:flex;flex-direction:column;gap:10px;margin-top:20px;}
+    .error-actions .btn{width:100%;}
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(errorOverlay);
+}
+
+function retrySave() {
+  const errorOverlay = document.getElementById('errorOverlay');
+  if (errorOverlay) errorOverlay.remove();
+
+  saveRetryCount = 0;
+  showSavingOverlay('Erneuter Versuch...');
+  sendConfigToDeviceDirect(recommendedConfig);
+}
+
+function goToFinetuningFromError() {
+  const errorOverlay = document.getElementById('errorOverlay');
+  if (errorOverlay) errorOverlay.remove();
+  goToFinetuning();
+}
+
+function showSuccessMessage() {
+  const successOverlay = document.createElement('div');
+  successOverlay.id = 'successOverlay';
+  successOverlay.innerHTML = `
+    <div class="success-content">
+      <div class="success-icon">✓</div>
+      <h3>Erfolgreich gespeichert!</h3>
+      <p>Dein Straba startet neu und übernimmt die neuen Einstellungen.</p>
+      <p class="success-hint">Dies dauert etwa 10-15 Sekunden.</p>
+    </div>
+  `;
+  successOverlay.style.cssText = `
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(40,167,69,0.95);display:flex;
+    align-items:center;justify-content:center;z-index:9999;
+    padding:20px;
+  `;
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .success-content{text-align:center;color:#fff;}
+    .success-icon{font-size:64px;margin-bottom:20px;animation:pop 0.5s ease-out;}
+    .success-content h3{font-size:24px;margin-bottom:10px;}
+    .success-content p{font-size:16px;opacity:0.9;}
+    .success-hint{font-size:14px;opacity:0.7;margin-top:15px;}
+    @keyframes pop{0%{transform:scale(0)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(successOverlay);
+
+  // Nach 5 Sekunden automatisch schließen
+  setTimeout(() => {
+    successOverlay.remove();
+  }, 5000);
+}
+
+// ==================== SAVING OVERLAY ====================
+function showSavingOverlay(text) {
+  let overlay = document.getElementById('savingOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'savingOverlay';
+    overlay.innerHTML = `
+      <div class="saving-content">
+        <div class="saving-spinner"></div>
+        <div class="saving-text">${text}</div>
+      </div>
+    `;
+    overlay.style.cssText = `
+      position:fixed;top:0;left:0;right:0;bottom:0;
+      background:rgba(0,0,0,0.9);display:flex;
+      align-items:center;justify-content:center;
+      flex-direction:column;z-index:9999;
+    `;
+    const style = document.createElement('style');
+    style.textContent = `
+      .saving-content{text-align:center;color:#fff;}
+      .saving-spinner{width:48px;height:48px;border:3px solid #333;
+        border-top-color:#0055a4;border-radius:50%;
+        animation:spin 1s linear infinite;margin:0 auto 20px;}
+      .saving-text{font-size:16px;}
+      @keyframes spin{to{transform:rotate(360deg)}}
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(overlay);
+  } else {
+    overlay.style.display = 'flex';
+    overlay.querySelector('.saving-text').textContent = text;
+  }
+}
+
+function updateSavingOverlay(text) {
+  const overlay = document.getElementById('savingOverlay');
+  if (overlay) {
+    overlay.querySelector('.saving-text').textContent = text;
+  }
+}
+
+function hideSavingOverlay() {
+  const overlay = document.getElementById('savingOverlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
+// Legacy-Funktion für Kompatibilität
+function sendConfigToDevice(color, rows) {
+  if (recommendedConfig) {
+    recommendedConfig.colour = color;
+    recommendedConfig.rows = rows;
+    sendConfigToDeviceDirect(recommendedConfig);
+  } else {
+    // Fallback für alte Aufrufe
+    const rblString = stations.map(s => s.fullId).join(',');
+    const filterString = stations.map(s => s.filter || '').join('|');
+
+    localStorage.setItem('straba_pending_rbl', rblString);
+    localStorage.setItem('straba_pending_filter', filterString);
+
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: 'setConfig',
+        rbl: rblString,
+        filter: filterString,
+        color: color,
+        rows: rows
+      }, '*');
+    }
+    window.location.href = 'index.html';
+  }
 }
 
 // Keep old saveConfig for compatibility
