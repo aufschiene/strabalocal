@@ -3311,20 +3311,22 @@ function addWienStation() {
     return;
   }
 
-  // Ausgewaehlte Richtungen speichern (Linie + towards)
+  // Ausgewaehlte Richtungen speichern (Linie + towards + richtungsId/patternID)
   const selectedDirections = [];
   wienSelectedDirections.forEach(d => {
     selectedDirections.push({
       line: wienSelectedLine.lineName,
       towards: d.towards || '',
-      type: 'metro'
+      type: 'metro',
+      richtungsId: String(d.patternID || '')  // Wien patternID = richtungsId
     });
   });
   wienOtherLines.forEach(ol => {
     selectedDirections.push({
       line: ol.lineName,
       towards: ol.towards || '',
-      type: ol.lineName.startsWith('U') ? 'metro' : 'tram'
+      type: ol.lineName.startsWith('U') ? 'metro' : 'tram',
+      richtungsId: String(ol.patternID || '')  // Wien patternID = richtungsId
     });
   });
 
@@ -5090,10 +5092,13 @@ async function loadFtDirectionsFromStations() {
         const lineName = dir.line || '';
         const towards = dir.towards || '';
         const type = dir.type || '';
+        const richtungsId = dir.richtungsId || '';
 
         if (!lineName) return;
 
-        const key = `${lineName}:${towards}`;
+        // Für Wien: Key basiert auf richtungsId (wenn vorhanden)
+        // Für Linz/andere: Key basiert auf towards
+        const key = richtungsId ? `${lineName}:R${richtungsId}` : `${lineName}:${towards}`;
         // Duplikate vermeiden
         if (!ftAvailableDirections.some(d => d.key === key)) {
           ftAvailableDirections.push({
@@ -5101,7 +5106,9 @@ async function loadFtDirectionsFromStations() {
             line: lineName,
             towards: towards,
             type: type,
-            station: station.stopName
+            richtungsId: richtungsId,
+            station: station.stopName,
+            network: station.network  // Netzwerk speichern für spätere Logik
           });
         }
       });
@@ -5119,19 +5126,23 @@ async function loadFtDirectionsFromStations() {
                 const lineName = line.name || '';
                 const towards = line.towards || monitor.towards || '';
                 const type = line.type || '';
+                const richtungsId = line.richtungsId || monitor.richtungsId || '';
 
                 if (!lineName) return;
 
                 const filterLines = station.filter ? station.filter.split(',').map(f => f.trim()) : [];
                 if (filterLines.length === 0 || filterLines.includes(lineName)) {
-                  const key = `${lineName}:${towards}`;
+                  // Für Wien: Key basiert auf richtungsId (wenn vorhanden)
+                  const key = richtungsId ? `${lineName}:R${richtungsId}` : `${lineName}:${towards}`;
                   if (!ftAvailableDirections.some(d => d.key === key)) {
                     ftAvailableDirections.push({
                       key: key,
                       line: lineName,
                       towards: towards,
                       type: type,
-                      station: station.stopName
+                      richtungsId: richtungsId,
+                      station: station.stopName,
+                      network: station.network
                     });
                   }
                 }
