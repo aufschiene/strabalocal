@@ -2550,7 +2550,7 @@ const NETWORKS = {
     region: 'DE',
     desc: 'Bodensee-Oberschwaben',
     searchType: 'server_proxy',
-    placeholder: 'z.B. Friedrichshafen...',
+    placeholder: 'z.B. Ravensburg, Bahnhof...',
     isJourneyBased: false
   },
   SALZBURG: {
@@ -3507,7 +3507,29 @@ async function selectStop(id, name) {
 
 function extractLines(data) {
   const linesMap = new Map();
-  
+
+  // BODO Filter: Nur reine Zahlen oder erlaubte Buslinien
+  // Erlaubt: Reine Zahlen (1, 2, 7, 22/3, etc.), S20-S199 (Schnellbusse), R25-R199 (Regiobusse)
+  function isBodoAllowed(name) {
+    const trimmed = name.trim();
+    // Reine Zahlen sind erlaubt (auch mit Schrägstrich wie 22/3)
+    if (/^[\d\/]+$/.test(trimmed)) return true;
+    // Schnellbusse S20-S199
+    const sMatch = trimmed.match(/^S\s*(\d+)$/i);
+    if (sMatch) {
+      const num = parseInt(sMatch[1]);
+      if (num >= 20 && num <= 199) return true;
+    }
+    // Regiobusse R25-R199
+    const rMatch = trimmed.match(/^R\s*(\d+)$/i);
+    if (rMatch) {
+      const num = parseInt(rMatch[1]);
+      if (num >= 25 && num <= 199) return true;
+    }
+    // Alles andere (MEX, RS, RE, ICE, etc.) ist nicht erlaubt
+    return false;
+  }
+
   if (data.data && data.data.monitors) {
     data.data.monitors.forEach(monitor => {
       if (monitor.lines) {
@@ -3515,7 +3537,12 @@ function extractLines(data) {
           const name = line.name || '?';
           const towards = line.towards || '';
           const key = `${name}|${towards}`;
-          
+
+          // Bei BODO: Nur erlaubte Linien anzeigen
+          if (selectedNetwork === 'BODO' && !isBodoAllowed(name)) {
+            return; // Nicht erlaubte Linie überspringen
+          }
+
           if (!linesMap.has(key)) {
             linesMap.set(key, { name, towards, type: line.type || '' });
           }
@@ -3523,7 +3550,7 @@ function extractLines(data) {
       }
     });
   }
-  
+
   availableLines = Array.from(linesMap.values());
   
   availableLines.sort((a, b) => {
@@ -5096,6 +5123,17 @@ async function loadFtDirectionsFromStations() {
 
         if (!lineName) return;
 
+        // Bei BODO: Nur erlaubte Linien (Zahlen, Zahlen mit Schrägstrich, S20-S199, R25-R199)
+        if (station.network === 'BODO') {
+          const trimmed = lineName.trim();
+          const isAllowed = /^[\d\/]+$/.test(trimmed) ||
+            (trimmed.match(/^S\s*(\d+)$/i) && parseInt(trimmed.match(/^S\s*(\d+)$/i)[1]) >= 20 && parseInt(trimmed.match(/^S\s*(\d+)$/i)[1]) <= 199) ||
+            (trimmed.match(/^R\s*(\d+)$/i) && parseInt(trimmed.match(/^R\s*(\d+)$/i)[1]) >= 25 && parseInt(trimmed.match(/^R\s*(\d+)$/i)[1]) <= 199);
+          if (!isAllowed) {
+            return; // Nicht erlaubte Linie überspringen
+          }
+        }
+
         // Für Wien: Key basiert auf richtungsId (wenn vorhanden)
         // Für Linz/andere: Key basiert auf towards
         const key = richtungsId ? `${lineName}:R${richtungsId}` : `${lineName}:${towards}`;
@@ -5129,6 +5167,17 @@ async function loadFtDirectionsFromStations() {
                 const richtungsId = line.richtungsId || monitor.richtungsId || '';
 
                 if (!lineName) return;
+
+                // Bei BODO: Nur erlaubte Linien (Zahlen, Zahlen mit Schrägstrich, S20-S199, R25-R199)
+                if (station.network === 'BODO') {
+                  const trimmed = lineName.trim();
+                  const isAllowed = /^[\d\/]+$/.test(trimmed) ||
+                    (trimmed.match(/^S\s*(\d+)$/i) && parseInt(trimmed.match(/^S\s*(\d+)$/i)[1]) >= 20 && parseInt(trimmed.match(/^S\s*(\d+)$/i)[1]) <= 199) ||
+                    (trimmed.match(/^R\s*(\d+)$/i) && parseInt(trimmed.match(/^R\s*(\d+)$/i)[1]) >= 25 && parseInt(trimmed.match(/^R\s*(\d+)$/i)[1]) <= 199);
+                  if (!isAllowed) {
+                    return; // Nicht erlaubte Linie überspringen
+                  }
+                }
 
                 const filterLines = station.filter ? station.filter.split(',').map(f => f.trim()) : [];
                 if (filterLines.length === 0 || filterLines.includes(lineName)) {
