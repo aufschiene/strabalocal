@@ -3808,10 +3808,39 @@ function calculateRecommendedConfig() {
     // Linien-Gruppierung (Format: "1+62,U1+U2" bedeutet Gruppe1=1&62, Gruppe2=U1&U2)
     lineGroups: stations.map(s => s.lineGroups || '').join('|'),
 
+    // Linien+Ziel Filter für Linz (automatisch aus ausgewählten directions)
+    // Format: "1:Auwiesen,2:Universität" - wird automatisch aus den directions gebaut
+    lineFilterDestination: buildLineFilterDestination(stations),
+
     // Capabilities (für UI)
     capabilities: capabilities,
     dominantNetwork: dominantNetwork
   };
+}
+
+/**
+ * Baut den lineFilterDestination String aus den directions der Linz-Stationen
+ * Format: "1:Auwiesen,2:Universität"
+ */
+function buildLineFilterDestination(stationsList) {
+  const filters = [];
+
+  stationsList.forEach(station => {
+    // Nur für Linz (Netzwerke ohne richtungsId)
+    if (station.network === 'LINZ' && station.directions && station.directions.length > 0) {
+      station.directions.forEach(dir => {
+        if (dir.line && dir.towards) {
+          // Format: "Linie:Richtung"
+          const filterEntry = dir.line + ':' + dir.towards;
+          if (!filters.includes(filterEntry)) {
+            filters.push(filterEntry);
+          }
+        }
+      });
+    }
+  });
+
+  return filters.join(',');
 }
 
 function goToDisplayConfig() {
