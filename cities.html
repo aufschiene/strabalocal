@@ -419,6 +419,27 @@
       flex-shrink: 0;
     }
     .station-chip .delete:hover { background: #ffcdd2; }
+    .station-chip .edit {
+      background: #e3f2fd;
+      border: none;
+      color: #1565c0;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-right: 6px;
+    }
+    .station-chip .edit:hover { background: #bbdefb; }
+    .station-chip .buttons {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
     
     .empty-state {
       text-align: center;
@@ -3790,8 +3811,30 @@ function removeStation(idx) {
 }
 
 function updateStationsList() {
-  stationCount.textContent = stations.length;
-  
+  // Gruppiere Stationen nach Name und Netzwerk
+  const groupedStations = new Map();
+  stations.forEach((s, idx) => {
+    const key = `${s.network}:${s.stopName}`;
+    if (!groupedStations.has(key)) {
+      groupedStations.set(key, {
+        network: s.network,
+        stopName: s.stopName,
+        isJourney: s.isJourney,
+        isExisting: s.isExisting,
+        indices: [],
+        filters: [],
+        directions: []
+      });
+    }
+    const group = groupedStations.get(key);
+    group.indices.push(idx);
+    if (s.filter) group.filters.push(s.filter);
+    if (s.directions) group.directions.push(...s.directions);
+  });
+
+  // Anzahl der einzigartigen Stationen anzeigen
+  stationCount.textContent = groupedStations.size;
+
   if (stations.length === 0) {
     emptyState.style.display = 'block';
     saveBtn.disabled = true;
@@ -3799,26 +3842,52 @@ function updateStationsList() {
     emptyState.style.display = 'none';
     saveBtn.disabled = false;
   }
-  
-  const chips = stations.map((s, idx) => {
-    const filterLabel = s.isJourney ? `Produkte: ${s.filter}` : `Linien: ${s.filter || 'Alle'}`;
-    const badgeClass = s.network.toLowerCase();
-    
+
+  const chips = Array.from(groupedStations.values()).map((group) => {
+    const uniqueFilters = [...new Set(group.filters)];
+    const filterLabel = group.isJourney
+      ? `Produkte: ${uniqueFilters.join(', ') || 'Alle'}`
+      : `Linien: ${uniqueFilters.join(', ') || 'Alle'}`;
+    const badgeClass = group.network.toLowerCase();
+    const firstIdx = group.indices[0];
+
     return `
-      <div class="station-chip ${s.isExisting ? 'existing' : ''} ${s.isJourney ? 'journey' : ''}">
-        <span class="network-badge ${badgeClass}">${s.network}</span>
+      <div class="station-chip ${group.isExisting ? 'existing' : ''} ${group.isJourney ? 'journey' : ''}">
+        <span class="network-badge ${badgeClass}">${group.network}</span>
         <div class="info">
-          <div class="stop-name">${s.stopName}</div>
+          <div class="stop-name">${group.stopName}</div>
           <div class="stop-details">${filterLabel}</div>
         </div>
-        <button class="delete" onclick="removeStation(${idx})">×</button>
+        <div class="buttons">
+          <button class="edit" onclick="editStation(${firstIdx})" title="Bearbeiten">✎</button>
+          <button class="delete" onclick="removeStationGroup('${group.network}:${group.stopName.replace(/'/g, "\\'")}')" title="Löschen">×</button>
+        </div>
       </div>
     `;
   }).join('');
-  
+
   const existingChips = stationsContainer.querySelectorAll('.station-chip');
   existingChips.forEach(c => c.remove());
   emptyState.insertAdjacentHTML('beforebegin', chips);
+}
+
+function removeStationGroup(key) {
+  // Entferne alle Stationen mit diesem Key
+  const [network, stopName] = [key.split(':')[0], key.split(':').slice(1).join(':')];
+  stations = stations.filter(s => !(s.network === network && s.stopName === stopName));
+  updateStationsList();
+}
+
+function editStation(idx) {
+  const station = stations[idx];
+  if (!station) return;
+
+  // Setze Netzwerk und gehe zur Linienauswahl
+  selectedNetwork = station.network;
+  selectedStop = { id: station.stopId, name: station.stopName };
+
+  // Zur Linienauswahl navigieren
+  selectStop(station.stopId, station.stopName);
 }
 
 // ==================== DISPLAY CONFIG ====================
@@ -3899,16 +3968,27 @@ function calculateRecommendedConfig() {
   // Gehweg-Werte (alle auf 0 als Default)
   const gehwegValues = stations.map(() => 0);
 
+  // Einzigartige Stationen für stationDetails (gruppiert nach Name+Netzwerk)
+  const uniqueStationDetails = [];
+  const seenStations = new Set();
+  stations.forEach(s => {
+    const key = `${s.network}:${s.stopName}`;
+    if (!seenStations.has(key)) {
+      seenStations.add(key);
+      uniqueStationDetails.push({
+        id: s.stopId,
+        name: s.stopName,
+        network: s.network,
+        lines: s.filter ? s.filter.split(',').map(l => ({ name: l, direction: '' })) : []
+      });
+    }
+  });
+
   return {
     // Station-Daten
     rbl: stations.map(s => s.fullId).join(','),
     filter: stations.map(s => s.filter || '').join('|'),
-    stationDetails: stations.map(s => ({
-      id: s.stopId,
-      name: s.stopName,
-      network: s.network,
-      lines: s.filter ? s.filter.split(',').map(l => ({ name: l, direction: '' })) : []
-    })),
+    stationDetails: uniqueStationDetails,
 
     // Display-Einstellungen
     colour: displayType,
@@ -4518,7 +4598,16 @@ function populateFtGehwegList() {
   const container = document.getElementById('ftGehwegList');
   container.innerHTML = '';
 
+  // Gruppiere Stationen nach Name und Netzwerk (wie in updateStationsList)
+  const uniqueStations = new Map();
   stations.forEach((station, index) => {
+    const key = `${station.network}:${station.stopName}`;
+    if (!uniqueStations.has(key)) {
+      uniqueStations.set(key, { station, index });
+    }
+  });
+
+  uniqueStations.forEach(({ station, index }) => {
     const gehwegValue = recommendedConfig.gehweg?.[index] || 0;
     const item = document.createElement('div');
     item.className = 'gehweg-item';
@@ -6156,6 +6245,20 @@ window.addEventListener('message', async function(event) {
         return gehwegMap[stopId] || 0;
       });
     }
+
+    // UI aktualisieren wenn Feintuning-Seite sichtbar ist
+    const ftStep = document.getElementById('stepFinetuning');
+    if (ftStep && !ftStep.classList.contains('hidden')) {
+      initFinetuningStep();
+    }
+
+    // Debug: Config geladen
+    console.log('[cities.html] Full config loaded:', {
+      lineGroups: recommendedConfig.lineGroups,
+      sortMode: recommendedConfig.sortMode,
+      rows: recommendedConfig.rows,
+      rowOrder: recommendedConfig.rowOrder
+    });
   }
 });
 
