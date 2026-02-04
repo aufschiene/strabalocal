@@ -269,6 +269,11 @@
       background: #006e34;
       color: #fff;
     }
+    /* O-Bus / Trolleybus - Orange */
+    .line-badge.type-obus {
+      background: #e67700;
+      color: #fff;
+    }
     /* Regional/Zug - Weiß mit schwarzer Schrift */
     .line-badge.type-train {
       background: #fff;
@@ -2208,16 +2213,6 @@
           <button class="toggle-btn active" data-value="3" onclick="setFtBrightness(3)">Hell</button>
         </div>
       </div>
-      <div class="form-row">
-        <div>
-          <div class="form-label">Sortierung</div>
-          <div class="form-hint">Dynamisch nach Zeit oder feste Reihenfolge</div>
-        </div>
-        <div class="toggle-row" id="ftSortModeToggle">
-          <button class="toggle-btn active" data-value="1" onclick="setFtSortMode(1)">Zeit</button>
-          <button class="toggle-btn" data-value="2" onclick="setFtSortMode(2)">Statisch</button>
-        </div>
-      </div>
     </div>
 
     <!-- Wien-spezifische Optionen -->
@@ -2239,7 +2234,7 @@
       </div>
     </div>
 
-    <!-- Richtungs-Gruppierung - kommt VOR der Reihenfolge! -->
+    <!-- Richtungs-Gruppierung & Sortierung -->
     <div class="config-card" id="ftGroupingCard">
       <h3>Richtungen gruppieren</h3>
       <p class="form-hint" style="margin-bottom:12px;">
@@ -2260,8 +2255,22 @@
         </div>
       </div>
 
-      <!-- Zeilen-Reihenfolge (nur bei Statisch sichtbar) - innerhalb der Gruppierungs-Card! -->
-      <div id="ftRowOrderSection" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid #e0e0e0;">
+      <!-- Sortierung Toggle -->
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid #e0e0e0;">
+        <div class="form-row">
+          <div>
+            <div class="form-label">Sortierung</div>
+            <div class="form-hint">Dynamisch nach Zeit oder feste Reihenfolge</div>
+          </div>
+          <div class="toggle-row" id="ftSortModeToggle">
+            <button class="toggle-btn active" data-value="1" onclick="setFtSortMode(1)">Zeit</button>
+            <button class="toggle-btn" data-value="2" onclick="setFtSortMode(2)">Statisch</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zeilen-Reihenfolge (nur bei Statisch sichtbar) -->
+      <div id="ftRowOrderSection" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #e0e0e0;">
         <div class="form-label" style="margin-bottom:12px;">Zeilen-Reihenfolge festlegen</div>
         <div class="form-hint" style="margin-bottom:12px;">Ziehe die Gruppen/Linien in die gewünschte Reihenfolge (Zeile 1 = oben)</div>
         <div class="ft-row-order-list" id="ftRowOrderList">
@@ -3603,6 +3612,11 @@ function getLineTypeClass(type, lineName) {
     return 'type-train';
   }
   
+  // O-Bus / Trolleybus (Linz)
+  if (t.includes('obus') || t.includes('trolley') || t.includes('oberleitungsbus')) {
+    return 'type-obus';
+  }
+
   // Bus explizit
   if (t.includes('bus') || t === 'ptbuscity' || t === 'ptbusnight') {
     return 'type-bus';
@@ -3637,11 +3651,16 @@ function getLineTypeClass(type, lineName) {
     return 'type-tram';
   }
   
+  // Linz O-Bus Linien: 41, 43, 45, 46 (ohne Buchstaben)
+  if (!isNaN(num) && [41, 43, 45, 46].includes(num) && /^\d+$/.test(lineName)) {
+    return 'type-obus';
+  }
+
   // Mittlere Nummern (20-99) ohne Buchstaben = wahrscheinlich Bus
   if (!isNaN(num) && num >= 20 && num <= 99 && /^\d+$/.test(lineName)) {
     return 'type-bus';
   }
-  
+
   // Default
   return 'type-default';
 }
