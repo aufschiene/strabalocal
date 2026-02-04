@@ -3820,25 +3820,46 @@ function calculateRecommendedConfig() {
 
 /**
  * Baut den lineFilterDestination String aus den directions der Linz-Stationen
- * Format: "1:Auwiesen,2:Universität"
+ *
+ * NEUES FORMAT mit Richtungs-Gruppierung:
+ * "1:Auwiesen|Remise Kleinmünchen,2:Universität|Auhof"
+ *
+ * Bedeutung: Linie 1 zeigt Auwiesen UND Remise Kleinmünchen (gleiche Richtung),
+ *            Linie 2 zeigt Universität UND Auhof
+ *
+ * Das löst das Problem, dass abends Trams als "Remise" statt "Auwiesen" fahren,
+ * aber trotzdem angezeigt werden sollen.
  */
 function buildLineFilterDestination(stationsList) {
-  const filters = [];
+  // Gruppiere nach Linie: { "1": ["Auwiesen", "Remise Kleinmünchen"], "2": ["Universität"] }
+  const lineToDestinations = {};
 
   stationsList.forEach(station => {
     // Nur für Linz (Netzwerke ohne richtungsId)
     if (station.network === 'LINZ' && station.directions && station.directions.length > 0) {
       station.directions.forEach(dir => {
         if (dir.line && dir.towards) {
-          // Format: "Linie:Richtung"
-          const filterEntry = dir.line + ':' + dir.towards;
-          if (!filters.includes(filterEntry)) {
-            filters.push(filterEntry);
+          const line = dir.line;
+          const dest = dir.towards;
+
+          if (!lineToDestinations[line]) {
+            lineToDestinations[line] = [];
+          }
+          if (!lineToDestinations[line].includes(dest)) {
+            lineToDestinations[line].push(dest);
           }
         }
       });
     }
   });
+
+  // Baue Filter-String: "1:Auwiesen|Remise,2:Uni|Auhof"
+  const filters = [];
+  for (const line in lineToDestinations) {
+    const destinations = lineToDestinations[line];
+    // Mehrere Ziele mit | verbinden
+    filters.push(line + ':' + destinations.join('|'));
+  }
 
   return filters.join(',');
 }
