@@ -3643,14 +3643,28 @@ function calculateRecommendedConfig() {
     }
   }
 
-  // Zeilenanzahl bestimmen
-  let totalLines = 0;
+  // Zeilenanzahl bestimmen: Anzahl der verschiedenen Linien/Richtungen
+  let totalDirections = 0;
   stations.forEach(s => {
-    totalLines += s.filter ? s.filter.split(',').length : 2;
+    if (s.directions && s.directions.length > 0) {
+      // Neue Struktur: directions Array zaehlen
+      totalDirections += s.directions.length;
+    } else if (s.filter) {
+      // Fallback: Filter-Linien zaehlen (alte Struktur)
+      totalDirections += s.filter.split(',').length;
+    } else {
+      totalDirections += 1;
+    }
   });
-  let rows = Math.min(Math.max(Math.ceil(totalLines / stations.length), 1), 3);
-  if (totalLines <= 2) rows = totalLines || 2;
-  if (rows > 3) rows = 3;
+  // Zeilen = Anzahl Richtungen, aber max 3
+  let rows;
+  if (totalDirections > 3) {
+    rows = 3;
+  } else if (totalDirections < 1) {
+    rows = 1;
+  } else {
+    rows = totalDirections;
+  }
 
   // Gehweg-Werte (alle auf 0 als Default)
   const gehwegValues = stations.map(() => 0);
@@ -4367,10 +4381,13 @@ let ftLineGroups = [];  // Array of groups: [{ directions: ['U1:Leopoldau', '62:
 let ftAvailableDirections = [];  // Alle verfugbaren Richtungen aus den Stationen
 let ftGroupingMode = false;  // true wenn gerade eine Gruppe erstellt wird
 let ftSelectedForGroup = [];  // Ausgewaehlte Richtungen fuer neue Gruppe
+let ftEventsAttached = false;  // Flag ob Events schon angehaengt wurden
 
 async function initFtGrouping() {
   ftLineGroups = [];
   ftAvailableDirections = [];
+  ftGroupingMode = false;
+  ftSelectedForGroup = [];
 
   // Richtungen aus allen Stationen laden
   await loadFtDirectionsFromStations();
@@ -4378,6 +4395,12 @@ async function initFtGrouping() {
   // Bestehende Gruppierung aus Config laden
   if (recommendedConfig && recommendedConfig.lineGroups) {
     parseFtExistingGroups(recommendedConfig.lineGroups);
+  }
+
+  // Event-Listener anhaengen (nur einmal)
+  if (!ftEventsAttached) {
+    setupFtGroupingEvents();
+    ftEventsAttached = true;
   }
 
   // UI rendern
@@ -4503,14 +4526,14 @@ function renderFtGroups() {
 
   if (ftLineGroups.length > 0) {
     html += ftLineGroups.map((group, gIdx) => {
-      const directionsHtml = (group.directions || []).map(key => {
+      const directionsHtml = (group.directions || []).map((key, dIdx) => {
         const dirInfo = ftAvailableDirections.find(d => d.key === key);
         const lineName = dirInfo ? dirInfo.line : key.split(':')[0];
         const towards = dirInfo ? dirInfo.towards : key.split(':').slice(1).join(':');
         const badgeClass = dirInfo ? getLineTypeClass(dirInfo.type, lineName) : 'type-default';
 
         return `
-          <div class="ft-direction-chip" data-direction="${escapeHtmlFt(key)}" onclick="removeFromGroup(${gIdx}, '${escapeHtmlFt(key)}')">
+          <div class="ft-direction-chip" data-group-idx="${gIdx}" data-dir-idx="${dIdx}" data-action="remove-from-group">
             <span class="line-badge ${badgeClass}">${lineName}</span>
             ${towards ? `<span class="dir-dest">${towards}</span>` : ''}
             <span class="chip-remove">x</span>
@@ -4522,7 +4545,7 @@ function renderFtGroups() {
         <div class="ft-group-box" data-group-idx="${gIdx}">
           <div class="ft-group-header">
             <span>Gruppe ${gIdx + 1}</span>
-            <button class="ft-group-delete" onclick="deleteFtGroup(${gIdx})">Loeschen</button>
+            <button class="ft-group-delete" data-action="delete-group" data-group-idx="${gIdx}">Loeschen</button>
           </div>
           <div class="ft-group-content">${directionsHtml}</div>
         </div>
@@ -4532,14 +4555,14 @@ function renderFtGroups() {
 
   // Wenn im Gruppierungs-Modus: aktuelle Auswahl anzeigen
   if (ftGroupingMode) {
-    const selectedHtml = ftSelectedForGroup.map(key => {
+    const selectedHtml = ftSelectedForGroup.map((key, idx) => {
       const dirInfo = ftAvailableDirections.find(d => d.key === key);
       const lineName = dirInfo ? dirInfo.line : key.split(':')[0];
       const towards = dirInfo ? dirInfo.towards : key.split(':').slice(1).join(':');
       const badgeClass = dirInfo ? getLineTypeClass(dirInfo.type, lineName) : 'type-default';
 
       return `
-        <div class="ft-direction-chip selected" onclick="toggleFtSelection('${escapeHtmlFt(key)}')">
+        <div class="ft-direction-chip selected" data-selection-idx="${idx}" data-action="toggle-selection">
           <span class="line-badge ${badgeClass}">${lineName}</span>
           ${towards ? `<span class="dir-dest">${towards}</span>` : ''}
         </div>
@@ -4555,15 +4578,15 @@ function renderFtGroups() {
           ${selectedHtml || '<span class="hint">Waehle mindestens 2 Richtungen aus</span>'}
         </div>
         <div class="ft-group-actions">
-          <button class="btn-cancel" onclick="cancelFtGrouping()">Abbrechen</button>
-          <button class="btn-confirm" onclick="confirmFtGroup()" ${ftSelectedForGroup.length < 2 ? 'disabled' : ''}>Gruppe erstellen</button>
+          <button class="btn-cancel" data-action="cancel-grouping">Abbrechen</button>
+          <button class="btn-confirm" data-action="confirm-group" ${ftSelectedForGroup.length < 2 ? 'disabled' : ''}>Gruppe erstellen</button>
         </div>
       </div>
     `;
   } else {
     // Button zum Erstellen einer neuen Gruppe
     html += `
-      <button class="ft-create-group-btn" onclick="startFtGrouping()">+ Neue Gruppe erstellen</button>
+      <button class="ft-create-group-btn" data-action="start-grouping">+ Neue Gruppe erstellen</button>
     `;
   }
 
@@ -4592,16 +4615,14 @@ function renderFtPool() {
     return;
   }
 
-  container.innerHTML = ungrouped.map(dir => {
+  container.innerHTML = ungrouped.map((dir, idx) => {
     const badgeClass = getLineTypeClass(dir.type, dir.line);
     const destText = dir.towards ? dir.towards : '';
-    const clickAction = ftGroupingMode
-      ? `onclick="toggleFtSelection('${escapeHtmlFt(dir.key)}')"`
-      : '';
     const clickableClass = ftGroupingMode ? 'clickable' : '';
+    const poolIdx = ftAvailableDirections.findIndex(d => d.key === dir.key);
 
     return `
-      <div class="ft-direction-chip ${clickableClass}" data-direction="${escapeHtmlFt(dir.key)}" ${clickAction}>
+      <div class="ft-direction-chip ${clickableClass}" data-pool-idx="${poolIdx}" ${ftGroupingMode ? 'data-action="pool-select"' : ''}>
         <span class="line-badge ${badgeClass}">${dir.line}</span>
         ${destText ? `<span class="dir-dest">${destText}</span>` : ''}
       </div>
@@ -4611,6 +4632,7 @@ function renderFtPool() {
 
 // Touch-freundliche Gruppierungs-Funktionen
 function startFtGrouping() {
+  console.log('startFtGrouping aufgerufen');
   ftGroupingMode = true;
   ftSelectedForGroup = [];
   renderFtGroupingUI();
@@ -4623,20 +4645,32 @@ function cancelFtGrouping() {
 }
 
 function toggleFtSelection(key) {
+  console.log('toggleFtSelection aufgerufen mit key:', key);
   const idx = ftSelectedForGroup.indexOf(key);
   if (idx === -1) {
     ftSelectedForGroup.push(key);
+    console.log('Key hinzugefuegt, ftSelectedForGroup:', ftSelectedForGroup);
   } else {
     ftSelectedForGroup.splice(idx, 1);
+    console.log('Key entfernt, ftSelectedForGroup:', ftSelectedForGroup);
   }
   renderFtGroupingUI();
 }
 
 function confirmFtGroup() {
-  if (ftSelectedForGroup.length < 2) return;
+  console.log('confirmFtGroup aufgerufen, ftSelectedForGroup:', ftSelectedForGroup);
+
+  if (ftSelectedForGroup.length < 2) {
+    console.log('Weniger als 2 Richtungen ausgewaehlt, Abbruch');
+    return;
+  }
+
+  console.log('Erstelle Gruppe mit:', ftSelectedForGroup);
 
   // Neue Gruppe erstellen
   ftLineGroups.push({ directions: [...ftSelectedForGroup] });
+
+  console.log('ftLineGroups nach Erstellung:', JSON.stringify(ftLineGroups));
 
   // Reset
   ftGroupingMode = false;
@@ -4662,13 +4696,23 @@ function removeFromGroup(gIdx, key) {
 
 
 function collectFtLineGroups() {
-  if (ftLineGroups.length === 0) return '';
+  console.log('collectFtLineGroups aufgerufen, ftLineGroups:', ftLineGroups);
+
+  if (ftLineGroups.length === 0) {
+    console.log('Keine Gruppen vorhanden');
+    return '';
+  }
 
   // Nur Gruppen mit mindestens 2 Richtungen
   const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 2);
-  if (validGroups.length === 0) return '';
+  if (validGroups.length === 0) {
+    console.log('Keine gueltigen Gruppen (mind. 2 Richtungen)');
+    return '';
+  }
 
-  return validGroups.map(g => g.directions.join('+')).join(',');
+  const result = validGroups.map(g => g.directions.join('+')).join(',');
+  console.log('Gruppierungs-String:', result);
+  return result;
 }
 
 function shortenDestFt(dest) {
@@ -4682,6 +4726,97 @@ function escapeHtmlFt(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// Event Delegation fuer Gruppierung - vermeidet Probleme mit Sonderzeichen
+function setupFtGroupingEvents() {
+  console.log('setupFtGroupingEvents aufgerufen');
+
+  // Groups Container Events
+  const groupsContainer = document.getElementById('ftGroupsContainer');
+  console.log('groupsContainer:', groupsContainer ? 'gefunden' : 'NICHT gefunden');
+
+  if (groupsContainer) {
+    groupsContainer.addEventListener('click', function(e) {
+      console.log('Click in groupsContainer, target:', e.target);
+      const target = e.target.closest('[data-action]');
+      if (!target) {
+        console.log('Kein data-action Element gefunden');
+        return;
+      }
+
+      const action = target.dataset.action;
+      console.log('Grouping action:', action, target.dataset);
+
+      switch(action) {
+        case 'start-grouping':
+          startFtGrouping();
+          break;
+        case 'cancel-grouping':
+          cancelFtGrouping();
+          break;
+        case 'confirm-group':
+          if (!target.disabled) {
+            confirmFtGroup();
+          }
+          break;
+        case 'delete-group':
+          const gIdx = parseInt(target.dataset.groupIdx);
+          deleteFtGroup(gIdx);
+          break;
+        case 'remove-from-group':
+          const groupIdx = parseInt(target.dataset.groupIdx);
+          const dirIdx = parseInt(target.dataset.dirIdx);
+          if (ftLineGroups[groupIdx] && ftLineGroups[groupIdx].directions) {
+            ftLineGroups[groupIdx].directions.splice(dirIdx, 1);
+            if (ftLineGroups[groupIdx].directions.length < 2) {
+              ftLineGroups.splice(groupIdx, 1);
+            }
+            renderFtGroupingUI();
+          }
+          break;
+        case 'toggle-selection':
+          const selIdx = parseInt(target.dataset.selectionIdx);
+          if (selIdx >= 0 && selIdx < ftSelectedForGroup.length) {
+            ftSelectedForGroup.splice(selIdx, 1);
+            renderFtGroupingUI();
+          }
+          break;
+      }
+    });
+  }
+
+  // Pool Container Events
+  const poolContainer = document.getElementById('ftPoolItems');
+  console.log('poolContainer:', poolContainer ? 'gefunden' : 'NICHT gefunden');
+
+  if (poolContainer) {
+    poolContainer.addEventListener('click', function(e) {
+      console.log('Click in poolContainer, target:', e.target, 'ftGroupingMode:', ftGroupingMode);
+      const target = e.target.closest('[data-action="pool-select"]');
+      if (!target) {
+        console.log('Kein pool-select Element');
+        return;
+      }
+      if (!ftGroupingMode) {
+        console.log('Nicht im Grouping-Modus');
+        return;
+      }
+
+      const poolIdx = parseInt(target.dataset.poolIdx);
+      console.log('Pool select, idx:', poolIdx);
+
+      if (poolIdx >= 0 && poolIdx < ftAvailableDirections.length) {
+        const key = ftAvailableDirections[poolIdx].key;
+        console.log('Adding to selection:', key);
+        toggleFtSelection(key);
+      }
+    });
+  }
+
+  console.log('Event-Listener eingerichtet');
+}
+
+// Event-Listener werden in initFtGrouping() angehaengt
 
 function saveFromFinetuning() {
   // Sammle alle Finetuning-Werte
