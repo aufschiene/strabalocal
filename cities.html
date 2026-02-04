@@ -470,6 +470,7 @@
       border-top: 1px solid #e0e0e0;
       padding: 16px 20px;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      z-index: 100;
     }
     .bottom-bar .container { max-width: 500px; }
     .btn-save {
@@ -1723,6 +1724,91 @@
       display: none;
     }
 
+    /* Zeilen-Reihenfolge Drag & Drop */
+    .ft-row-order-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ft-row-order-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #f8f8f8;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      cursor: grab;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .ft-row-order-item:hover {
+      border-color: #0055a4;
+      background: #f0f5fa;
+    }
+    .ft-row-order-item.dragging {
+      opacity: 0.5;
+      border-color: #0055a4;
+      background: #e8f0f8;
+    }
+    .ft-row-order-item .drag-handle {
+      color: #999;
+      font-size: 18px;
+      cursor: grab;
+    }
+    .ft-row-order-item .row-number {
+      background: #0055a4;
+      color: #fff;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .ft-row-order-item .line-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 14px;
+      background: #333;
+      color: #fff;
+    }
+    .ft-row-order-item .direction-text {
+      flex: 1;
+      font-size: 14px;
+      color: #333;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Gruppen-Styling in der Reihenfolge */
+    .ft-row-order-item.ft-row-order-group {
+      background: linear-gradient(135deg, #f0f5fa 0%, #e8f0f8 100%);
+      border-color: #0055a4;
+    }
+    .ft-row-order-item .group-badges {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .ft-row-order-item .group-badges .line-badge {
+      padding: 3px 8px;
+      font-size: 12px;
+    }
+    .ft-row-order-empty {
+      padding: 20px;
+      text-align: center;
+      color: #888;
+      font-size: 14px;
+      background: #f8f8f8;
+      border-radius: 10px;
+      border: 2px dashed #ddd;
+    }
+
     /* Night Mode Times */
     .finetuning-step .night-times {
       display: flex;
@@ -2122,6 +2208,16 @@
           <button class="toggle-btn active" data-value="3" onclick="setFtBrightness(3)">Hell</button>
         </div>
       </div>
+      <div class="form-row">
+        <div>
+          <div class="form-label">Sortierung</div>
+          <div class="form-hint">Dynamisch nach Zeit oder feste Reihenfolge</div>
+        </div>
+        <div class="toggle-row" id="ftSortModeToggle">
+          <button class="toggle-btn active" data-value="1" onclick="setFtSortMode(1)">Zeit</button>
+          <button class="toggle-btn" data-value="2" onclick="setFtSortMode(2)">Statisch</button>
+        </div>
+      </div>
     </div>
 
     <!-- Wien-spezifische Optionen -->
@@ -2143,32 +2239,7 @@
       </div>
     </div>
 
-    <!-- Linz: Linien-Filter (nur bestimmte Linien+Richtungen anzeigen) -->
-    <div class="config-card" id="ftLinzFilterCard" style="display:none;">
-      <h3>Linien-Filter (Linz)</h3>
-      <p class="form-hint" style="margin-bottom:12px;">
-        Wähle welche Linien+Richtungen angezeigt werden sollen.
-        Alle anderen werden ausgeblendet.
-      </p>
-
-      <div class="ft-filter-area">
-        <div class="ft-filter-selected" id="ftFilterSelected">
-          <div class="pool-header">Angezeigte Linien:</div>
-          <div class="filter-items" id="ftFilterItems">
-            <!-- Ausgewählte Filter werden hier gerendert -->
-          </div>
-        </div>
-
-        <div class="ft-filter-pool" id="ftFilterPool">
-          <div class="pool-header">Verfügbare Linien+Richtungen:</div>
-          <div class="pool-items" id="ftFilterPoolItems">
-            <!-- Alle Richtungen werden hier gerendert -->
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Richtungs-Gruppierung -->
+    <!-- Richtungs-Gruppierung - kommt VOR der Reihenfolge! -->
     <div class="config-card" id="ftGroupingCard">
       <h3>Richtungen gruppieren</h3>
       <p class="form-hint" style="margin-bottom:12px;">
@@ -2186,6 +2257,15 @@
           <div class="pool-items" id="ftPoolItems">
             <!-- Richtungen werden hier gerendert -->
           </div>
+        </div>
+      </div>
+
+      <!-- Zeilen-Reihenfolge (nur bei Statisch sichtbar) - innerhalb der Gruppierungs-Card! -->
+      <div id="ftRowOrderSection" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid #e0e0e0;">
+        <div class="form-label" style="margin-bottom:12px;">Zeilen-Reihenfolge festlegen</div>
+        <div class="form-hint" style="margin-bottom:12px;">Ziehe die Gruppen/Linien in die gewünschte Reihenfolge (Zeile 1 = oben)</div>
+        <div class="ft-row-order-list" id="ftRowOrderList">
+          <!-- Wird dynamisch gefüllt mit drag & drop Items (Gruppen + einzelne Linien) -->
         </div>
       </div>
     </div>
@@ -3804,6 +3884,9 @@ function calculateRecommendedConfig() {
     stopInterval: 10,
     gehweg: gehwegValues,
     showFunMessages: true,
+    sortMode: 1,           // 1 = Zeit (dynamisch), 2 = Statisch
+    rowOrder: '',          // Zeilen-Reihenfolge einfach (für Wien)
+    rowOrderDestination: '',  // Zeilen-Reihenfolge mit Ziel (für Linz)
 
     // Linien-Gruppierung (Format: "1+62,U1+U2" bedeutet Gruppe1=1&62, Gruppe2=U1&U2)
     lineGroups: stations.map(s => s.lineGroups || '').join('|'),
@@ -3978,11 +4061,12 @@ function updateRealisticPreview(config) {
       highlight: '#87ceeb',    // Skyblue für Hochflurer
       name: 'Wiener Linien'
     },
-    2: { // Linz AG
-      bg: '#000500',
-      text: '#fff05d',
-      highlight: '#87ceeb',
-      name: 'Linz AG'
+    2: { // Linz AG - LED Matrix Style
+      bg: '#001405',           // Dunkelgrün (LED Matrix Hintergrund)
+      text: '#c8ff00',         // Gelb-Grün (LED Farbe)
+      highlight: '#c8ff00',
+      name: 'Linz AG',
+      isLedMatrix: true        // Flag für spezielles LED-Matrix Rendering
     },
     3: { // VBB Berlin
       bg: '#000500',
@@ -4053,6 +4137,7 @@ function updateRealisticPreview(config) {
   if (sampleData.length === 0) {
     const fallbackData = {
       1: [{ line: 'U6', dest: 'Floridsdorf', time: 3 }, { line: '2', dest: 'Ottakring', time: 6 }, { line: '13A', dest: 'Hauptbahnhof', time: 8 }],
+      2: [{ line: '1', dest: 'Auwiesen', time: 2 }, { line: '2', dest: 'Solar City', time: 5 }, { line: '43', dest: 'Harbachsiedlung', time: 8 }],  // Linz AG
       4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }],
       5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'S7', dest: 'Ahrensfelde', time: 5 }],
       6: [{ line: 'ICE', dest: 'Berlin Hbf', time: 12 }, { line: 'RJ', dest: 'Wien Hbf', time: 28 }],
@@ -4062,35 +4147,69 @@ function updateRealisticPreview(config) {
     sampleData = (fallbackData[colour] || fallbackData[1]).slice(0, rows);
   }
 
-  // Realistische Preview im Stil von display_wien.cpp
+  // Realistische Preview im Stil von display_wien.cpp / display_linz.cpp
   const rowHeight = Math.floor(80 / rows);
-  previewEl.style.background = style.bg;
   previewEl.style.borderRadius = '4px';
   previewEl.style.padding = '0';
   previewEl.style.overflow = 'hidden';
 
-  previewEl.innerHTML = `
-    <div class="realistic-display" style="width:100%;height:100%;display:flex;flex-direction:column;">
-      ${sampleData.slice(0, rows).map((dep, i) => {
-        const textColor = dep.isHighfloor && config.capabilities?.showHighFloor ? style.highlight : style.text;
-        return `
-          <div class="display-row" style="
-            flex:1;
-            display:flex;
-            align-items:center;
-            padding:2px 4px;
-            border-bottom:${i < rows - 1 ? '1px solid #000' : 'none'};
-            color:${textColor};
-            font-family:'Courier New',monospace;
-          ">
-            <span style="font-weight:bold;font-size:10px;min-width:28px;">${dep.line}</span>
-            <span style="flex:1;font-size:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 4px;">${dep.dest}</span>
-            <span style="font-weight:bold;font-size:11px;color:${style.text};">${dep.time}</span>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
+  // Linz AG LED-Matrix Style
+  if (style.isLedMatrix) {
+    const gridColor = '#000a02';  // Noch dunkleres Grün für Gitter
+    previewEl.style.background = style.bg;
+    previewEl.style.backgroundImage = `radial-gradient(circle, ${gridColor} 1px, transparent 1px)`;
+    previewEl.style.backgroundSize = '4px 4px';
+
+    previewEl.innerHTML = `
+      <div class="realistic-display linz-led-matrix" style="width:100%;height:100%;display:flex;flex-direction:column;">
+        ${sampleData.slice(0, rows).map((dep, i) => {
+          return `
+            <div class="display-row" style="
+              flex:1;
+              display:flex;
+              align-items:center;
+              padding:2px 4px;
+              border-bottom:${i < rows - 1 ? '1px solid #000a02' : 'none'};
+              color:${style.text};
+              font-family:'Courier New',monospace;
+              text-shadow: 0 0 4px ${style.text}, 0 0 8px ${style.text}40;
+            ">
+              <span style="font-weight:bold;font-size:10px;min-width:28px;text-shadow:0 0 6px ${style.text};">${dep.line}</span>
+              <span style="flex:1;font-size:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 4px;">${dep.dest}</span>
+              <span style="font-weight:bold;font-size:11px;text-shadow:0 0 6px ${style.text};">${dep.time}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  } else {
+    // Standard Display Style (Wien, etc.)
+    previewEl.style.background = style.bg;
+    previewEl.style.backgroundImage = 'none';
+
+    previewEl.innerHTML = `
+      <div class="realistic-display" style="width:100%;height:100%;display:flex;flex-direction:column;">
+        ${sampleData.slice(0, rows).map((dep, i) => {
+          const textColor = dep.isHighfloor && config.capabilities?.showHighFloor ? style.highlight : style.text;
+          return `
+            <div class="display-row" style="
+              flex:1;
+              display:flex;
+              align-items:center;
+              padding:2px 4px;
+              border-bottom:${i < rows - 1 ? '1px solid #000' : 'none'};
+              color:${textColor};
+              font-family:'Courier New',monospace;
+            ">
+              <span style="font-weight:bold;font-size:10px;min-width:28px;">${dep.line}</span>
+              <span style="flex:1;font-size:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 4px;">${dep.dest}</span>
+              <span style="font-weight:bold;font-size:11px;color:${style.text};">${dep.time}</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
 }
 
 // Legacy-Funktion für Kompatibilität
@@ -4308,8 +4427,8 @@ function initFinetuningStep() {
   // Gruppierung initialisieren
   initFtGrouping();
 
-  // Linz-Filter initialisieren (zeigt Karte nur für Linz)
-  initFtLinzFilter();
+  // Sortierungsmodus initialisieren
+  setFtSortMode(config.sortMode || 1);
 
   // Preview aktualisieren
   updateFinetuningPreview();
@@ -4387,6 +4506,288 @@ function getFtBrightness() {
   return active ? parseInt(active.dataset.value) : 3;
 }
 
+// ==================== SORTIERUNG & ZEILEN-REIHENFOLGE ====================
+let ftSortMode = 1;  // 1 = Zeit (dynamisch), 2 = Statisch
+let ftRowOrder = []; // Array von {line, towards, key} in der gewünschten Reihenfolge
+
+function setFtSortMode(value) {
+  ftSortMode = value;
+  document.querySelectorAll('#ftSortModeToggle .toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.value) === value);
+  });
+
+  // Zeilen-Reihenfolge Sektion ein-/ausblenden
+  const rowOrderSection = document.getElementById('ftRowOrderSection');
+  if (value === 2) {
+    rowOrderSection.style.display = 'block';
+    initRowOrderList();
+  } else {
+    rowOrderSection.style.display = 'none';
+  }
+}
+
+function getFtSortMode() {
+  return ftSortMode;
+}
+
+function initRowOrderList() {
+  const container = document.getElementById('ftRowOrderList');
+
+  // Sammle alle verfügbaren Linien+Richtungen aus den Stationen
+  const allDirections = [];
+  stations.forEach(station => {
+    if (station.directions && Array.isArray(station.directions)) {
+      station.directions.forEach(dir => {
+        const key = `${dir.line}:${dir.towards || ''}`;
+        if (!allDirections.some(d => d.key === key)) {
+          allDirections.push({
+            line: dir.line,
+            towards: dir.towards || '',
+            type: dir.type || '',
+            key: key
+          });
+        }
+      });
+    } else if (station.filter) {
+      // Fallback: aus filter String
+      const lines = station.filter.split(',').map(l => l.trim());
+      lines.forEach(lineName => {
+        const key = `${lineName}:`;
+        if (!allDirections.some(d => d.key === key)) {
+          allDirections.push({
+            line: lineName,
+            towards: station.stopName || '',
+            type: '',
+            key: key
+          });
+        }
+      });
+    }
+  });
+
+  // Erstelle Order-Items basierend auf Gruppen + einzelne ungruppierten Richtungen
+  const orderItems = [];
+  const usedKeys = new Set();
+
+  // 1. Füge Gruppen hinzu
+  ftLineGroups.forEach((group, gIdx) => {
+    const groupDirections = (group.directions || []).map(key => {
+      const dirInfo = allDirections.find(d => d.key === key);
+      return dirInfo || { key, line: key.split(':')[0], towards: key.split(':').slice(1).join(':') };
+    });
+
+    orderItems.push({
+      type: 'group',
+      groupIndex: gIdx,
+      directions: groupDirections,
+      key: `group_${gIdx}`
+    });
+
+    // Markiere alle Keys dieser Gruppe als verwendet
+    (group.directions || []).forEach(k => usedKeys.add(k));
+  });
+
+  // 2. Füge ungruppierten Richtungen hinzu
+  allDirections.forEach(dir => {
+    if (!usedKeys.has(dir.key)) {
+      orderItems.push({
+        type: 'single',
+        line: dir.line,
+        towards: dir.towards,
+        lineType: dir.type,
+        key: dir.key
+      });
+    }
+  });
+
+  // Wenn ftRowOrder leer oder veraltet ist, initialisiere neu
+  if (ftRowOrder.length === 0 || !ftRowOrder[0].type) {
+    ftRowOrder = orderItems;
+  } else {
+    // Synchronisiere: behalte Reihenfolge, aber aktualisiere Gruppen
+    const newOrder = [];
+    const processedKeys = new Set();
+
+    // Behalte bestehende Reihenfolge wo möglich
+    ftRowOrder.forEach(item => {
+      if (item.type === 'group') {
+        // Prüfe ob Gruppe noch existiert
+        const matchingGroup = orderItems.find(oi =>
+          oi.type === 'group' && oi.groupIndex === item.groupIndex
+        );
+        if (matchingGroup) {
+          newOrder.push(matchingGroup);
+          processedKeys.add(matchingGroup.key);
+        }
+      } else if (item.type === 'single') {
+        // Prüfe ob Single noch existiert und nicht gruppiert wurde
+        const matchingSingle = orderItems.find(oi =>
+          oi.type === 'single' && oi.key === item.key
+        );
+        if (matchingSingle) {
+          newOrder.push(matchingSingle);
+          processedKeys.add(matchingSingle.key);
+        }
+      }
+    });
+
+    // Füge neue Items hinzu die noch nicht in der Reihenfolge sind
+    orderItems.forEach(item => {
+      if (!processedKeys.has(item.key)) {
+        newOrder.push(item);
+      }
+    });
+
+    ftRowOrder = newOrder;
+  }
+
+  renderRowOrderList();
+}
+
+function renderRowOrderList() {
+  const container = document.getElementById('ftRowOrderList');
+
+  if (ftRowOrder.length === 0) {
+    container.innerHTML = '<div class="ft-row-order-empty">Keine Linien verfügbar</div>';
+    return;
+  }
+
+  container.innerHTML = ftRowOrder.map((item, idx) => {
+    if (item.type === 'group') {
+      // Gruppe darstellen - zeigt alle Linien der Gruppe
+      const badgesHtml = item.directions.map(dir => {
+        const badgeClass = getLineTypeClass(dir.type || dir.lineType, dir.line);
+        return `<span class="line-badge ${badgeClass}">${dir.line}</span>`;
+      }).join('');
+
+      const firstDest = item.directions[0]?.towards || '';
+
+      return `
+        <div class="ft-row-order-item ft-row-order-group" draggable="true" data-index="${idx}">
+          <span class="drag-handle">☰</span>
+          <span class="row-number">${idx + 1}</span>
+          <span class="group-badges">${badgesHtml}</span>
+          <span class="direction-text">${firstDest}</span>
+        </div>
+      `;
+    } else {
+      // Einzelne Linie
+      const badgeClass = getLineTypeClass(item.lineType, item.line);
+      return `
+        <div class="ft-row-order-item" draggable="true" data-index="${idx}">
+          <span class="drag-handle">☰</span>
+          <span class="row-number">${idx + 1}</span>
+          <span class="line-badge ${badgeClass}">${item.line}</span>
+          <span class="direction-text">${item.towards || 'Alle Richtungen'}</span>
+        </div>
+      `;
+    }
+  }).join('');
+
+  // Drag & Drop Events hinzufügen
+  const items = container.querySelectorAll('.ft-row-order-item');
+  items.forEach(item => {
+    item.addEventListener('dragstart', handleDragStart);
+    item.addEventListener('dragend', handleDragEnd);
+    item.addEventListener('dragover', handleDragOver);
+    item.addEventListener('drop', handleDrop);
+    item.addEventListener('dragenter', handleDragEnter);
+    item.addEventListener('dragleave', handleDragLeave);
+  });
+}
+
+let draggedItem = null;
+let draggedIndex = -1;
+
+function handleDragStart(e) {
+  draggedItem = this;
+  draggedIndex = parseInt(this.dataset.index);
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', draggedIndex);
+}
+
+function handleDragEnd(e) {
+  this.classList.remove('dragging');
+  document.querySelectorAll('.ft-row-order-item').forEach(item => {
+    item.classList.remove('drag-over');
+  });
+  draggedItem = null;
+  draggedIndex = -1;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function handleDragEnter(e) {
+  e.preventDefault();
+  if (this !== draggedItem) {
+    this.classList.add('drag-over');
+  }
+}
+
+function handleDragLeave(e) {
+  this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const targetIndex = parseInt(this.dataset.index);
+
+  if (draggedIndex !== -1 && draggedIndex !== targetIndex) {
+    // Element verschieben
+    const movedItem = ftRowOrder.splice(draggedIndex, 1)[0];
+    ftRowOrder.splice(targetIndex, 0, movedItem);
+
+    // Liste neu rendern
+    renderRowOrderList();
+  }
+
+  this.classList.remove('drag-over');
+}
+
+function getRowOrderString() {
+  // Einfaches Format für Wien: "U6,2,43" - nur Linien
+  // Bei Gruppen: erste Linie der Gruppe verwenden
+  const lines = [];
+  ftRowOrder.forEach(item => {
+    if (item.type === 'group' && item.directions && item.directions.length > 0) {
+      // Bei Gruppe: alle Linien der Gruppe hinzufügen (erste kommt zuerst)
+      item.directions.forEach(dir => {
+        if (!lines.includes(dir.line)) {
+          lines.push(dir.line);
+        }
+      });
+    } else if (item.type === 'single') {
+      if (!lines.includes(item.line)) {
+        lines.push(item.line);
+      }
+    }
+  });
+  return lines.join(',');
+}
+
+function getRowOrderDestinationString() {
+  // Format für Linz: "1:Auwiesen,2:Solarcity" - Linie+Ziel
+  // Bei Gruppen: alle Richtungen der Gruppe in Reihenfolge
+  const items = [];
+  ftRowOrder.forEach(item => {
+    if (item.type === 'group' && item.directions && item.directions.length > 0) {
+      // Bei Gruppe: alle Richtungen der Gruppe hinzufügen
+      item.directions.forEach(dir => {
+        items.push(`${dir.line}:${dir.towards || ''}`);
+      });
+    } else if (item.type === 'single') {
+      items.push(`${item.line}:${item.towards || ''}`);
+    }
+  });
+  return items.join(',');
+}
+
 function updateFinetuningPreview() {
   const colour = parseInt(document.getElementById('ftColorSelect').value);
   const rows = getFtRows();
@@ -4435,12 +4836,32 @@ function updateFinetuningPreview() {
   // Render basierend auf Display-Typ
   let html = '';
 
-  if (colour === 1 || colour === 2 || colour === 3) {
-    // Wien/Linz/VBB Style: Gelb auf schwarz
+  if (colour === 2) {
+    // LINZ Style: Gelb-Grün auf dunkelgrünem Hintergrund mit LED-Matrix Look
+    const bgColor = '#001405';  // Sehr dunkelgrün
+    const textColor = '#c8ff00';  // Gelb-Grün (LED-Farbe)
+    const gridColor = '#002810';  // Etwas heller für Gitter-Muster
+    previewEl.style.background = bgColor;
+    previewEl.style.backgroundImage = `radial-gradient(circle, ${gridColor} 1px, transparent 1px)`;
+    previewEl.style.backgroundSize = '4px 4px';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
+      ${data.map((dep, i) => {
+        return `<div style="flex:1;display:flex;align-items:center;padding:4px 8px;border-bottom:${i < rows - 1 ? '1px solid #0a3020' : 'none'};color:${textColor};">
+          <span style="font-weight:bold;font-size:18px;min-width:36px;text-shadow:0 0 8px ${textColor};">${dep.line}</span>
+          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 6px;text-shadow:0 0 4px ${textColor};">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:18px;text-shadow:0 0 8px ${textColor};">${dep.time}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  else if (colour === 1 || colour === 3) {
+    // Wien/VBB Style: Gelb auf schwarz
     const bgColor = '#000500';
     const textColor = '#fff05d';
     const hlColor = '#87ceeb';
     previewEl.style.background = bgColor;
+    previewEl.style.backgroundImage = 'none';
 
     html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
       ${data.map((dep, i) => {
@@ -4456,6 +4877,7 @@ function updateFinetuningPreview() {
   else if (colour === 4) {
     // WLB Style: Weiß auf blau gestreift
     previewEl.style.background = '#0078c8';
+    previewEl.style.backgroundImage = 'none';
 
     html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
       ${data.map((dep, i) => {
@@ -4472,6 +4894,7 @@ function updateFinetuningPreview() {
     // DB Style: Modern dunkel
     const bgColor = '#0a1628';
     previewEl.style.background = bgColor;
+    previewEl.style.backgroundImage = 'none';
 
     html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
       ${data.map((dep, i) => {
@@ -4488,6 +4911,7 @@ function updateFinetuningPreview() {
   else if (colour === 7) {
     // BODO Style: Blau
     previewEl.style.background = '#005BBB';
+    previewEl.style.backgroundImage = 'none';
 
     html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
       ${data.map((dep, i) => `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;color:#fff;">
@@ -4500,6 +4924,7 @@ function updateFinetuningPreview() {
   else if (colour === 8) {
     // Salzburg Style: Schwarz/Weiß alternierend mit Uhrzeit
     previewEl.style.background = '#000';
+    previewEl.style.backgroundImage = 'none';
 
     html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
       ${data.map((dep, i) => {
@@ -4532,113 +4957,17 @@ function backFromFinetuning() {
 }
 
 // ==================== FEINTUNING: LINZ LINIEN-FILTER ====================
-let ftLineFilter = [];  // Array von erlaubten "line:destination" Strings
-let ftFilterEventsAttached = false;
+// Filter wird jetzt automatisch aus ausgewählten Linien generiert (in buildLineFilterDestination)
 
 function isLinzNetwork() {
   // Prüfe ob mindestens eine Station aus Linz ist
   return stations.some(s => s.network === 'LINZ' || (s.stopId && s.stopId.toString().startsWith('LINZ:')));
 }
 
-async function initFtLinzFilter() {
-  ftLineFilter = [];
-
-  // Linz-Filter Karte nur für Linz anzeigen
-  const filterCard = document.getElementById('ftLinzFilterCard');
-  if (!isLinzNetwork()) {
-    filterCard.style.display = 'none';
-    return;
-  }
-  filterCard.style.display = 'block';
-
-  // Bestehenden Linien+Ziel Filter aus Config laden (lineFilterDestination)
-  if (recommendedConfig && recommendedConfig.lineFilterDestination) {
-    ftLineFilter = recommendedConfig.lineFilterDestination.split(',').map(f => f.trim()).filter(f => f);
-  }
-
-  // Events anhaengen
-  if (!ftFilterEventsAttached) {
-    setupFtFilterEvents();
-    ftFilterEventsAttached = true;
-  }
-
-  // UI rendern
-  renderFtFilterUI();
-}
-
-function setupFtFilterEvents() {
-  // Event delegation für Filter-Pool
-  document.getElementById('ftFilterPoolItems')?.addEventListener('click', function(e) {
-    const item = e.target.closest('.filter-pool-item');
-    if (item) {
-      const key = item.dataset.key;
-      if (key && !ftLineFilter.includes(key)) {
-        ftLineFilter.push(key);
-        renderFtFilterUI();
-      }
-    }
-  });
-
-  // Event delegation für Filter entfernen
-  document.getElementById('ftFilterItems')?.addEventListener('click', function(e) {
-    const btn = e.target.closest('.remove-filter');
-    if (btn) {
-      const key = btn.dataset.key;
-      ftLineFilter = ftLineFilter.filter(f => f !== key);
-      renderFtFilterUI();
-    }
-  });
-}
-
-function renderFtFilterUI() {
-  renderFtFilterSelected();
-  renderFtFilterPool();
-}
-
-function renderFtFilterSelected() {
-  const container = document.getElementById('ftFilterItems');
-  if (!container) return;
-
-  if (ftLineFilter.length === 0) {
-    container.innerHTML = '<div class="no-filter-hint">Kein Filter - alle Linien werden angezeigt</div>';
-    return;
-  }
-
-  container.innerHTML = ftLineFilter.map(key => {
-    const parts = key.split(':');
-    const line = parts[0] || '';
-    const dest = parts.slice(1).join(':') || '';
-    return `<div class="filter-item">
-      <span class="line">${line}</span>
-      <span class="dest">${dest}</span>
-      <button class="remove-filter" data-key="${key}">&times;</button>
-    </div>`;
-  }).join('');
-}
-
-function renderFtFilterPool() {
-  const container = document.getElementById('ftFilterPoolItems');
-  if (!container) return;
-
-  // Zeige alle verfügbaren Richtungen, die noch nicht im Filter sind
-  const available = ftAvailableDirections.filter(d => !ftLineFilter.includes(d.key));
-
-  if (available.length === 0) {
-    container.innerHTML = '<div class="no-filter-hint">Alle Richtungen sind bereits ausgewählt</div>';
-    return;
-  }
-
-  container.innerHTML = available.map(d => {
-    return `<div class="filter-pool-item" data-key="${d.key}">
-      <span style="font-weight:600;">${d.line}</span>
-      <span style="color:#666;font-size:12px;">${d.towards || ''}</span>
-    </div>`;
-  }).join('');
-}
-
 function collectFtLineFilter() {
-  if (ftLineFilter.length === 0) return '';
-  return ftLineFilter.join(',');
+  // Filter wird automatisch aus den ausgewählten Linien/Richtungen generiert
+  // Verwende den bereits generierten Wert aus recommendedConfig
+  return recommendedConfig?.lineFilterDestination || '';
 }
 
 // ==================== FEINTUNING: RICHTUNGS-GRUPPIERUNG ====================
@@ -4941,11 +5270,17 @@ function confirmFtGroup() {
   ftGroupingMode = false;
   ftSelectedForGroup = [];
   renderFtGroupingUI();
+
+  // Reihenfolge-Liste aktualisieren (Gruppen haben sich geändert)
+  updateRowOrderAfterGroupChange();
 }
 
 function deleteFtGroup(gIdx) {
   ftLineGroups.splice(gIdx, 1);
   renderFtGroupingUI();
+
+  // Reihenfolge-Liste aktualisieren (Gruppen haben sich geändert)
+  updateRowOrderAfterGroupChange();
 }
 
 function removeFromGroup(gIdx, key) {
@@ -4957,6 +5292,20 @@ function removeFromGroup(gIdx, key) {
     }
   }
   renderFtGroupingUI();
+
+  // Reihenfolge-Liste aktualisieren (Gruppen haben sich geändert)
+  updateRowOrderAfterGroupChange();
+}
+
+// Aktualisiere die Reihenfolge-Liste wenn Gruppen geändert werden
+function updateRowOrderAfterGroupChange() {
+  // Leere ftRowOrder damit initRowOrderList es neu aufbaut
+  ftRowOrder = [];
+
+  // Wenn Statisch-Modus aktiv ist, sofort neu rendern
+  if (ftSortMode === 2) {
+    initRowOrderList();
+  }
 }
 
 
@@ -5106,6 +5455,9 @@ function saveFromFinetuning() {
   const nightStart = parseInt(document.getElementById('ftNightStart').value) || 22;
   const nightEnd = parseInt(document.getElementById('ftNightEnd').value) || 6;
   const showFunMessages = isFtToggleActive('ftFunMessagesToggle');
+  const sortMode = getFtSortMode();
+  const rowOrder = getRowOrderString();  // Einfach für Wien
+  const rowOrderDestination = getRowOrderDestinationString();  // Mit Ziel für Linz
 
   // Gehweg-Werte sammeln
   const gehweg = [];
@@ -5135,6 +5487,13 @@ function saveFromFinetuning() {
   recommendedConfig.gehweg = gehweg;
   recommendedConfig.lineGroups = lineGroupsStr;
   recommendedConfig.lineFilterDestination = lineFilterDestStr;  // Linz Linie+Ziel Filter
+  recommendedConfig.sortMode = sortMode;
+  recommendedConfig.rowOrder = rowOrder;
+  recommendedConfig.rowOrderDestination = rowOrderDestination;
+
+  console.log('saveFromFinetuning - sortMode:', sortMode);
+  console.log('saveFromFinetuning - rowOrder:', rowOrder);
+  console.log('saveFromFinetuning - rowOrderDestination:', rowOrderDestination);
 
   // Speichern
   showSavingOverlay('Speichere Einstellungen...');
@@ -5187,7 +5546,9 @@ function sendConfigToDeviceDirect(config) {
     gehweg: gehwegString,
     linegroups: config.lineGroups || '',  // NEU: Linien-Gruppierung
     linefilter: config.lineFilter || '',  // Linien-Filter (nur Linienname)
-    linefilterdestination: config.lineFilterDestination || ''  // NEU: Linien+Ziel Filter für Linz
+    linefilterdestination: config.lineFilterDestination || '',  // NEU: Linien+Ziel Filter für Linz
+    roworder: config.rowOrder || '',  // NEU: Zeilen-Reihenfolge einfach
+    roworderdestination: config.rowOrderDestination || ''  // NEU: Zeilen-Reihenfolge mit Ziel
   };
 
   console.log('Sende Config direkt an Gerät:', configData);
