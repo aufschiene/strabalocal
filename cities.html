@@ -4446,6 +4446,9 @@ function initFinetuningStep() {
   // Gruppierung initialisieren
   initFtGrouping();
 
+  // Zeilen-Reihenfolge zurücksetzen, damit gespeicherte Konfiguration geladen wird
+  ftRowOrder = [];
+
   // Sortierungsmodus initialisieren
   setFtSortMode(config.sortMode || 1);
 
@@ -4552,6 +4555,9 @@ function getFtSortMode() {
 function initRowOrderList() {
   const container = document.getElementById('ftRowOrderList');
 
+  // Versuche gespeicherte Reihenfolge aus Config zu laden
+  const savedRowOrder = recommendedConfig?.rowOrderDestination || recommendedConfig?.rowOrder || '';
+
   // Sammle alle verfügbaren Linien+Richtungen aus den Stationen
   const allDirections = [];
   stations.forEach(station => {
@@ -4620,8 +4626,61 @@ function initRowOrderList() {
   });
 
   // Wenn ftRowOrder leer oder veraltet ist, initialisiere neu
-  if (ftRowOrder.length === 0 || !ftRowOrder[0].type) {
-    ftRowOrder = orderItems;
+  if (ftRowOrder.length === 0 || !ftRowOrder[0]?.type) {
+    // Versuche gespeicherte Reihenfolge aus Config zu laden
+    if (savedRowOrder && savedRowOrder.length > 0) {
+      const savedItems = savedRowOrder.split(',').map(s => s.trim());
+      const sortedOrder = [];
+      const processedKeys = new Set();
+
+      // Sortiere orderItems nach der gespeicherten Reihenfolge
+      savedItems.forEach(savedItem => {
+        // savedItem ist im Format "2:solarCity" oder nur "2"
+        const colonIdx = savedItem.indexOf(':');
+        const savedLine = colonIdx > 0 ? savedItem.substring(0, colonIdx) : savedItem;
+        const savedDest = colonIdx > 0 ? savedItem.substring(colonIdx + 1) : '';
+
+        // Finde passendes Item (Gruppe oder Single)
+        for (const item of orderItems) {
+          if (processedKeys.has(item.key)) continue;
+
+          if (item.type === 'group') {
+            // Prüfe ob diese Gruppe die gespeicherte Linie+Destination enthält
+            const hasMatch = item.directions.some(d => {
+              const lineMatch = d.line === savedLine;
+              const destMatch = !savedDest || d.towards === savedDest ||
+                                d.towards.includes(savedDest) || savedDest.includes(d.towards);
+              return lineMatch && destMatch;
+            });
+            if (hasMatch) {
+              sortedOrder.push(item);
+              processedKeys.add(item.key);
+              break;
+            }
+          } else if (item.type === 'single') {
+            const lineMatch = item.line === savedLine;
+            const destMatch = !savedDest || item.towards === savedDest ||
+                              item.towards.includes(savedDest) || savedDest.includes(item.towards);
+            if (lineMatch && destMatch) {
+              sortedOrder.push(item);
+              processedKeys.add(item.key);
+              break;
+            }
+          }
+        }
+      });
+
+      // Füge nicht gefundene Items am Ende hinzu
+      orderItems.forEach(item => {
+        if (!processedKeys.has(item.key)) {
+          sortedOrder.push(item);
+        }
+      });
+
+      ftRowOrder = sortedOrder;
+    } else {
+      ftRowOrder = orderItems;
+    }
   } else {
     // Synchronisiere: behalte Reihenfolge, aber aktualisiere Gruppen
     const newOrder = [];
@@ -5977,6 +6036,65 @@ window.addEventListener('message', async function(event) {
     // Linien-Gruppierung aus Config übernehmen
     if (event.data.config.linegroups) {
       recommendedConfig.lineGroups = event.data.config.linegroups;
+    }
+    // Sortierungsmodus aus Config übernehmen
+    if (event.data.config.sort_mode !== undefined) {
+      recommendedConfig.sortMode = event.data.config.sort_mode;
+    }
+    // Zeilen-Reihenfolge aus Config übernehmen
+    if (event.data.config.roworder) {
+      recommendedConfig.rowOrder = event.data.config.roworder;
+    }
+    if (event.data.config.roworderdestination) {
+      recommendedConfig.rowOrderDestination = event.data.config.roworderdestination;
+    }
+    // Weitere Feintuning-Einstellungen
+    if (event.data.config.colour !== undefined) {
+      recommendedConfig.colour = event.data.config.colour;
+    }
+    if (event.data.config.lines_count !== undefined) {
+      recommendedConfig.rows = parseInt(event.data.config.lines_count);
+    }
+    if (event.data.config.brightness_level !== undefined) {
+      recommendedConfig.displayLight = event.data.config.brightness_level;
+    }
+    if (event.data.config.show_high_floor_warning !== undefined) {
+      recommendedConfig.chopper = event.data.config.show_high_floor_warning ? 1 : 0;
+    }
+    if (event.data.config.show_cooling_info !== undefined) {
+      recommendedConfig.silberpfeil = event.data.config.show_cooling_info ? 1 : 0;
+    }
+    if (event.data.config.night_mode_enabled !== undefined) {
+      recommendedConfig.nightMode = event.data.config.night_mode_enabled;
+    }
+    if (event.data.config.night_mode_start !== undefined) {
+      recommendedConfig.nightStart = event.data.config.night_mode_start;
+    }
+    if (event.data.config.night_mode_end !== undefined) {
+      recommendedConfig.nightEnd = event.data.config.night_mode_end;
+    }
+    if (event.data.config.show_fun_messages !== undefined) {
+      recommendedConfig.showFunMessages = event.data.config.show_fun_messages;
+    }
+    // Gehweg aus Config übernehmen (Format: "stopId:value|stopId:value")
+    if (event.data.config.gehweg) {
+      const gehwegStr = event.data.config.gehweg;
+      const gehwegMap = {};
+
+      // Parse "stopId:value|stopId:value" oder "stopId:value,stopId:value"
+      const separator = gehwegStr.includes('|') ? '|' : ',';
+      gehwegStr.split(separator).forEach(entry => {
+        const [stopId, value] = entry.split(':');
+        if (stopId && value !== undefined) {
+          gehwegMap[stopId] = parseInt(value) || 0;
+        }
+      });
+
+      // Erstelle Array in der Reihenfolge der Stationen
+      recommendedConfig.gehweg = stations.map(station => {
+        const stopId = station.stopId || '';
+        return gehwegMap[stopId] || 0;
+      });
     }
   }
 });
