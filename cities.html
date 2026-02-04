@@ -4868,6 +4868,9 @@ function saveFromFinetuning() {
 
   console.log('recommendedConfig.lineGroups:', recommendedConfig.lineGroups);
 
+  // DEBUG
+  alert('VOR Speichern - lineGroups: "' + lineGroupsStr + '"');
+
   // Speichern
   showSavingOverlay('Speichere Einstellungen...');
   sendConfigToDeviceDirect(recommendedConfig);
@@ -4924,7 +4927,7 @@ function sendConfigToDeviceDirect(config) {
   console.log('linegroups im configData:', configData.linegroups);
 
   // DEBUG: Alert um Wert zu sehen bevor Seite wechselt
-  alert('linegroups wird gesendet: "' + configData.linegroups + '"');
+  alert('config.lineGroups: "' + config.lineGroups + '"\nconfigData.linegroups: "' + configData.linegroups + '"');
 
   // Prüfe ob wir im iframe sind
   const inIframe = window.parent && window.parent !== window;
