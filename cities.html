@@ -4618,11 +4618,11 @@ function renderFtPool() {
   container.innerHTML = ungrouped.map((dir, idx) => {
     const badgeClass = getLineTypeClass(dir.type, dir.line);
     const destText = dir.towards ? dir.towards : '';
-    const clickableClass = ftGroupingMode ? 'clickable' : '';
     const poolIdx = ftAvailableDirections.findIndex(d => d.key === dir.key);
 
+    // Immer klickbar - Gruppierungsmodus startet automatisch beim ersten Klick
     return `
-      <div class="ft-direction-chip ${clickableClass}" data-pool-idx="${poolIdx}" ${ftGroupingMode ? 'data-action="pool-select"' : ''}>
+      <div class="ft-direction-chip clickable" data-pool-idx="${poolIdx}">
         <span class="line-badge ${badgeClass}">${dir.line}</span>
         ${destText ? `<span class="dir-dest">${destText}</span>` : ''}
       </div>
@@ -4792,13 +4792,9 @@ function setupFtGroupingEvents() {
   if (poolContainer) {
     poolContainer.addEventListener('click', function(e) {
       console.log('Click in poolContainer, target:', e.target, 'ftGroupingMode:', ftGroupingMode);
-      const target = e.target.closest('[data-action="pool-select"]');
+      const target = e.target.closest('[data-pool-idx]');
       if (!target) {
-        console.log('Kein pool-select Element');
-        return;
-      }
-      if (!ftGroupingMode) {
-        console.log('Nicht im Grouping-Modus');
+        console.log('Kein pool Element');
         return;
       }
 
@@ -4807,6 +4803,14 @@ function setupFtGroupingEvents() {
 
       if (poolIdx >= 0 && poolIdx < ftAvailableDirections.length) {
         const key = ftAvailableDirections[poolIdx].key;
+
+        // Automatisch Gruppierungsmodus starten wenn noch nicht aktiv
+        if (!ftGroupingMode) {
+          console.log('Starte automatisch Gruppierungsmodus');
+          ftGroupingMode = true;
+          ftSelectedForGroup = [];
+        }
+
         console.log('Adding to selection:', key);
         toggleFtSelection(key);
       }
@@ -4839,6 +4843,7 @@ function saveFromFinetuning() {
 
   // Linien-Gruppierung sammeln
   const lineGroupsStr = collectFtLineGroups();
+  console.log('saveFromFinetuning - lineGroupsStr:', lineGroupsStr);
 
   // Update recommendedConfig
   recommendedConfig.colour = colour;
@@ -4852,6 +4857,8 @@ function saveFromFinetuning() {
   recommendedConfig.showFunMessages = showFunMessages;
   recommendedConfig.gehweg = gehweg;
   recommendedConfig.lineGroups = lineGroupsStr;
+
+  console.log('recommendedConfig.lineGroups:', recommendedConfig.lineGroups);
 
   // Speichern
   showSavingOverlay('Speichere Einstellungen...');
@@ -4975,7 +4982,9 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('displaymode', configData.displaymode);
     formData.append('stopinterval', configData.stopinterval);
     formData.append('gehweg', configData.gehweg);
+    formData.append('linegroups', configData.linegroups);
 
+    console.log('FormData linegroups:', configData.linegroups);
     updateSavingOverlay('Speichere Einstellungen...');
 
     const response = await fetch('http://straba.local/config', {
