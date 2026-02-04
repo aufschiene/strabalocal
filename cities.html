@@ -1222,6 +1222,83 @@
       font-size: 20px;
     }
 
+    /* Feintuning Linz-Filter */
+    .ft-filter-area {
+      margin-top: 12px;
+    }
+    .ft-filter-selected {
+      background: #e8ffe8;
+      border: 1px solid #90d090;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    .filter-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 40px;
+    }
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #4CAF50;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .filter-item .remove-filter {
+      background: rgba(255,255,255,0.3);
+      border: none;
+      color: white;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .filter-item .remove-filter:hover {
+      background: rgba(255,255,255,0.5);
+    }
+    .ft-filter-pool {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .filter-pool-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #f0f0f0;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 14px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .filter-pool-item:hover {
+      background: #e0e0e0;
+      border-color: #4CAF50;
+    }
+    .filter-pool-item.selected {
+      background: #4CAF50;
+      color: white;
+    }
+    .no-filter-hint {
+      color: #888;
+      font-size: 13px;
+      padding: 8px;
+      text-align: center;
+    }
+
     /* Feintuning Gruppierung */
     .ft-grouping-area {
       margin-top: 12px;
@@ -2063,6 +2140,31 @@
           <div class="form-hint">U-Bahn Silberpfeil-Warnung</div>
         </div>
         <div class="toggle-switch active" id="ftSilberpfeilToggle" onclick="toggleFtSwitch('ftSilberpfeilToggle')"></div>
+      </div>
+    </div>
+
+    <!-- Linz: Linien-Filter (nur bestimmte Linien+Richtungen anzeigen) -->
+    <div class="config-card" id="ftLinzFilterCard" style="display:none;">
+      <h3>Linien-Filter (Linz)</h3>
+      <p class="form-hint" style="margin-bottom:12px;">
+        Wähle welche Linien+Richtungen angezeigt werden sollen.
+        Alle anderen werden ausgeblendet.
+      </p>
+
+      <div class="ft-filter-area">
+        <div class="ft-filter-selected" id="ftFilterSelected">
+          <div class="pool-header">Angezeigte Linien:</div>
+          <div class="filter-items" id="ftFilterItems">
+            <!-- Ausgewählte Filter werden hier gerendert -->
+          </div>
+        </div>
+
+        <div class="ft-filter-pool" id="ftFilterPool">
+          <div class="pool-header">Verfügbare Linien+Richtungen:</div>
+          <div class="pool-items" id="ftFilterPoolItems">
+            <!-- Alle Richtungen werden hier gerendert -->
+          </div>
+        </div>
       </div>
     </div>
 
@@ -4156,6 +4258,9 @@ function initFinetuningStep() {
   // Gruppierung initialisieren
   initFtGrouping();
 
+  // Linz-Filter initialisieren (zeigt Karte nur für Linz)
+  initFtLinzFilter();
+
   // Preview aktualisieren
   updateFinetuningPreview();
 }
@@ -4374,6 +4479,116 @@ function updateFinetuningPreview() {
 function backFromFinetuning() {
   document.getElementById('stepFinetuning').classList.add('hidden');
   document.getElementById('stepDisplayConfig').classList.remove('hidden');
+}
+
+// ==================== FEINTUNING: LINZ LINIEN-FILTER ====================
+let ftLineFilter = [];  // Array von erlaubten "line:destination" Strings
+let ftFilterEventsAttached = false;
+
+function isLinzNetwork() {
+  // Prüfe ob mindestens eine Station aus Linz ist
+  return stations.some(s => s.network === 'LINZ' || (s.stopId && s.stopId.toString().startsWith('LINZ:')));
+}
+
+async function initFtLinzFilter() {
+  ftLineFilter = [];
+
+  // Linz-Filter Karte nur für Linz anzeigen
+  const filterCard = document.getElementById('ftLinzFilterCard');
+  if (!isLinzNetwork()) {
+    filterCard.style.display = 'none';
+    return;
+  }
+  filterCard.style.display = 'block';
+
+  // Bestehenden Linien+Ziel Filter aus Config laden (lineFilterDestination)
+  if (recommendedConfig && recommendedConfig.lineFilterDestination) {
+    ftLineFilter = recommendedConfig.lineFilterDestination.split(',').map(f => f.trim()).filter(f => f);
+  }
+
+  // Events anhaengen
+  if (!ftFilterEventsAttached) {
+    setupFtFilterEvents();
+    ftFilterEventsAttached = true;
+  }
+
+  // UI rendern
+  renderFtFilterUI();
+}
+
+function setupFtFilterEvents() {
+  // Event delegation für Filter-Pool
+  document.getElementById('ftFilterPoolItems')?.addEventListener('click', function(e) {
+    const item = e.target.closest('.filter-pool-item');
+    if (item) {
+      const key = item.dataset.key;
+      if (key && !ftLineFilter.includes(key)) {
+        ftLineFilter.push(key);
+        renderFtFilterUI();
+      }
+    }
+  });
+
+  // Event delegation für Filter entfernen
+  document.getElementById('ftFilterItems')?.addEventListener('click', function(e) {
+    const btn = e.target.closest('.remove-filter');
+    if (btn) {
+      const key = btn.dataset.key;
+      ftLineFilter = ftLineFilter.filter(f => f !== key);
+      renderFtFilterUI();
+    }
+  });
+}
+
+function renderFtFilterUI() {
+  renderFtFilterSelected();
+  renderFtFilterPool();
+}
+
+function renderFtFilterSelected() {
+  const container = document.getElementById('ftFilterItems');
+  if (!container) return;
+
+  if (ftLineFilter.length === 0) {
+    container.innerHTML = '<div class="no-filter-hint">Kein Filter - alle Linien werden angezeigt</div>';
+    return;
+  }
+
+  container.innerHTML = ftLineFilter.map(key => {
+    const parts = key.split(':');
+    const line = parts[0] || '';
+    const dest = parts.slice(1).join(':') || '';
+    return `<div class="filter-item">
+      <span class="line">${line}</span>
+      <span class="dest">${dest}</span>
+      <button class="remove-filter" data-key="${key}">&times;</button>
+    </div>`;
+  }).join('');
+}
+
+function renderFtFilterPool() {
+  const container = document.getElementById('ftFilterPoolItems');
+  if (!container) return;
+
+  // Zeige alle verfügbaren Richtungen, die noch nicht im Filter sind
+  const available = ftAvailableDirections.filter(d => !ftLineFilter.includes(d.key));
+
+  if (available.length === 0) {
+    container.innerHTML = '<div class="no-filter-hint">Alle Richtungen sind bereits ausgewählt</div>';
+    return;
+  }
+
+  container.innerHTML = available.map(d => {
+    return `<div class="filter-pool-item" data-key="${d.key}">
+      <span style="font-weight:600;">${d.line}</span>
+      <span style="color:#666;font-size:12px;">${d.towards || ''}</span>
+    </div>`;
+  }).join('');
+}
+
+function collectFtLineFilter() {
+  if (ftLineFilter.length === 0) return '';
+  return ftLineFilter.join(',');
 }
 
 // ==================== FEINTUNING: RICHTUNGS-GRUPPIERUNG ====================
@@ -4853,6 +5068,10 @@ function saveFromFinetuning() {
   const lineGroupsStr = collectFtLineGroups();
   console.log('saveFromFinetuning - lineGroupsStr:', lineGroupsStr);
 
+  // Linz Linien+Ziel Filter sammeln (linefilterdestination)
+  const lineFilterDestStr = collectFtLineFilter();
+  console.log('saveFromFinetuning - lineFilterDestStr:', lineFilterDestStr);
+
   // Update recommendedConfig
   recommendedConfig.colour = colour;
   recommendedConfig.rows = rows;
@@ -4865,6 +5084,7 @@ function saveFromFinetuning() {
   recommendedConfig.showFunMessages = showFunMessages;
   recommendedConfig.gehweg = gehweg;
   recommendedConfig.lineGroups = lineGroupsStr;
+  recommendedConfig.lineFilterDestination = lineFilterDestStr;  // Linz Linie+Ziel Filter
 
   // Speichern
   showSavingOverlay('Speichere Einstellungen...');
@@ -4915,7 +5135,9 @@ function sendConfigToDeviceDirect(config) {
     displaymode: String(config.displayMode),
     stopinterval: String(config.stopInterval),
     gehweg: gehwegString,
-    linegroups: config.lineGroups || ''  // NEU: Linien-Gruppierung
+    linegroups: config.lineGroups || '',  // NEU: Linien-Gruppierung
+    linefilter: config.lineFilter || '',  // Linien-Filter (nur Linienname)
+    linefilterdestination: config.lineFilterDestination || ''  // NEU: Linien+Ziel Filter für Linz
   };
 
   console.log('Sende Config direkt an Gerät:', configData);
@@ -4989,8 +5211,12 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('stopinterval', configData.stopinterval);
     formData.append('gehweg', configData.gehweg);
     formData.append('linegroups', configData.linegroups);
+    formData.append('linefilter', configData.linefilter);
+    formData.append('linefilterdestination', configData.linefilterdestination);
 
     console.log('FormData linegroups:', configData.linegroups);
+    console.log('FormData linefilter:', configData.linefilter);
+    console.log('FormData linefilterdestination:', configData.linefilterdestination);
     updateSavingOverlay('Speichere Einstellungen...');
 
     const response = await fetch('http://straba.local/config', {
@@ -5308,11 +5534,20 @@ window.addEventListener('message', async function(event) {
     await loadExistingConfig(event.data.rbl, event.data.filter);
   }
   if (event.data?.type === 'loadFullConfig' && event.data.config?.rbl_id) {
-    // Load Wien data first if any WL stations  
+    // Load Wien data first if any WL stations
     if (event.data.config.rbl_id && !event.data.config.rbl_id.includes(':')) {
       await loadWienData();
     }
     await loadExistingConfig(event.data.config.rbl_id, event.data.config.lines_filter);
+
+    // Linz Linien+Ziel Filter aus Config übernehmen
+    if (event.data.config.linefilterdestination) {
+      recommendedConfig.lineFilterDestination = event.data.config.linefilterdestination;
+    }
+    // Linien-Gruppierung aus Config übernehmen
+    if (event.data.config.linegroups) {
+      recommendedConfig.lineGroups = event.data.config.linegroups;
+    }
   }
 });
 
