@@ -4696,15 +4696,23 @@ function removeFromGroup(gIdx, key) {
 
 
 function collectFtLineGroups() {
-  console.log('collectFtLineGroups aufgerufen, ftLineGroups:', ftLineGroups);
+  console.log('collectFtLineGroups aufgerufen, ftLineGroups:', JSON.stringify(ftLineGroups));
+  console.log('ftLineGroups.length:', ftLineGroups.length);
 
   if (ftLineGroups.length === 0) {
     console.log('Keine Gruppen vorhanden');
     return '';
   }
 
+  // Debug: Zeige jede Gruppe
+  ftLineGroups.forEach((g, i) => {
+    console.log(`Gruppe ${i}:`, JSON.stringify(g), 'directions:', g.directions, 'length:', g.directions ? g.directions.length : 'undefined');
+  });
+
   // Nur Gruppen mit mindestens 2 Richtungen
   const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 2);
+  console.log('validGroups.length:', validGroups.length);
+
   if (validGroups.length === 0) {
     console.log('Keine gueltigen Gruppen (mind. 2 Richtungen)');
     return '';
@@ -4913,6 +4921,10 @@ function sendConfigToDeviceDirect(config) {
   };
 
   console.log('Sende Config direkt an Gerät:', configData);
+  console.log('linegroups im configData:', configData.linegroups);
+
+  // DEBUG: Alert um Wert zu sehen bevor Seite wechselt
+  alert('linegroups wird gesendet: "' + configData.linegroups + '"');
 
   // Prüfe ob wir im iframe sind
   const inIframe = window.parent && window.parent !== window;
