@@ -1307,39 +1307,150 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 10px;
+      padding: 8px 12px;
       background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      cursor: grab;
-      font-size: 12px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      font-size: 13px;
       transition: all 0.15s;
       user-select: none;
     }
-    .ft-direction-chip:hover {
-      border-color: #0055a4;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    .ft-direction-chip.clickable {
+      cursor: pointer;
     }
-    .ft-direction-chip.dragging {
-      opacity: 0.4;
-      cursor: grabbing;
-    }
-    .ft-direction-chip.drag-over {
+    .ft-direction-chip.clickable:hover,
+    .ft-direction-chip.clickable:active {
       border-color: #0055a4;
       background: #e8f4ff;
-      transform: scale(1.05);
+    }
+    .ft-direction-chip.selected {
+      border-color: #0055a4;
+      background: #0055a4;
+      color: #fff;
+    }
+    .ft-direction-chip.selected .dir-dest {
+      color: #fff;
     }
     .ft-direction-chip .line-badge {
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 3px 8px;
+      border-radius: 5px;
       font-weight: 700;
-      font-size: 11px;
-      min-width: 24px;
+      font-size: 12px;
+      min-width: 28px;
       text-align: center;
     }
     .ft-direction-chip .dir-dest {
       color: #555;
-      font-size: 11px;
+      font-size: 12px;
+    }
+    .ft-direction-chip .chip-remove {
+      margin-left: 4px;
+      color: #999;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .ft-direction-chip:hover .chip-remove {
+      color: #c00;
+    }
+
+    /* Neue Gruppe erstellen Button */
+    .ft-create-group-btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      background: #f0f5ff;
+      border: 2px dashed #0055a4;
+      border-radius: 10px;
+      color: #0055a4;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ft-create-group-btn:hover,
+    .ft-create-group-btn:active {
+      background: #e0ebff;
+    }
+
+    /* Gruppe im Erstellungs-Modus */
+    .ft-group-creating {
+      border: 2px solid #0055a4;
+      background: #f8fbff;
+    }
+    .ft-group-creating .ft-group-header {
+      background: #0055a4;
+      color: #fff;
+    }
+    .ft-group-creating .hint {
+      color: #888;
+      font-size: 12px;
+      font-style: italic;
+    }
+    .ft-group-actions {
+      display: flex;
+      gap: 10px;
+      padding: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .ft-group-actions .btn-cancel {
+      flex: 1;
+      padding: 10px;
+      background: #f0f0f0;
+      border: none;
+      border-radius: 8px;
+      color: #666;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .ft-group-actions .btn-confirm {
+      flex: 1;
+      padding: 10px;
+      background: #0055a4;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .ft-group-actions .btn-confirm:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    /* Gruppe Box */
+    .ft-group-box {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .ft-group-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #e0e0e0;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .ft-group-delete {
+      background: none;
+      border: none;
+      color: #c00;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+    .ft-group-content {
+      padding: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 40px;
     }
 
     /* Form Rows */
@@ -1753,61 +1864,7 @@
     </button>
   </div>
 
-  <!-- Step 5: Line Grouping (optional) -->
-  <div class="card hidden" id="stepGrouping">
-    <button class="back-btn" onclick="goBack('lines')">Zurück</button>
-    <h2>Richtungen gruppieren</h2>
-
-    <div class="grouping-info">
-      <div class="grouping-info-header">
-        <span class="icon">💡</span>
-        <h4>Was ist das?</h4>
-      </div>
-      <p>
-        Manchmal fahren verschiedene Linien die gleiche Strecke (z.B. Linie 1 und 62 zwischen Oper und Karlsplatz).
-        Hier kannst du <strong>einzelne Richtungen gruppieren</strong>, sodass sie am Display zusammen angezeigt werden
-        – nur mit der jeweils nachsten Abfahrt. So siehst du sofort, wann die nachste Bim kommt.
-      </p>
-      <p style="margin-top:8px;font-size:12px;color:#777;">
-        <strong>Tipp:</strong> Du kannst z.B. U1 Richtung Leopoldau mit Linie 62 Richtung Meidling gruppieren,
-        wahrend die anderen Richtungen getrennt bleiben!
-      </p>
-    </div>
-
-    <div class="grouping-toggle" id="groupingToggle" onclick="toggleGroupingMode()">
-      <div class="grouping-toggle-label">
-        <span class="icon">🔗</span>
-        <span>Richtungen gruppieren</span>
-      </div>
-      <div class="grouping-toggle-switch"></div>
-    </div>
-
-    <div class="grouping-container hidden" id="groupingArea">
-      <div class="line-groups-area" id="lineGroupsArea">
-        <!-- Custom groups will be rendered here -->
-      </div>
-
-      <button class="add-group-btn" onclick="addNewGroup()">
-        <span>+</span> Neue Gruppe erstellen
-      </button>
-
-      <div class="ungrouped-lines">
-        <div class="ungrouped-lines-header">Verfugbare Richtungen (per Drag & Drop in Gruppen ziehen):</div>
-        <div class="ungrouped-lines-list" id="ungroupedLinesList"
-             ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
-             ondrop="handleDropToUngrouped(event)">
-          <!-- Ungrouped directions will be rendered here -->
-        </div>
-      </div>
-    </div>
-
-    <button class="btn btn-primary" onclick="addStationWithGroups()" style="margin-top: 16px;">
-      Station hinzufügen
-    </button>
-    <button class="btn btn-secondary" onclick="skipGroupingAndAdd()">
-      Ohne Gruppierung hinzufügen
-    </button>
-  </div>
+  <!-- Step 5 entfernt - Gruppierung jetzt nur im Feintuning -->
 
   <!-- Added Stations -->
   <div class="card" id="stationsCard">
@@ -2014,7 +2071,6 @@
       <h3>Richtungen gruppieren</h3>
       <p class="form-hint" style="margin-bottom:12px;">
         Gruppiere Linien die die gleiche Strecke fahren (z.B. Linie 1 und 62).
-        Ziehe zwei Richtungen zusammen um sie zu gruppieren.
         Nicht gruppierte Linien werden einzeln angezeigt.
       </p>
 
@@ -2023,12 +2079,8 @@
           <!-- Gruppen werden hier gerendert -->
         </div>
 
-        <div class="ft-directions-pool"
-             id="ftDirectionsPool"
-             ondragover="handleFtDragOver(event)"
-             ondragleave="handleFtDragLeave(event)"
-             ondrop="handleFtDropToPool(event)">
-          <div class="pool-header">Verfugbare Richtungen:</div>
+        <div class="ft-directions-pool" id="ftDirectionsPool">
+          <div class="pool-header">Verfuegbare Richtungen:</div>
           <div class="pool-items" id="ftPoolItems">
             <!-- Richtungen werden hier gerendert -->
           </div>
@@ -2424,9 +2476,7 @@ function showStep(step) {
   stepSearch.classList.toggle('hidden', step !== 'search');
   stepLines.classList.toggle('hidden', step !== 'lines');
 
-  // Grouping Step
-  const stepGrouping = document.getElementById('stepGrouping');
-  if (stepGrouping) stepGrouping.classList.toggle('hidden', step !== 'grouping');
+  // Grouping Step entfernt - jetzt nur im Feintuning
 
   // Journey-Modus Steps
   const stepJourneySearch = document.getElementById('stepJourneySearch');
@@ -3457,306 +3507,9 @@ function updateAddButton() {
   addStationBtn.disabled = selectedLines.size === 0;
 }
 
-// ==================== LINE GROUPING ====================
-let lineGroups = [];  // Array of groups: [{ name: 'Gruppe 1', lines: ['1', '62'] }, ...]
-let groupingEnabled = false;
-let draggedLine = null;
-
+// Gruppierung jetzt nur im Feintuning - alte Funktionen entfernt
 function showGroupingStep() {
-  if (!selectedNetwork || !selectedStop || selectedLines.size === 0) return;
-
-  // Get selected directions (line + towards)
-  const selectedDirections = Array.from(selectedLines).map(idx => availableLines[idx]);
-
-  // Only show grouping if 2+ directions selected
-  if (selectedDirections.length < 2) {
-    // Skip grouping, go directly to add
-    addStation();
-    return;
-  }
-
-  // Reset grouping state
-  lineGroups = [];
-  groupingEnabled = false;
-  document.getElementById('groupingToggle').classList.remove('active');
-  document.getElementById('groupingArea').classList.add('hidden');
-
-  // Render ungrouped directions (not just line names!)
-  renderUngroupedDirections(selectedDirections);
-
-  // Show grouping step
-  showStep('grouping');
-}
-
-function toggleGroupingMode() {
-  groupingEnabled = !groupingEnabled;
-  const toggle = document.getElementById('groupingToggle');
-  const area = document.getElementById('groupingArea');
-
-  if (groupingEnabled) {
-    toggle.classList.add('active');
-    area.classList.remove('hidden');
-  } else {
-    toggle.classList.remove('active');
-    area.classList.add('hidden');
-  }
-}
-
-// Store all selected directions for grouping
-let allSelectedDirections = [];
-
-function renderUngroupedDirections(directions) {
-  // Store for later use
-  allSelectedDirections = directions;
-
-  const container = document.getElementById('ungroupedLinesList');
-
-  // Get directions that are not in any group (by key: line:towards)
-  const groupedKeys = lineGroups.flatMap(g => g.directions || []);
-  const ungrouped = directions.filter(d => {
-    const key = `${d.name}:${d.towards || ''}`;
-    return !groupedKeys.includes(key);
-  });
-
-  container.innerHTML = ungrouped.map(dir => {
-    const badgeClass = getLineTypeClass(dir.type, dir.name);
-    const key = `${dir.name}:${dir.towards || ''}`;
-    const displayText = dir.towards ? `${dir.name} -> ${shortenDestination(dir.towards)}` : dir.name;
-    return `
-      <div class="draggable-line direction-item" draggable="true" data-direction="${escapeHtml(key)}"
-           ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)">
-        <span class="line-badge ${badgeClass}">${dir.name}</span>
-        <span class="direction-arrow">${dir.towards ? ' -> ' + shortenDestination(dir.towards) : ''}</span>
-      </div>
-    `;
-  }).join('');
-
-  if (ungrouped.length === 0) {
-    container.innerHTML = '<span style="color:#999;font-size:12px;">Alle Richtungen sind gruppiert</span>';
-  }
-}
-
-function shortenDestination(dest) {
-  if (!dest) return '';
-  // Shorten long destinations for display
-  if (dest.length > 20) {
-    return dest.substring(0, 18) + '...';
-  }
-  return dest;
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// Keep old function for backwards compatibility
-function renderUngroupedLines(lineNames) {
-  // Convert to direction format for compatibility
-  const directions = lineNames.map(name => {
-    const lineInfo = availableLines.find(l => l.name === name);
-    return lineInfo || { name, towards: '', type: '' };
-  });
-  renderUngroupedDirections(directions);
-}
-
-function renderLineGroups() {
-  const container = document.getElementById('lineGroupsArea');
-
-  let html = lineGroups.map((group, gIdx) => {
-    // Now we store directions (line:towards) instead of just lines
-    const directionsHtml = (group.directions || []).map(key => {
-      // Parse key back to line and towards
-      const [lineName, ...towardsParts] = key.split(':');
-      const towards = towardsParts.join(':'); // rejoin in case towards contains ':'
-      const lineInfo = availableLines.find(l => l.name === lineName && (l.towards || '') === towards);
-      const badgeClass = lineInfo ? getLineTypeClass(lineInfo.type, lineName) : 'type-default';
-      const displayText = towards ? `${lineName} -> ${shortenDestination(towards)}` : lineName;
-      return `
-        <div class="draggable-line direction-item" draggable="true" data-direction="${escapeHtml(key)}" data-group="${gIdx}"
-             ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)">
-          <span class="line-badge ${badgeClass}">${lineName}</span>
-          <span class="direction-arrow">${towards ? ' -> ' + shortenDestination(towards) : ''}</span>
-        </div>
-      `;
-    }).join('');
-
-    const isEmpty = !group.directions || group.directions.length === 0;
-
-    return `
-      <div class="custom-group" data-group-idx="${gIdx}">
-        <div class="custom-group-header">
-          <span class="group-icon">📦</span>
-          <span class="group-name">${group.name}</span>
-          <button class="group-delete" onclick="deleteGroup(${gIdx})">x</button>
-        </div>
-        <div class="group-lines-dropzone ${isEmpty ? 'empty' : ''}"
-             data-group-idx="${gIdx}"
-             ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
-             ondrop="handleDrop(event, ${gIdx})">
-          ${directionsHtml}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  container.innerHTML = html + `
-    <button class="add-group-btn" onclick="addNewGroup()">
-      <span>+</span> Neue Gruppe erstellen
-    </button>
-  `;
-
-  // Render ungrouped directions
-  renderUngroupedDirections(allSelectedDirections);
-}
-
-function addNewGroup() {
-  const groupNum = lineGroups.length + 1;
-  lineGroups.push({
-    name: `Gruppe ${groupNum}`,
-    directions: []  // Now stores directions instead of lines
-  });
-  renderLineGroups();
-}
-
-function deleteGroup(gIdx) {
-  lineGroups.splice(gIdx, 1);
-  renderLineGroups();
-}
-
-// Drag & Drop handlers - now works with directions
-let draggedDirection = null;
-
-function handleDragStart(e) {
-  // Support both old (line) and new (direction) format
-  draggedDirection = e.target.dataset.direction || e.target.dataset.line;
-  e.target.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', draggedDirection);
-}
-
-function handleDragEnd(e) {
-  e.target.classList.remove('dragging');
-  draggedDirection = null;
-  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-}
-
-function handleDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.classList.add('drag-over');
-}
-
-function handleDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over');
-}
-
-function handleDrop(e, groupIdx) {
-  e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-
-  if (!draggedDirection) return;
-
-  // Remove from any existing group
-  lineGroups.forEach(g => {
-    if (g.directions) {
-      g.directions = g.directions.filter(d => d !== draggedDirection);
-    }
-    // Also handle old format for backwards compat
-    if (g.lines) {
-      g.lines = g.lines.filter(l => l !== draggedDirection);
-    }
-  });
-
-  // Add to new group
-  if (groupIdx >= 0 && groupIdx < lineGroups.length) {
-    if (!lineGroups[groupIdx].directions) {
-      lineGroups[groupIdx].directions = [];
-    }
-    lineGroups[groupIdx].directions.push(draggedDirection);
-  }
-
-  renderLineGroups();
-}
-
-function handleDropToUngrouped(e) {
-  e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-
-  if (!draggedDirection) return;
-
-  // Remove from all groups
-  lineGroups.forEach(g => {
-    if (g.directions) {
-      g.directions = g.directions.filter(d => d !== draggedDirection);
-    }
-    if (g.lines) {
-      g.lines = g.lines.filter(l => l !== draggedDirection);
-    }
-  });
-
-  renderLineGroups();
-}
-
-function addStationWithGroups() {
-  if (!selectedNetwork || !selectedStop || selectedLines.size === 0) return;
-
-  const selectedLineNames = Array.from(selectedLines).map(idx => availableLines[idx].name);
-  const uniqueLineNames = [...new Set(selectedLineNames)];
-  const filter = uniqueLineNames.join(',');
-
-  const fullId = `${selectedNetwork}:${selectedStop.id}`;
-
-  // Check duplicate
-  if (stations.some(s => s.fullId === fullId)) {
-    alert('Diese Station ist bereits hinzugefugt!');
-    return;
-  }
-
-  // Build groups string for ESP
-  // NEW FORMAT with directions: "U1:Leopoldau+62:Meidling,1:Stefan-Fadinger-Platz+62:Karlsplatz"
-  // Each direction is "line:destination", groups separated by comma, directions in group by +
-  let groupsString = '';
-  if (groupingEnabled && lineGroups.length > 0) {
-    const validGroups = lineGroups.filter(g => g.directions && g.directions.length >= 2);
-    if (validGroups.length > 0) {
-      groupsString = validGroups.map(g => g.directions.join('+')).join(',');
-    }
-  }
-
-  // Ausgewaehlte Richtungen speichern (Linie + towards)
-  const selectedDirections = Array.from(selectedLines).map(idx => ({
-    line: availableLines[idx].name,
-    towards: availableLines[idx].towards || '',
-    type: availableLines[idx].type || ''
-  }));
-
-  stations.push({
-    network: selectedNetwork,
-    networkName: NETWORKS[selectedNetwork].name,
-    stopId: selectedStop.id,
-    stopName: selectedStop.name,
-    filter: filter,
-    fullId: fullId,
-    isExisting: false,
-    lineGroups: groupsString,  // Format: "U1:Leopoldau+62:Meidling,..."
-    directions: selectedDirections  // Speichert Linie + Richtung
-  });
-
-  // Reset and go back
-  selectedStop = null;
-  selectedLines = new Set();
-  lineGroups = [];
-  allSelectedDirections = [];
-  groupingEnabled = false;
-  goBack('region');
-  updateStationsList();
-}
-
-function skipGroupingAndAdd() {
-  groupingEnabled = false;
-  lineGroups = [];
+  // Direkt Station hinzufuegen - Gruppierung im Feintuning
   addStation();
 }
 
@@ -4611,8 +4364,9 @@ function backFromFinetuning() {
 
 // ==================== FEINTUNING: RICHTUNGS-GRUPPIERUNG ====================
 let ftLineGroups = [];  // Array of groups: [{ directions: ['U1:Leopoldau', '62:Meidling'] }, ...]
-let ftDraggedDirection = null;
 let ftAvailableDirections = [];  // Alle verfugbaren Richtungen aus den Stationen
+let ftGroupingMode = false;  // true wenn gerade eine Gruppe erstellt wird
+let ftSelectedForGroup = [];  // Ausgewaehlte Richtungen fuer neue Gruppe
 
 async function initFtGrouping() {
   ftLineGroups = [];
@@ -4744,43 +4498,76 @@ function renderFtGroups() {
   const container = document.getElementById('ftGroupsContainer');
   if (!container) return;
 
-  if (ftLineGroups.length === 0) {
-    container.innerHTML = '<div class="no-groups-hint">Ziehe eine Richtung auf eine andere um sie zu gruppieren</div>';
-    return;
+  // Bestehende Gruppen anzeigen
+  let html = '';
+
+  if (ftLineGroups.length > 0) {
+    html += ftLineGroups.map((group, gIdx) => {
+      const directionsHtml = (group.directions || []).map(key => {
+        const dirInfo = ftAvailableDirections.find(d => d.key === key);
+        const lineName = dirInfo ? dirInfo.line : key.split(':')[0];
+        const towards = dirInfo ? dirInfo.towards : key.split(':').slice(1).join(':');
+        const badgeClass = dirInfo ? getLineTypeClass(dirInfo.type, lineName) : 'type-default';
+
+        return `
+          <div class="ft-direction-chip" data-direction="${escapeHtmlFt(key)}" onclick="removeFromGroup(${gIdx}, '${escapeHtmlFt(key)}')">
+            <span class="line-badge ${badgeClass}">${lineName}</span>
+            ${towards ? `<span class="dir-dest">${towards}</span>` : ''}
+            <span class="chip-remove">x</span>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="ft-group-box" data-group-idx="${gIdx}">
+          <div class="ft-group-header">
+            <span>Gruppe ${gIdx + 1}</span>
+            <button class="ft-group-delete" onclick="deleteFtGroup(${gIdx})">Loeschen</button>
+          </div>
+          <div class="ft-group-content">${directionsHtml}</div>
+        </div>
+      `;
+    }).join('');
   }
 
-  container.innerHTML = ftLineGroups.map((group, gIdx) => {
-    const directionsHtml = (group.directions || []).map(key => {
+  // Wenn im Gruppierungs-Modus: aktuelle Auswahl anzeigen
+  if (ftGroupingMode) {
+    const selectedHtml = ftSelectedForGroup.map(key => {
       const dirInfo = ftAvailableDirections.find(d => d.key === key);
       const lineName = dirInfo ? dirInfo.line : key.split(':')[0];
       const towards = dirInfo ? dirInfo.towards : key.split(':').slice(1).join(':');
       const badgeClass = dirInfo ? getLineTypeClass(dirInfo.type, lineName) : 'type-default';
 
       return `
-        <div class="ft-direction-chip" draggable="true" data-direction="${escapeHtmlFt(key)}" data-group="${gIdx}"
-             ondragstart="handleFtDragStart(event)" ondragend="handleFtDragEnd(event)">
+        <div class="ft-direction-chip selected" onclick="toggleFtSelection('${escapeHtmlFt(key)}')">
           <span class="line-badge ${badgeClass}">${lineName}</span>
           ${towards ? `<span class="dir-dest">${towards}</span>` : ''}
         </div>
       `;
     }).join('');
 
-    return `
-      <div class="ft-group-box" data-group-idx="${gIdx}">
+    html += `
+      <div class="ft-group-box ft-group-creating">
         <div class="ft-group-header">
-          <span>Gruppe ${gIdx + 1}</span>
-          <button class="ft-group-delete" onclick="deleteFtGroup(${gIdx})">x</button>
+          <span>Neue Gruppe (${ftSelectedForGroup.length} ausgewaehlt)</span>
         </div>
-        <div class="ft-group-content"
-             data-group-idx="${gIdx}"
-             ondragover="handleFtDragOver(event)"
-             ondragleave="handleFtDragLeave(event)"
-             ondrop="handleFtDropToGroup(event, ${gIdx})">
-          ${directionsHtml}
+        <div class="ft-group-content">
+          ${selectedHtml || '<span class="hint">Waehle mindestens 2 Richtungen aus</span>'}
+        </div>
+        <div class="ft-group-actions">
+          <button class="btn-cancel" onclick="cancelFtGrouping()">Abbrechen</button>
+          <button class="btn-confirm" onclick="confirmFtGroup()" ${ftSelectedForGroup.length < 2 ? 'disabled' : ''}>Gruppe erstellen</button>
         </div>
       </div>
     `;
-  }).join('');
+  } else {
+    // Button zum Erstellen einer neuen Gruppe
+    html += `
+      <button class="ft-create-group-btn" onclick="startFtGrouping()">+ Neue Gruppe erstellen</button>
+    `;
+  }
+
+  container.innerHTML = html;
 }
 
 function renderFtPool() {
@@ -4790,21 +4577,31 @@ function renderFtPool() {
   // Gruppierte Keys sammeln
   const groupedKeys = ftLineGroups.flatMap(g => g.directions || []);
 
-  // Ungroupierte filtern
-  const ungrouped = ftAvailableDirections.filter(d => !groupedKeys.includes(d.key));
+  // Ungroupierte filtern (und nicht in aktueller Auswahl)
+  const ungrouped = ftAvailableDirections.filter(d =>
+    !groupedKeys.includes(d.key) && !ftSelectedForGroup.includes(d.key)
+  );
 
-  if (ungrouped.length === 0) {
+  if (ungrouped.length === 0 && !ftGroupingMode) {
     container.innerHTML = '<div class="pool-empty">Alle Richtungen sind gruppiert</div>';
+    return;
+  }
+
+  if (ungrouped.length === 0 && ftGroupingMode) {
+    container.innerHTML = '<div class="pool-empty">Keine weiteren Richtungen verfuegbar</div>';
     return;
   }
 
   container.innerHTML = ungrouped.map(dir => {
     const badgeClass = getLineTypeClass(dir.type, dir.line);
     const destText = dir.towards ? dir.towards : '';
+    const clickAction = ftGroupingMode
+      ? `onclick="toggleFtSelection('${escapeHtmlFt(dir.key)}')"`
+      : '';
+    const clickableClass = ftGroupingMode ? 'clickable' : '';
+
     return `
-      <div class="ft-direction-chip" draggable="true" data-direction="${escapeHtmlFt(dir.key)}"
-           ondragstart="handleFtDragStart(event)" ondragend="handleFtDragEnd(event)"
-           ondragover="handleFtDragOverChip(event)" ondrop="handleFtDropOnChip(event)">
+      <div class="ft-direction-chip ${clickableClass}" data-direction="${escapeHtmlFt(dir.key)}" ${clickAction}>
         <span class="line-badge ${badgeClass}">${dir.line}</span>
         ${destText ? `<span class="dir-dest">${destText}</span>` : ''}
       </div>
@@ -4812,111 +4609,57 @@ function renderFtPool() {
   }).join('');
 }
 
+// Touch-freundliche Gruppierungs-Funktionen
+function startFtGrouping() {
+  ftGroupingMode = true;
+  ftSelectedForGroup = [];
+  renderFtGroupingUI();
+}
+
+function cancelFtGrouping() {
+  ftGroupingMode = false;
+  ftSelectedForGroup = [];
+  renderFtGroupingUI();
+}
+
+function toggleFtSelection(key) {
+  const idx = ftSelectedForGroup.indexOf(key);
+  if (idx === -1) {
+    ftSelectedForGroup.push(key);
+  } else {
+    ftSelectedForGroup.splice(idx, 1);
+  }
+  renderFtGroupingUI();
+}
+
+function confirmFtGroup() {
+  if (ftSelectedForGroup.length < 2) return;
+
+  // Neue Gruppe erstellen
+  ftLineGroups.push({ directions: [...ftSelectedForGroup] });
+
+  // Reset
+  ftGroupingMode = false;
+  ftSelectedForGroup = [];
+  renderFtGroupingUI();
+}
+
 function deleteFtGroup(gIdx) {
   ftLineGroups.splice(gIdx, 1);
   renderFtGroupingUI();
 }
 
-// Drag & Drop handlers
-function handleFtDragStart(e) {
-  ftDraggedDirection = e.target.dataset.direction;
-  e.target.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', ftDraggedDirection);
-}
-
-function handleFtDragEnd(e) {
-  e.target.classList.remove('dragging');
-  ftDraggedDirection = null;
-  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-}
-
-function handleFtDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.classList.add('drag-over');
-}
-
-function handleFtDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over');
-}
-
-// Drop auf eine andere Richtung = automatisch neue Gruppe erstellen
-function handleFtDragOverChip(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  const targetDir = e.currentTarget.dataset.direction;
-  if (targetDir && targetDir !== ftDraggedDirection) {
-    e.currentTarget.classList.add('drag-over');
+function removeFromGroup(gIdx, key) {
+  if (ftLineGroups[gIdx] && ftLineGroups[gIdx].directions) {
+    ftLineGroups[gIdx].directions = ftLineGroups[gIdx].directions.filter(d => d !== key);
+    // Gruppe loeschen wenn weniger als 2 Richtungen
+    if (ftLineGroups[gIdx].directions.length < 2) {
+      ftLineGroups.splice(gIdx, 1);
+    }
   }
-}
-
-function handleFtDropOnChip(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.currentTarget.classList.remove('drag-over');
-
-  const targetDir = e.currentTarget.dataset.direction;
-  if (!ftDraggedDirection || !targetDir || ftDraggedDirection === targetDir) return;
-
-  // Beide aus bestehenden Gruppen entfernen
-  ftLineGroups.forEach(g => {
-    if (g.directions) {
-      g.directions = g.directions.filter(d => d !== ftDraggedDirection && d !== targetDir);
-    }
-  });
-
-  // Leere Gruppen entfernen
-  ftLineGroups = ftLineGroups.filter(g => g.directions && g.directions.length > 0);
-
-  // Neue Gruppe mit beiden erstellen
-  ftLineGroups.push({ directions: [targetDir, ftDraggedDirection] });
-
   renderFtGroupingUI();
 }
 
-function handleFtDropToGroup(e, groupIdx) {
-  e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-
-  if (!ftDraggedDirection) return;
-
-  // Aus allen Gruppen entfernen
-  ftLineGroups.forEach(g => {
-    if (g.directions) {
-      g.directions = g.directions.filter(d => d !== ftDraggedDirection);
-    }
-  });
-
-  // Leere Gruppen entfernen
-  ftLineGroups = ftLineGroups.filter(g => g.directions && g.directions.length > 0);
-
-  // Zur Zielgruppe hinzufugen (falls sie noch existiert)
-  if (groupIdx < ftLineGroups.length) {
-    ftLineGroups[groupIdx].directions.push(ftDraggedDirection);
-  }
-
-  renderFtGroupingUI();
-}
-
-function handleFtDropToPool(e) {
-  e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-
-  if (!ftDraggedDirection) return;
-
-  // Aus allen Gruppen entfernen
-  ftLineGroups.forEach(g => {
-    if (g.directions) {
-      g.directions = g.directions.filter(d => d !== ftDraggedDirection);
-    }
-  });
-
-  // Leere Gruppen entfernen
-  ftLineGroups = ftLineGroups.filter(g => g.directions && g.directions.length > 0);
-
-  renderFtGroupingUI();
-}
 
 function collectFtLineGroups() {
   if (ftLineGroups.length === 0) return '';
