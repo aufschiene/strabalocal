@@ -4918,8 +4918,26 @@ function initRowOrderList() {
   // 1. Füge Gruppen hinzu
   ftLineGroups.forEach((group, gIdx) => {
     const groupDirections = (group.directions || []).map(key => {
-      const dirInfo = allDirections.find(d => d.key === key);
-      return dirInfo || { key, line: key.split(':')[0], towards: key.split(':').slice(1).join(':') };
+      // Suche exaktes Match
+      let dirInfo = allDirections.find(d => d.key === key);
+
+      // Fallback: Suche nach Linie+richtungsId wenn Key mit :R beginnt
+      if (!dirInfo && key.includes(':R')) {
+        const colonIdx = key.indexOf(':');
+        const line = key.substring(0, colonIdx);
+        const richtungsId = key.substring(colonIdx + 2); // Nach ":R"
+        dirInfo = allDirections.find(d => d.line === line && d.richtungsId === richtungsId);
+      }
+
+      // Fallback: Suche nach Linie+Zieltext
+      if (!dirInfo && key.includes(':') && !key.includes(':R')) {
+        const colonIdx = key.indexOf(':');
+        const line = key.substring(0, colonIdx);
+        const towards = key.substring(colonIdx + 1);
+        dirInfo = allDirections.find(d => d.line === line && d.towards === towards);
+      }
+
+      return dirInfo || { key, line: key.split(':')[0], towards: key.includes(':R') ? '' : key.split(':').slice(1).join(':') };
     });
 
     orderItems.push({
@@ -4929,8 +4947,9 @@ function initRowOrderList() {
       key: `group_${gIdx}`
     });
 
-    // Markiere alle Keys dieser Gruppe als verwendet
+    // Markiere alle Keys dieser Gruppe als verwendet (sowohl der Original-Key als auch der gefundene)
     (group.directions || []).forEach(k => usedKeys.add(k));
+    groupDirections.forEach(d => usedKeys.add(d.key));
   });
 
   // 2. Füge ungruppierten Richtungen hinzu
@@ -5008,11 +5027,15 @@ function initRowOrderList() {
     const processedKeys = new Set();
     const processedGroupIndices = new Set();
 
-    // Sammle alle Keys die jetzt in Gruppen sind
+    // Sammle alle Keys die jetzt in Gruppen sind (inkl. Linie für Fallback-Match)
     const keysInGroups = new Set();
+    const linesInGroups = new Set();
     orderItems.forEach(item => {
       if (item.type === 'group') {
-        item.directions.forEach(d => keysInGroups.add(d.key));
+        item.directions.forEach(d => {
+          keysInGroups.add(d.key);
+          linesInGroups.add(d.line);
+        });
       }
     });
 
