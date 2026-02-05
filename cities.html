@@ -3980,10 +3980,30 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
       let isSelected = false;
 
       if (existingDirections && existingDirections.length > 0) {
-        // Wenn directions vorhanden: exaktes Matching
-        isSelected = existingDirections.some(d =>
-          d.line === line.name && (d.towards === line.towards || !d.towards || !line.towards)
-        );
+        // Wenn directions vorhanden: exaktes Matching (Line + Richtung müssen übereinstimmen)
+        isSelected = existingDirections.some(d => {
+          // Linienname muss übereinstimmen
+          if (d.line !== line.name) return false;
+
+          // Beide haben Richtung: müssen übereinstimmen
+          if (d.towards && line.towards) {
+            return d.towards === line.towards;
+          }
+
+          // Gespeicherte direction hat Richtung, aber API nicht: kein Match
+          // (API sollte normalerweise immer towards haben)
+          if (d.towards && !line.towards) {
+            return false;
+          }
+
+          // Gespeicherte direction hat KEINE Richtung: nur Linienname matchen
+          // Das passiert bei alten Configs die ohne directions gespeichert wurden
+          if (!d.towards) {
+            return true;
+          }
+
+          return false;
+        });
       } else if (existingFilter) {
         // Fallback: Nur Liniennummer prüfen (für alte Config ohne directions)
         const filterLines = existingFilter.split(',').map(l => l.trim());
@@ -6294,14 +6314,11 @@ async function loadExistingConfig(rbl, filter) {
 
     // Directions aus API laden (gefiltert nach station.filter)
     try {
-      console.log('[loadExistingConfig] Fetching directions for', fullId);
       const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
       const data = await response.json();
-      console.log('[loadExistingConfig] API response:', data);
 
       if (data.data && data.data.monitors) {
         const filterLines = station.filter ? station.filter.split(',').map(f => f.trim()) : [];
-        console.log('[loadExistingConfig] filterLines:', filterLines);
 
         data.data.monitors.forEach(monitor => {
           if (monitor.lines && Array.isArray(monitor.lines)) {
@@ -6330,9 +6347,8 @@ async function loadExistingConfig(rbl, filter) {
           }
         });
       }
-      console.log('[loadExistingConfig] station.directions:', station.directions);
     } catch (e) {
-      console.error('[loadExistingConfig] API error:', e);
+      // API error - station will have empty directions
     }
 
     stations.push(station);
