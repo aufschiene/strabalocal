@@ -2914,7 +2914,6 @@ async function loadWienData() {
   try {
     const response = await fetch(WIEN_DATA_URL);
     wienData = await response.json();
-    console.log('Wien data loaded:', wienData.length, 'lines');
   } catch (e) {
     console.error('Failed to load Wien data:', e);
   }
@@ -5319,9 +5318,33 @@ function isLinzNetwork() {
 }
 
 function collectFtLineFilter() {
-  // Filter wird automatisch aus den ausgewählten Linien/Richtungen generiert
-  // Verwende den bereits generierten Wert aus recommendedConfig
-  return recommendedConfig?.lineFilterDestination || '';
+  // Generiere Filter aus allen aktuell verfügbaren Richtungen
+  // Format: "1:Universität,2:Solarcity,27:Chemiepark"
+  // WICHTIG: Gruppierte Linien werden im Display sowieso nicht gefiltert,
+  // daher hier nur die ungruppierten Richtungen sammeln
+
+  const filterParts = [];
+
+  // Sammle alle Keys die in Gruppen sind
+  const groupedKeys = new Set();
+  for (const group of ftLineGroups) {
+    if (group.directions) {
+      for (const key of group.directions) {
+        groupedKeys.add(key);
+      }
+    }
+  }
+
+  // Nur ungroupierte Richtungen zum Filter hinzufügen
+  for (const dir of ftAvailableDirections) {
+    if (dir.line && dir.towards && !groupedKeys.has(dir.key)) {
+      filterParts.push(dir.line + ':' + dir.towards);
+    }
+  }
+
+  // Entferne Duplikate
+  const uniqueParts = [...new Set(filterParts)];
+  return uniqueParts.join(',');
 }
 
 // ==================== FEINTUNING: RICHTUNGS-GRUPPIERUNG ====================
@@ -5345,6 +5368,9 @@ async function initFtGrouping() {
     parseFtExistingGroups(recommendedConfig.lineGroups);
   }
 
+  // WICHTIG: Bereinige Gruppen - entferne Linien die nicht mehr ausgewählt sind
+  cleanupGroupsWithCurrentDirections();
+
   // Event-Listener anhaengen (nur einmal)
   if (!ftEventsAttached) {
     setupFtGroupingEvents();
@@ -5353,6 +5379,46 @@ async function initFtGrouping() {
 
   // UI rendern
   renderFtGroupingUI();
+}
+
+// Bereinigt Gruppen: Entfernt Linien die nicht mehr in ftAvailableDirections sind
+// Löst Gruppen auf die weniger als 2 Linien haben
+function cleanupGroupsWithCurrentDirections() {
+  // Sammle alle aktuell verfügbaren Keys
+  const availableKeys = new Set(ftAvailableDirections.map(d => d.key));
+
+  // Gehe durch alle Gruppen und entferne ungültige Richtungen
+  for (let i = ftLineGroups.length - 1; i >= 0; i--) {
+    const group = ftLineGroups[i];
+    if (!group.directions) {
+      ftLineGroups.splice(i, 1);
+      continue;
+    }
+
+    // Filtere nur die Richtungen die noch verfügbar sind
+    group.directions = group.directions.filter(key => {
+      // Prüfe ob der Key in availableKeys ist
+      if (availableKeys.has(key)) return true;
+
+      // Fallback: Prüfe ob Linie:Destination matcht (ohne R-Prefix für richtungsId)
+      // z.B. "27:Chemiepark" sollte matchen auch wenn Key anders formatiert ist
+      const parts = key.split(':');
+      if (parts.length >= 2) {
+        const line = parts[0];
+        const dest = parts.slice(1).join(':');
+        // Suche nach passender Richtung
+        return ftAvailableDirections.some(d =>
+          d.line === line && (d.towards === dest || d.key === key)
+        );
+      }
+      return false;
+    });
+
+    // Gruppe auflösen wenn weniger als 2 Richtungen übrig
+    if (group.directions.length < 2) {
+      ftLineGroups.splice(i, 1);
+    }
+  }
 }
 
 async function loadFtDirectionsFromStations() {
@@ -5447,7 +5513,7 @@ async function loadFtDirectionsFromStations() {
           });
         }
       } catch (e) {
-        console.log('Fehler beim Laden der Richtungen:', station.stopName, e);
+        // Fehler beim Laden ignorieren
       }
     }
   }
@@ -5471,7 +5537,6 @@ async function loadFtDirectionsFromStations() {
     return (a.towards || '').localeCompare(b.towards || '');
   });
 
-  console.log('Geladene Richtungen:', ftAvailableDirections);
 }
 
 function parseFtExistingGroups(lineGroupsStr) {
@@ -5611,7 +5676,6 @@ function renderFtPool() {
 
 // Touch-freundliche Gruppierungs-Funktionen
 function startFtGrouping() {
-  console.log('startFtGrouping aufgerufen');
   ftGroupingMode = true;
   ftSelectedForGroup = [];
   renderFtGroupingUI();
@@ -5624,32 +5688,22 @@ function cancelFtGrouping() {
 }
 
 function toggleFtSelection(key) {
-  console.log('toggleFtSelection aufgerufen mit key:', key);
   const idx = ftSelectedForGroup.indexOf(key);
   if (idx === -1) {
     ftSelectedForGroup.push(key);
-    console.log('Key hinzugefuegt, ftSelectedForGroup:', ftSelectedForGroup);
   } else {
     ftSelectedForGroup.splice(idx, 1);
-    console.log('Key entfernt, ftSelectedForGroup:', ftSelectedForGroup);
   }
   renderFtGroupingUI();
 }
 
 function confirmFtGroup() {
-  console.log('confirmFtGroup aufgerufen, ftSelectedForGroup:', ftSelectedForGroup);
-
   if (ftSelectedForGroup.length < 2) {
-    console.log('Weniger als 2 Richtungen ausgewaehlt, Abbruch');
     return;
   }
 
-  console.log('Erstelle Gruppe mit:', ftSelectedForGroup);
-
   // Neue Gruppe erstellen
   ftLineGroups.push({ directions: [...ftSelectedForGroup] });
-
-  console.log('ftLineGroups nach Erstellung:', JSON.stringify(ftLineGroups));
 
   // Reset
   ftGroupingMode = false;
@@ -5695,31 +5749,18 @@ function updateRowOrderAfterGroupChange() {
 
 
 function collectFtLineGroups() {
-  console.log('collectFtLineGroups aufgerufen, ftLineGroups:', JSON.stringify(ftLineGroups));
-  console.log('ftLineGroups.length:', ftLineGroups.length);
-
   if (ftLineGroups.length === 0) {
-    console.log('Keine Gruppen vorhanden');
     return '';
   }
-
-  // Debug: Zeige jede Gruppe
-  ftLineGroups.forEach((g, i) => {
-    console.log(`Gruppe ${i}:`, JSON.stringify(g), 'directions:', g.directions, 'length:', g.directions ? g.directions.length : 'undefined');
-  });
 
   // Nur Gruppen mit mindestens 2 Richtungen
   const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 2);
-  console.log('validGroups.length:', validGroups.length);
 
   if (validGroups.length === 0) {
-    console.log('Keine gueltigen Gruppen (mind. 2 Richtungen)');
     return '';
   }
 
-  const result = validGroups.map(g => g.directions.join('+')).join(',');
-  console.log('Gruppierungs-String:', result);
-  return result;
+  return validGroups.map(g => g.directions.join('+')).join(',');
 }
 
 function shortenDestFt(dest) {
@@ -5736,23 +5777,15 @@ function escapeHtmlFt(text) {
 
 // Event Delegation fuer Gruppierung - vermeidet Probleme mit Sonderzeichen
 function setupFtGroupingEvents() {
-  console.log('setupFtGroupingEvents aufgerufen');
-
   // Groups Container Events
   const groupsContainer = document.getElementById('ftGroupsContainer');
-  console.log('groupsContainer:', groupsContainer ? 'gefunden' : 'NICHT gefunden');
 
   if (groupsContainer) {
     groupsContainer.addEventListener('click', function(e) {
-      console.log('Click in groupsContainer, target:', e.target);
       const target = e.target.closest('[data-action]');
-      if (!target) {
-        console.log('Kein data-action Element gefunden');
-        return;
-      }
+      if (!target) return;
 
       const action = target.dataset.action;
-      console.log('Grouping action:', action, target.dataset);
 
       switch(action) {
         case 'start-grouping':
@@ -5794,37 +5827,27 @@ function setupFtGroupingEvents() {
 
   // Pool Container Events
   const poolContainer = document.getElementById('ftPoolItems');
-  console.log('poolContainer:', poolContainer ? 'gefunden' : 'NICHT gefunden');
 
   if (poolContainer) {
     poolContainer.addEventListener('click', function(e) {
-      console.log('Click in poolContainer, target:', e.target, 'ftGroupingMode:', ftGroupingMode);
       const target = e.target.closest('[data-pool-idx]');
-      if (!target) {
-        console.log('Kein pool Element');
-        return;
-      }
+      if (!target) return;
 
       const poolIdx = parseInt(target.dataset.poolIdx);
-      console.log('Pool select, idx:', poolIdx);
 
       if (poolIdx >= 0 && poolIdx < ftAvailableDirections.length) {
         const key = ftAvailableDirections[poolIdx].key;
 
         // Automatisch Gruppierungsmodus starten wenn noch nicht aktiv
         if (!ftGroupingMode) {
-          console.log('Starte automatisch Gruppierungsmodus');
           ftGroupingMode = true;
           ftSelectedForGroup = [];
         }
 
-        console.log('Adding to selection:', key);
         toggleFtSelection(key);
       }
     });
   }
-
-  console.log('Event-Listener eingerichtet');
 }
 
 // Event-Listener werden in initFtGrouping() angehaengt
@@ -5853,11 +5876,9 @@ function saveFromFinetuning() {
 
   // Linien-Gruppierung sammeln
   const lineGroupsStr = collectFtLineGroups();
-  console.log('saveFromFinetuning - lineGroupsStr:', lineGroupsStr);
 
   // Linz Linien+Ziel Filter sammeln (linefilterdestination)
   const lineFilterDestStr = collectFtLineFilter();
-  console.log('saveFromFinetuning - lineFilterDestStr:', lineFilterDestStr);
 
   // Update recommendedConfig
   recommendedConfig.colour = colour;
@@ -5875,10 +5896,6 @@ function saveFromFinetuning() {
   recommendedConfig.sortMode = sortMode;
   recommendedConfig.rowOrder = rowOrder;
   recommendedConfig.rowOrderDestination = rowOrderDestination;
-
-  console.log('saveFromFinetuning - sortMode:', sortMode);
-  console.log('saveFromFinetuning - rowOrder:', rowOrder);
-  console.log('saveFromFinetuning - rowOrderDestination:', rowOrderDestination);
 
   // Speichern
   showSavingOverlay('Speichere Einstellungen...');
@@ -5935,8 +5952,6 @@ function sendConfigToDeviceDirect(config) {
     roworder: config.rowOrder || '',  // NEU: Zeilen-Reihenfolge einfach
     roworderdestination: config.rowOrderDestination || ''  // NEU: Zeilen-Reihenfolge mit Ziel
   };
-
-  console.log('Sende Config direkt an Gerät:', configData);
 
   // Prüfe ob wir im iframe sind
   const inIframe = window.parent && window.parent !== window;
@@ -6010,9 +6025,6 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('linefilter', configData.linefilter);
     formData.append('linefilterdestination', configData.linefilterdestination);
 
-    console.log('FormData linegroups:', configData.linegroups);
-    console.log('FormData linefilter:', configData.linefilter);
-    console.log('FormData linefilterdestination:', configData.linefilterdestination);
     updateSavingOverlay('Speichere Einstellungen...');
 
     const response = await fetch('http://straba.local/config', {
@@ -6217,8 +6229,6 @@ function saveConfig() {
   const rblString = stations.map(s => s.fullId).join(',');
   const filterString = stations.map(s => s.filter || '').join('|');
   
-  console.log('Saving:', { rbl: rblString, filter: filterString });
-  
   localStorage.setItem('straba_pending_rbl', rblString);
   localStorage.setItem('straba_pending_filter', filterString);
   
@@ -6420,19 +6430,6 @@ window.addEventListener('message', async function(event) {
       initFinetuningStep();
     }
 
-    // Debug: Config geladen
-    console.log('[cities.html] Full config loaded:', {
-      lineGroups: recommendedConfig.lineGroups,
-      sortMode: recommendedConfig.sortMode,
-      rows: recommendedConfig.rows,
-      rowOrder: recommendedConfig.rowOrder,
-      colour: recommendedConfig.colour,
-      displayLight: recommendedConfig.displayLight,
-      chopper: recommendedConfig.chopper,
-      silberpfeil: recommendedConfig.silberpfeil,
-      nightMode: recommendedConfig.nightMode
-    });
-    console.log('[cities.html] Raw config from ESP32:', event.data.config);
   }
 });
 
