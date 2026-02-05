@@ -5614,13 +5614,48 @@ function parseFtExistingGroups(lineGroupsStr) {
 
   ftLineGroups = [];
 
-  // Format: "U1:Leopoldau+62:Meidling,1:xyz+2:abc"
+  // Format: "U1:Leopoldau+62:Meidling,1:xyz+2:abc" (alt) oder "12:R60500312+19:R60500097" (neu)
   const groups = lineGroupsStr.split(',');
   groups.forEach((groupStr) => {
     if (groupStr.includes('+')) {
-      const directions = groupStr.split('+').map(d => d.trim()).filter(d => d);
-      if (directions.length >= 2) {
-        ftLineGroups.push({ directions: directions });
+      const rawDirections = groupStr.split('+').map(d => d.trim()).filter(d => d);
+
+      // Mappe alte Keys (12:Auwiesen) auf neue Keys (12:R60500312)
+      const mappedDirections = rawDirections.map(rawKey => {
+        // Wenn der Key schon das neue Format hat (mit :R), behalte ihn
+        if (rawKey.includes(':R')) {
+          return rawKey;
+        }
+
+        // Altes Format: "12:Auwiesen" -> versuche passende richtungsId zu finden
+        const colonIdx = rawKey.indexOf(':');
+        if (colonIdx > 0) {
+          const line = rawKey.substring(0, colonIdx);
+          const dest = rawKey.substring(colonIdx + 1);
+
+          // Suche in ftAvailableDirections nach passender Linie+Richtung
+          const match = ftAvailableDirections.find(d =>
+            d.line === line && d.towards === dest
+          );
+
+          if (match) {
+            return match.key;  // Nutze den neuen Key mit richtungsId
+          }
+
+          // Kein exakter Match - versuche nur nach Linie zu matchen
+          const lineMatch = ftAvailableDirections.find(d => d.line === line);
+          if (lineMatch && lineMatch.richtungsId) {
+            // Warnung: Nicht exakt, aber besser als nichts
+            return lineMatch.key;
+          }
+        }
+
+        // Fallback: Behalte den alten Key
+        return rawKey;
+      });
+
+      if (mappedDirections.length >= 2) {
+        ftLineGroups.push({ directions: mappedDirections });
       }
     }
   });
