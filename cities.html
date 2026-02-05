@@ -5006,26 +5006,50 @@ function initRowOrderList() {
     // Synchronisiere: behalte Reihenfolge, aber aktualisiere Gruppen
     const newOrder = [];
     const processedKeys = new Set();
+    const processedGroupIndices = new Set();
+
+    // Sammle alle Keys die jetzt in Gruppen sind
+    const keysInGroups = new Set();
+    orderItems.forEach(item => {
+      if (item.type === 'group') {
+        item.directions.forEach(d => keysInGroups.add(d.key));
+      }
+    });
 
     // Behalte bestehende Reihenfolge wo möglich
     ftRowOrder.forEach(item => {
       if (item.type === 'group') {
-        // Prüfe ob Gruppe noch existiert
+        // Prüfe ob Gruppe noch existiert (gleicher Index)
         const matchingGroup = orderItems.find(oi =>
           oi.type === 'group' && oi.groupIndex === item.groupIndex
         );
-        if (matchingGroup) {
+        if (matchingGroup && !processedGroupIndices.has(matchingGroup.groupIndex)) {
           newOrder.push(matchingGroup);
           processedKeys.add(matchingGroup.key);
+          processedGroupIndices.add(matchingGroup.groupIndex);
         }
       } else if (item.type === 'single') {
-        // Prüfe ob Single noch existiert und nicht gruppiert wurde
-        const matchingSingle = orderItems.find(oi =>
-          oi.type === 'single' && oi.key === item.key
-        );
-        if (matchingSingle) {
-          newOrder.push(matchingSingle);
-          processedKeys.add(matchingSingle.key);
+        // Prüfe ob dieses Single jetzt in einer Gruppe ist
+        if (keysInGroups.has(item.key)) {
+          // Dieses Single ist jetzt gruppiert - füge die Gruppe hier ein (falls noch nicht eingefügt)
+          const groupWithThisKey = orderItems.find(oi =>
+            oi.type === 'group' && oi.directions.some(d => d.key === item.key)
+          );
+          if (groupWithThisKey && !processedGroupIndices.has(groupWithThisKey.groupIndex)) {
+            newOrder.push(groupWithThisKey);
+            processedKeys.add(groupWithThisKey.key);
+            processedGroupIndices.add(groupWithThisKey.groupIndex);
+          }
+          // Single nicht mehr hinzufügen (ist in Gruppe)
+        } else {
+          // Prüfe ob Single noch existiert
+          const matchingSingle = orderItems.find(oi =>
+            oi.type === 'single' && oi.key === item.key
+          );
+          if (matchingSingle) {
+            newOrder.push(matchingSingle);
+            processedKeys.add(matchingSingle.key);
+          }
         }
       }
     });
