@@ -4969,23 +4969,30 @@ function initRowOrderList() {
   if (ftRowOrder.length === 0 || !ftRowOrder[0]?.type) {
     // Versuche gespeicherte Reihenfolge aus Config zu laden
     if (savedRowOrder && savedRowOrder.length > 0) {
+      // Format: "1:Uni+2:Uni,3:Solar" - Gruppen mit +, Einträge mit ,
       const savedItems = savedRowOrder.split(',').map(s => s.trim());
       const sortedOrder = [];
       const processedKeys = new Set();
 
       // Sortiere orderItems nach der gespeicherten Reihenfolge
       savedItems.forEach(savedItem => {
-        // savedItem ist im Format "2:solarCity" oder nur "2"
-        const colonIdx = savedItem.indexOf(':');
-        const savedLine = colonIdx > 0 ? savedItem.substring(0, colonIdx) : savedItem;
-        const savedDest = colonIdx > 0 ? savedItem.substring(colonIdx + 1) : '';
+        // Prüfe ob savedItem eine Gruppe ist (enthält +)
+        const isGroupItem = savedItem.includes('+');
 
-        // Finde passendes Item (Gruppe oder Single)
-        for (const item of orderItems) {
-          if (processedKeys.has(item.key)) continue;
+        if (isGroupItem) {
+          // Gruppe: "1:Uni+2:Uni" - parse alle Teile
+          const groupParts = savedItem.split('+').map(p => p.trim());
+          const firstPart = groupParts[0];
+          const colonIdx = firstPart.indexOf(':');
+          const savedLine = colonIdx > 0 ? firstPart.substring(0, colonIdx) : firstPart;
+          const savedDest = colonIdx > 0 ? firstPart.substring(colonIdx + 1) : '';
 
-          if (item.type === 'group') {
-            // Prüfe ob diese Gruppe die gespeicherte Linie+Destination enthält
+          // Finde passende Gruppe in orderItems
+          for (const item of orderItems) {
+            if (processedKeys.has(item.key)) continue;
+            if (item.type !== 'group') continue;
+
+            // Prüfe ob diese Gruppe die erste Linie+Destination enthält
             const hasMatch = item.directions.some(d => {
               const lineMatch = d.line === savedLine;
               const destMatch = !savedDest || d.towards === savedDest ||
@@ -4997,14 +5004,39 @@ function initRowOrderList() {
               processedKeys.add(item.key);
               break;
             }
-          } else if (item.type === 'single') {
-            const lineMatch = item.line === savedLine;
-            const destMatch = !savedDest || item.towards === savedDest ||
-                              item.towards.includes(savedDest) || savedDest.includes(item.towards);
-            if (lineMatch && destMatch) {
-              sortedOrder.push(item);
-              processedKeys.add(item.key);
-              break;
+          }
+        } else {
+          // Single: "2:solarCity" oder nur "2"
+          const colonIdx = savedItem.indexOf(':');
+          const savedLine = colonIdx > 0 ? savedItem.substring(0, colonIdx) : savedItem;
+          const savedDest = colonIdx > 0 ? savedItem.substring(colonIdx + 1) : '';
+
+          // Finde passendes Item (Gruppe oder Single)
+          for (const item of orderItems) {
+            if (processedKeys.has(item.key)) continue;
+
+            if (item.type === 'group') {
+              // Prüfe ob diese Gruppe die gespeicherte Linie+Destination enthält
+              const hasMatch = item.directions.some(d => {
+                const lineMatch = d.line === savedLine;
+                const destMatch = !savedDest || d.towards === savedDest ||
+                                  d.towards.includes(savedDest) || savedDest.includes(d.towards);
+                return lineMatch && destMatch;
+              });
+              if (hasMatch) {
+                sortedOrder.push(item);
+                processedKeys.add(item.key);
+                break;
+              }
+            } else if (item.type === 'single') {
+              const lineMatch = item.line === savedLine;
+              const destMatch = !savedDest || item.towards === savedDest ||
+                                item.towards.includes(savedDest) || savedDest.includes(item.towards);
+              if (lineMatch && destMatch) {
+                sortedOrder.push(item);
+                processedKeys.add(item.key);
+                break;
+              }
             }
           }
         }
@@ -5228,15 +5260,15 @@ function getRowOrderString() {
 }
 
 function getRowOrderDestinationString() {
-  // Format für Linz: "1:Auwiesen,2:Solarcity" - Linie+Ziel
-  // Bei Gruppen: alle Richtungen der Gruppe in Reihenfolge
+  // Format für Linz: "1:Uni+2:Uni,3:Solarc" - Gruppen mit +, Einträge mit ,
+  // Bei Gruppen: alle Richtungen der Gruppe mit + verbunden
+  // Bei Singles: einzeln
   const items = [];
   ftRowOrder.forEach(item => {
     if (item.type === 'group' && item.directions && item.directions.length > 0) {
-      // Bei Gruppe: alle Richtungen der Gruppe hinzufügen
-      item.directions.forEach(dir => {
-        items.push(`${dir.line}:${dir.towards || ''}`);
-      });
+      // Bei Gruppe: alle Richtungen mit + verbinden
+      const groupParts = item.directions.map(dir => `${dir.line}:${dir.towards || ''}`);
+      items.push(groupParts.join('+'));
     } else if (item.type === 'single') {
       items.push(`${item.line}:${item.towards || ''}`);
     }
