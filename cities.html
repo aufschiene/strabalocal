@@ -5275,19 +5275,53 @@ async function initFtGrouping() {
   // Richtungen aus allen Stationen laden
   await loadFtDirectionsFromStations();
 
+  // Debug: Was haben wir geladen?
+  console.log('[FtGrouping] ftAllDirections geladen:', ftAllDirections.length, 'Richtungen');
+  console.log('[FtGrouping] Keys:', ftAllDirections.map(d => d.key));
+
   // Bestehende Gruppierung aus roworderdestination laden (neues Format)
   // Fallback auf linegroups für alte Configs
   if (recommendedConfig && recommendedConfig.rowOrderDestination) {
+    console.log('[FtGrouping] Parse rowOrderDestination:', recommendedConfig.rowOrderDestination);
     parseRowOrderDestination(recommendedConfig.rowOrderDestination);
   } else if (recommendedConfig && recommendedConfig.lineGroups) {
+    console.log('[FtGrouping] Parse lineGroups:', recommendedConfig.lineGroups);
     parseFtExistingGroups(recommendedConfig.lineGroups);
   }
+
+  console.log('[FtGrouping] Nach Parse: ftLineGroups hat', ftLineGroups.length, 'Einträge');
+
+  // WICHTIG: Prüfe ob alle Richtungen in ftAllDirections auch in ftLineGroups sind
+  // Falls nicht: Füge fehlende Richtungen als neue 1er-Gruppen hinzu
+  const usedKeys = new Set();
+  ftLineGroups.forEach(group => {
+    (group.directions || []).forEach(key => usedKeys.add(key));
+  });
+
+  // Fehlende Richtungen finden und hinzufügen
+  const missingDirections = ftAllDirections.filter(d => !usedKeys.has(d.key));
+  if (missingDirections.length > 0) {
+    console.log('[FtGrouping] Fehlende Richtungen gefunden:', missingDirections.map(d => d.key));
+    missingDirections.forEach(dir => {
+      ftLineGroups.push({ directions: [dir.key] });
+    });
+  }
+
+  // Ungültige Keys aus ftLineGroups entfernen (Keys die nicht mehr in ftAllDirections existieren)
+  const validKeys = new Set(ftAllDirections.map(d => d.key));
+  ftLineGroups = ftLineGroups.map(group => {
+    const validDirections = (group.directions || []).filter(key => validKeys.has(key));
+    return { directions: validDirections };
+  }).filter(group => group.directions.length > 0);  // Leere Gruppen entfernen
+
+  console.log('[FtGrouping] Nach Bereinigung: ftLineGroups hat', ftLineGroups.length, 'Einträge');
 
   // Pool aktualisieren (Richtungen die nicht in Gruppen sind)
   updatePoolDirections();
 
-  // Wenn noch keine Gruppen existieren, erstelle für jede Richtung eine 1er-Gruppe
+  // Wenn immer noch keine Gruppen existieren, erstelle für jede Richtung eine 1er-Gruppe
   if (ftLineGroups.length === 0 && ftAllDirections.length > 0) {
+    console.log('[FtGrouping] Keine Gruppen - erstelle 1er-Gruppen für alle Richtungen');
     ftAllDirections.forEach(dir => {
       ftLineGroups.push({ directions: [dir.key] });
     });
