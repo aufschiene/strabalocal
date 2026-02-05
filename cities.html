@@ -3868,10 +3868,26 @@ function updateStationsList() {
   }
 
   const chips = Array.from(groupedStations.values()).map((group) => {
-    const uniqueFilters = [...new Set(group.filters)];
-    const filterLabel = group.isJourney
-      ? `Produkte: ${uniqueFilters.join(', ') || 'Alle'}`
-      : `Linien: ${uniqueFilters.join(', ') || 'Alle'}`;
+    let filterLabel;
+    if (group.isJourney) {
+      const uniqueFilters = [...new Set(group.filters)];
+      filterLabel = `Produkte: ${uniqueFilters.join(', ') || 'Alle'}`;
+    } else if (group.directions && group.directions.length > 0) {
+      // Zeige Linien mit Richtungen: "1 → Böfingen, 2 → Kuhberg"
+      const directionLabels = group.directions.map(d => {
+        if (d.towards) {
+          return `${d.line} → ${d.towards}`;
+        }
+        return d.line;
+      });
+      // Unique und sortiert
+      const uniqueLabels = [...new Set(directionLabels)];
+      filterLabel = uniqueLabels.join(', ');
+    } else {
+      // Fallback: nur Liniennummern
+      const uniqueFilters = [...new Set(group.filters)];
+      filterLabel = `Linien: ${uniqueFilters.join(', ') || 'Alle'}`;
+    }
     const badgeClass = group.network.toLowerCase();
     const firstIdx = group.indices[0];
 
@@ -3932,12 +3948,12 @@ async function editStation(idx) {
   } else {
     // Andere Netzwerke: Direkt zur Linienauswahl
     selectedStop = { id: station.stopId, name: station.stopName };
-    await selectStopForEdit(station.stopId, station.stopName, station.directions || []);
+    await selectStopForEdit(station.stopId, station.stopName, station.directions || [], station.filter || '');
   }
 }
 
 // Spezielle Version von selectStop für das Bearbeiten (mit Vorauswahl)
-async function selectStopForEdit(id, name, existingDirections) {
+async function selectStopForEdit(id, name, existingDirections, existingFilter) {
   selectedStop = { id, name };
   selectedLines = new Set();
   availableLines = [];
@@ -3960,11 +3976,21 @@ async function selectStopForEdit(id, name, existingDirections) {
 
     extractLines(data);
 
-    // Vorauswahl: Markiere Linien die bereits in existingDirections sind
+    // Vorauswahl: Markiere Linien die bereits ausgewählt waren
     availableLines.forEach((line, idx) => {
-      const isSelected = existingDirections.some(d =>
-        d.line === line.name && (d.towards === line.towards || !d.towards || !line.towards)
-      );
+      let isSelected = false;
+
+      if (existingDirections && existingDirections.length > 0) {
+        // Wenn directions vorhanden: exaktes Matching
+        isSelected = existingDirections.some(d =>
+          d.line === line.name && (d.towards === line.towards || !d.towards || !line.towards)
+        );
+      } else if (existingFilter) {
+        // Fallback: Nur Liniennummer prüfen (für alte Config ohne directions)
+        const filterLines = existingFilter.split(',').map(l => l.trim());
+        isSelected = filterLines.includes(line.name);
+      }
+
       if (isSelected) {
         selectedLines.add(idx);
       }
