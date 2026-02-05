@@ -2368,6 +2368,22 @@
 </div>
 
 <script>
+// ==================== EARLY MESSAGE HANDLER ====================
+// Fängt Nachrichten ab, die vor dem Laden des restlichen Scripts ankommen
+let _pendingConfigMessages = [];
+let _configHandlerReady = false;
+
+window.addEventListener('message', function(event) {
+  if (event.data?.type === 'loadFullConfig' || event.data?.type === 'loadExistingConfig') {
+    if (_configHandlerReady) {
+      // Handler ist bereit, nichts zu tun (wird vom späteren Handler verarbeitet)
+    } else {
+      // Puffere Nachrichten für später
+      _pendingConfigMessages.push(event.data);
+    }
+  }
+});
+
 // ==================== CONFIG ====================
 const REGIONS = {
   AT: {
@@ -6261,30 +6277,45 @@ function saveConfig() {
 }
 
 // ==================== LOAD EXISTING ====================
-async function loadExistingConfig(rbl, filter) {
+// linefilterdestination: Linz-Format "1:Auwiesen,2:solarCity,27:Chemiepark" mit Line:Destination
+async function loadExistingConfig(rbl, filter, linefilterdestination) {
   if (!rbl || rbl.trim() === '') return;
-  
+
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
   const filterParts = filter ? filter.split('|') : [];
-  
+
+  // Parse linefilterdestination: "1:Auwiesen,2:solarCity,27:Chemiepark" -> [{line: "1", towards: "Auwiesen"}, ...]
+  const lineDestinations = [];
+  if (linefilterdestination) {
+    linefilterdestination.split(',').forEach(entry => {
+      const colonIdx = entry.indexOf(':');
+      if (colonIdx > 0) {
+        lineDestinations.push({
+          line: entry.substring(0, colonIdx).trim(),
+          towards: entry.substring(colonIdx + 1).trim()
+        });
+      }
+    });
+  }
+
   for (let idx = 0; idx < rblParts.length; idx++) {
     const part = rblParts[idx];
     let network, stopId;
-    
+
     if (part.includes(':')) {
       [network, stopId] = part.split(':');
     } else {
       network = 'WL';
       stopId = part;
     }
-    
+
     const fullId = `${network}:${stopId}`;
     if (stations.some(s => s.fullId === fullId)) continue;
-    
+
     // Check if it's a journey (has > in stopId)
     const isJourney = stopId.includes('>');
     let stopName = `Station ${stopId}`;
-    
+
     if (isJourney) {
       const [fromId, toId] = stopId.split('>');
       // Try to get names from API
@@ -6298,28 +6329,30 @@ async function loadExistingConfig(rbl, filter) {
         stopName = resolvedName;
       }
     }
-    
+
+    // Filter für diese Station: Liniennamen aus filterParts oder aus lineDestinations
+    const stationFilter = filterParts[idx] || '';
+    const filterLines = stationFilter ? stationFilter.split(',').map(f => f.trim()) : [];
+
     // Station erstellen
     const station = {
       network,
       networkName: NETWORKS[network]?.name || network,
       stopId,
       stopName,
-      filter: filterParts[idx] || '',
+      filter: stationFilter,
       fullId,
       isJourney,
       isExisting: true,
       directions: []  // Wird unten befüllt
     };
 
-    // Directions aus API laden (gefiltert nach station.filter)
+    // Directions aus API laden (gefiltert)
     try {
       const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
       const data = await response.json();
 
       if (data.data && data.data.monitors) {
-        const filterLines = station.filter ? station.filter.split(',').map(f => f.trim()) : [];
-
         data.data.monitors.forEach(monitor => {
           if (monitor.lines && Array.isArray(monitor.lines)) {
             monitor.lines.forEach(line => {
@@ -6328,8 +6361,23 @@ async function loadExistingConfig(rbl, filter) {
               const type = line.type || '';
               const richtungsId = line.richtungsId || monitor.richtungsId || '';
 
-              // Nur Linien die im Filter sind (oder alle wenn kein Filter)
-              if (filterLines.length === 0 || filterLines.includes(lineName)) {
+              // Prüfen ob diese Linie+Richtung ausgewählt werden soll
+              let shouldInclude = false;
+
+              if (lineDestinations.length > 0) {
+                // Linz-Modus: Prüfe gegen linefilterdestination (Line + Destination)
+                shouldInclude = lineDestinations.some(ld =>
+                  ld.line === lineName && ld.towards === towards
+                );
+              } else if (filterLines.length > 0) {
+                // Fallback: Nur Liniennummer prüfen
+                shouldInclude = filterLines.includes(lineName);
+              } else {
+                // Kein Filter: Alle Linien einschließen
+                shouldInclude = true;
+              }
+
+              if (shouldInclude) {
                 // Duplikate vermeiden
                 const exists = station.directions.some(d =>
                   d.line === lineName && d.towards === towards
@@ -6394,27 +6442,32 @@ async function resolveStationName(network, stopId) {
 }
 
 // ==================== ESP32 COMMUNICATION ====================
-window.addEventListener('message', async function(event) {
-  if (event.data?.type === 'loadExistingConfig') {
+async function handleConfigMessage(data) {
+  console.log('Processing config message:', data.type, data);
+
+  if (data.type === 'loadExistingConfig') {
     // Load Wien data first if any WL stations
-    if (event.data.rbl && !event.data.rbl.includes(':')) {
+    if (data.rbl && !data.rbl.includes(':')) {
       await loadWienData();
     }
-    await loadExistingConfig(event.data.rbl, event.data.filter);
+    await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '');
+    return;
   }
-  if (event.data?.type === 'loadFullConfig' && (event.data.config?.rbl_id || event.data.config?.rbl)) {
+
+  if (data.type === 'loadFullConfig' && (data.config?.rbl_id || data.config?.rbl)) {
     // Markiere, dass eine bestehende Config geladen wurde
     hasExistingConfig = true;
 
     // Unterstütze beide Feldnamen (rbl_id/rbl und lines_filter/filter)
-    const rblId = event.data.config.rbl_id || event.data.config.rbl || '';
-    const linesFilter = event.data.config.lines_filter || event.data.config.filter || '';
+    const rblId = data.config.rbl_id || data.config.rbl || '';
+    const linesFilter = data.config.lines_filter || data.config.filter || '';
+    const lineFilterDest = data.config.linefilterdestination || '';
 
     // Load Wien data first if any WL stations
     if (rblId && !rblId.includes(':')) {
       await loadWienData();
     }
-    await loadExistingConfig(rblId, linesFilter);
+    await loadExistingConfig(rblId, linesFilter, lineFilterDest);
 
     // Initialisiere recommendedConfig falls noch nicht vorhanden
     if (!recommendedConfig) {
@@ -6422,57 +6475,57 @@ window.addEventListener('message', async function(event) {
     }
 
     // Linz Linien+Ziel Filter aus Config übernehmen
-    if (event.data.config.linefilterdestination) {
-      recommendedConfig.lineFilterDestination = event.data.config.linefilterdestination;
+    if (data.config.linefilterdestination) {
+      recommendedConfig.lineFilterDestination = data.config.linefilterdestination;
     }
     // Linien-Gruppierung aus Config übernehmen
-    if (event.data.config.linegroups) {
-      recommendedConfig.lineGroups = event.data.config.linegroups;
+    if (data.config.linegroups) {
+      recommendedConfig.lineGroups = data.config.linegroups;
     }
     // Sortierungsmodus aus Config übernehmen
-    if (event.data.config.sort_mode !== undefined) {
-      recommendedConfig.sortMode = parseInt(event.data.config.sort_mode) || 1;
+    if (data.config.sort_mode !== undefined) {
+      recommendedConfig.sortMode = parseInt(data.config.sort_mode) || 1;
     }
     // Zeilen-Reihenfolge aus Config übernehmen
-    if (event.data.config.roworder) {
-      recommendedConfig.rowOrder = event.data.config.roworder;
+    if (data.config.roworder) {
+      recommendedConfig.rowOrder = data.config.roworder;
     }
-    if (event.data.config.roworderdestination) {
-      recommendedConfig.rowOrderDestination = event.data.config.roworderdestination;
+    if (data.config.roworderdestination) {
+      recommendedConfig.rowOrderDestination = data.config.roworderdestination;
     }
     // Weitere Feintuning-Einstellungen
-    if (event.data.config.colour !== undefined) {
-      recommendedConfig.colour = parseInt(event.data.config.colour) || 1;
+    if (data.config.colour !== undefined) {
+      recommendedConfig.colour = parseInt(data.config.colour) || 1;
     }
-    if (event.data.config.lines_count !== undefined) {
-      recommendedConfig.rows = parseInt(event.data.config.lines_count) || 2;
+    if (data.config.lines_count !== undefined) {
+      recommendedConfig.rows = parseInt(data.config.lines_count) || 2;
     }
     // displaylight (ESP32 Feldname)
-    if (event.data.config.displaylight !== undefined) {
-      recommendedConfig.displayLight = parseInt(event.data.config.displaylight) || 3;
+    if (data.config.displaylight !== undefined) {
+      recommendedConfig.displayLight = parseInt(data.config.displaylight) || 3;
     }
     // chopper und silberpfeil (ESP32 Feldnamen, als String gesendet)
-    if (event.data.config.chopper !== undefined) {
-      recommendedConfig.chopper = parseInt(event.data.config.chopper) || 0;
+    if (data.config.chopper !== undefined) {
+      recommendedConfig.chopper = parseInt(data.config.chopper) || 0;
     }
-    if (event.data.config.silberpfeil !== undefined) {
-      recommendedConfig.silberpfeil = parseInt(event.data.config.silberpfeil) || 0;
+    if (data.config.silberpfeil !== undefined) {
+      recommendedConfig.silberpfeil = parseInt(data.config.silberpfeil) || 0;
     }
-    if (event.data.config.night_mode_enabled !== undefined) {
-      recommendedConfig.nightMode = event.data.config.night_mode_enabled;
+    if (data.config.night_mode_enabled !== undefined) {
+      recommendedConfig.nightMode = data.config.night_mode_enabled;
     }
-    if (event.data.config.night_mode_start !== undefined) {
-      recommendedConfig.nightStart = parseInt(event.data.config.night_mode_start) || 22;
+    if (data.config.night_mode_start !== undefined) {
+      recommendedConfig.nightStart = parseInt(data.config.night_mode_start) || 22;
     }
-    if (event.data.config.night_mode_end !== undefined) {
-      recommendedConfig.nightEnd = parseInt(event.data.config.night_mode_end) || 6;
+    if (data.config.night_mode_end !== undefined) {
+      recommendedConfig.nightEnd = parseInt(data.config.night_mode_end) || 6;
     }
-    if (event.data.config.show_fun_messages !== undefined) {
-      recommendedConfig.showFunMessages = event.data.config.show_fun_messages;
+    if (data.config.show_fun_messages !== undefined) {
+      recommendedConfig.showFunMessages = data.config.show_fun_messages;
     }
     // Gehweg aus Config übernehmen (Format: "stopId:value|stopId:value")
-    if (event.data.config.gehweg) {
-      const gehwegStr = event.data.config.gehweg;
+    if (data.config.gehweg) {
+      const gehwegStr = data.config.gehweg;
       const gehwegMap = {};
 
       // Parse "stopId:value|stopId:value" oder "stopId:value,stopId:value"
@@ -6496,9 +6549,23 @@ window.addEventListener('message', async function(event) {
     if (ftStep && !ftStep.classList.contains('hidden')) {
       initFinetuningStep();
     }
+  }
+}
 
+// Event-Listener der die Funktion aufruft
+window.addEventListener('message', async function(event) {
+  if (event.data?.type === 'loadExistingConfig' || event.data?.type === 'loadFullConfig') {
+    await handleConfigMessage(event.data);
   }
 });
+
+// Markiere Handler als bereit und verarbeite gepufferte Nachrichten
+_configHandlerReady = true;
+if (_pendingConfigMessages.length > 0) {
+  console.log('Processing', _pendingConfigMessages.length, 'buffered config messages');
+  _pendingConfigMessages.forEach(msg => handleConfigMessage(msg));
+  _pendingConfigMessages = [];
+}
 
 // ==================== JOURNEY MODE (DB) ====================
 let journeyFromTimeout = null;
