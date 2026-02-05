@@ -6279,7 +6279,8 @@ async function loadExistingConfig(rbl, filter) {
       }
     }
     
-    stations.push({
+    // Station erstellen
+    const station = {
       network,
       networkName: NETWORKS[network]?.name || network,
       stopId,
@@ -6287,10 +6288,52 @@ async function loadExistingConfig(rbl, filter) {
       filter: filterParts[idx] || '',
       fullId,
       isJourney,
-      isExisting: true
-    });
+      isExisting: true,
+      directions: []  // Wird unten befüllt
+    };
+
+    // Directions aus API laden (gefiltert nach station.filter)
+    try {
+      const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
+      const data = await response.json();
+
+      if (data.data && data.data.monitors) {
+        const filterLines = station.filter ? station.filter.split(',').map(f => f.trim()) : [];
+
+        data.data.monitors.forEach(monitor => {
+          if (monitor.lines && Array.isArray(monitor.lines)) {
+            monitor.lines.forEach(line => {
+              const lineName = line.name || '';
+              const towards = line.towards || monitor.towards || '';
+              const type = line.type || '';
+              const richtungsId = line.richtungsId || monitor.richtungsId || '';
+
+              // Nur Linien die im Filter sind (oder alle wenn kein Filter)
+              if (filterLines.length === 0 || filterLines.includes(lineName)) {
+                // Duplikate vermeiden
+                const exists = station.directions.some(d =>
+                  d.line === lineName && d.towards === towards
+                );
+                if (!exists) {
+                  station.directions.push({
+                    line: lineName,
+                    towards: towards,
+                    type: type,
+                    richtungsId: richtungsId
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+    } catch (e) {
+      // API-Fehler ignorieren - directions bleibt leer
+    }
+
+    stations.push(station);
   }
-  
+
   if (stations.length > 0) {
     updateStationsList();
   }
