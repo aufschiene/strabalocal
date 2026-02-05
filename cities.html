@@ -4891,11 +4891,6 @@ function initRowOrderList() {
 function renderRowOrderList() {
   const container = document.getElementById('ftRowOrderList');
 
-  console.log('[RenderRowOrder] ftLineGroups:', ftLineGroups.length, 'Einträge');
-  ftLineGroups.forEach((g, i) => {
-    console.log(`[RenderRowOrder] Gruppe ${i}:`, g.directions);
-  });
-
   // NEUES KONZEPT: ftLineGroups IST die Reihenfolge (alle Einträge sind Gruppen)
   if (ftLineGroups.length === 0) {
     container.innerHTML = '<div class="ft-row-order-empty">Keine Linien verfügbar</div>';
@@ -5281,21 +5276,13 @@ async function initFtGrouping() {
   // Richtungen aus allen Stationen laden
   await loadFtDirectionsFromStations();
 
-  // Debug: Was haben wir geladen?
-  console.log('[FtGrouping] ftAllDirections geladen:', ftAllDirections.length, 'Richtungen');
-  console.log('[FtGrouping] Keys:', ftAllDirections.map(d => d.key));
-
   // Bestehende Gruppierung aus roworderdestination laden (neues Format)
   // Fallback auf linegroups für alte Configs
   if (recommendedConfig && recommendedConfig.rowOrderDestination) {
-    console.log('[FtGrouping] Parse rowOrderDestination:', recommendedConfig.rowOrderDestination);
     parseRowOrderDestination(recommendedConfig.rowOrderDestination);
   } else if (recommendedConfig && recommendedConfig.lineGroups) {
-    console.log('[FtGrouping] Parse lineGroups:', recommendedConfig.lineGroups);
     parseFtExistingGroups(recommendedConfig.lineGroups);
   }
-
-  console.log('[FtGrouping] Nach Parse: ftLineGroups hat', ftLineGroups.length, 'Einträge');
 
   // WICHTIG: Prüfe ob alle Richtungen in ftAllDirections auch in ftLineGroups sind
   // Falls nicht: Füge fehlende Richtungen als neue 1er-Gruppen hinzu
@@ -5307,7 +5294,6 @@ async function initFtGrouping() {
   // Fehlende Richtungen finden und hinzufügen
   const missingDirections = ftAllDirections.filter(d => !usedKeys.has(d.key));
   if (missingDirections.length > 0) {
-    console.log('[FtGrouping] Fehlende Richtungen gefunden:', missingDirections.map(d => d.key));
     missingDirections.forEach(dir => {
       ftLineGroups.push({ directions: [dir.key] });
     });
@@ -5320,14 +5306,11 @@ async function initFtGrouping() {
     return { directions: validDirections };
   }).filter(group => group.directions.length > 0);  // Leere Gruppen entfernen
 
-  console.log('[FtGrouping] Nach Bereinigung: ftLineGroups hat', ftLineGroups.length, 'Einträge');
-
   // Pool aktualisieren (Richtungen die nicht in Gruppen sind)
   updatePoolDirections();
 
   // Wenn immer noch keine Gruppen existieren, erstelle für jede Richtung eine 1er-Gruppe
   if (ftLineGroups.length === 0 && ftAllDirections.length > 0) {
-    console.log('[FtGrouping] Keine Gruppen - erstelle 1er-Gruppen für alle Richtungen');
     ftAllDirections.forEach(dir => {
       ftLineGroups.push({ directions: [dir.key] });
     });
@@ -5421,11 +5404,8 @@ function updatePoolDirections() {
 async function loadFtDirectionsFromStations() {
   ftAllDirections = [];
 
-  console.log('[LoadDirections] Stationen:', stations.length);
-
   // Richtungen aus den gespeicherten Stationen laden
   for (const station of stations) {
-    console.log('[LoadDirections] Station:', station.stopName, 'directions:', station.directions?.length || 0);
     if (station.directions && Array.isArray(station.directions)) {
       station.directions.forEach(dir => {
         const lineName = dir.line || '';
@@ -5765,13 +5745,9 @@ function removeFromGroup(gIdx, key) {
 
 // Aktualisiere die Reihenfolge-Liste wenn Gruppen geändert werden
 function updateRowOrderAfterGroupChange() {
-  console.log('[RowOrderUpdate] ftLineGroups:', ftLineGroups.length, 'Einträge');
-  console.log('[RowOrderUpdate] ftSortMode:', ftSortMode);
-
   // NEUES KONZEPT: ftLineGroups IST die Reihenfolge
   // Bei Gruppenänderung: einfach die Liste neu rendern
   if (ftSortMode === 2) {
-    console.log('[RowOrderUpdate] Rendere Zeilen-Reihenfolge neu');
     renderRowOrderList();
   }
 }
@@ -6573,6 +6549,47 @@ if (_pendingConfigMessages.length > 0) {
   _pendingConfigMessages.forEach(msg => handleConfigMessage(msg));
   _pendingConfigMessages = [];
 }
+
+// ==================== AUTO-RETRY: Config vom Parent anfordern ====================
+// Falls nach ein paar Sekunden keine Stationen geladen sind, frage aktiv nach
+let _configReceived = false;
+let _configRetryCount = 0;
+const _maxConfigRetries = 5;
+
+function requestConfigFromParent() {
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
+    window.parent.postMessage({ type: 'requestFullConfig' }, '*');
+  }
+}
+
+function checkAndRetryConfig() {
+  if (_configReceived || stations.length > 0) {
+    return;
+  }
+
+  if (_configRetryCount >= _maxConfigRetries) {
+    return;
+  }
+
+  _configRetryCount++;
+  requestConfigFromParent();
+
+  // Nächster Retry in 2 Sekunden
+  setTimeout(checkAndRetryConfig, 2000);
+}
+
+// Markiere Config als erhalten wenn Stationen geladen werden
+const _originalHandleConfigMessage = handleConfigMessage;
+handleConfigMessage = async function(data) {
+  await _originalHandleConfigMessage(data);
+  if (stations.length > 0) {
+    _configReceived = true;
+  }
+};
+
+// Starte Retry-Mechanismus nach 1 Sekunde
+setTimeout(checkAndRetryConfig, 1000);
 
 // ==================== JOURNEY MODE (DB) ====================
 let journeyFromTimeout = null;
