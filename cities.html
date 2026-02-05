@@ -6258,16 +6258,19 @@ function saveConfig() {
 
 // ==================== LOAD EXISTING ====================
 // linefilterdestination: Linz-Format "1:Auwiesen,2:solarCity,27:Chemiepark" mit Line:Destination
-async function loadExistingConfig(rbl, filter, linefilterdestination) {
+// roworderdestination: Wien-Format "4A:Karlsplatz U,4A:Wittelsbachstraße,59A:Bhf. Meidling S U" mit Line:Destination
+async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination) {
   if (!rbl || rbl.trim() === '') return;
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
   const filterParts = filter ? filter.split('|') : [];
 
-  // Parse linefilterdestination: "1:Auwiesen,2:solarCity,27:Chemiepark" -> [{line: "1", towards: "Auwiesen"}, ...]
+  // Parse linefilterdestination ODER roworderdestination (beide haben gleiches Format)
+  // roworderdestination hat Priorität für Wien (enthält die Richtungen)
   const lineDestinations = [];
-  if (linefilterdestination) {
-    linefilterdestination.split(',').forEach(entry => {
+  const destSource = roworderdestination || linefilterdestination;
+  if (destSource) {
+    destSource.split(',').forEach(entry => {
       const colonIdx = entry.indexOf(':');
       if (colonIdx > 0) {
         lineDestinations.push({
@@ -6429,7 +6432,7 @@ async function handleConfigMessage(data) {
     if (data.rbl && !data.rbl.includes(':')) {
       await loadWienData();
     }
-    await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '');
+    await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '');
     return;
   }
 
@@ -6446,12 +6449,13 @@ async function handleConfigMessage(data) {
     const rblId = data.config.rbl_id || data.config.rbl || '';
     const linesFilter = data.config.lines_filter || data.config.filter || '';
     const lineFilterDest = data.config.linefilterdestination || '';
+    const rowOrderDest = data.config.roworderdestination || '';
 
     // Load Wien data first if any WL stations
     if (rblId && !rblId.includes(':')) {
       await loadWienData();
     }
-    await loadExistingConfig(rblId, linesFilter, lineFilterDest);
+    await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest);
 
     // Initialisiere recommendedConfig falls noch nicht vorhanden
     if (!recommendedConfig) {
