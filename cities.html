@@ -3515,6 +3515,17 @@ function displaySearchResults(results) {
 
 // ==================== STOP SELECTION ====================
 async function selectStop(id, name) {
+  const fullId = `${selectedNetwork}:${id}`;
+
+  // Prüfen ob diese Station schon existiert - dann automatisch Bearbeiten-Modus
+  const existingIndex = stations.findIndex(s => s.fullId === fullId);
+  if (existingIndex !== -1) {
+    const existingStation = stations[existingIndex];
+    editingStationIndex = existingIndex;
+    await selectStopForEdit(id, name, existingStation.directions || [], existingStation.filter || '');
+    return;
+  }
+
   selectedStop = { id, name };
   selectedLines = new Set();
   availableLines = [];
@@ -3533,7 +3544,6 @@ async function selectStop(id, name) {
   addStationBtn.textContent = 'Weiter';  // Button-Text zurücksetzen
 
   try {
-    const fullId = `${selectedNetwork}:${id}`;
     const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
     const data = await response.json();
 
