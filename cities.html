@@ -6463,6 +6463,11 @@ async function handleConfigMessage(data) {
     // Markiere, dass eine bestehende Config geladen wurde
     hasExistingConfig = true;
 
+    // WICHTIG: Bestehende Stationen löschen, da loadFullConfig vollständigere Daten hat
+    // (inkl. linefilterdestination). loadExistingConfig könnte vorher schon
+    // mit unvollständigen Daten gelaufen sein.
+    stations.length = 0;
+
     // Unterstütze beide Feldnamen (rbl_id/rbl und lines_filter/filter)
     const rblId = data.config.rbl_id || data.config.rbl || '';
     const linesFilter = data.config.lines_filter || data.config.filter || '';
