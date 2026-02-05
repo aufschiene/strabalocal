@@ -5053,10 +5053,20 @@ function initRowOrderList() {
         }
       } else if (item.type === 'single') {
         // Prüfe ob dieses Single jetzt in einer Gruppe ist
-        if (keysInGroups.has(item.key)) {
+        // Vergleiche über Key ODER über Linie+Towards
+        const isInGroup = keysInGroups.has(item.key) ||
+          Array.from(orderItems).some(oi =>
+            oi.type === 'group' && oi.directions.some(d =>
+              d.key === item.key || (d.line === item.line && d.towards === item.towards)
+            )
+          );
+
+        if (isInGroup) {
           // Dieses Single ist jetzt gruppiert - füge die Gruppe hier ein (falls noch nicht eingefügt)
           const groupWithThisKey = orderItems.find(oi =>
-            oi.type === 'group' && oi.directions.some(d => d.key === item.key)
+            oi.type === 'group' && oi.directions.some(d =>
+              d.key === item.key || (d.line === item.line && d.towards === item.towards)
+            )
           );
           if (groupWithThisKey && !processedGroupIndices.has(groupWithThisKey.groupIndex)) {
             newOrder.push(groupWithThisKey);
@@ -5067,7 +5077,7 @@ function initRowOrderList() {
         } else {
           // Prüfe ob Single noch existiert
           const matchingSingle = orderItems.find(oi =>
-            oi.type === 'single' && oi.key === item.key
+            oi.type === 'single' && (oi.key === item.key || (oi.line === item.line && oi.towards === item.towards))
           );
           if (matchingSingle) {
             newOrder.push(matchingSingle);
@@ -6371,7 +6381,6 @@ function saveConfig() {
 // ==================== LOAD EXISTING ====================
 // linefilterdestination: Linz-Format "1:Auwiesen,2:solarCity,27:Chemiepark" mit Line:Destination
 async function loadExistingConfig(rbl, filter, linefilterdestination) {
-  console.log('loadExistingConfig called with:', { rbl, filter, linefilterdestination });
   if (!rbl || rbl.trim() === '') return;
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
@@ -6390,7 +6399,6 @@ async function loadExistingConfig(rbl, filter, linefilterdestination) {
       }
     });
   }
-  console.log('Parsed lineDestinations:', lineDestinations);
 
   for (let idx = 0; idx < rblParts.length; idx++) {
     const part = rblParts[idx];
@@ -6463,11 +6471,9 @@ async function loadExistingConfig(rbl, filter, linefilterdestination) {
                 shouldInclude = lineDestinations.some(ld =>
                   ld.line === lineName && ld.towards === towards
                 );
-                console.log(`Checking ${lineName}:${towards} against lineDestinations:`, shouldInclude);
               } else if (filterLines.length > 0) {
                 // Fallback: Nur Liniennummer prüfen
                 shouldInclude = filterLines.includes(lineName);
-                console.log(`Fallback: Checking ${lineName} against filterLines:`, shouldInclude);
               } else {
                 // Kein Filter: Alle Linien einschließen
                 shouldInclude = true;
@@ -6540,7 +6546,6 @@ async function resolveStationName(network, stopId) {
 
 // ==================== ESP32 COMMUNICATION ====================
 async function handleConfigMessage(data) {
-  console.log('Processing config message:', data.type, data);
 
   if (data.type === 'loadExistingConfig') {
     // Load Wien data first if any WL stations
