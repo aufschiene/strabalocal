@@ -3878,16 +3878,22 @@ function removeStationGroup(key) {
   updateStationsList();
 }
 
-function editStation(idx) {
+async function editStation(idx) {
   const station = stations[idx];
   if (!station) return;
 
-  // Setze Netzwerk und gehe zur Linienauswahl
+  // Setze Netzwerk
   selectedNetwork = station.network;
-  selectedStop = { id: station.stopId, name: station.stopName };
 
-  // Zur Linienauswahl navigieren
-  selectStop(station.stopId, station.stopName);
+  if (station.network === 'WL') {
+    // Wien: Lade Wien-Daten und gehe zur Linienauswahl
+    await loadWienData();
+    showStep('wienLine');
+  } else {
+    // Andere Netzwerke: Direkt zur Linienauswahl
+    selectedStop = { id: station.stopId, name: station.stopName };
+    selectStop(station.stopId, station.stopName);
+  }
 }
 
 // ==================== DISPLAY CONFIG ====================
@@ -4078,9 +4084,47 @@ function buildLineFilterDestination(stationsList) {
 function goToDisplayConfig() {
   if (stations.length === 0) return;
 
+  // Speichere vorherige Einstellungen (vom Gerät geladen)
+  const previousSettings = recommendedConfig ? {
+    lineGroups: recommendedConfig.lineGroups,
+    sortMode: recommendedConfig.sortMode,
+    rowOrder: recommendedConfig.rowOrder,
+    rowOrderDestination: recommendedConfig.rowOrderDestination,
+    lineFilterDestination: recommendedConfig.lineFilterDestination,
+    gehweg: recommendedConfig.gehweg,
+    rows: recommendedConfig.rows,
+    colour: recommendedConfig.colour,
+    displayLight: recommendedConfig.displayLight,
+    chopper: recommendedConfig.chopper,
+    silberpfeil: recommendedConfig.silberpfeil,
+    nightMode: recommendedConfig.nightMode,
+    nightStart: recommendedConfig.nightStart,
+    nightEnd: recommendedConfig.nightEnd,
+    showFunMessages: recommendedConfig.showFunMessages
+  } : null;
+
   // Berechne vollständige empfohlene Konfiguration
   recommendedConfig = calculateRecommendedConfig();
   if (!recommendedConfig) return;
+
+  // Übernehme vorherige Einstellungen (wenn vom Gerät geladen)
+  if (previousSettings) {
+    if (previousSettings.lineGroups) recommendedConfig.lineGroups = previousSettings.lineGroups;
+    if (previousSettings.sortMode !== undefined) recommendedConfig.sortMode = previousSettings.sortMode;
+    if (previousSettings.rowOrder) recommendedConfig.rowOrder = previousSettings.rowOrder;
+    if (previousSettings.rowOrderDestination) recommendedConfig.rowOrderDestination = previousSettings.rowOrderDestination;
+    if (previousSettings.lineFilterDestination) recommendedConfig.lineFilterDestination = previousSettings.lineFilterDestination;
+    if (previousSettings.gehweg) recommendedConfig.gehweg = previousSettings.gehweg;
+    if (previousSettings.rows) recommendedConfig.rows = previousSettings.rows;
+    if (previousSettings.colour !== undefined) recommendedConfig.colour = previousSettings.colour;
+    if (previousSettings.displayLight !== undefined) recommendedConfig.displayLight = previousSettings.displayLight;
+    if (previousSettings.chopper !== undefined) recommendedConfig.chopper = previousSettings.chopper;
+    if (previousSettings.silberpfeil !== undefined) recommendedConfig.silberpfeil = previousSettings.silberpfeil;
+    if (previousSettings.nightMode !== undefined) recommendedConfig.nightMode = previousSettings.nightMode;
+    if (previousSettings.nightStart !== undefined) recommendedConfig.nightStart = previousSettings.nightStart;
+    if (previousSettings.nightEnd !== undefined) recommendedConfig.nightEnd = previousSettings.nightEnd;
+    if (previousSettings.showFunMessages !== undefined) recommendedConfig.showFunMessages = previousSettings.showFunMessages;
+  }
 
   suggestedColor = recommendedConfig.colour;
   suggestedRows = recommendedConfig.rows;
