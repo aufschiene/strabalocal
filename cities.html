@@ -4971,6 +4971,9 @@ function initRowOrderList() {
     if (savedRowOrder && savedRowOrder.length > 0) {
       // Format: "1:Uni+2:Uni,3:Solar" - Gruppen mit +, Einträge mit ,
       const savedItems = savedRowOrder.split(',').map(s => s.trim());
+      console.log('[RowOrder] savedRowOrder:', savedRowOrder);
+      console.log('[RowOrder] savedItems:', savedItems);
+      console.log('[RowOrder] orderItems:', orderItems.map(i => ({ type: i.type, key: i.key, dirs: i.directions?.length })));
       const sortedOrder = [];
       const processedKeys = new Set();
 
@@ -4986,8 +4989,10 @@ function initRowOrderList() {
           const colonIdx = firstPart.indexOf(':');
           const savedLine = colonIdx > 0 ? firstPart.substring(0, colonIdx) : firstPart;
           const savedDest = colonIdx > 0 ? firstPart.substring(colonIdx + 1) : '';
+          console.log('[RowOrder] Looking for group with line:', savedLine, 'dest:', savedDest);
 
           // Finde passende Gruppe in orderItems
+          let found = false;
           for (const item of orderItems) {
             if (processedKeys.has(item.key)) continue;
             if (item.type !== 'group') continue;
@@ -5000,10 +5005,15 @@ function initRowOrderList() {
               return lineMatch && destMatch;
             });
             if (hasMatch) {
+              console.log('[RowOrder] Found matching group:', item.key);
               sortedOrder.push(item);
               processedKeys.add(item.key);
+              found = true;
               break;
             }
+          }
+          if (!found) {
+            console.log('[RowOrder] NO matching group found for:', savedItem);
           }
         } else {
           // Single: "2:solarCity" oder nur "2"
