@@ -4719,7 +4719,7 @@ function goToFinetuning() {
   initFinetuningStep();
 }
 
-function initFinetuningStep() {
+async function initFinetuningStep() {
   const config = recommendedConfig;
   if (!config) return;
 
@@ -4756,9 +4756,10 @@ function initFinetuningStep() {
   populateFtGehwegList();
 
   // Gruppierung initialisieren (lädt auch roworderdestination und setzt ftLineGroups)
-  initFtGrouping();
+  // WICHTIG: await weil initFtGrouping async ist!
+  await initFtGrouping();
 
-  // Sortierungsmodus initialisieren
+  // Sortierungsmodus initialisieren (NACH initFtGrouping!)
   setFtSortMode(config.sortMode || 1);
 
   // Preview aktualisieren
@@ -4889,6 +4890,11 @@ function initRowOrderList() {
 
 function renderRowOrderList() {
   const container = document.getElementById('ftRowOrderList');
+
+  console.log('[RenderRowOrder] ftLineGroups:', ftLineGroups.length, 'Einträge');
+  ftLineGroups.forEach((g, i) => {
+    console.log(`[RenderRowOrder] Gruppe ${i}:`, g.directions);
+  });
 
   // NEUES KONZEPT: ftLineGroups IST die Reihenfolge (alle Einträge sind Gruppen)
   if (ftLineGroups.length === 0) {
@@ -5415,8 +5421,11 @@ function updatePoolDirections() {
 async function loadFtDirectionsFromStations() {
   ftAllDirections = [];
 
+  console.log('[LoadDirections] Stationen:', stations.length);
+
   // Richtungen aus den gespeicherten Stationen laden
   for (const station of stations) {
+    console.log('[LoadDirections] Station:', station.stopName, 'directions:', station.directions?.length || 0);
     if (station.directions && Array.isArray(station.directions)) {
       station.directions.forEach(dir => {
         const lineName = dir.line || '';
@@ -5756,9 +5765,13 @@ function removeFromGroup(gIdx, key) {
 
 // Aktualisiere die Reihenfolge-Liste wenn Gruppen geändert werden
 function updateRowOrderAfterGroupChange() {
+  console.log('[RowOrderUpdate] ftLineGroups:', ftLineGroups.length, 'Einträge');
+  console.log('[RowOrderUpdate] ftSortMode:', ftSortMode);
+
   // NEUES KONZEPT: ftLineGroups IST die Reihenfolge
   // Bei Gruppenänderung: einfach die Liste neu rendern
   if (ftSortMode === 2) {
+    console.log('[RowOrderUpdate] Rendere Zeilen-Reihenfolge neu');
     renderRowOrderList();
   }
 }
