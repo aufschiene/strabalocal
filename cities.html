@@ -4755,11 +4755,8 @@ function initFinetuningStep() {
   // Gehweg-Liste
   populateFtGehwegList();
 
-  // Gruppierung initialisieren
+  // Gruppierung initialisieren (lädt auch roworderdestination und setzt ftLineGroups)
   initFtGrouping();
-
-  // Zeilen-Reihenfolge zurücksetzen, damit gespeicherte Konfiguration geladen wird
-  ftRowOrder = [];
 
   // Sortierungsmodus initialisieren
   setFtSortMode(config.sortMode || 1);
@@ -4851,7 +4848,8 @@ function getFtBrightness() {
 
 // ==================== SORTIERUNG & ZEILEN-REIHENFOLGE ====================
 let ftSortMode = 1;  // 1 = Zeit (dynamisch), 2 = Statisch
-let ftRowOrder = []; // Array von {line, towards, key} in der gewünschten Reihenfolge
+// NEUES KONZEPT: ftLineGroups IST die Reihenfolge (ftRowOrder wird nicht mehr benötigt)
+// Die Reihenfolge von ftLineGroups entspricht der Anzeigereihenfolge auf dem Display
 
 function setFtSortMode(value) {
   ftSortMode = value;
@@ -4874,269 +4872,16 @@ function getFtSortMode() {
 }
 
 function initRowOrderList() {
-  const container = document.getElementById('ftRowOrderList');
+  // NEUES KONZEPT: ftLineGroups IST die Reihenfolge
+  // Diese Funktion wird aufgerufen wenn der statische Sortiermodus aktiviert wird
+  // ftLineGroups sollte bereits durch initFtGrouping() befüllt sein
 
-  // Versuche gespeicherte Reihenfolge aus Config zu laden
-  const savedRowOrder = recommendedConfig?.rowOrderDestination || recommendedConfig?.rowOrder || '';
-
-  // Sammle alle verfügbaren Linien+Richtungen aus den Stationen
-  const allDirections = [];
-  stations.forEach(station => {
-    if (station.directions && Array.isArray(station.directions)) {
-      station.directions.forEach(dir => {
-        const key = `${dir.line}:${dir.towards || ''}`;
-        if (!allDirections.some(d => d.key === key)) {
-          allDirections.push({
-            line: dir.line,
-            towards: dir.towards || '',
-            type: dir.type || '',
-            key: key
-          });
-        }
-      });
-    } else if (station.filter) {
-      // Fallback: aus filter String
-      const lines = station.filter.split(',').map(l => l.trim());
-      lines.forEach(lineName => {
-        const key = `${lineName}:`;
-        if (!allDirections.some(d => d.key === key)) {
-          allDirections.push({
-            line: lineName,
-            towards: station.stopName || '',
-            type: '',
-            key: key
-          });
-        }
-      });
-    }
-  });
-
-  // Erstelle Order-Items basierend auf Gruppen + einzelne ungruppierten Richtungen
-  const orderItems = [];
-  const usedKeys = new Set();
-
-  // 1. Füge Gruppen hinzu
-  ftLineGroups.forEach((group, gIdx) => {
-    const groupDirections = (group.directions || []).map(key => {
-      // Suche exaktes Match
-      let dirInfo = allDirections.find(d => d.key === key);
-
-      // Fallback: Suche nach Linie+richtungsId wenn Key mit :R beginnt
-      if (!dirInfo && key.includes(':R')) {
-        const colonIdx = key.indexOf(':');
-        const line = key.substring(0, colonIdx);
-        const richtungsId = key.substring(colonIdx + 2); // Nach ":R"
-        dirInfo = allDirections.find(d => d.line === line && d.richtungsId === richtungsId);
-      }
-
-      // Fallback: Suche nach Linie+Zieltext
-      if (!dirInfo && key.includes(':') && !key.includes(':R')) {
-        const colonIdx = key.indexOf(':');
-        const line = key.substring(0, colonIdx);
-        const towards = key.substring(colonIdx + 1);
-        dirInfo = allDirections.find(d => d.line === line && d.towards === towards);
-      }
-
-      return dirInfo || { key, line: key.split(':')[0], towards: key.includes(':R') ? '' : key.split(':').slice(1).join(':') };
+  // Falls ftLineGroups noch leer ist, aus ftAllDirections befüllen
+  if (ftLineGroups.length === 0 && ftAllDirections.length > 0) {
+    ftAllDirections.forEach(dir => {
+      ftLineGroups.push({ directions: [dir.key] });
     });
-
-    orderItems.push({
-      type: 'group',
-      groupIndex: gIdx,
-      directions: groupDirections,
-      key: `group_${gIdx}`
-    });
-
-    // Markiere alle Keys dieser Gruppe als verwendet (sowohl der Original-Key als auch der gefundene)
-    (group.directions || []).forEach(k => usedKeys.add(k));
-    groupDirections.forEach(d => usedKeys.add(d.key));
-  });
-
-  // 2. Füge ungruppierten Richtungen hinzu
-  allDirections.forEach(dir => {
-    if (!usedKeys.has(dir.key)) {
-      orderItems.push({
-        type: 'single',
-        line: dir.line,
-        towards: dir.towards,
-        lineType: dir.type,
-        key: dir.key
-      });
-    }
-  });
-
-  // Wenn ftRowOrder leer oder veraltet ist, initialisiere neu
-  if (ftRowOrder.length === 0 || !ftRowOrder[0]?.type) {
-    // Versuche gespeicherte Reihenfolge aus Config zu laden
-    if (savedRowOrder && savedRowOrder.length > 0) {
-      // Format: "1:Uni+2:Uni,3:Solar" - Gruppen mit +, Einträge mit ,
-      const savedItems = savedRowOrder.split(',').map(s => s.trim());
-      console.log('[RowOrder] savedRowOrder:', savedRowOrder);
-      console.log('[RowOrder] savedItems:', savedItems);
-      console.log('[RowOrder] orderItems:', orderItems.map(i => ({ type: i.type, key: i.key, dirs: i.directions?.length })));
-      const sortedOrder = [];
-      const processedKeys = new Set();
-
-      // Sortiere orderItems nach der gespeicherten Reihenfolge
-      savedItems.forEach(savedItem => {
-        // Prüfe ob savedItem eine Gruppe ist (enthält +)
-        const isGroupItem = savedItem.includes('+');
-
-        if (isGroupItem) {
-          // Gruppe: "1:Uni+2:Uni" - parse alle Teile
-          const groupParts = savedItem.split('+').map(p => p.trim());
-          const firstPart = groupParts[0];
-          const colonIdx = firstPart.indexOf(':');
-          const savedLine = colonIdx > 0 ? firstPart.substring(0, colonIdx) : firstPart;
-          const savedDest = colonIdx > 0 ? firstPart.substring(colonIdx + 1) : '';
-          console.log('[RowOrder] Looking for group with line:', savedLine, 'dest:', savedDest);
-
-          // Finde passende Gruppe in orderItems
-          let found = false;
-          for (const item of orderItems) {
-            if (processedKeys.has(item.key)) continue;
-            if (item.type !== 'group') continue;
-
-            // Prüfe ob diese Gruppe die erste Linie+Destination enthält
-            const hasMatch = item.directions.some(d => {
-              const lineMatch = d.line === savedLine;
-              const destMatch = !savedDest || d.towards === savedDest ||
-                                d.towards.includes(savedDest) || savedDest.includes(d.towards);
-              return lineMatch && destMatch;
-            });
-            if (hasMatch) {
-              console.log('[RowOrder] Found matching group:', item.key);
-              sortedOrder.push(item);
-              processedKeys.add(item.key);
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
-            console.log('[RowOrder] NO matching group found for:', savedItem);
-          }
-        } else {
-          // Single: "2:solarCity" oder nur "2"
-          const colonIdx = savedItem.indexOf(':');
-          const savedLine = colonIdx > 0 ? savedItem.substring(0, colonIdx) : savedItem;
-          const savedDest = colonIdx > 0 ? savedItem.substring(colonIdx + 1) : '';
-
-          // Finde passendes Item (Gruppe oder Single)
-          for (const item of orderItems) {
-            if (processedKeys.has(item.key)) continue;
-
-            if (item.type === 'group') {
-              // Prüfe ob diese Gruppe die gespeicherte Linie+Destination enthält
-              const hasMatch = item.directions.some(d => {
-                const lineMatch = d.line === savedLine;
-                const destMatch = !savedDest || d.towards === savedDest ||
-                                  d.towards.includes(savedDest) || savedDest.includes(d.towards);
-                return lineMatch && destMatch;
-              });
-              if (hasMatch) {
-                sortedOrder.push(item);
-                processedKeys.add(item.key);
-                break;
-              }
-            } else if (item.type === 'single') {
-              const lineMatch = item.line === savedLine;
-              const destMatch = !savedDest || item.towards === savedDest ||
-                                item.towards.includes(savedDest) || savedDest.includes(item.towards);
-              if (lineMatch && destMatch) {
-                sortedOrder.push(item);
-                processedKeys.add(item.key);
-                break;
-              }
-            }
-          }
-        }
-      });
-
-      // Füge nicht gefundene Items am Ende hinzu
-      orderItems.forEach(item => {
-        if (!processedKeys.has(item.key)) {
-          sortedOrder.push(item);
-        }
-      });
-
-      ftRowOrder = sortedOrder;
-    } else {
-      ftRowOrder = orderItems;
-    }
-  } else {
-    // Synchronisiere: behalte Reihenfolge, aber aktualisiere Gruppen
-    const newOrder = [];
-    const processedKeys = new Set();
-    const processedGroupIndices = new Set();
-
-    // Sammle alle Keys die jetzt in Gruppen sind (inkl. Linie für Fallback-Match)
-    const keysInGroups = new Set();
-    const linesInGroups = new Set();
-    orderItems.forEach(item => {
-      if (item.type === 'group') {
-        item.directions.forEach(d => {
-          keysInGroups.add(d.key);
-          linesInGroups.add(d.line);
-        });
-      }
-    });
-
-    // Behalte bestehende Reihenfolge wo möglich
-    ftRowOrder.forEach(item => {
-      if (item.type === 'group') {
-        // Prüfe ob Gruppe noch existiert (gleicher Index)
-        const matchingGroup = orderItems.find(oi =>
-          oi.type === 'group' && oi.groupIndex === item.groupIndex
-        );
-        if (matchingGroup && !processedGroupIndices.has(matchingGroup.groupIndex)) {
-          newOrder.push(matchingGroup);
-          processedKeys.add(matchingGroup.key);
-          processedGroupIndices.add(matchingGroup.groupIndex);
-        }
-      } else if (item.type === 'single') {
-        // Prüfe ob dieses Single jetzt in einer Gruppe ist
-        // Vergleiche über Key ODER über Linie+Towards
-        const isInGroup = keysInGroups.has(item.key) ||
-          Array.from(orderItems).some(oi =>
-            oi.type === 'group' && oi.directions.some(d =>
-              d.key === item.key || (d.line === item.line && d.towards === item.towards)
-            )
-          );
-
-        if (isInGroup) {
-          // Dieses Single ist jetzt gruppiert - füge die Gruppe hier ein (falls noch nicht eingefügt)
-          const groupWithThisKey = orderItems.find(oi =>
-            oi.type === 'group' && oi.directions.some(d =>
-              d.key === item.key || (d.line === item.line && d.towards === item.towards)
-            )
-          );
-          if (groupWithThisKey && !processedGroupIndices.has(groupWithThisKey.groupIndex)) {
-            newOrder.push(groupWithThisKey);
-            processedKeys.add(groupWithThisKey.key);
-            processedGroupIndices.add(groupWithThisKey.groupIndex);
-          }
-          // Single nicht mehr hinzufügen (ist in Gruppe)
-        } else {
-          // Prüfe ob Single noch existiert
-          const matchingSingle = orderItems.find(oi =>
-            oi.type === 'single' && (oi.key === item.key || (oi.line === item.line && oi.towards === item.towards))
-          );
-          if (matchingSingle) {
-            newOrder.push(matchingSingle);
-            processedKeys.add(matchingSingle.key);
-          }
-        }
-      }
-    });
-
-    // Füge neue Items hinzu die noch nicht in der Reihenfolge sind
-    orderItems.forEach(item => {
-      if (!processedKeys.has(item.key)) {
-        newOrder.push(item);
-      }
-    });
-
-    ftRowOrder = newOrder;
+    ftPoolDirections = [];
   }
 
   renderRowOrderList();
@@ -5145,41 +4890,40 @@ function initRowOrderList() {
 function renderRowOrderList() {
   const container = document.getElementById('ftRowOrderList');
 
-  if (ftRowOrder.length === 0) {
+  // NEUES KONZEPT: ftLineGroups IST die Reihenfolge (alle Einträge sind Gruppen)
+  if (ftLineGroups.length === 0) {
     container.innerHTML = '<div class="ft-row-order-empty">Keine Linien verfügbar</div>';
     return;
   }
 
-  container.innerHTML = ftRowOrder.map((item, idx) => {
-    if (item.type === 'group') {
-      // Gruppe darstellen - zeigt alle Linien der Gruppe
-      const badgesHtml = item.directions.map(dir => {
-        const badgeClass = getLineTypeClass(dir.type || dir.lineType, dir.line);
-        return `<span class="line-badge ${badgeClass}">${dir.line}</span>`;
-      }).join('');
+  container.innerHTML = ftLineGroups.map((group, idx) => {
+    const directions = group.directions || [];
+    const isMulti = directions.length > 1;  // Echte Gruppe (mehr als 1 Richtung)
 
-      const firstDest = item.directions[0]?.towards || '';
+    // Badges für alle Richtungen der Gruppe
+    const badgesHtml = directions.map(key => {
+      const dirInfo = ftAllDirections.find(d => d.key === key);
+      const line = dirInfo ? dirInfo.line : key.split(':')[0];
+      const type = dirInfo ? dirInfo.type : '';
+      const badgeClass = getLineTypeClass(type, line);
+      return `<span class="line-badge ${badgeClass}">${line}</span>`;
+    }).join('');
 
-      return `
-        <div class="ft-row-order-item ft-row-order-group" draggable="true" data-index="${idx}">
-          <span class="drag-handle">☰</span>
-          <span class="row-number">${idx + 1}</span>
-          <span class="group-badges">${badgesHtml}</span>
-          <span class="direction-text">${firstDest}</span>
-        </div>
-      `;
-    } else {
-      // Einzelne Linie
-      const badgeClass = getLineTypeClass(item.lineType, item.line);
-      return `
-        <div class="ft-row-order-item" draggable="true" data-index="${idx}">
-          <span class="drag-handle">☰</span>
-          <span class="row-number">${idx + 1}</span>
-          <span class="line-badge ${badgeClass}">${item.line}</span>
-          <span class="direction-text">${item.towards || 'Alle Richtungen'}</span>
-        </div>
-      `;
-    }
+    // Zieltext aus der ersten Richtung
+    const firstKey = directions[0];
+    const firstDirInfo = ftAllDirections.find(d => d.key === firstKey);
+    const destText = firstDirInfo ? (firstDirInfo.towards || 'Alle Richtungen') : '';
+
+    const cssClass = isMulti ? 'ft-row-order-item ft-row-order-group' : 'ft-row-order-item';
+
+    return `
+      <div class="${cssClass}" draggable="true" data-index="${idx}">
+        <span class="drag-handle">☰</span>
+        <span class="row-number">${idx + 1}</span>
+        <span class="group-badges">${badgesHtml}</span>
+        <span class="direction-text">${destText}</span>
+      </div>
+    `;
   }).join('');
 
   // Drag & Drop Events hinzufügen
@@ -5237,9 +4981,9 @@ function handleDrop(e) {
   const targetIndex = parseInt(this.dataset.index);
 
   if (draggedIndex !== -1 && draggedIndex !== targetIndex) {
-    // Element verschieben
-    const movedItem = ftRowOrder.splice(draggedIndex, 1)[0];
-    ftRowOrder.splice(targetIndex, 0, movedItem);
+    // NEUES KONZEPT: ftLineGroups ist jetzt die Reihenfolge
+    const movedItem = ftLineGroups.splice(draggedIndex, 1)[0];
+    ftLineGroups.splice(targetIndex, 0, movedItem);
 
     // Liste neu rendern
     renderRowOrderList();
@@ -5249,38 +4993,56 @@ function handleDrop(e) {
 }
 
 function getRowOrderString() {
+  // NEUES KONZEPT: ftLineGroups ist die Reihenfolge
   // Einfaches Format für Wien: "U6,2,43" - nur Linien
-  // Bei Gruppen: erste Linie der Gruppe verwenden
   const lines = [];
-  ftRowOrder.forEach(item => {
-    if (item.type === 'group' && item.directions && item.directions.length > 0) {
-      // Bei Gruppe: alle Linien der Gruppe hinzufügen (erste kommt zuerst)
-      item.directions.forEach(dir => {
-        if (!lines.includes(dir.line)) {
-          lines.push(dir.line);
+  ftLineGroups.forEach(group => {
+    if (group.directions && group.directions.length > 0) {
+      // Alle Linien der Gruppe hinzufügen
+      group.directions.forEach(key => {
+        const dirInfo = ftAllDirections.find(d => d.key === key);
+        const line = dirInfo ? dirInfo.line : key.split(':')[0];
+        if (!lines.includes(line)) {
+          lines.push(line);
         }
       });
-    } else if (item.type === 'single') {
-      if (!lines.includes(item.line)) {
-        lines.push(item.line);
-      }
     }
   });
   return lines.join(',');
 }
 
 function getRowOrderDestinationString() {
-  // Format für Linz: "1:Uni+2:Uni,3:Solarc" - Gruppen mit +, Einträge mit ,
-  // Bei Gruppen: alle Richtungen der Gruppe mit + verbunden
-  // Bei Singles: einzeln
+  // NEUES KONZEPT: Alles sind Gruppen (auch 1er-Gruppen)
+  // Format: "1:Uni+2:Uni,3:Solarc,26:St.Margarethen" - Gruppen mit +, Einträge mit ,
+  // ftLineGroups = [{ directions: ['1:RId1', '2:RId2'] }, { directions: ['3:RId3'] }, ...]
+
+  if (ftLineGroups.length === 0) {
+    return '';
+  }
+
   const items = [];
-  ftRowOrder.forEach(item => {
-    if (item.type === 'group' && item.directions && item.directions.length > 0) {
-      // Bei Gruppe: alle Richtungen mit + verbinden
-      const groupParts = item.directions.map(dir => `${dir.line}:${dir.towards || ''}`);
+  ftLineGroups.forEach(group => {
+    if (group.directions && group.directions.length > 0) {
+      // Jede Richtung (Key) in "Linie:Ziel" Format umwandeln
+      const groupParts = group.directions.map(key => {
+        const dirInfo = ftAllDirections.find(d => d.key === key);
+        if (dirInfo) {
+          return `${dirInfo.line}:${dirInfo.towards || ''}`;
+        }
+        // Fallback: Key direkt verwenden (ohne das R-Prefix falls vorhanden)
+        const colonIdx = key.indexOf(':');
+        if (colonIdx > 0) {
+          const line = key.substring(0, colonIdx);
+          let dest = key.substring(colonIdx + 1);
+          // Falls es ein richtungsId-Key ist (z.B. "2:R60500123"), leeren String verwenden
+          if (dest.startsWith('R') && /^\d+$/.test(dest.substring(1))) {
+            dest = '';
+          }
+          return `${line}:${dest}`;
+        }
+        return key;
+      });
       items.push(groupParts.join('+'));
-    } else if (item.type === 'single') {
-      items.push(`${item.line}:${item.towards || ''}`);
     }
   });
   return items.join(',');
@@ -5481,7 +5243,7 @@ function collectFtLineFilter() {
   }
 
   // Nur ungroupierte Richtungen zum Filter hinzufügen
-  for (const dir of ftAvailableDirections) {
+  for (const dir of ftAllDirections) {
     if (dir.line && dir.towards && !groupedKeys.has(dir.key)) {
       filterParts.push(dir.line + ':' + dir.towards);
     }
@@ -5493,28 +5255,44 @@ function collectFtLineFilter() {
 }
 
 // ==================== FEINTUNING: RICHTUNGS-GRUPPIERUNG ====================
-let ftLineGroups = [];  // Array of groups: [{ directions: ['U1:Leopoldau', '62:Meidling'] }, ...]
-let ftAvailableDirections = [];  // Alle verfugbaren Richtungen aus den Stationen
+// NEUES KONZEPT: Alles sind Gruppen - auch einzelne Linien (1er-Gruppen)
+// ftLineGroups = Alle Zeilen-Einträge in Reihenfolge (= roworderdestination)
+// ftPoolDirections = Verfügbare Richtungen zum Hinzufügen (nicht in Gruppen)
+let ftLineGroups = [];  // Array of groups: [{ directions: ['key1', 'key2'] }, { directions: ['key3'] }, ...]
+let ftAllDirections = [];  // Alle verfügbaren Richtungen aus den Stationen (Master-Liste)
+let ftPoolDirections = [];  // Richtungen die noch nicht in ftLineGroups sind (zum Hinzufügen)
 let ftGroupingMode = false;  // true wenn gerade eine Gruppe erstellt wird
 let ftSelectedForGroup = [];  // Ausgewaehlte Richtungen fuer neue Gruppe
 let ftEventsAttached = false;  // Flag ob Events schon angehaengt wurden
 
 async function initFtGrouping() {
   ftLineGroups = [];
-  ftAvailableDirections = [];
+  ftAllDirections = [];
+  ftPoolDirections = [];
   ftGroupingMode = false;
   ftSelectedForGroup = [];
 
   // Richtungen aus allen Stationen laden
   await loadFtDirectionsFromStations();
 
-  // Bestehende Gruppierung aus Config laden
-  if (recommendedConfig && recommendedConfig.lineGroups) {
+  // Bestehende Gruppierung aus roworderdestination laden (neues Format)
+  // Fallback auf linegroups für alte Configs
+  if (recommendedConfig && recommendedConfig.rowOrderDestination) {
+    parseRowOrderDestination(recommendedConfig.rowOrderDestination);
+  } else if (recommendedConfig && recommendedConfig.lineGroups) {
     parseFtExistingGroups(recommendedConfig.lineGroups);
   }
 
-  // WICHTIG: Bereinige Gruppen - entferne Linien die nicht mehr ausgewählt sind
-  cleanupGroupsWithCurrentDirections();
+  // Pool aktualisieren (Richtungen die nicht in Gruppen sind)
+  updatePoolDirections();
+
+  // Wenn noch keine Gruppen existieren, erstelle für jede Richtung eine 1er-Gruppe
+  if (ftLineGroups.length === 0 && ftAllDirections.length > 0) {
+    ftAllDirections.forEach(dir => {
+      ftLineGroups.push({ directions: [dir.key] });
+    });
+    ftPoolDirections = [];
+  }
 
   // Event-Listener anhaengen (nur einmal)
   if (!ftEventsAttached) {
@@ -5526,52 +5304,85 @@ async function initFtGrouping() {
   renderFtGroupingUI();
 }
 
-// Bereinigt Gruppen: Entfernt Linien die nicht mehr in ftAvailableDirections sind
-// Löst Gruppen auf die weniger als 2 Linien haben
-function cleanupGroupsWithCurrentDirections() {
-  // Sammle alle aktuell verfügbaren Keys
-  const availableKeys = new Set(ftAvailableDirections.map(d => d.key));
+// Parse roworderdestination: "26:St. Margarethen,2:Uni+1:Uni,2:solarCity+1:Auwiesen"
+function parseRowOrderDestination(rowOrderStr) {
+  if (!rowOrderStr) return;
 
-  // Gehe durch alle Gruppen und entferne ungültige Richtungen
-  for (let i = ftLineGroups.length - 1; i >= 0; i--) {
-    const group = ftLineGroups[i];
-    if (!group.directions) {
-      ftLineGroups.splice(i, 1);
-      continue;
-    }
+  ftLineGroups = [];
 
-    // Filtere nur die Richtungen die noch verfügbar sind
-    group.directions = group.directions.filter(key => {
-      // Prüfe ob der Key in availableKeys ist
-      if (availableKeys.has(key)) return true;
+  // Split by , für Einträge, dann by + für Gruppen-Mitglieder
+  const entries = rowOrderStr.split(',').map(s => s.trim()).filter(s => s);
 
-      // Fallback: Prüfe ob Linie:Destination matcht (ohne R-Prefix für richtungsId)
-      // z.B. "27:Chemiepark" sollte matchen auch wenn Key anders formatiert ist
-      const parts = key.split(':');
-      if (parts.length >= 2) {
-        const line = parts[0];
-        const dest = parts.slice(1).join(':');
-        // Suche nach passender Richtung
-        return ftAvailableDirections.some(d =>
-          d.line === line && (d.towards === dest || d.key === key)
-        );
+  entries.forEach(entry => {
+    const parts = entry.split('+').map(p => p.trim()).filter(p => p);
+    const directions = [];
+
+    parts.forEach(part => {
+      // part ist "2:Universität" oder "2:R60500123"
+      const key = mapToAvailableKey(part);
+      if (key) {
+        directions.push(key);
       }
-      return false;
     });
 
-    // Gruppe auflösen wenn weniger als 2 Richtungen übrig
-    if (group.directions.length < 2) {
-      ftLineGroups.splice(i, 1);
+    if (directions.length > 0) {
+      ftLineGroups.push({ directions });
     }
+  });
+}
+
+// Mappt einen gespeicherten Key (z.B. "2:Universität") auf den verfügbaren Key in ftAllDirections
+function mapToAvailableKey(savedKey) {
+  // Exakter Match
+  let match = ftAllDirections.find(d => d.key === savedKey);
+  if (match) return match.key;
+
+  // Parse savedKey
+  const colonIdx = savedKey.indexOf(':');
+  if (colonIdx <= 0) return null;
+
+  const line = savedKey.substring(0, colonIdx);
+  const rest = savedKey.substring(colonIdx + 1);
+
+  // Ist es ein richtungsId-Key? (z.B. "2:R60500123")
+  if (rest.startsWith('R')) {
+    const richtungsId = rest.substring(1);
+    match = ftAllDirections.find(d => d.line === line && d.richtungsId === richtungsId);
+    if (match) return match.key;
   }
+
+  // Ist es ein Zieltext-Key? (z.B. "2:Universität")
+  match = ftAllDirections.find(d => d.line === line && d.towards === rest);
+  if (match) return match.key;
+
+  // Partial Match auf Zieltext
+  match = ftAllDirections.find(d =>
+    d.line === line && (d.towards.includes(rest) || rest.includes(d.towards))
+  );
+  if (match) return match.key;
+
+  // Nur Linie matchen als letzter Fallback
+  match = ftAllDirections.find(d => d.line === line);
+  if (match) return match.key;
+
+  return null;
+}
+
+// Aktualisiert ftPoolDirections basierend auf ftLineGroups
+function updatePoolDirections() {
+  const usedKeys = new Set();
+  ftLineGroups.forEach(group => {
+    (group.directions || []).forEach(key => usedKeys.add(key));
+  });
+
+  ftPoolDirections = ftAllDirections.filter(d => !usedKeys.has(d.key));
 }
 
 async function loadFtDirectionsFromStations() {
-  ftAvailableDirections = [];
+  ftAllDirections = [];
 
-  // Richtungen aus den gespeicherten Stationen laden (wurden beim Hinzufuegen gespeichert)
+  // Richtungen aus den gespeicherten Stationen laden
   for (const station of stations) {
-    // Neue Struktur: directions Array mit {line, towards, type}
     if (station.directions && Array.isArray(station.directions)) {
       station.directions.forEach(dir => {
         const lineName = dir.line || '';
@@ -5581,107 +5392,39 @@ async function loadFtDirectionsFromStations() {
 
         if (!lineName) return;
 
-        // Bei BODO: Nur erlaubte Linien (Zahlen, Zahlen mit Schrägstrich, S20-S199, R25-R199)
+        // Bei BODO: Nur erlaubte Linien
         if (station.network === 'BODO') {
           const trimmed = lineName.trim();
           const isAllowed = /^[\d\/]+$/.test(trimmed) ||
             (trimmed.match(/^S\s*(\d+)$/i) && parseInt(trimmed.match(/^S\s*(\d+)$/i)[1]) >= 20 && parseInt(trimmed.match(/^S\s*(\d+)$/i)[1]) <= 199) ||
             (trimmed.match(/^R\s*(\d+)$/i) && parseInt(trimmed.match(/^R\s*(\d+)$/i)[1]) >= 25 && parseInt(trimmed.match(/^R\s*(\d+)$/i)[1]) <= 199);
-          if (!isAllowed) {
-            return; // Nicht erlaubte Linie überspringen
-          }
+          if (!isAllowed) return;
         }
 
-        // Für Wien: Key basiert auf richtungsId (wenn vorhanden)
-        // Für Linz/andere: Key basiert auf towards
         const key = richtungsId ? `${lineName}:R${richtungsId}` : `${lineName}:${towards}`;
-        // Duplikate vermeiden
-        if (!ftAvailableDirections.some(d => d.key === key)) {
-          ftAvailableDirections.push({
-            key: key,
-            line: lineName,
-            towards: towards,
-            type: type,
-            richtungsId: richtungsId,
-            station: station.stopName,
-            network: station.network  // Netzwerk speichern für spätere Logik
+        if (!ftAllDirections.some(d => d.key === key)) {
+          ftAllDirections.push({
+            key, line: lineName, towards, type, richtungsId,
+            station: station.stopName, network: station.network
           });
         }
       });
-    } else {
-      // Fallback fuer alte Stationen ohne directions: API aufrufen
-      try {
-        const fullId = `${station.network}:${station.stopId}`;
-        const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
-        const data = await response.json();
-
-        if (data.data && data.data.monitors) {
-          data.data.monitors.forEach(monitor => {
-            if (monitor.lines && Array.isArray(monitor.lines)) {
-              monitor.lines.forEach(line => {
-                const lineName = line.name || '';
-                const towards = line.towards || monitor.towards || '';
-                const type = line.type || '';
-                const richtungsId = line.richtungsId || monitor.richtungsId || '';
-
-                if (!lineName) return;
-
-                // Bei BODO: Nur erlaubte Linien (Zahlen, Zahlen mit Schrägstrich, S20-S199, R25-R199)
-                if (station.network === 'BODO') {
-                  const trimmed = lineName.trim();
-                  const isAllowed = /^[\d\/]+$/.test(trimmed) ||
-                    (trimmed.match(/^S\s*(\d+)$/i) && parseInt(trimmed.match(/^S\s*(\d+)$/i)[1]) >= 20 && parseInt(trimmed.match(/^S\s*(\d+)$/i)[1]) <= 199) ||
-                    (trimmed.match(/^R\s*(\d+)$/i) && parseInt(trimmed.match(/^R\s*(\d+)$/i)[1]) >= 25 && parseInt(trimmed.match(/^R\s*(\d+)$/i)[1]) <= 199);
-                  if (!isAllowed) {
-                    return; // Nicht erlaubte Linie überspringen
-                  }
-                }
-
-                const filterLines = station.filter ? station.filter.split(',').map(f => f.trim()) : [];
-                if (filterLines.length === 0 || filterLines.includes(lineName)) {
-                  // Für Wien: Key basiert auf richtungsId (wenn vorhanden)
-                  const key = richtungsId ? `${lineName}:R${richtungsId}` : `${lineName}:${towards}`;
-                  if (!ftAvailableDirections.some(d => d.key === key)) {
-                    ftAvailableDirections.push({
-                      key: key,
-                      line: lineName,
-                      towards: towards,
-                      type: type,
-                      richtungsId: richtungsId,
-                      station: station.stopName,
-                      network: station.network
-                    });
-                  }
-                }
-              });
-            }
-          });
-        }
-      } catch (e) {
-        // Fehler beim Laden ignorieren
-      }
     }
   }
 
   // Richtungen ohne towards entfernen wenn es welche mit towards gibt
   const linesWithTowards = new Set();
-  ftAvailableDirections.forEach(d => {
-    if (d.towards) linesWithTowards.add(d.line);
-  });
-  ftAvailableDirections = ftAvailableDirections.filter(d => {
-    if (!d.towards && linesWithTowards.has(d.line)) return false;
-    return true;
-  });
+  ftAllDirections.forEach(d => { if (d.towards) linesWithTowards.add(d.line); });
+  ftAllDirections = ftAllDirections.filter(d => !(!d.towards && linesWithTowards.has(d.line)));
 
   // Nach Linie und dann nach Richtung sortieren
-  ftAvailableDirections.sort((a, b) => {
+  ftAllDirections.sort((a, b) => {
     const aNum = parseInt(a.line) || 999;
     const bNum = parseInt(b.line) || 999;
     if (aNum !== bNum) return aNum - bNum;
     if (a.line !== b.line) return a.line.localeCompare(b.line);
     return (a.towards || '').localeCompare(b.towards || '');
   });
-
 }
 
 function parseFtExistingGroups(lineGroupsStr) {
@@ -5708,8 +5451,8 @@ function parseFtExistingGroups(lineGroupsStr) {
           const line = rawKey.substring(0, colonIdx);
           const dest = rawKey.substring(colonIdx + 1);
 
-          // Suche in ftAvailableDirections nach passender Linie+Richtung
-          const match = ftAvailableDirections.find(d =>
+          // Suche in ftAllDirections nach passender Linie+Richtung
+          const match = ftAllDirections.find(d =>
             d.line === line && d.towards === dest
           );
 
@@ -5718,7 +5461,7 @@ function parseFtExistingGroups(lineGroupsStr) {
           }
 
           // Kein exakter Match - versuche nur nach Linie zu matchen
-          const lineMatch = ftAvailableDirections.find(d => d.line === line);
+          const lineMatch = ftAllDirections.find(d => d.line === line);
           if (lineMatch && lineMatch.richtungsId) {
             // Warnung: Nicht exakt, aber besser als nichts
             return lineMatch.key;
@@ -5745,13 +5488,17 @@ function renderFtGroups() {
   const container = document.getElementById('ftGroupsContainer');
   if (!container) return;
 
-  // Bestehende Gruppen anzeigen
+  // Nur echte Gruppen (mit >= 2 Richtungen) anzeigen
   let html = '';
+  let groupNumber = 1;
 
-  if (ftLineGroups.length > 0) {
-    html += ftLineGroups.map((group, gIdx) => {
-      const directionsHtml = (group.directions || []).map((key, dIdx) => {
-        const dirInfo = ftAvailableDirections.find(d => d.key === key);
+  ftLineGroups.forEach((group, gIdx) => {
+    const directions = group.directions || [];
+
+    // Nur echte Gruppen (2+) als "Gruppen" darstellen
+    if (directions.length >= 2) {
+      const directionsHtml = directions.map((key, dIdx) => {
+        const dirInfo = ftAllDirections.find(d => d.key === key);
         const lineName = dirInfo ? dirInfo.line : key.split(':')[0];
         const towards = dirInfo ? dirInfo.towards : key.split(':').slice(1).join(':');
         const badgeClass = dirInfo ? getLineTypeClass(dirInfo.type, lineName) : 'type-default';
@@ -5765,22 +5512,23 @@ function renderFtGroups() {
         `;
       }).join('');
 
-      return `
+      html += `
         <div class="ft-group-box" data-group-idx="${gIdx}">
           <div class="ft-group-header">
-            <span>Gruppe ${gIdx + 1}</span>
+            <span>Gruppe ${groupNumber}</span>
             <button class="ft-group-delete" data-action="delete-group" data-group-idx="${gIdx}">Loeschen</button>
           </div>
           <div class="ft-group-content">${directionsHtml}</div>
         </div>
       `;
-    }).join('');
-  }
+      groupNumber++;
+    }
+  });
 
   // Wenn im Gruppierungs-Modus: aktuelle Auswahl anzeigen
   if (ftGroupingMode) {
     const selectedHtml = ftSelectedForGroup.map((key, idx) => {
-      const dirInfo = ftAvailableDirections.find(d => d.key === key);
+      const dirInfo = ftAllDirections.find(d => d.key === key);
       const lineName = dirInfo ? dirInfo.line : key.split(':')[0];
       const towards = dirInfo ? dirInfo.towards : key.split(':').slice(1).join(':');
       const badgeClass = dirInfo ? getLineTypeClass(dirInfo.type, lineName) : 'type-default';
@@ -5799,7 +5547,7 @@ function renderFtGroups() {
           <span>Neue Gruppe (${ftSelectedForGroup.length} ausgewaehlt)</span>
         </div>
         <div class="ft-group-content">
-          ${selectedHtml || '<span class="hint">Waehle mindestens 2 Richtungen aus</span>'}
+          ${selectedHtml || '<span class="hint">Waehle mindestens 2 Richtungen aus dem Pool</span>'}
         </div>
         <div class="ft-group-actions">
           <button class="btn-cancel" data-action="cancel-grouping">Abbrechen</button>
@@ -5808,10 +5556,13 @@ function renderFtGroups() {
       </div>
     `;
   } else {
-    // Button zum Erstellen einer neuen Gruppe
-    html += `
-      <button class="ft-create-group-btn" data-action="start-grouping">+ Neue Gruppe erstellen</button>
-    `;
+    // Button zum Erstellen einer neuen Gruppe (nur wenn es genug 1er-Gruppen gibt)
+    const singleGroups = ftLineGroups.filter(g => (g.directions || []).length === 1);
+    if (singleGroups.length >= 2) {
+      html += `
+        <button class="ft-create-group-btn" data-action="start-grouping">+ Neue Gruppe erstellen</button>
+      `;
+    }
   }
 
   container.innerHTML = html;
@@ -5821,34 +5572,37 @@ function renderFtPool() {
   const container = document.getElementById('ftPoolItems');
   if (!container) return;
 
-  // Gruppierte Keys sammeln
-  const groupedKeys = ftLineGroups.flatMap(g => g.directions || []);
+  // NEUES KONZEPT: Pool = 1er-Gruppen aus ftLineGroups (einzelne Linien die nicht in echten Gruppen sind)
+  // Filtere: 1er-Gruppen die nicht in der aktuellen Auswahl sind
+  const singleGroups = ftLineGroups.filter(g => {
+    const dirs = g.directions || [];
+    return dirs.length === 1 && !ftSelectedForGroup.includes(dirs[0]);
+  });
 
-  // Ungroupierte filtern (und nicht in aktueller Auswahl)
-  const ungrouped = ftAvailableDirections.filter(d =>
-    !groupedKeys.includes(d.key) && !ftSelectedForGroup.includes(d.key)
-  );
-
-  if (ungrouped.length === 0 && !ftGroupingMode) {
+  if (singleGroups.length === 0 && !ftGroupingMode) {
     container.innerHTML = '<div class="pool-empty">Alle Richtungen sind gruppiert</div>';
     return;
   }
 
-  if (ungrouped.length === 0 && ftGroupingMode) {
+  if (singleGroups.length === 0 && ftGroupingMode) {
     container.innerHTML = '<div class="pool-empty">Keine weiteren Richtungen verfuegbar</div>';
     return;
   }
 
-  container.innerHTML = ungrouped.map((dir, idx) => {
-    const badgeClass = getLineTypeClass(dir.type, dir.line);
-    const destText = dir.towards ? dir.towards : '';
-    const poolIdx = ftAvailableDirections.findIndex(d => d.key === dir.key);
+  container.innerHTML = singleGroups.map((group, idx) => {
+    const key = group.directions[0];
+    const dirInfo = ftAllDirections.find(d => d.key === key);
+    const line = dirInfo ? dirInfo.line : key.split(':')[0];
+    const towards = dirInfo ? dirInfo.towards : '';
+    const type = dirInfo ? dirInfo.type : '';
+    const badgeClass = getLineTypeClass(type, line);
+    const poolIdx = ftAllDirections.findIndex(d => d.key === key);
 
     // Immer klickbar - Gruppierungsmodus startet automatisch beim ersten Klick
     return `
       <div class="ft-direction-chip clickable" data-pool-idx="${poolIdx}">
-        <span class="line-badge ${badgeClass}">${dir.line}</span>
-        ${destText ? `<span class="dir-dest">${destText}</span>` : ''}
+        <span class="line-badge ${badgeClass}">${line}</span>
+        ${towards ? `<span class="dir-dest">${towards}</span>` : ''}
       </div>
     `;
   }).join('');
@@ -5882,8 +5636,29 @@ function confirmFtGroup() {
     return;
   }
 
+  // Entferne die ausgewählten Richtungen aus bestehenden Gruppen
+  // (z.B. wenn sie vorher als 1er-Gruppen existierten)
+  ftSelectedForGroup.forEach(key => {
+    // Finde Gruppen, die diesen Key enthalten
+    for (let i = ftLineGroups.length - 1; i >= 0; i--) {
+      const group = ftLineGroups[i];
+      const keyIdx = (group.directions || []).indexOf(key);
+      if (keyIdx !== -1) {
+        // Entferne den Key aus dieser Gruppe
+        group.directions.splice(keyIdx, 1);
+        // Entferne leere Gruppen
+        if (group.directions.length === 0) {
+          ftLineGroups.splice(i, 1);
+        }
+      }
+    }
+  });
+
   // Neue Gruppe erstellen
   ftLineGroups.push({ directions: [...ftSelectedForGroup] });
+
+  // Pool aktualisieren
+  updatePoolDirections();
 
   // Reset
   ftGroupingMode = false;
@@ -5895,7 +5670,20 @@ function confirmFtGroup() {
 }
 
 function deleteFtGroup(gIdx) {
+  // Alle Richtungen der Gruppe als eigene 1er-Gruppen wieder einfügen
+  const groupToDelete = ftLineGroups[gIdx];
+  if (groupToDelete && groupToDelete.directions) {
+    groupToDelete.directions.forEach(key => {
+      ftLineGroups.push({ directions: [key] });
+    });
+  }
+
+  // Gruppe entfernen
   ftLineGroups.splice(gIdx, 1);
+
+  // Pool aktualisieren
+  updatePoolDirections();
+
   renderFtGroupingUI();
 
   // Reihenfolge-Liste aktualisieren (Gruppen haben sich geändert)
@@ -5905,11 +5693,27 @@ function deleteFtGroup(gIdx) {
 function removeFromGroup(gIdx, key) {
   if (ftLineGroups[gIdx] && ftLineGroups[gIdx].directions) {
     ftLineGroups[gIdx].directions = ftLineGroups[gIdx].directions.filter(d => d !== key);
-    // Gruppe loeschen wenn weniger als 2 Richtungen
-    if (ftLineGroups[gIdx].directions.length < 2) {
+
+    // Wenn Gruppe noch mindestens 2 Richtungen hat, bleibt sie bestehen
+    // Die entfernte Richtung wird als neue 1er-Gruppe hinzugefügt
+    if (ftLineGroups[gIdx].directions.length >= 2) {
+      // Entfernte Richtung als eigene 1er-Gruppe hinzufügen
+      ftLineGroups.push({ directions: [key] });
+    } else if (ftLineGroups[gIdx].directions.length === 1) {
+      // Nur noch 1 Richtung übrig - Gruppe bleibt als 1er-Gruppe
+      // Entfernte Richtung als eigene 1er-Gruppe hinzufügen
+      ftLineGroups.push({ directions: [key] });
+    } else {
+      // Gruppe ist leer - entfernen
       ftLineGroups.splice(gIdx, 1);
+      // Entfernte Richtung als eigene 1er-Gruppe hinzufügen
+      ftLineGroups.push({ directions: [key] });
     }
   }
+
+  // Pool aktualisieren
+  updatePoolDirections();
+
   renderFtGroupingUI();
 
   // Reihenfolge-Liste aktualisieren (Gruppen haben sich geändert)
@@ -5918,17 +5722,17 @@ function removeFromGroup(gIdx, key) {
 
 // Aktualisiere die Reihenfolge-Liste wenn Gruppen geändert werden
 function updateRowOrderAfterGroupChange() {
-  // Leere ftRowOrder damit initRowOrderList es neu aufbaut
-  ftRowOrder = [];
-
-  // Wenn Statisch-Modus aktiv ist, sofort neu rendern
+  // NEUES KONZEPT: ftLineGroups IST die Reihenfolge
+  // Bei Gruppenänderung: einfach die Liste neu rendern
   if (ftSortMode === 2) {
-    initRowOrderList();
+    renderRowOrderList();
   }
 }
 
 
 function collectFtLineGroups() {
+  // linegroups Format: "2:R60500312+1:R60500920,19:R60500097+12:R60500123"
+  // Nur echte Gruppen (≥2 Richtungen) für ESP32 linegroups
   if (ftLineGroups.length === 0) {
     return '';
   }
@@ -5940,7 +5744,16 @@ function collectFtLineGroups() {
     return '';
   }
 
-  return validGroups.map(g => g.directions.join('+')).join(',');
+  // Keys zu "Linie:RrichtungsId" Format (für ESP32 Matching)
+  return validGroups.map(g => {
+    return g.directions.map(key => {
+      const dirInfo = ftAllDirections.find(d => d.key === key);
+      if (dirInfo && dirInfo.richtungsId) {
+        return `${dirInfo.line}:R${dirInfo.richtungsId}`;
+      }
+      return key;  // Fallback: Key direkt verwenden
+    }).join('+');
+  }).join(',');
 }
 
 function shortenDestFt(dest) {
@@ -6015,8 +5828,8 @@ function setupFtGroupingEvents() {
 
       const poolIdx = parseInt(target.dataset.poolIdx);
 
-      if (poolIdx >= 0 && poolIdx < ftAvailableDirections.length) {
-        const key = ftAvailableDirections[poolIdx].key;
+      if (poolIdx >= 0 && poolIdx < ftAllDirections.length) {
+        const key = ftAllDirections[poolIdx].key;
 
         // Automatisch Gruppierungsmodus starten wenn noch nicht aktiv
         if (!ftGroupingMode) {
@@ -6519,7 +6332,6 @@ async function loadExistingConfig(rbl, filter, linefilterdestination) {
               } else {
                 // Kein Filter: Alle Linien einschließen
                 shouldInclude = true;
-                console.log(`No filter, including ${lineName}:${towards}`);
               }
 
               if (shouldInclude) {
@@ -6711,7 +6523,6 @@ window.addEventListener('message', async function(event) {
 // Markiere Handler als bereit und verarbeite gepufferte Nachrichten
 _configHandlerReady = true;
 if (_pendingConfigMessages.length > 0) {
-  console.log('Processing', _pendingConfigMessages.length, 'buffered config messages');
   _pendingConfigMessages.forEach(msg => handleConfigMessage(msg));
   _pendingConfigMessages = [];
 }
