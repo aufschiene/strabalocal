@@ -2063,8 +2063,8 @@
         <p>Noch keine Stationen hinzugefügt</p>
       </div>
     </div>
-    <button class="btn btn-secondary hidden" id="openFinetuningBtn" onclick="goToDisplayConfig()" style="margin-top: 12px; width: 100%;">
-      ⚙️ Feintuning öffnen
+    <button class="btn btn-primary hidden" id="openFinetuningBtn" onclick="handleStationsNextStep()" style="margin-top: 12px; width: 100%;">
+      Weiter
     </button>
   </div>
   
@@ -2651,6 +2651,7 @@ let availableLines = [];
 let selectedLines = new Set();
 let stations = [];
 let editingStationIndex = null;  // Index der Station die bearbeitet wird (null = neue Station)
+let hasExistingConfig = false;   // True wenn Config vom Gerät geladen wurde
 let wienData = null;
 let searchTimeout = null;
 
@@ -3859,7 +3860,11 @@ function updateStationsList() {
   } else {
     emptyState.style.display = 'none';
     saveBtn.disabled = false;
-    if (openFinetuningBtn) openFinetuningBtn.classList.remove('hidden');
+    if (openFinetuningBtn) {
+      openFinetuningBtn.classList.remove('hidden');
+      // Button-Text je nach Config-Status
+      openFinetuningBtn.textContent = hasExistingConfig ? 'Feintuning öffnen' : 'Weiter';
+    }
   }
 
   const chips = Array.from(groupedStations.values()).map((group) => {
@@ -3895,6 +3900,18 @@ function removeStationGroup(key) {
   const [network, stopName] = [key.split(':')[0], key.split(':').slice(1).join(':')];
   stations = stations.filter(s => !(s.network === network && s.stopName === stopName));
   updateStationsList();
+}
+
+// Nächster Schritt nach Stationen-Auswahl
+function handleStationsNextStep() {
+  if (hasExistingConfig) {
+    // Bestehende Config vom Gerät: Direkt zum Feintuning
+    goToDisplayConfig();  // Erst Config berechnen
+    goToFinetuning();     // Dann direkt zum Feintuning
+  } else {
+    // Neue Config: Zur Display-Config Seite
+    goToDisplayConfig();
+  }
 }
 
 async function editStation(idx) {
@@ -6287,6 +6304,9 @@ window.addEventListener('message', async function(event) {
     await loadExistingConfig(event.data.rbl, event.data.filter);
   }
   if (event.data?.type === 'loadFullConfig' && event.data.config?.rbl_id) {
+    // Markiere, dass eine bestehende Config geladen wurde
+    hasExistingConfig = true;
+
     // Load Wien data first if any WL stations
     if (event.data.config.rbl_id && !event.data.config.rbl_id.includes(':')) {
       await loadWienData();
