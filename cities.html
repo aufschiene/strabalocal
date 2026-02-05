@@ -6313,6 +6313,11 @@ window.addEventListener('message', async function(event) {
     }
     await loadExistingConfig(event.data.config.rbl_id, event.data.config.lines_filter);
 
+    // Initialisiere recommendedConfig falls noch nicht vorhanden
+    if (!recommendedConfig) {
+      recommendedConfig = calculateRecommendedConfig() || {};
+    }
+
     // Linz Linien+Ziel Filter aus Config übernehmen
     if (event.data.config.linefilterdestination) {
       recommendedConfig.lineFilterDestination = event.data.config.linefilterdestination;
@@ -6323,7 +6328,7 @@ window.addEventListener('message', async function(event) {
     }
     // Sortierungsmodus aus Config übernehmen
     if (event.data.config.sort_mode !== undefined) {
-      recommendedConfig.sortMode = event.data.config.sort_mode;
+      recommendedConfig.sortMode = parseInt(event.data.config.sort_mode) || 1;
     }
     // Zeilen-Reihenfolge aus Config übernehmen
     if (event.data.config.roworder) {
@@ -6334,28 +6339,30 @@ window.addEventListener('message', async function(event) {
     }
     // Weitere Feintuning-Einstellungen
     if (event.data.config.colour !== undefined) {
-      recommendedConfig.colour = event.data.config.colour;
+      recommendedConfig.colour = parseInt(event.data.config.colour) || 1;
     }
     if (event.data.config.lines_count !== undefined) {
-      recommendedConfig.rows = parseInt(event.data.config.lines_count);
+      recommendedConfig.rows = parseInt(event.data.config.lines_count) || 2;
     }
-    if (event.data.config.brightness_level !== undefined) {
-      recommendedConfig.displayLight = event.data.config.brightness_level;
+    // displaylight (ESP32 Feldname)
+    if (event.data.config.displaylight !== undefined) {
+      recommendedConfig.displayLight = parseInt(event.data.config.displaylight) || 3;
     }
-    if (event.data.config.show_high_floor_warning !== undefined) {
-      recommendedConfig.chopper = event.data.config.show_high_floor_warning ? 1 : 0;
+    // chopper und silberpfeil (ESP32 Feldnamen, als String gesendet)
+    if (event.data.config.chopper !== undefined) {
+      recommendedConfig.chopper = parseInt(event.data.config.chopper) || 0;
     }
-    if (event.data.config.show_cooling_info !== undefined) {
-      recommendedConfig.silberpfeil = event.data.config.show_cooling_info ? 1 : 0;
+    if (event.data.config.silberpfeil !== undefined) {
+      recommendedConfig.silberpfeil = parseInt(event.data.config.silberpfeil) || 0;
     }
     if (event.data.config.night_mode_enabled !== undefined) {
       recommendedConfig.nightMode = event.data.config.night_mode_enabled;
     }
     if (event.data.config.night_mode_start !== undefined) {
-      recommendedConfig.nightStart = event.data.config.night_mode_start;
+      recommendedConfig.nightStart = parseInt(event.data.config.night_mode_start) || 22;
     }
     if (event.data.config.night_mode_end !== undefined) {
-      recommendedConfig.nightEnd = event.data.config.night_mode_end;
+      recommendedConfig.nightEnd = parseInt(event.data.config.night_mode_end) || 6;
     }
     if (event.data.config.show_fun_messages !== undefined) {
       recommendedConfig.showFunMessages = event.data.config.show_fun_messages;
@@ -6392,8 +6399,14 @@ window.addEventListener('message', async function(event) {
       lineGroups: recommendedConfig.lineGroups,
       sortMode: recommendedConfig.sortMode,
       rows: recommendedConfig.rows,
-      rowOrder: recommendedConfig.rowOrder
+      rowOrder: recommendedConfig.rowOrder,
+      colour: recommendedConfig.colour,
+      displayLight: recommendedConfig.displayLight,
+      chopper: recommendedConfig.chopper,
+      silberpfeil: recommendedConfig.silberpfeil,
+      nightMode: recommendedConfig.nightMode
     });
+    console.log('[cities.html] Raw config from ESP32:', event.data.config);
   }
 });
 
