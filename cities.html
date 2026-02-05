@@ -2063,6 +2063,9 @@
         <p>Noch keine Stationen hinzugefügt</p>
       </div>
     </div>
+    <button class="btn btn-secondary hidden" id="openFinetuningBtn" onclick="goToDisplayConfig()" style="margin-top: 12px; width: 100%;">
+      ⚙️ Feintuning öffnen
+    </button>
   </div>
   
   <!-- Step: Display Config -->
@@ -2647,6 +2650,7 @@ let selectedStop = null;
 let availableLines = [];
 let selectedLines = new Set();
 let stations = [];
+let editingStationIndex = null;  // Index der Station die bearbeitet wird (null = neue Station)
 let wienData = null;
 let searchTimeout = null;
 
@@ -3498,26 +3502,28 @@ async function selectStop(id, name) {
   selectedStop = { id, name };
   selectedLines = new Set();
   availableLines = [];
-  
+  editingStationIndex = null;  // Sicherstellen dass wir nicht im Bearbeiten-Modus sind
+
   document.getElementById('selectedStationName').textContent = name;
   document.getElementById('selectedStationInfo').textContent = `${NETWORKS[selectedNetwork].name} · ID: ${id}`;
-  
+
   searchResults.classList.remove('show');
   showStep('lines');
-  
+
   // Load departures to get available lines
   linesLoading.classList.remove('hidden');
   linesContainer.classList.add('hidden');
   addStationBtn.disabled = true;
-  
+  addStationBtn.textContent = 'Weiter';  // Button-Text zurücksetzen
+
   try {
     const fullId = `${selectedNetwork}:${id}`;
     const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
     const data = await response.json();
-    
+
     extractLines(data);
     renderLines();
-    
+
     linesLoading.classList.add('hidden');
     linesContainer.classList.remove('hidden');
   } catch (e) {
@@ -3774,30 +3780,39 @@ function addStation() {
 
   const fullId = `${selectedNetwork}:${selectedStop.id}`;
 
-  // Check duplicate
-  if (stations.some(s => s.fullId === fullId)) {
-    alert('Diese Station ist bereits hinzugefügt!');
-    return;
-  }
-
   // Ausgewaehlte Richtungen speichern (Linie + towards)
   const selectedDirections = Array.from(selectedLines).map(idx => ({
     line: availableLines[idx].name,
     towards: availableLines[idx].towards || '',
-    type: availableLines[idx].type || ''
+    type: availableLines[idx].type || '',
+    richtungsId: availableLines[idx].richtungsId || ''
   }));
 
-  stations.push({
-    network: selectedNetwork,
-    networkName: NETWORKS[selectedNetwork].name,
-    stopId: selectedStop.id,
-    stopName: selectedStop.name,
-    filter: filter,
-    fullId: fullId,
-    isExisting: false,
-    directions: selectedDirections  // Speichert Linie + Richtung
-  });
-  
+  if (editingStationIndex !== null) {
+    // Bearbeiten-Modus: Bestehende Station aktualisieren
+    const existingStation = stations[editingStationIndex];
+    existingStation.filter = filter;
+    existingStation.directions = selectedDirections;
+    editingStationIndex = null;  // Reset
+  } else {
+    // Neu-Modus: Duplikat prüfen
+    if (stations.some(s => s.fullId === fullId)) {
+      alert('Diese Station ist bereits hinzugefügt!');
+      return;
+    }
+
+    stations.push({
+      network: selectedNetwork,
+      networkName: NETWORKS[selectedNetwork].name,
+      stopId: selectedStop.id,
+      stopName: selectedStop.name,
+      filter: filter,
+      fullId: fullId,
+      isExisting: false,
+      directions: selectedDirections
+    });
+  }
+
   // Reset and go back
   selectedStop = null;
   selectedLines = new Set();
@@ -3835,12 +3850,16 @@ function updateStationsList() {
   // Anzahl der einzigartigen Stationen anzeigen
   stationCount.textContent = groupedStations.size;
 
+  const openFinetuningBtn = document.getElementById('openFinetuningBtn');
+
   if (stations.length === 0) {
     emptyState.style.display = 'block';
     saveBtn.disabled = true;
+    if (openFinetuningBtn) openFinetuningBtn.classList.add('hidden');
   } else {
     emptyState.style.display = 'none';
     saveBtn.disabled = false;
+    if (openFinetuningBtn) openFinetuningBtn.classList.remove('hidden');
   }
 
   const chips = Array.from(groupedStations.values()).map((group) => {
@@ -3882,17 +3901,69 @@ async function editStation(idx) {
   const station = stations[idx];
   if (!station) return;
 
+  // Setze Bearbeiten-Modus
+  editingStationIndex = idx;
+
   // Setze Netzwerk
   selectedNetwork = station.network;
 
   if (station.network === 'WL') {
     // Wien: Lade Wien-Daten und gehe zur Linienauswahl
+    editingStationIndex = null;  // Wien hat eigenen Flow
     await loadWienData();
     showStep('wienLine');
   } else {
     // Andere Netzwerke: Direkt zur Linienauswahl
     selectedStop = { id: station.stopId, name: station.stopName };
-    selectStop(station.stopId, station.stopName);
+    await selectStopForEdit(station.stopId, station.stopName, station.directions || []);
+  }
+}
+
+// Spezielle Version von selectStop für das Bearbeiten (mit Vorauswahl)
+async function selectStopForEdit(id, name, existingDirections) {
+  selectedStop = { id, name };
+  selectedLines = new Set();
+  availableLines = [];
+
+  document.getElementById('selectedStationName').textContent = name;
+  document.getElementById('selectedStationInfo').textContent = `${NETWORKS[selectedNetwork].name} · ID: ${id}`;
+
+  searchResults.classList.remove('show');
+  showStep('lines');
+
+  // Load departures to get available lines
+  linesLoading.classList.remove('hidden');
+  linesContainer.classList.add('hidden');
+  addStationBtn.disabled = true;
+
+  try {
+    const fullId = `${selectedNetwork}:${id}`;
+    const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
+    const data = await response.json();
+
+    extractLines(data);
+
+    // Vorauswahl: Markiere Linien die bereits in existingDirections sind
+    availableLines.forEach((line, idx) => {
+      const isSelected = existingDirections.some(d =>
+        d.line === line.name && (d.towards === line.towards || !d.towards || !line.towards)
+      );
+      if (isSelected) {
+        selectedLines.add(idx);
+      }
+    });
+
+    renderLines();
+
+    linesLoading.classList.add('hidden');
+    linesContainer.classList.remove('hidden');
+
+    // Button-Status und -Text aktualisieren
+    addStationBtn.disabled = selectedLines.size === 0;
+    addStationBtn.textContent = 'Aktualisieren';
+  } catch (e) {
+    console.error('Failed to load departures:', e);
+    linesLoading.innerHTML = '<div style="color:#d32f2f">Fehler beim Laden der Linien</div>';
   }
 }
 
