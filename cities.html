@@ -6294,11 +6294,14 @@ async function loadExistingConfig(rbl, filter) {
 
     // Directions aus API laden (gefiltert nach station.filter)
     try {
+      console.log('[loadExistingConfig] Fetching directions for', fullId);
       const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
       const data = await response.json();
+      console.log('[loadExistingConfig] API response:', data);
 
       if (data.data && data.data.monitors) {
         const filterLines = station.filter ? station.filter.split(',').map(f => f.trim()) : [];
+        console.log('[loadExistingConfig] filterLines:', filterLines);
 
         data.data.monitors.forEach(monitor => {
           if (monitor.lines && Array.isArray(monitor.lines)) {
@@ -6327,8 +6330,9 @@ async function loadExistingConfig(rbl, filter) {
           }
         });
       }
+      console.log('[loadExistingConfig] station.directions:', station.directions);
     } catch (e) {
-      // API-Fehler ignorieren - directions bleibt leer
+      console.error('[loadExistingConfig] API error:', e);
     }
 
     stations.push(station);
@@ -6382,15 +6386,19 @@ window.addEventListener('message', async function(event) {
     }
     await loadExistingConfig(event.data.rbl, event.data.filter);
   }
-  if (event.data?.type === 'loadFullConfig' && event.data.config?.rbl_id) {
+  if (event.data?.type === 'loadFullConfig' && (event.data.config?.rbl_id || event.data.config?.rbl)) {
     // Markiere, dass eine bestehende Config geladen wurde
     hasExistingConfig = true;
 
+    // Unterstütze beide Feldnamen (rbl_id/rbl und lines_filter/filter)
+    const rblId = event.data.config.rbl_id || event.data.config.rbl || '';
+    const linesFilter = event.data.config.lines_filter || event.data.config.filter || '';
+
     // Load Wien data first if any WL stations
-    if (event.data.config.rbl_id && !event.data.config.rbl_id.includes(':')) {
+    if (rblId && !rblId.includes(':')) {
       await loadWienData();
     }
-    await loadExistingConfig(event.data.config.rbl_id, event.data.config.lines_filter);
+    await loadExistingConfig(rblId, linesFilter);
 
     // Initialisiere recommendedConfig falls noch nicht vorhanden
     if (!recommendedConfig) {
