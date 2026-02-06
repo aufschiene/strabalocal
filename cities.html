@@ -1063,12 +1063,31 @@
       background: #1a1a1a;
       color: #fff;
     }
+    /* DE Fernverkehr */
     .product-option .product-badge.ice { background: #fff; color: #1a1a1a; border: 2px solid #1a1a1a; }
     .product-option .product-badge.ic { background: #fff; color: #1a1a1a; border: 2px solid #1a1a1a; }
-    .product-option .product-badge.rj { background: #c41e3a; color: #fff; }
-    .product-option .product-badge.re { background: #006e34; color: #fff; }
-    .product-option .product-badge.rb { background: #006e34; color: #fff; }
+    .product-option .product-badge.ec { background: #fff; color: #1a1a1a; border: 2px solid #1a1a1a; }
+    /* DE Regional */
+    .product-option .product-badge.re { background: #1E5A9C; color: #fff; }
+    .product-option .product-badge.rb { background: #1E5A9C; color: #fff; }
+    .product-option .product-badge.ire { background: #1E5A9C; color: #fff; }
     .product-option .product-badge.s { background: #006e34; color: #fff; }
+    /* AT Fernverkehr */
+    .product-option .product-badge.rjx { background: #E2001A; color: #fff; }
+    .product-option .product-badge.rj { background: #E2001A; color: #fff; }
+    .product-option .product-badge.d { background: #E2001A; color: #fff; }
+    /* AT Regional */
+    .product-option .product-badge.rex { background: #E2001A; color: #fff; }
+    .product-option .product-badge.r { background: #666666; color: #fff; }
+    .product-option .product-badge.cjx { background: #E2001A; color: #fff; }
+    /* International */
+    .product-option .product-badge.nj { background: #1a237e; color: #fff; }
+    .product-option .product-badge.en { background: #1a237e; color: #fff; }
+    .product-option .product-badge.tgv { background: #6E2064; color: #fff; }
+    .product-option .product-badge.tha { background: #6E2064; color: #fff; }
+    .product-option .product-badge.est { background: #6E2064; color: #fff; }
+    .product-option .product-badge.flx { background: #73D700; color: #000; }
+    .product-option .product-badge.wb { background: #007CC3; color: #fff; }
     .product-option .product-name {
       font-size: 14px;
       color: #333;
@@ -1963,24 +1982,11 @@
     
     <!-- Zugauswahl erscheint automatisch -->
     <div class="journey-products hidden" id="journeyProductsSection">
-      <h3 style="color:#0055a4;margin:20px 0 12px;font-size:16px;">Züge auswählen</h3>
-      
-      <div class="product-category">
-        <div class="category-header" onclick="toggleCategory('domestic')">
-          <span>Deutsche Züge</span>
-          <span class="category-toggle" id="domesticToggle">▼</span>
-        </div>
-        <div class="category-content" id="domesticProducts"></div>
-      </div>
-      
-      <div class="product-category">
-        <div class="category-header" onclick="toggleCategory('international')">
-          <span>International</span>
-          <span class="category-toggle" id="internationalToggle">▼</span>
-        </div>
-        <div class="category-content" id="internationalProducts"></div>
-      </div>
-      
+      <h3 style="color:#0055a4;margin:20px 0 12px;font-size:16px;">Zuggattungen auswählen</h3>
+
+      <!-- Dynamisch generierte Kategorien -->
+      <div id="productCategoriesContainer"></div>
+
       <button class="btn btn-primary" id="addJourneyBtn" onclick="addJourneyStation()" disabled style="margin-top:16px;width:100%">
         Verbindung hinzufügen
       </button>
@@ -2552,34 +2558,66 @@ const NETWORKS = {
     ]
   },
   DB: {
-    name: 'Deutsche Bahn',
+    name: 'Deutsche Bahn / ÖBB',
     shortName: 'DB',
-    region: 'DE',
-    desc: 'ICE, IC, RJ, RE, S-Bahn',
+    region: 'DE/AT',
+    desc: 'ICE, IC, RJ, REX, RE, S-Bahn',
     searchType: 'server_proxy',
-    placeholder: 'z.B. München Hbf, Berlin Hbf...',
+    placeholder: 'z.B. München Hbf, Wien Hbf, Linz Hbf...',
     isJourneyBased: true,
     productCategories: {
-      domestic: {
-        label: 'Deutsche Züge',
+      de_fern: {
+        label: 'Deutschland Fernverkehr',
+        collapsed: false,
         products: [
           { id: 'ICE', name: 'ICE', desc: 'Intercity-Express' },
           { id: 'IC', name: 'IC', desc: 'Intercity' },
-          { id: 'EC', name: 'EC', desc: 'Eurocity' },
+          { id: 'EC', name: 'EC', desc: 'Eurocity' }
+        ]
+      },
+      de_regional: {
+        label: 'Deutschland Regionalverkehr',
+        collapsed: true,
+        products: [
           { id: 'RE', name: 'RE', desc: 'Regional-Express' },
           { id: 'RB', name: 'RB', desc: 'Regionalbahn' },
+          { id: 'IRE', name: 'IRE', desc: 'Interregio-Express' },
           { id: 'S', name: 'S', desc: 'S-Bahn' }
         ]
       },
-      international: {
-        label: 'International',
+      at_fern: {
+        label: 'Österreich Fernverkehr',
+        collapsed: true,
         products: [
-          { id: 'RJX', name: 'RJX', desc: 'Railjet Xpress (ÖBB)' },
-          { id: 'RJ', name: 'RJ', desc: 'Railjet (ÖBB)' },
-          { id: 'NJ', name: 'NJ', desc: 'Nightjet (ÖBB)' },
-          { id: 'TGV', name: 'TGV', desc: 'TGV (SNCF)' },
+          { id: 'RJX', name: 'RJX', desc: 'Railjet Xpress' },
+          { id: 'RJ', name: 'RJ', desc: 'Railjet' },
+          { id: 'ICE', name: 'ICE', desc: 'ICE (DB/ÖBB)' },
+          { id: 'EC', name: 'EC', desc: 'Eurocity' },
+          { id: 'IC', name: 'IC', desc: 'Intercity' },
+          { id: 'D', name: 'D', desc: 'Schnellzug' }
+        ]
+      },
+      at_regional: {
+        label: 'Österreich Regionalverkehr',
+        collapsed: true,
+        products: [
+          { id: 'REX', name: 'REX', desc: 'Regional-Express' },
+          { id: 'R', name: 'R', desc: 'Regionalzug' },
+          { id: 'S', name: 'S', desc: 'S-Bahn (ÖBB)' },
+          { id: 'CJX', name: 'CJX', desc: 'Cityjet Xpress' }
+        ]
+      },
+      international: {
+        label: 'Internationaler Fernverkehr',
+        collapsed: true,
+        products: [
+          { id: 'NJ', name: 'NJ', desc: 'Nightjet (Nachtzug)' },
+          { id: 'EN', name: 'EN', desc: 'EuroNight' },
+          { id: 'TGV', name: 'TGV', desc: 'TGV (Frankreich)' },
           { id: 'THA', name: 'THA', desc: 'Thalys' },
-          { id: 'FLX', name: 'FLX', desc: 'Flixtrain' }
+          { id: 'EST', name: 'EST', desc: 'Eurostar' },
+          { id: 'FLX', name: 'FLX', desc: 'Flixtrain' },
+          { id: 'WB', name: 'WB', desc: 'Westbahn' }
         ]
       }
     }
@@ -3361,22 +3399,20 @@ function addWienStation() {
     return;
   }
 
-  // Ausgewaehlte Richtungen speichern (Linie + towards + richtungsId/patternID)
+  // Ausgewaehlte Richtungen speichern (Linie + towards)
   const selectedDirections = [];
   wienSelectedDirections.forEach(d => {
     selectedDirections.push({
       line: wienSelectedLine.lineName,
       towards: d.towards || '',
-      type: 'metro',
-      richtungsId: String(d.patternID || '')  // Wien patternID = richtungsId
+      type: 'metro'
     });
   });
   wienOtherLines.forEach(ol => {
     selectedDirections.push({
       line: ol.lineName,
       towards: ol.towards || '',
-      type: ol.lineName.startsWith('U') ? 'metro' : 'tram',
-      richtungsId: String(ol.patternID || '')  // Wien patternID = richtungsId
+      type: ol.lineName.startsWith('U') ? 'metro' : 'tram'
     });
   });
 
@@ -3606,7 +3642,11 @@ function extractLines(data) {
           }
 
           if (!linesMap.has(key)) {
-            linesMap.set(key, { name, towards, type: line.type || '' });
+            linesMap.set(key, {
+              name,
+              towards,
+              type: line.type || ''
+            });
           }
         });
       }
@@ -3725,8 +3765,13 @@ function getLineTypeClass(type, lineName) {
     return 'type-suburban';
   }
   
-  // Zug: RE, RB, IC, EC, ICE
-  if (/^(RE|RB|IC|EC|ICE|IR|R)\d*$/.test(lineName)) {
+  // Zug: RE, RB, IC, EC, ICE, REX, RJ, RJX, NJ, D, IRE, CJX, EN, TGV, WB, FLX
+  if (/^(RE|RB|IC|EC|ICE|IR|REX|RJ|RJX|NJ|IRE|CJX|EN|TGV|THA|EST|WB|FLX|D)\d*$/.test(lineName)) {
+    return 'type-train';
+  }
+
+  // ÖBB Regionalzug: R + Nummer (z.B. R50, R51)
+  if (/^R\d+$/.test(lineName)) {
     return 'type-train';
   }
   
@@ -3819,8 +3864,7 @@ function addStation() {
   const selectedDirections = Array.from(selectedLines).map(idx => ({
     line: availableLines[idx].name,
     towards: availableLines[idx].towards || '',
-    type: availableLines[idx].type || '',
-    richtungsId: availableLines[idx].richtungsId || ''
+    type: availableLines[idx].type || ''
   }));
 
   if (editingStationIndex !== null) {
@@ -3857,7 +3901,29 @@ function addStation() {
 
 function removeStation(idx) {
   stations.splice(idx, 1);
+
+  // WICHTIG: Feintuning-Daten zurücksetzen wenn Stationen geändert werden
+  // Die Gruppierungen basieren auf den Richtungen der Stationen
+  resetFinetuningData();
+
   updateStationsList();
+}
+
+// Setzt alle Feintuning-Daten zurück
+function resetFinetuningData() {
+  ftLineGroups = [];
+  ftAllDirections = [];
+  ftPoolDirections = [];
+  ftGroupingMode = false;
+  ftSelectedForGroup = [];
+
+  // recommendedConfig zurücksetzen (wird beim Öffnen neu berechnet)
+  if (recommendedConfig) {
+    recommendedConfig.lineGroups = '';
+    recommendedConfig.rowOrderDestination = '';
+  }
+
+  console.log('[resetFinetuningData] Alle Feintuning-Daten zurückgesetzt');
 }
 
 function updateStationsList() {
@@ -4011,6 +4077,10 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
     extractLines(data);
 
     // Vorauswahl: Markiere Linien die bereits ausgewählt waren
+    console.log('[editStation] existingDirections:', existingDirections);
+    console.log('[editStation] existingFilter:', existingFilter);
+    console.log('[editStation] availableLines:', availableLines);
+
     availableLines.forEach((line, idx) => {
       let isSelected = false;
 
@@ -4022,7 +4092,9 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
 
           // Beide haben Richtung: müssen übereinstimmen
           if (d.towards && line.towards) {
-            return d.towards === line.towards;
+            const match = d.towards === line.towards;
+            console.log(`[editStation] Comparing: d.towards="${d.towards}" vs line.towards="${line.towards}" => ${match}`);
+            return match;
           }
 
           // Gespeicherte direction hat Richtung, aber API nicht: kein Match
@@ -4100,16 +4172,19 @@ function calculateRecommendedConfig() {
   let displayName = NETWORK_COLORS[dominantNetwork]?.name || 'Wiener Linien';
   let description = `Optimiert für ${NETWORKS[dominantNetwork]?.name || dominantNetwork}`;
 
-  // Spezialfall DB: S-Bahn vs Fernverkehr
+  // Spezialfall DB/ÖBB: S-Bahn vs Fernverkehr vs Regionalverkehr
   if (dominantNetwork === 'DB') {
     const dbStations = stations.filter(s => s.network === 'DB');
-    let hasSBahn = false, hasFernverkehr = false;
+    let hasSBahn = false, hasFernverkehr = false, hasRegional = false;
     dbStations.forEach(s => {
       const products = s.filter || '';
       if (products.includes('S')) hasSBahn = true;
-      if (/ICE|IC|EC|RJ|RJX|NJ|TGV|THA|EN/.test(products)) hasFernverkehr = true;
+      // Fernverkehr: ICE, IC, EC, RJ, RJX, NJ, TGV, THA, EN, D, WB, EST
+      if (/ICE|IC|EC|RJ|RJX|NJ|TGV|THA|EN|EST|WB|FLX/.test(products)) hasFernverkehr = true;
+      // Regionalverkehr (ohne S-Bahn): RE, RB, REX, R, IRE, CJX
+      if (/\b(RE|RB|REX|IRE|CJX)\b/.test(products) || /^R\d/.test(products)) hasRegional = true;
     });
-    if (hasSBahn && !hasFernverkehr) {
+    if (hasSBahn && !hasFernverkehr && !hasRegional) {
       displayType = 5;
       displayName = 'DB S-Bahn';
       description = 'Optimiert für S-Bahn Anzeige';
@@ -4139,9 +4214,6 @@ function calculateRecommendedConfig() {
     rows = totalDirections;
   }
 
-  // Gehweg-Werte (alle auf 0 als Default)
-  const gehwegValues = stations.map(() => 0);
-
   // Einzigartige Stationen für stationDetails (gruppiert nach Name+Netzwerk)
   const uniqueStationDetails = [];
   const seenStations = new Set();
@@ -4157,6 +4229,9 @@ function calculateRecommendedConfig() {
       });
     }
   });
+
+  // Gehweg-Werte (alle auf 0 als Default) - WICHTIG: basiert auf uniqueStationDetails!
+  const gehwegValues = uniqueStationDetails.map(() => 0);
 
   return {
     // Station-Daten
@@ -4220,7 +4295,7 @@ function buildLineFilterDestination(stationsList) {
   const lineToDestinations = {};
 
   stationsList.forEach(station => {
-    // Nur für Linz (Netzwerke ohne richtungsId)
+    // Für Linz: Sammle Linien+Ziele
     if (station.network === 'LINZ' && station.directions && station.directions.length > 0) {
       station.directions.forEach(dir => {
         if (dir.line && dir.towards) {
@@ -4337,29 +4412,37 @@ function suggestDisplayConfig() {
   let colorId, colorName, description;
   
   if (dominantNetwork === 'DB') {
-    // Check for S-Bahn vs Fernverkehr
+    // Check for S-Bahn vs Fernverkehr vs Regionalverkehr
     const dbStations = stations.filter(s => s.network === 'DB');
     let hasSBahn = false;
     let hasFernverkehr = false;
-    
+    let hasRegional = false;
+
     dbStations.forEach(s => {
       const products = s.filter || s.products || '';
       if (products.includes('S')) hasSBahn = true;
-      if (/ICE|IC|EC|RJ|RJX|NJ|TGV|THA|EN/.test(products)) hasFernverkehr = true;
+      // Fernverkehr: ICE, IC, EC, RJ, RJX, NJ, TGV, THA, EN, D, WB, EST, FLX
+      if (/ICE|IC|EC|RJ|RJX|NJ|TGV|THA|EN|EST|WB|FLX/.test(products)) hasFernverkehr = true;
+      // Regionalverkehr (ohne S-Bahn): RE, RB, REX, R, IRE, CJX
+      if (/\b(RE|RB|REX|IRE|CJX)\b/.test(products) || /^R\d/.test(products)) hasRegional = true;
     });
-    
+
     if (hasFernverkehr && !hasSBahn) {
       colorId = 6;
-      colorName = 'DB Fernverkehr';
-      description = 'Optimiert für ICE, IC, RJ Anzeige';
-    } else if (hasSBahn && !hasFernverkehr) {
+      colorName = 'DB/ÖBB Fernverkehr';
+      description = 'Optimiert für ICE, IC, RJ, RJX Anzeige';
+    } else if (hasSBahn && !hasFernverkehr && !hasRegional) {
       colorId = 5;
       colorName = 'DB S-Bahn';
       description = 'Optimiert für S-Bahn Anzeige';
+    } else if (hasRegional && !hasFernverkehr) {
+      colorId = 5;  // S-Bahn Style auch für Regionalverkehr
+      colorName = 'DB/ÖBB Regional';
+      description = 'Optimiert für RE, REX, RB Anzeige';
     } else {
       colorId = 6;
-      colorName = 'DB Fernverkehr';
-      description = 'Gemischte DB-Verbindungen';
+      colorName = 'DB/ÖBB Fernverkehr';
+      description = 'Gemischte Zug-Verbindungen';
     }
   } else {
     const netColor = NETWORK_COLORS[dominantNetwork] || NETWORK_COLORS.WL;
@@ -4808,21 +4891,16 @@ function populateFtGehwegList() {
   const container = document.getElementById('ftGehwegList');
   container.innerHTML = '';
 
-  // Gruppiere Stationen nach Name und Netzwerk (wie in updateStationsList)
-  const uniqueStations = new Map();
-  stations.forEach((station, index) => {
-    const key = `${station.network}:${station.stopName}`;
-    if (!uniqueStations.has(key)) {
-      uniqueStations.set(key, { station, index });
-    }
-  });
+  // Nutze stationDetails (unique stations) für konsistente Indices
+  // stationDetails hat bereits die richtigen stop-IDs für den Gehweg-String
+  if (!recommendedConfig.stationDetails) return;
 
-  uniqueStations.forEach(({ station, index }) => {
+  recommendedConfig.stationDetails.forEach((station, index) => {
     const gehwegValue = recommendedConfig.gehweg?.[index] || 0;
     const item = document.createElement('div');
     item.className = 'gehweg-item';
     item.innerHTML = `
-      <span class="station-name">${station.stopName}</span>
+      <span class="station-name">${station.name}</span>
       <input type="number" min="0" max="30" value="${gehwegValue}"
              id="ftGehweg_${index}" onchange="updateFinetuningPreview()">
       <span class="unit">Min</span>
@@ -5030,9 +5108,8 @@ function getRowOrderString() {
 }
 
 function getRowOrderDestinationString() {
-  // NEUES KONZEPT: Alles sind Gruppen (auch 1er-Gruppen)
-  // Format: "1:Uni+2:Uni,3:Solarc,26:St.Margarethen" - Gruppen mit +, Einträge mit ,
-  // ftLineGroups = [{ directions: ['1:RId1', '2:RId2'] }, { directions: ['3:RId3'] }, ...]
+  // VEREINFACHT: Format ist immer "Linie:Ziel+Linie:Ziel,..."
+  // ftLineGroups = [{ directions: ['1:Auwiesen', '2:solarCity'] }, { directions: ['3:Solarc'] }, ...]
 
   if (ftLineGroups.length === 0) {
     return '';
@@ -5041,26 +5118,8 @@ function getRowOrderDestinationString() {
   const items = [];
   ftLineGroups.forEach(group => {
     if (group.directions && group.directions.length > 0) {
-      // Jede Richtung (Key) in "Linie:Ziel" Format umwandeln
-      const groupParts = group.directions.map(key => {
-        const dirInfo = ftAllDirections.find(d => d.key === key);
-        if (dirInfo) {
-          return `${dirInfo.line}:${dirInfo.towards || ''}`;
-        }
-        // Fallback: Key direkt verwenden (ohne das R-Prefix falls vorhanden)
-        const colonIdx = key.indexOf(':');
-        if (colonIdx > 0) {
-          const line = key.substring(0, colonIdx);
-          let dest = key.substring(colonIdx + 1);
-          // Falls es ein richtungsId-Key ist (z.B. "2:R60500123"), leeren String verwenden
-          if (dest.startsWith('R') && /^\d+$/.test(dest.substring(1))) {
-            dest = '';
-          }
-          return `${line}:${dest}`;
-        }
-        return key;
-      });
-      items.push(groupParts.join('+'));
+      // Keys sind bereits im "Linie:Ziel" Format
+      items.push(group.directions.join('+'));
     }
   });
   return items.join(',');
@@ -5101,8 +5160,8 @@ function updateFinetuningPreview() {
       2: [{ line: '1', dest: 'Auwiesen', time: 4 }, { line: '3', dest: 'Landgutstr.', time: 7 }, { line: '46', dest: 'Hauptbahnhof', time: 11 }],
       3: [{ line: 'U6', dest: 'Alt-Tegel', time: 2 }, { line: 'S1', dest: 'Oranienburg', time: 5 }, { line: 'M10', dest: 'Warschauer', time: 8 }],
       4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden', time: 19 }],
-      5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'S7', dest: 'Ahrensfelde', time: 5 }, { line: 'S5', dest: 'Strausberg', time: 9 }],
-      6: [{ line: 'ICE', dest: 'Berlin Hbf', time: 12 }, { line: 'RJ', dest: 'Wien Hbf', time: 28 }, { line: 'IC', dest: 'Hamburg', time: 45 }],
+      5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'REX', dest: 'Linz Hbf', time: 5 }, { line: 'RE', dest: 'München', time: 9 }],
+      6: [{ line: 'RJX', dest: 'Wien Hbf', time: 8 }, { line: 'ICE', dest: 'Berlin Hbf', time: 15 }, { line: 'NJ', dest: 'Hamburg', time: 32 }],
       7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
       8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }]
     };
@@ -5177,7 +5236,18 @@ function updateFinetuningPreview() {
     html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
       ${data.map((dep, i) => {
         const rowBg = i % 2 === 0 ? '#192846' : '#0f1c32';
-        const lineColor = dep.line.startsWith('S') ? '#009640' : (dep.line === 'ICE' || dep.line === 'IC' ? '#c80000' : (dep.line === 'RJ' ? '#c80000' : '#666'));
+        // Farben für verschiedene Zuggattungen
+        let lineColor = '#666';  // Default grau
+        const ln = dep.line;
+        if (ln.startsWith('S')) lineColor = '#009640';  // S-Bahn grün
+        else if (/^(ICE|IC|EC)/.test(ln)) lineColor = '#c80000';  // DB Fernverkehr rot
+        else if (/^(RJ|RJX|NJ)/.test(ln)) lineColor = '#c80000';  // ÖBB Fernverkehr rot
+        else if (/^(RE|RB|IRE)/.test(ln)) lineColor = '#1E5A9C';  // DE Regional blau
+        else if (/^(REX|CJX)/.test(ln)) lineColor = '#E2001A';  // ÖBB REX rot
+        else if (/^R\d/.test(ln)) lineColor = '#666666';  // ÖBB R grau
+        else if (/^(TGV|THA|EST)/.test(ln)) lineColor = '#6E2064';  // Internationale Züge lila
+        else if (ln === 'WB') lineColor = '#007CC3';  // Westbahn blau
+        else if (ln === 'FLX') lineColor = '#73D700';  // Flixtrain grün
         return `<div style="flex:1;display:flex;align-items:center;padding:4px 8px;background:${rowBg};color:#fff;">
           <span style="font-weight:bold;font-size:12px;min-width:38px;background:${lineColor};color:#fff;padding:3px 6px;border-radius:4px;text-align:center;">${dep.line}</span>
           <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
@@ -5293,13 +5363,22 @@ async function initFtGrouping() {
   // Richtungen aus allen Stationen laden
   await loadFtDirectionsFromStations();
 
-  // Bestehende Gruppierung aus roworderdestination laden (neues Format)
-  // Fallback auf linegroups für alte Configs
-  if (recommendedConfig && recommendedConfig.rowOrderDestination) {
-    parseRowOrderDestination(recommendedConfig.rowOrderDestination);
-  } else if (recommendedConfig && recommendedConfig.lineGroups) {
+  // DEBUG: Zeige alle verfügbaren Richtungen
+  console.log('[initFtGrouping] ftAllDirections:', ftAllDirections.map(d => d.key));
+
+  // Bestehende Gruppierung laden:
+  // PRIORITÄT: lineGroups (enthält RichtungsIds, zuverlässiger)
+  // FALLBACK: rowOrderDestination (enthält Zieltexte, kann mehrdeutig sein)
+  if (recommendedConfig && recommendedConfig.lineGroups) {
+    console.log('[initFtGrouping] Lade aus lineGroups:', recommendedConfig.lineGroups);
     parseFtExistingGroups(recommendedConfig.lineGroups);
+  } else if (recommendedConfig && recommendedConfig.rowOrderDestination) {
+    console.log('[initFtGrouping] Lade aus rowOrderDestination:', recommendedConfig.rowOrderDestination);
+    parseRowOrderDestination(recommendedConfig.rowOrderDestination);
   }
+
+  // DEBUG: Zeige geladene Gruppen
+  console.log('[initFtGrouping] Nach Parsing - ftLineGroups:', ftLineGroups.map(g => g.directions));
 
   // WICHTIG: Prüfe ob alle Richtungen in ftAllDirections auch in ftLineGroups sind
   // Falls nicht: Füge fehlende Richtungen als neue 1er-Gruppen hinzu
@@ -5310,6 +5389,7 @@ async function initFtGrouping() {
 
   // Fehlende Richtungen finden und hinzufügen
   const missingDirections = ftAllDirections.filter(d => !usedKeys.has(d.key));
+  console.log('[initFtGrouping] Fehlende Richtungen:', missingDirections.map(d => d.key));
   if (missingDirections.length > 0) {
     missingDirections.forEach(dir => {
       ftLineGroups.push({ directions: [dir.key] });
@@ -5318,10 +5398,16 @@ async function initFtGrouping() {
 
   // Ungültige Keys aus ftLineGroups entfernen (Keys die nicht mehr in ftAllDirections existieren)
   const validKeys = new Set(ftAllDirections.map(d => d.key));
+  console.log('[initFtGrouping] Gültige Keys:', [...validKeys]);
   ftLineGroups = ftLineGroups.map(group => {
     const validDirections = (group.directions || []).filter(key => validKeys.has(key));
+    if (validDirections.length !== group.directions.length) {
+      console.log('[initFtGrouping] Gefilterte Gruppe:', group.directions, '->', validDirections);
+    }
     return { directions: validDirections };
   }).filter(group => group.directions.length > 0);  // Leere Gruppen entfernen
+
+  console.log('[initFtGrouping] Finale Gruppen:', ftLineGroups.map(g => g.directions));
 
   // Pool aktualisieren (Richtungen die nicht in Gruppen sind)
   updatePoolDirections();
@@ -5349,6 +5435,7 @@ function parseRowOrderDestination(rowOrderStr) {
   if (!rowOrderStr) return;
 
   ftLineGroups = [];
+  const usedKeys = new Set();  // Verhindert Duplikate über alle Gruppen
 
   // Split by , für Einträge, dann by + für Gruppen-Mitglieder
   const entries = rowOrderStr.split(',').map(s => s.trim()).filter(s => s);
@@ -5360,8 +5447,9 @@ function parseRowOrderDestination(rowOrderStr) {
     parts.forEach(part => {
       // part ist "2:Universität" oder "2:R60500123"
       const key = mapToAvailableKey(part);
-      if (key) {
+      if (key && !usedKeys.has(key)) {
         directions.push(key);
+        usedKeys.add(key);
       }
     });
 
@@ -5369,9 +5457,11 @@ function parseRowOrderDestination(rowOrderStr) {
       ftLineGroups.push({ directions });
     }
   });
+
+  console.log('[parseRowOrderDestination] Gruppen ohne Duplikate:', ftLineGroups.map(g => g.directions));
 }
 
-// Mappt einen gespeicherten Key (z.B. "2:Universität") auf den verfügbaren Key in ftAllDirections
+// VEREINFACHT: Mappt einen gespeicherten Key (z.B. "2:Universität") auf verfügbare Keys
 function mapToAvailableKey(savedKey) {
   // Exakter Match
   let match = ftAllDirections.find(d => d.key === savedKey);
@@ -5382,22 +5472,21 @@ function mapToAvailableKey(savedKey) {
   if (colonIdx <= 0) return null;
 
   const line = savedKey.substring(0, colonIdx);
-  const rest = savedKey.substring(colonIdx + 1);
+  const dest = savedKey.substring(colonIdx + 1);
 
-  // Ist es ein richtungsId-Key? (z.B. "2:R60500123")
-  if (rest.startsWith('R')) {
-    const richtungsId = rest.substring(1);
-    match = ftAllDirections.find(d => d.line === line && d.richtungsId === richtungsId);
+  // Legacy-Support: Altes richtungsId-Format (z.B. "2:R60500123") -> Linie matchen
+  if (dest.startsWith('R') && /^\d+$/.test(dest.substring(1))) {
+    match = ftAllDirections.find(d => d.line === line);
     if (match) return match.key;
   }
 
-  // Ist es ein Zieltext-Key? (z.B. "2:Universität")
-  match = ftAllDirections.find(d => d.line === line && d.towards === rest);
+  // Zieltext-Key (z.B. "2:Universität")
+  match = ftAllDirections.find(d => d.line === line && d.towards === dest);
   if (match) return match.key;
 
   // Partial Match auf Zieltext
   match = ftAllDirections.find(d =>
-    d.line === line && (d.towards.includes(rest) || rest.includes(d.towards))
+    d.line === line && (d.towards.includes(dest) || dest.includes(d.towards))
   );
   if (match) return match.key;
 
@@ -5409,26 +5498,33 @@ function mapToAvailableKey(savedKey) {
 }
 
 // Aktualisiert ftPoolDirections basierend auf ftLineGroups
+// Pool = alle Richtungen die NICHT in Gruppen sind
 function updatePoolDirections() {
   const usedKeys = new Set();
   ftLineGroups.forEach(group => {
     (group.directions || []).forEach(key => usedKeys.add(key));
   });
 
+  // Eine Richtung ist im Pool wenn ihr Key NICHT in einer Gruppe ist
   ftPoolDirections = ftAllDirections.filter(d => !usedKeys.has(d.key));
+
+  console.log('[updatePoolDirections] usedKeys:', [...usedKeys]);
+  console.log('[updatePoolDirections] Pool:', ftPoolDirections.map(d => d.key));
 }
 
 async function loadFtDirectionsFromStations() {
   ftAllDirections = [];
 
+  console.log('[loadFtDirectionsFromStations] Stationen:', stations.length);
+
   // Richtungen aus den gespeicherten Stationen laden
   for (const station of stations) {
+    console.log(`[loadFtDirectionsFromStations] Station: ${station.stopName}, directions:`, station.directions);
     if (station.directions && Array.isArray(station.directions)) {
       station.directions.forEach(dir => {
         const lineName = dir.line || '';
         const towards = dir.towards || '';
         const type = dir.type || '';
-        const richtungsId = dir.richtungsId || '';
 
         if (!lineName) return;
 
@@ -5441,10 +5537,12 @@ async function loadFtDirectionsFromStations() {
           if (!isAllowed) return;
         }
 
-        const key = richtungsId ? `${lineName}:R${richtungsId}` : `${lineName}:${towards}`;
+        // VEREINFACHT: Key ist immer Linie:Ziel (keine richtungsId mehr)
+        const key = `${lineName}:${towards}`;
+        console.log(`[loadFtDirectionsFromStations] Key: ${key}`);
         if (!ftAllDirections.some(d => d.key === key)) {
           ftAllDirections.push({
-            key, line: lineName, towards, type, richtungsId,
+            key, line: lineName, towards, type,
             station: station.stopName, network: station.network
           });
         }
@@ -5452,10 +5550,14 @@ async function loadFtDirectionsFromStations() {
     }
   }
 
+  console.log('[loadFtDirectionsFromStations] ftAllDirections vor Filter:', ftAllDirections.map(d => d.key));
+
   // Richtungen ohne towards entfernen wenn es welche mit towards gibt
   const linesWithTowards = new Set();
   ftAllDirections.forEach(d => { if (d.towards) linesWithTowards.add(d.line); });
   ftAllDirections = ftAllDirections.filter(d => !(!d.towards && linesWithTowards.has(d.line)));
+
+  console.log('[loadFtDirectionsFromStations] ftAllDirections nach Filter:', ftAllDirections.map(d => d.key));
 
   // Nach Linie und dann nach Richtung sortieren
   ftAllDirections.sort((a, b) => {
@@ -5467,53 +5569,70 @@ async function loadFtDirectionsFromStations() {
   });
 }
 
+// VEREINFACHT: Format ist immer "Linie:Ziel+Linie:Ziel,..."
 function parseFtExistingGroups(lineGroupsStr) {
   if (!lineGroupsStr) return;
 
   ftLineGroups = [];
+  const usedKeys = new Set();  // Verhindert Duplikate über alle Gruppen
+  console.log('[parseFtExistingGroups] Eingabe:', lineGroupsStr);
 
-  // Format: "U1:Leopoldau+62:Meidling,1:xyz+2:abc" (alt) oder "12:R60500312+19:R60500097" (neu)
+  // Format: "1:Auwiesen+2:solarCity,1:Uni+2:Uni"
   const groups = lineGroupsStr.split(',');
-  groups.forEach((groupStr) => {
+
+  groups.forEach((groupStr, groupIdx) => {
     if (groupStr.includes('+')) {
       const rawDirections = groupStr.split('+').map(d => d.trim()).filter(d => d);
 
-      // Mappe alte Keys (12:Auwiesen) auf neue Keys (12:R60500312)
+      // Mappe auf verfügbare Keys in ftAllDirections
       const mappedDirections = rawDirections.map(rawKey => {
-        // Wenn der Key schon das neue Format hat (mit :R), behalte ihn
-        if (rawKey.includes(':R')) {
-          return rawKey;
-        }
-
-        // Altes Format: "12:Auwiesen" -> versuche passende richtungsId zu finden
+        // Parse Linie:Ziel
         const colonIdx = rawKey.indexOf(':');
         if (colonIdx > 0) {
           const line = rawKey.substring(0, colonIdx);
-          const dest = rawKey.substring(colonIdx + 1);
+          let dest = rawKey.substring(colonIdx + 1);
 
-          // Suche in ftAllDirections nach passender Linie+Richtung
-          const match = ftAllDirections.find(d =>
-            d.line === line && d.towards === dest
-          );
-
-          if (match) {
-            return match.key;  // Nutze den neuen Key mit richtungsId
+          // Falls altes Format mit :R (richtungsId), extrahiere nur die Linie
+          if (dest.startsWith('R') && /^\d+$/.test(dest.substring(1))) {
+            // Altes richtungsId-Format - suche nach Linie
+            const lineMatch = ftAllDirections.find(d => d.line === line);
+            if (lineMatch) {
+              console.log(`[parseFtExistingGroups] '${rawKey}' -> Linien-Migration: ${lineMatch.key}`);
+              return lineMatch.key;
+            }
           }
 
-          // Kein exakter Match - versuche nur nach Linie zu matchen
-          const lineMatch = ftAllDirections.find(d => d.line === line);
-          if (lineMatch && lineMatch.richtungsId) {
-            // Warnung: Nicht exakt, aber besser als nichts
-            return lineMatch.key;
+          // Suche exakten Match Linie:Ziel
+          const match = ftAllDirections.find(d => d.line === line && d.towards === dest);
+          if (match) {
+            console.log(`[parseFtExistingGroups] '${rawKey}' -> Match: ${match.key}`);
+            return match.key;
+          }
+
+          // Partial Match (Ziel enthält oder ist enthalten)
+          const partialMatch = ftAllDirections.find(d =>
+            d.line === line && (d.towards.includes(dest) || dest.includes(d.towards))
+          );
+          if (partialMatch) {
+            console.log(`[parseFtExistingGroups] '${rawKey}' -> Partial: ${partialMatch.key}`);
+            return partialMatch.key;
           }
         }
 
-        // Fallback: Behalte den alten Key
-        return rawKey;
-      });
+        // Direkter Key-Match
+        const directMatch = ftAllDirections.find(d => d.key === rawKey);
+        if (directMatch) return directMatch.key;
+
+        console.log(`[parseFtExistingGroups] '${rawKey}' -> NICHT gefunden`);
+        return null;
+      }).filter(k => k !== null && !usedKeys.has(k));  // Filter Duplikate
+
+      // Alle gemappten Keys als verwendet markieren
+      mappedDirections.forEach(k => usedKeys.add(k));
 
       if (mappedDirections.length >= 2) {
         ftLineGroups.push({ directions: mappedDirections });
+        console.log(`[parseFtExistingGroups] Gruppe ${groupIdx}:`, mappedDirections);
       }
     }
   });
@@ -5784,14 +5903,11 @@ function collectFtLineGroups() {
     return '';
   }
 
-  // Keys zu "Linie:RrichtungsId" Format (für ESP32 Matching)
+  // VEREINFACHT: Format ist immer "Linie:Ziel+Linie:Ziel,..."
   return validGroups.map(g => {
     return g.directions.map(key => {
-      const dirInfo = ftAllDirections.find(d => d.key === key);
-      if (dirInfo && dirInfo.richtungsId) {
-        return `${dirInfo.line}:R${dirInfo.richtungsId}`;
-      }
-      return key;  // Fallback: Key direkt verwenden
+      // Key ist bereits im Format "Linie:Ziel"
+      return key;
     }).join('+');
   }).join(',');
 }
@@ -5900,12 +6016,14 @@ function saveFromFinetuning() {
   const rowOrder = getRowOrderString();  // Einfach für Wien
   const rowOrderDestination = getRowOrderDestinationString();  // Mit Ziel für Linz
 
-  // Gehweg-Werte sammeln
+  // Gehweg-Werte sammeln (durch stationDetails iterieren für konsistente Indices)
   const gehweg = [];
-  stations.forEach((_, index) => {
-    const input = document.getElementById(`ftGehweg_${index}`);
-    gehweg.push(input ? parseInt(input.value) || 0 : 0);
-  });
+  if (recommendedConfig.stationDetails) {
+    recommendedConfig.stationDetails.forEach((_, index) => {
+      const input = document.getElementById(`ftGehweg_${index}`);
+      gehweg.push(input ? parseInt(input.value) || 0 : 0);
+    });
+  }
 
   // Linien-Gruppierung sammeln
   const lineGroupsStr = collectFtLineGroups();
@@ -6284,19 +6402,28 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
 
   // Parse linefilterdestination ODER roworderdestination (beide haben gleiches Format)
   // roworderdestination hat Priorität für Wien (enthält die Richtungen)
+  // Format kann sein: "1:Auwiesen,2:solarCity" oder mit Gruppen "1:Auwiesen+2:solarCity,3:xyz"
   const lineDestinations = [];
   const destSource = roworderdestination || linefilterdestination;
   if (destSource) {
-    destSource.split(',').forEach(entry => {
-      const colonIdx = entry.indexOf(':');
-      if (colonIdx > 0) {
-        lineDestinations.push({
-          line: entry.substring(0, colonIdx).trim(),
-          towards: entry.substring(colonIdx + 1).trim()
-        });
-      }
+    // Erst by , splitten, dann by + um Gruppen zu behandeln
+    destSource.split(',').forEach(groupOrEntry => {
+      // Jeder Eintrag kann "1:Auwiesen+2:solarCity" oder nur "1:Auwiesen" sein
+      const parts = groupOrEntry.split('+');
+      parts.forEach(entry => {
+        const colonIdx = entry.indexOf(':');
+        if (colonIdx > 0) {
+          const line = entry.substring(0, colonIdx).trim();
+          const towards = entry.substring(colonIdx + 1).trim();
+          // Duplikate vermeiden
+          if (!lineDestinations.some(ld => ld.line === line && ld.towards === towards)) {
+            lineDestinations.push({ line, towards });
+          }
+        }
+      });
     });
   }
+  console.log('[loadExistingConfig] lineDestinations:', lineDestinations);
 
   for (let idx = 0; idx < rblParts.length; idx++) {
     const part = rblParts[idx];
@@ -6359,7 +6486,6 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
               const lineName = line.name || '';
               const towards = line.towards || monitor.towards || '';
               const type = line.type || '';
-              const richtungsId = line.richtungsId || monitor.richtungsId || '';
 
               // Prüfen ob diese Linie+Richtung ausgewählt werden soll
               let shouldInclude = false;
@@ -6386,8 +6512,7 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
                   station.directions.push({
                     line: lineName,
                     towards: towards,
-                    type: type,
-                    richtungsId: richtungsId
+                    type: type
                   });
                 }
               }
@@ -6529,7 +6654,7 @@ async function handleConfigMessage(data) {
       recommendedConfig.showFunMessages = data.config.show_fun_messages;
     }
     // Gehweg aus Config übernehmen (Format: "stopId:value|stopId:value")
-    if (data.config.gehweg) {
+    if (data.config.gehweg && recommendedConfig.stationDetails) {
       const gehwegStr = data.config.gehweg;
       const gehwegMap = {};
 
@@ -6542,9 +6667,10 @@ async function handleConfigMessage(data) {
         }
       });
 
-      // Erstelle Array in der Reihenfolge der Stationen
-      recommendedConfig.gehweg = stations.map(station => {
-        const stopId = station.stopId || '';
+      // Erstelle Array in der Reihenfolge der stationDetails (unique stations)
+      // WICHTIG: Muss mit stationDetails konsistent sein, nicht stations!
+      recommendedConfig.gehweg = recommendedConfig.stationDetails.map(station => {
+        const stopId = station.id || '';
         return gehwegMap[stopId] || 0;
       });
     }
@@ -6758,17 +6884,35 @@ function showProductsInline() {
 function renderProductCategories() {
   const netConfig = NETWORKS[selectedNetwork];
   const categories = netConfig.productCategories || {};
-  
-  // Domestic
-  const domesticContainer = document.getElementById('domesticProducts');
-  const domesticProducts = categories.domestic?.products || [];
-  domesticContainer.innerHTML = domesticProducts.map(p => renderProductOption(p)).join('');
-  
-  // International
-  const intlContainer = document.getElementById('internationalProducts');
-  const intlProducts = categories.international?.products || [];
-  intlContainer.innerHTML = intlProducts.map(p => renderProductOption(p)).join('');
-  
+  const container = document.getElementById('productCategoriesContainer');
+
+  if (!container) return;
+
+  // Alle Kategorien dynamisch rendern
+  let html = '';
+  Object.entries(categories).forEach(([catId, catData]) => {
+    const products = catData.products || [];
+    if (products.length === 0) return;
+
+    // Collapsed-Status aus Config oder default offen
+    const isCollapsed = catData.collapsed === true;
+    const toggleIcon = isCollapsed ? '▶' : '▼';
+    const collapsedClass = isCollapsed ? 'collapsed' : '';
+
+    html += `
+      <div class="product-category">
+        <div class="category-header" onclick="toggleCategory('${catId}')">
+          <span>${catData.label}</span>
+          <span class="category-toggle" id="${catId}Toggle">${toggleIcon}</span>
+        </div>
+        <div class="category-content ${collapsedClass}" id="${catId}Products">
+          ${products.map(p => renderProductOption(p)).join('')}
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
   updateAddJourneyButton();
 }
 
