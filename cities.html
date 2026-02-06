@@ -2291,6 +2291,15 @@
             <button class="toggle-btn" data-value="2" onclick="setFtSortMode(2)">Statisch</button>
           </div>
         </div>
+        <!-- Info-Box für Sortierungsmodi -->
+        <div id="ftSortModeInfo" style="margin-top:12px; padding:12px; background:#f5f5f5; border-radius:8px; font-size:13px; color:#555;">
+          <div id="ftSortModeInfoTime" style="display:block;">
+            <strong>Zeit:</strong> Die nächsten Abfahrten werden immer oben angezeigt - egal welche Linie. Ideal wenn du einfach den nächsten Zug/Bus nehmen willst.
+          </div>
+          <div id="ftSortModeInfoStatic" style="display:none;">
+            <strong>Statisch:</strong> Jede Linie hat eine feste Zeile auf dem Display. Du kannst unten die Reihenfolge festlegen. Ideal wenn du immer dieselbe Linie im Blick haben willst.
+          </div>
+        </div>
       </div>
 
       <!-- Zeilen-Reihenfolge (nur bei Statisch sichtbar) -->
@@ -4857,6 +4866,14 @@ function setFtSortMode(value) {
   document.querySelectorAll('#ftSortModeToggle .toggle-btn').forEach(btn => {
     btn.classList.toggle('active', parseInt(btn.dataset.value) === value);
   });
+
+  // Info-Box umschalten
+  const infoTime = document.getElementById('ftSortModeInfoTime');
+  const infoStatic = document.getElementById('ftSortModeInfoStatic');
+  if (infoTime && infoStatic) {
+    infoTime.style.display = (value === 1) ? 'block' : 'none';
+    infoStatic.style.display = (value === 2) ? 'block' : 'none';
+  }
 
   // Zeilen-Reihenfolge Sektion ein-/ausblenden
   const rowOrderSection = document.getElementById('ftRowOrderSection');
