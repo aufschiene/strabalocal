@@ -104,7 +104,8 @@
     .network-badge.bodo { background: #005BBB; color: #fff; }
     .network-badge.salzburg { background: #E3000F; color: #fff; }
     .network-badge.sbg { background: #E3000F; color: #fff; }
-    
+    .network-badge.paris { background: #003B80; color: #fff; }
+
     /* Region badges */
     .region-badge {
       display: inline-block;
@@ -120,6 +121,7 @@
     .region-badge.de { background: linear-gradient(180deg, #000 33%, #D00 33%, #D00 66%, #FC0 66%); }
     .region-badge.ch { background: #D52B1E; color: #fff; }
     .region-badge.dk { background: #C8102E; color: #fff; }
+    .region-badge.fr { background: linear-gradient(90deg, #002395 33%, #fff 33%, #fff 66%, #ED2939 66%); }
     
     .selection-btn.disabled {
       opacity: 0.4;
@@ -394,6 +396,7 @@
     .station-chip .network-badge.bodo { background: #005BBB; color: #fff; }
     .station-chip .network-badge.salzburg { background: #E3000F; color: #fff; }
     .station-chip .network-badge.sbg { background: #E3000F; color: #fff; }
+    .station-chip .network-badge.paris { background: #003B80; color: #fff; }
     .station-chip .info { flex: 1; min-width: 0; }
     .station-chip .stop-name {
       font-weight: 600;
@@ -1957,6 +1960,11 @@
         <div class="name">Deutschland</div>
         <div class="desc">DB, Berlin, Bodensee</div>
       </button>
+      <button class="selection-btn" onclick="selectRegion('FR')">
+        <div class="region-badge fr"></div>
+        <div class="name">Frankreich</div>
+        <div class="desc">Paris (RATP)</div>
+      </button>
       <button class="selection-btn disabled" onclick="selectRegion('CH')">
         <div class="region-badge ch">CH</div>
         <div class="name">Schweiz</div>
@@ -2180,6 +2188,8 @@
           <option value="5">DB S-Bahn</option>
           <option value="6">DB Fernverkehr</option>
           <option value="7">BODO Bodensee</option>
+          <option value="8">Salzburg AG</option>
+          <option value="9">RATP Paris</option>
         </select>
       </div>
 
@@ -2258,6 +2268,7 @@
           <option value="6">DB Fernverkehr</option>
           <option value="7">BODO Bodensee</option>
           <option value="8">Salzburg AG</option>
+          <option value="9">RATP Paris</option>
         </select>
       </div>
       <div class="form-row">
@@ -2462,6 +2473,10 @@ const REGIONS = {
     name: 'Schweiz',
     networks: []
   },
+  FR: {
+    name: 'Frankreich',
+    networks: ['PARIS']
+  },
   DK: {
     name: 'Dänemark',
     networks: []
@@ -2532,6 +2547,15 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 8,             // Salzburg AG
+    defaultBrightness: 3
+  },
+  PARIS: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 9,             // RATP Paris
     defaultBrightness: 3
   }
 };
@@ -2747,6 +2771,15 @@ const NETWORKS = {
       { id: 'mauterndorf', name: 'Mauterndorf', info: 'Bus' },
       { id: 'st-michael-im-lungau', name: 'St. Michael im Lungau', info: 'Bus' }
     ]
+  },
+  PARIS: {
+    name: 'RATP Paris',
+    shortName: 'RATP',
+    region: 'FR',
+    desc: 'Métro, RER, Tram, Bus',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Châtelet, Gare du Nord...',
+    isJourneyBased: false
   }
 };
 
@@ -4227,7 +4260,8 @@ const NETWORK_COLORS = {
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
   BERLIN: { id: 3, name: 'VBB Berlin', color: '#F0AB00' },
   BODO: { id: 7, name: 'BODO Bodensee', color: '#005BBB' },
-  SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' }
+  SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
+  PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' }
 };
 
 let suggestedColor = 1;
@@ -4619,6 +4653,12 @@ function updateRealisticPreview(config) {
       text: '#ffffff',
       highlight: '#E3000F',
       name: 'Salzburg AG'
+    },
+    9: { // RATP Paris
+      bg: '#000000',
+      text: '#ffcd00',
+      highlight: '#003B80',
+      name: 'RATP Paris'
     }
   };
 
@@ -4658,7 +4698,8 @@ function updateRealisticPreview(config) {
       5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'S7', dest: 'Ahrensfelde', time: 5 }],
       6: [{ line: 'ICE', dest: 'Berlin Hbf', time: 12 }, { line: 'RJ', dest: 'Wien Hbf', time: 28 }],
       7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }],
-      8: [{ line: '1', dest: 'Hellbrunn', time: 3 }, { line: 'S3', dest: 'Salzburg Hbf', time: 7 }, { line: '22', dest: 'Aigen', time: 11 }]
+      8: [{ line: '1', dest: 'Hellbrunn', time: 3 }, { line: 'S3', dest: 'Salzburg Hbf', time: 7 }, { line: '22', dest: 'Aigen', time: 11 }],
+      9: [{ line: '1', dest: 'La Defense', time: 2 }, { line: '4', dest: 'Porte de Clignan.', time: 4 }, { line: '14', dest: 'Saint-Denis', time: 6 }]
     };
     sampleData = (fallbackData[colour] || fallbackData[1]).slice(0, rows);
   }
@@ -4696,6 +4737,31 @@ function updateRealisticPreview(config) {
             </div>
           `;
         }).join('')}
+      </div>
+    `;
+  } else if (colour === 9) {
+    // Paris RATP Style
+    previewEl.style.background = '#000';
+    previewEl.style.backgroundImage = 'none';
+
+    const dep = sampleData[0] || { line: '1', dest: 'La Defense', time: 2 };
+    const dep2 = sampleData[1] || { line: '1', dest: 'La Defense', time: 5 };
+    previewEl.innerHTML = `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+        <div style="background:#003270;padding:4px 6px;display:flex;align-items:center;gap:6px;">
+          <div style="width:20px;height:20px;border-radius:50%;background:#ffcd00;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:11px;color:#000;">${dep.line}</div>
+          <span style="color:#fff;font-size:9px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
+        </div>
+        <div style="flex:1;display:flex;">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid #333;">
+            <span style="color:#a0aac8;font-size:7px;">1er metro</span>
+            <span style="color:#ffcd00;font-size:18px;font-weight:bold;">${dep.time}</span>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <span style="color:#a0aac8;font-size:7px;">2e metro</span>
+            <span style="color:#ffcd00;font-size:18px;font-weight:bold;">${dep2.time}</span>
+          </div>
+        </div>
       </div>
     `;
   } else {
@@ -4777,6 +4843,8 @@ function updateQuickPreview() {
   else if (colour === 5 || colour === 6) networkForCapabilities = 'DB';
   else if (colour === 3) networkForCapabilities = 'BERLIN';
   else if (colour === 7) networkForCapabilities = 'BODO';
+  else if (colour === 8) networkForCapabilities = 'SALZBURG';
+  else if (colour === 9) networkForCapabilities = 'PARIS';
 
   const caps = CITY_CAPABILITIES[networkForCapabilities] || CITY_CAPABILITIES.WL;
 
@@ -5327,7 +5395,8 @@ function updateFinetuningPreview() {
       5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'REX', dest: 'Linz Hbf', time: 5 }, { line: 'RE', dest: 'München', time: 9 }],
       6: [{ line: 'RJX', dest: 'Wien Hbf', time: 8 }, { line: 'ICE', dest: 'Berlin Hbf', time: 15 }, { line: 'NJ', dest: 'Hamburg', time: 32 }],
       7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
-      8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }]
+      8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }],
+      9: [{ line: '1', dest: 'La Defense', time: 2, timeStr: '14:22' }, { line: '4', dest: 'Porte de Clignancourt', time: 4, timeStr: '14:24' }, { line: '14', dest: 'Saint-Denis Pleyel', time: 6, timeStr: '14:26' }]
     };
     data = fallbackData[colour] || fallbackData[1];
   }
@@ -5449,6 +5518,30 @@ function updateFinetuningPreview() {
           <span style="font-weight:bold;font-size:14px;">${timeDisplay}</span>
         </div>`;
       }).join('')}
+    </div>`;
+  }
+  else if (colour === 9) {
+    // Paris RATP Style: Dunkelblauer Header mit Linie + Ziel, darunter 2 große Countdowns
+    previewEl.style.background = '#000';
+    previewEl.style.backgroundImage = 'none';
+
+    const dep = data[0] || { line: '1', dest: 'La Defense', time: 2 };
+    const dep2 = data[1] || { line: '1', dest: 'La Defense', time: 5 };
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+      <div style="background:#003270;padding:6px 10px;display:flex;align-items:center;gap:8px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:#ffcd00;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:16px;color:#000;">${dep.line}</div>
+        <span style="color:#fff;font-size:13px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
+      </div>
+      <div style="flex:1;display:flex;">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid #333;">
+          <span style="color:#a0aac8;font-size:10px;">1er metro</span>
+          <span style="color:#ffcd00;font-size:28px;font-weight:bold;">${dep.time}</span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+          <span style="color:#a0aac8;font-size:10px;">2e metro</span>
+          <span style="color:#ffcd00;font-size:28px;font-weight:bold;">${dep2.time}</span>
+        </div>
+      </div>
     </div>`;
   }
 
