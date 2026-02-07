@@ -6028,20 +6028,21 @@ function updateRowOrderAfterGroupChange() {
 
 
 function collectFtLineGroups() {
-  // linegroups Format: "2:R60500312+1:R60500920,19:R60500097+12:R60500123"
-  // Nur echte Gruppen (≥2 Richtungen) für ESP32 linegroups
+  // linegroups Format: "1:Universität+2:Universität,41:Hessenplatz,43:Stadtfriedhof"
+  // ALLE Gruppen (auch 1er-Gruppen) - jede Zeile ist eine Gruppe!
+  // Das sagt der Straba welche Richtungen angezeigt werden sollen
   if (ftLineGroups.length === 0) {
     return '';
   }
 
-  // Nur Gruppen mit mindestens 2 Richtungen
-  const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 2);
+  // ALLE Gruppen mit mindestens 1 Richtung (auch Einzellinien!)
+  const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 1);
 
   if (validGroups.length === 0) {
     return '';
   }
 
-  // VEREINFACHT: Format ist immer "Linie:Ziel+Linie:Ziel,..."
+  // Format: "Linie:Ziel+Linie:Ziel,Linie:Ziel,..." (+ für Gruppen, , für Trennung)
   return validGroups.map(g => {
     return g.directions.map(key => {
       // Key ist bereits im Format "Linie:Ziel"
