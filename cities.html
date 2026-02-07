@@ -2286,6 +2286,17 @@
     <!-- Wien-spezifische Optionen -->
     <div class="config-card" id="ftWienOptions" style="display:none;">
       <h3>Wien-Optionen <span class="wien-only-badge">WL</span></h3>
+      <div class="form-row" id="ftRowTextColor">
+        <div>
+          <div class="form-label">Schriftfarbe</div>
+          <div class="form-hint">Textfarbe für Wien-Display</div>
+        </div>
+        <div class="toggle-row" id="ftTextColorToggle">
+          <button class="toggle-btn active" data-value="1" onclick="setFtTextColor(1)" style="background:#FFD700;color:#000">Gelb</button>
+          <button class="toggle-btn" data-value="2" onclick="setFtTextColor(2)" style="background:#FFF;color:#000">Weiß</button>
+          <button class="toggle-btn" data-value="3" onclick="setFtTextColor(3)" style="background:#FF8C00;color:#000">Orange</button>
+        </div>
+      </div>
       <div class="form-row" id="ftRowChopper">
         <div>
           <div class="form-label">Hochflurer markieren</div>
@@ -2753,6 +2764,7 @@ let selectedLines = new Set();
 let stations = [];
 let editingStationIndex = null;  // Index der Station die bearbeitet wird (null = neue Station)
 let hasExistingConfig = false;   // True wenn Config vom Gerät geladen wurde
+let directionsChanged = false;   // True wenn Richtungen geändert wurden (Gruppen/Reihenfolge neu berechnen)
 let wienData = null;
 let searchTimeout = null;
 
@@ -3964,6 +3976,9 @@ function resetFinetuningData() {
   ftGroupingMode = false;
   ftSelectedForGroup = [];
 
+  // Flag setzen: Richtungen wurden geändert -> Gruppen/Reihenfolge müssen neu berechnet werden
+  directionsChanged = true;
+
   // recommendedConfig KOMPLETT zurücksetzen (wird beim Öffnen neu berechnet)
   if (recommendedConfig) {
     recommendedConfig.lineGroups = '';
@@ -3973,7 +3988,7 @@ function resetFinetuningData() {
     recommendedConfig.lineFilterDestination = '';
   }
 
-  console.log('[resetFinetuningData] Alle Feintuning-Daten zurückgesetzt');
+  console.log('[resetFinetuningData] Alle Feintuning-Daten zurückgesetzt, directionsChanged=true');
 }
 
 function updateStationsList() {
@@ -4419,11 +4434,19 @@ function goToDisplayConfig() {
 
   // Übernehme vorherige Einstellungen (wenn vom Gerät geladen)
   if (previousSettings) {
-    if (previousSettings.lineGroups) recommendedConfig.lineGroups = previousSettings.lineGroups;
+    // WICHTIG: Gruppen/Reihenfolge NUR wiederherstellen wenn Richtungen NICHT geändert wurden!
+    // Wenn directionsChanged=true, müssen diese neu berechnet werden
+    if (!directionsChanged) {
+      if (previousSettings.lineGroups) recommendedConfig.lineGroups = previousSettings.lineGroups;
+      if (previousSettings.rowOrder) recommendedConfig.rowOrder = previousSettings.rowOrder;
+      if (previousSettings.rowOrderDestination) recommendedConfig.rowOrderDestination = previousSettings.rowOrderDestination;
+      if (previousSettings.lineFilterDestination) recommendedConfig.lineFilterDestination = previousSettings.lineFilterDestination;
+    } else {
+      console.log('[goToDisplayConfig] directionsChanged=true -> Gruppen/Reihenfolge werden neu berechnet');
+    }
+
+    // Diese Einstellungen immer übernehmen (sind unabhängig von Richtungen)
     if (previousSettings.sortMode !== undefined) recommendedConfig.sortMode = previousSettings.sortMode;
-    if (previousSettings.rowOrder) recommendedConfig.rowOrder = previousSettings.rowOrder;
-    if (previousSettings.rowOrderDestination) recommendedConfig.rowOrderDestination = previousSettings.rowOrderDestination;
-    if (previousSettings.lineFilterDestination) recommendedConfig.lineFilterDestination = previousSettings.lineFilterDestination;
     if (previousSettings.gehweg) recommendedConfig.gehweg = previousSettings.gehweg;
     if (previousSettings.rows) recommendedConfig.rows = previousSettings.rows;
     if (previousSettings.colour !== undefined) recommendedConfig.colour = previousSettings.colour;
@@ -4435,6 +4458,9 @@ function goToDisplayConfig() {
     if (previousSettings.nightEnd !== undefined) recommendedConfig.nightEnd = previousSettings.nightEnd;
     if (previousSettings.showFunMessages !== undefined) recommendedConfig.showFunMessages = previousSettings.showFunMessages;
   }
+
+  // Flag zurücksetzen
+  directionsChanged = false;
 
   suggestedColor = recommendedConfig.colour;
   suggestedRows = recommendedConfig.rows;
@@ -4894,10 +4920,11 @@ async function initFinetuningStep() {
   // Wien-spezifische Optionen
   const caps = config.capabilities || {};
   const wienOptions = document.getElementById('ftWienOptions');
-  if (caps.showHighFloor || caps.showAirCondition) {
+  if (caps.showHighFloor || caps.showAirCondition || caps.textColorChangeable) {
     wienOptions.style.display = 'block';
     setFtToggle('ftChopperToggle', config.chopper === 1);
     setFtToggle('ftSilberpfeilToggle', config.silberpfeil === 1);
+    setFtTextColor(config.textColor || 1);  // Default: Gelb (1)
   } else {
     wienOptions.style.display = 'none';
   }
@@ -4999,6 +5026,19 @@ function setFtBrightness(value) {
 function getFtBrightness() {
   const active = document.querySelector('#ftBrightnessToggle .toggle-btn.active');
   return active ? parseInt(active.dataset.value) : 3;
+}
+
+// Toggle-Buttons für Wien-Textfarbe
+function setFtTextColor(value) {
+  document.querySelectorAll('#ftTextColorToggle .toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.value) === value);
+  });
+  updateFinetuningPreview();
+}
+
+function getFtTextColor() {
+  const active = document.querySelector('#ftTextColorToggle .toggle-btn.active');
+  return active ? parseInt(active.dataset.value) : 1;  // Default: Gelb
 }
 
 // ==================== SORTIERUNG & ZEILEN-REIHENFOLGE ====================
@@ -6145,6 +6185,7 @@ function saveFromFinetuning() {
   const colour = parseInt(document.getElementById('ftColorSelect').value);
   const rows = getFtRows();
   const displayLight = getFtBrightness();
+  const textColor = getFtTextColor();  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
   const chopper = isFtToggleActive('ftChopperToggle') ? 1 : 0;
   const silberpfeil = isFtToggleActive('ftSilberpfeilToggle') ? 1 : 0;
   const nightMode = isFtToggleActive('ftNightModeToggle');
@@ -6174,6 +6215,7 @@ function saveFromFinetuning() {
   recommendedConfig.colour = colour;
   recommendedConfig.rows = rows;
   recommendedConfig.displayLight = displayLight;
+  recommendedConfig.textColor = textColor;  // Wien Schriftfarbe
   recommendedConfig.chopper = chopper;
   recommendedConfig.silberpfeil = silberpfeil;
   recommendedConfig.nightMode = nightMode;
@@ -6219,6 +6261,7 @@ function sendConfigToDeviceDirect(config) {
   }
 
   // Config-Daten für ESP32
+  console.log('[sendConfigToDeviceDirect] config.rows:', config.rows);
   const configData = {
     type: 'setRBL',
     rbl: config.rbl,
@@ -6229,6 +6272,7 @@ function sendConfigToDeviceDirect(config) {
     silberpfeil: String(config.silberpfeil),
     colour: String(config.colour),
     displaylight: String(config.displayLight),
+    textcolor: String(config.textColor || 1),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
     nightmode: config.nightMode ? '1' : '0',
     nightstart: String(config.nightStart),
     nightend: String(config.nightEnd),
@@ -6304,6 +6348,7 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('silberpfeil', configData.silberpfeil);
     formData.append('colour', configData.colour);
     formData.append('displaylight', configData.displaylight);
+    formData.append('textcolor', configData.textcolor);  // Wien Schriftfarbe
     formData.append('nightmode', configData.nightmode);
     formData.append('nightstart', configData.nightstart);
     formData.append('nightend', configData.nightend);
@@ -6779,6 +6824,10 @@ async function handleConfigMessage(data) {
     }
     if (data.config.silberpfeil !== undefined) {
       recommendedConfig.silberpfeil = parseInt(data.config.silberpfeil) || 0;
+    }
+    // Wien Schriftfarbe
+    if (data.config.text_color !== undefined) {
+      recommendedConfig.textColor = parseInt(data.config.text_color) || 1;
     }
     if (data.config.night_mode_enabled !== undefined) {
       recommendedConfig.nightMode = data.config.night_mode_enabled;
