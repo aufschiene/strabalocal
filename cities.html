@@ -1226,8 +1226,17 @@
       background: #f5f5f5;
       z-index: 1000;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;  /* Smooth scrolling auf iOS */
       padding: 20px;
       padding-bottom: 100px;
+      touch-action: pan-y;  /* Erlaubt vertikales Scrollen überall */
+    }
+    /* Alle Buttons/Chips im Feintuning erlauben Scrollen durchzureichen */
+    .finetuning-step button,
+    .finetuning-step .config-card,
+    .finetuning-step .pool-items,
+    .finetuning-step .group-directions {
+      touch-action: pan-y;
     }
     .finetuning-step .ft-container {
       max-width: 500px;
@@ -1437,6 +1446,7 @@
       font-size: 13px;
       transition: all 0.15s;
       user-select: none;
+      touch-action: manipulation;  /* Verhindert Touch-Delay, erlaubt aber Scrollen */
     }
     .ft-direction-chip.clickable {
       cursor: pointer;
@@ -1827,6 +1837,34 @@
       font-size: 14px;
       color: #333;
       white-space: nowrap;
+    }
+    .ft-row-order-item .move-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-left: auto;
+    }
+    .ft-row-order-item .move-btn {
+      background: #e0e0e0;
+      border: none;
+      border-radius: 4px;
+      width: 28px;
+      height: 20px;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+      touch-action: manipulation;
+    }
+    .ft-row-order-item .move-btn:hover:not(:disabled) {
+      background: #0055a4;
+      color: #fff;
+    }
+    .ft-row-order-item .move-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -3873,6 +3911,9 @@ function addStation() {
     existingStation.filter = filter;
     existingStation.directions = selectedDirections;
     editingStationIndex = null;  // Reset
+
+    // WICHTIG: Feintuning-Daten zurücksetzen wenn Richtungen geändert werden
+    resetFinetuningData();
   } else {
     // Neu-Modus: Duplikat prüfen
     if (stations.some(s => s.fullId === fullId)) {
@@ -3917,10 +3958,13 @@ function resetFinetuningData() {
   ftGroupingMode = false;
   ftSelectedForGroup = [];
 
-  // recommendedConfig zurücksetzen (wird beim Öffnen neu berechnet)
+  // recommendedConfig KOMPLETT zurücksetzen (wird beim Öffnen neu berechnet)
   if (recommendedConfig) {
     recommendedConfig.lineGroups = '';
+    recommendedConfig.rowOrder = '';
     recommendedConfig.rowOrderDestination = '';
+    recommendedConfig.lineFilter = '';
+    recommendedConfig.lineFilterDestination = '';
   }
 
   console.log('[resetFinetuningData] Alle Feintuning-Daten zurückgesetzt');
@@ -3945,7 +3989,17 @@ function updateStationsList() {
     const group = groupedStations.get(key);
     group.indices.push(idx);
     if (s.filter) group.filters.push(s.filter);
-    if (s.directions) group.directions.push(...s.directions);
+    // Directions hinzufügen, aber Duplikate vermeiden
+    if (s.directions) {
+      s.directions.forEach(d => {
+        const exists = group.directions.some(existing =>
+          existing.line === d.line && existing.towards === d.towards
+        );
+        if (!exists) {
+          group.directions.push(d);
+        }
+      });
+    }
   });
 
   // Anzahl der einzigartigen Stationen anzeigen
@@ -5011,6 +5065,8 @@ function renderRowOrderList() {
     const destText = firstDirInfo ? (firstDirInfo.towards || 'Alle Richtungen') : '';
 
     const cssClass = isMulti ? 'ft-row-order-item ft-row-order-group' : 'ft-row-order-item';
+    const isFirst = idx === 0;
+    const isLast = idx === ftLineGroups.length - 1;
 
     return `
       <div class="${cssClass}" draggable="true" data-index="${idx}">
@@ -5018,6 +5074,10 @@ function renderRowOrderList() {
         <span class="row-number">${idx + 1}</span>
         <span class="group-badges">${badgesHtml}</span>
         <span class="direction-text">${destText}</span>
+        <span class="move-buttons">
+          <button class="move-btn move-up" onclick="moveRowOrder(${idx}, -1)" ${isFirst ? 'disabled' : ''}>▲</button>
+          <button class="move-btn move-down" onclick="moveRowOrder(${idx}, 1)" ${isLast ? 'disabled' : ''}>▼</button>
+        </span>
       </div>
     `;
   }).join('');
@@ -5088,9 +5148,60 @@ function handleDrop(e) {
   this.classList.remove('drag-over');
 }
 
+// Mobile-freundliche Alternative zu Drag & Drop
+function moveRowOrder(index, direction) {
+  const newIndex = index + direction;
+
+  // Prüfe Grenzen
+  if (newIndex < 0 || newIndex >= ftLineGroups.length) return;
+
+  // Tausche Elemente
+  const temp = ftLineGroups[index];
+  ftLineGroups[index] = ftLineGroups[newIndex];
+  ftLineGroups[newIndex] = temp;
+
+  // Liste neu rendern
+  renderRowOrderList();
+}
+
 function getRowOrderString() {
   // NEUES KONZEPT: ftLineGroups ist die Reihenfolge
-  // Einfaches Format für Wien: "U6,2,43" - nur Linien
+  // Prüfe ob Wien-Modus (WL Netzwerk)
+  const isWien = stations.some(s => s.network === 'WL');
+
+  if (isWien) {
+    // WIEN: Format "stopId:Linie,stopId:Linie" (z.B. "4430:13A,381:U6")
+    // Bei Wien ist jede stopId = ein Bahnsteig für eine Linie
+    const items = [];
+    ftLineGroups.forEach(group => {
+      if (group.directions && group.directions.length > 0) {
+        group.directions.forEach(key => {
+          const dirInfo = ftAllDirections.find(d => d.key === key);
+          if (dirInfo) {
+            // Finde die stopId für diese Linie aus den Stationen
+            stations.forEach(station => {
+              if (station.network === 'WL' && station.directions) {
+                station.directions.forEach(dir => {
+                  if (dir.line === dirInfo.line) {
+                    // Wien: stopId kann mehrere sein (kommagetrennt), nimm die erste
+                    const stopIdParts = station.stopId.split(',');
+                    const stopId = stopIdParts[0];
+                    const item = `${stopId}:${dirInfo.line}`;
+                    if (!items.includes(item)) {
+                      items.push(item);
+                    }
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+    return items.join(',');
+  }
+
+  // STANDARD (Linz, etc.): Einfaches Format "1,2,43" - nur Linien
   const lines = [];
   ftLineGroups.forEach(group => {
     if (group.directions && group.directions.length > 0) {
@@ -5498,18 +5609,32 @@ function mapToAvailableKey(savedKey) {
 }
 
 // Aktualisiert ftPoolDirections basierend auf ftLineGroups
-// Pool = alle Richtungen die NICHT in Gruppen sind
+// Pool = alle Richtungen die in 1er-Gruppen sind (können zu neuen Gruppen kombiniert werden)
+// Richtungen in 2er+ Gruppen sind NICHT im Pool (bereits gruppiert)
 function updatePoolDirections() {
-  const usedKeys = new Set();
+  // Keys die in echten Gruppen (2+ Richtungen) sind
+  const groupedKeys = new Set();
+  // Keys die in 1er-Gruppen sind (verfügbar für neue Gruppierung)
+  const singleKeys = new Set();
+
   ftLineGroups.forEach(group => {
-    (group.directions || []).forEach(key => usedKeys.add(key));
+    const dirs = group.directions || [];
+    if (dirs.length >= 2) {
+      // Echte Gruppe - diese Keys sind nicht mehr verfügbar
+      dirs.forEach(key => groupedKeys.add(key));
+    } else if (dirs.length === 1) {
+      // 1er-Gruppe - diese Keys sind verfügbar für neue Gruppierung
+      singleKeys.add(dirs[0]);
+    }
   });
 
-  // Eine Richtung ist im Pool wenn ihr Key NICHT in einer Gruppe ist
-  ftPoolDirections = ftAllDirections.filter(d => !usedKeys.has(d.key));
+  // Pool = alle Richtungen die NICHT in echten Gruppen (2+) sind
+  // Das inkludiert: 1er-Gruppen UND Richtungen die noch gar nicht in ftLineGroups sind
+  ftPoolDirections = ftAllDirections.filter(d => !groupedKeys.has(d.key));
 
-  console.log('[updatePoolDirections] usedKeys:', [...usedKeys]);
-  console.log('[updatePoolDirections] Pool:', ftPoolDirections.map(d => d.key));
+  console.log('[updatePoolDirections] In echten Gruppen (2+):', [...groupedKeys]);
+  console.log('[updatePoolDirections] In 1er-Gruppen:', [...singleKeys]);
+  console.log('[updatePoolDirections] Pool (verfügbar):', ftPoolDirections.map(d => d.key));
 }
 
 async function loadFtDirectionsFromStations() {
