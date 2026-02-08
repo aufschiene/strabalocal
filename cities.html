@@ -105,6 +105,10 @@
     .network-badge.salzburg { background: #E3000F; color: #fff; }
     .network-badge.sbg { background: #E3000F; color: #fff; }
     .network-badge.paris { background: #003B80; color: #fff; }
+    .network-badge.oebb { background: #E2001A; color: #fff; }
+    .network-badge.oebb_sbahn { background: #0055A4; color: #fff; }
+    .network-badge.oebb_reg_noe { background: #0055A4; color: #fff; }
+    .network-badge.oebb_reg_ooe { background: #0055A4; color: #fff; }
 
     /* Region badges */
     .region-badge {
@@ -122,7 +126,28 @@
     .region-badge.ch { background: #D52B1E; color: #fff; }
     .region-badge.dk { background: #C8102E; color: #fff; }
     .region-badge.fr { background: linear-gradient(90deg, #002395 33%, #fff 33%, #fff 66%, #ED2939 66%); }
-    
+
+    /* Bundesland-Wappen (stilisierte Schild-Form) */
+    .wappen-badge {
+      width: 36px;
+      height: 42px;
+      margin: 0 auto 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      border-radius: 4px 4px 4px 4px;
+      clip-path: polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%);
+      border: none;
+    }
+    .wappen-badge.wien { background: linear-gradient(180deg, #ED2939 50%, #fff 50%); color: #ED2939; }
+    .wappen-badge.noe { background: linear-gradient(180deg, #003DA5 50%, #FFD700 50%); color: #FFD700; }
+    .wappen-badge.ooe { background: linear-gradient(180deg, #fff 50%, #ED2939 50%); color: #333; }
+    .wappen-badge.sbg { background: linear-gradient(180deg, #ED2939 50%, #fff 50%); color: #fff; }
+    .wappen-badge.oebb { background: #E2001A; color: #fff; }
+
     .selection-btn.disabled {
       opacity: 0.4;
       cursor: not-allowed;
@@ -268,7 +293,7 @@
     }
     /* S-Bahn - Grün */
     .line-badge.type-suburban {
-      background: #006e34;
+      background: #0055A4;
       color: #fff;
     }
     /* O-Bus / Trolleybus - Orange */
@@ -346,10 +371,165 @@
       color: #555;
     }
     .direction-option .direction-text::before {
-      content: '→ ';
+      content: '';
+    }
+    .via-active {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      background: #0055a4;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .stopovers-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 14px 10px 48px;
+      background: #f0f5fa;
+    }
+    .stopovers-label {
+      font-size: 11px;
+      color: #888;
+      font-weight: 600;
+    }
+    .stopover-chip {
+      display: inline-block;
+      padding: 3px 10px;
+      background: #e0e8f0;
+      color: #444;
+      border-radius: 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .stopover-chip:hover {
+      background: #c8d8e8;
+    }
+    .stopover-chip.active {
+      background: #0055a4;
+      color: #fff;
+    }
+
+    /* === OEBB VON-NACH MODUS === */
+    .oebb-from-label {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+    .oebb-dest-section {
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .oebb-dest-label {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 6px;
+    }
+    .oebb-dest-input-wrap {
+      position: relative;
+    }
+    .oebb-dest-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.15s;
+      box-sizing: border-box;
+    }
+    .oebb-dest-input:focus {
+      border-color: #0055a4;
+    }
+    .oebb-dest-clear {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #999;
+      font-size: 16px;
+      padding: 4px;
+    }
+    .oebb-dest-results {
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      margin-top: 4px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .oebb-dest-results:empty {
+      display: none;
+    }
+    .oebb-dest-item {
+      padding: 12px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.1s;
+    }
+    .oebb-dest-item:last-child {
+      border-bottom: none;
+    }
+    .oebb-dest-item:hover {
+      background: #f0f5fa;
+    }
+    .oebb-dest-item-name {
+      font-size: 15px;
+      color: #333;
+    }
+    .oebb-dest-no-result {
+      padding: 12px 14px;
+      color: #999;
+      font-size: 13px;
+    }
+    .oebb-dest-chosen {
+      padding: 10px 14px;
+      background: #e8f0f8;
+      border-radius: 10px;
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .strecke-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 16px 0 8px;
+    }
+    .strecke-gattungen-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .gattung-chip {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .gattung-chip.on {
+      background: #0055a4;
+      color: #fff;
+    }
+    .gattung-chip.off {
+      background: #e8e8e8;
       color: #999;
     }
-    
+    .gattung-chip:hover {
+      opacity: 0.85;
+    }
+
     .lines-loading {
       text-align: center;
       padding: 30px;
@@ -397,6 +577,10 @@
     .station-chip .network-badge.salzburg { background: #E3000F; color: #fff; }
     .station-chip .network-badge.sbg { background: #E3000F; color: #fff; }
     .station-chip .network-badge.paris { background: #003B80; color: #fff; }
+    .station-chip .network-badge.oebb { background: #E2001A; color: #fff; }
+    .station-chip .network-badge.oebb_sbahn { background: #009640; color: #fff; }
+    .station-chip .network-badge.oebb_reg_noe { background: #0055A4; color: #fff; }
+    .station-chip .network-badge.oebb_reg_ooe { background: #0055A4; color: #fff; }
     .station-chip .info { flex: 1; min-width: 0; }
     .station-chip .stop-name {
       font-weight: 600;
@@ -1953,7 +2137,7 @@
       <button class="selection-btn" onclick="selectRegion('AT')">
         <div class="region-badge at"></div>
         <div class="name">Österreich</div>
-        <div class="desc">Wien, Linz, Badner Bahn</div>
+        <div class="desc">Wien, Linz, Salzburg, ÖBB</div>
       </button>
       <button class="selection-btn" onclick="selectRegion('DE')">
         <div class="region-badge de"></div>
@@ -1978,10 +2162,10 @@
     </div>
   </div>
   
-  <!-- Step 2: Network -->
+  <!-- Step 2: Network (oder Bundesland bei AT) -->
   <div class="card hidden" id="stepNetwork">
-    <button class="back-btn" onclick="goBack('region')">Zurück</button>
-    <h2>Netzwerk wählen</h2>
+    <button class="back-btn" id="networkBackBtn" onclick="goBack('region')">Zurück</button>
+    <h2 id="networkStepTitle">Netzwerk wählen</h2>
     <div class="selection-grid" id="networkGrid"></div>
   </div>
   
@@ -2190,6 +2374,7 @@
           <option value="7">BODO Bodensee</option>
           <option value="8">Salzburg AG</option>
           <option value="9">RATP Paris</option>
+          <option value="10">Straba Ansicht</option>
         </select>
       </div>
 
@@ -2269,6 +2454,7 @@
           <option value="7">BODO Bodensee</option>
           <option value="8">Salzburg AG</option>
           <option value="9">RATP Paris</option>
+          <option value="10">Straba Ansicht</option>
         </select>
       </div>
       <div class="form-row">
@@ -2463,7 +2649,15 @@ window.addEventListener('message', function(event) {
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'LINZ', 'SALZBURG']
+    networks: ['WL', 'WLB', 'LINZ', 'SALZBURG', 'OEBB', 'OEBB_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE'],
+    // Bundesländer-Struktur für schönere Auswahl
+    subRegions: {
+      AT_W: { name: 'Wien', wappen: 'wien', desc: 'U-Bahn, Tram, Bus, S-Bahn, Badner Bahn', networks: ['WL', 'OEBB_SBAHN', 'WLB'] },
+      AT_NOE: { name: 'Niederösterreich', wappen: 'noe', desc: 'S-Bahn, REX, Regionalzug', networks: ['OEBB_REG_NOE'] },
+      AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus, S-Bahn, REX', networks: ['LINZ', 'OEBB_REG_OOE'] },
+      AT_SBG: { name: 'Salzburg', wappen: 'sbg', desc: 'Obus, Lokalbahn', networks: ['SALZBURG'] },
+      AT_FERN: { name: 'Fernverkehr', wappen: 'oebb', desc: 'RJ, ICE, IC, REX, Nightjet', networks: ['OEBB'] }
+    }
   },
   DE: {
     name: 'Deutschland',
@@ -2556,6 +2750,42 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 9,             // RATP Paris
+    defaultBrightness: 3
+  },
+  OEBB: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 6,             // DB Fernverkehr
+    defaultBrightness: 3
+  },
+  OEBB_SBAHN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 5,             // S-Bahn Anzeige
+    defaultBrightness: 3
+  },
+  OEBB_REG_NOE: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 5,
+    defaultBrightness: 3
+  },
+  OEBB_REG_OOE: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 5,
     defaultBrightness: 3
   }
 };
@@ -2695,6 +2925,42 @@ const NETWORKS = {
       }
     }
   },
+  OEBB: {
+    name: 'ÖBB Fernverkehr',
+    shortName: 'ÖBB',
+    region: 'AT',
+    desc: 'Railjet, IC, REX, Nightjet',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Wien Hbf, Linz Hbf, Salzburg Hbf...',
+    isJourneyBased: false
+  },
+  OEBB_SBAHN: {
+    name: 'ÖBB S-Bahn Wien',
+    shortName: 'S',
+    region: 'AT',
+    desc: 'S-Bahn Wien (S1-S80)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Meidling, Handelskai, Floridsdorf...',
+    isJourneyBased: false
+  },
+  OEBB_REG_NOE: {
+    name: 'S-Bahn/Regional NÖ',
+    shortName: 'REG',
+    region: 'AT',
+    desc: 'S-Bahn, REX, Regionalzug in NÖ',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. St. Pölten, Baden, Wr. Neustadt...',
+    isJourneyBased: false
+  },
+  OEBB_REG_OOE: {
+    name: 'S-Bahn/Regional OÖ',
+    shortName: 'REG',
+    region: 'AT',
+    desc: 'S-Bahn, REX, Regionalzug in OÖ',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Linz Hbf, Wels, Steyr...',
+    isJourneyBased: false
+  },
   BERLIN: {
     name: 'VBB Berlin',
     shortName: 'VBB',
@@ -2794,6 +3060,7 @@ let selectedNetwork = null;
 let selectedStop = null;
 let availableLines = [];
 let selectedLines = new Set();
+let selectedVias = new Map();     // idx → stopover-name (via-Filter pro Richtung)
 let stations = [];
 let editingStationIndex = null;  // Index der Station die bearbeitet wird (null = neue Station)
 let hasExistingConfig = false;   // True wenn Config vom Gerät geladen wurde
@@ -2807,10 +3074,19 @@ let wienSelectedStation = null;
 let wienSelectedDirections = [];
 let wienOtherLines = [];
 
+// Sub-Region (Bundesland)
+let selectedSubRegion = null;
+
 // Journey-Modus (für DB)
 let journeyFromStop = null;
 let journeyToStop = null;
 let selectedProducts = new Set();
+
+// OEBB Von-Nach Modus
+let oebb_toStop = null;              // {id, name} - gewähltes Ziel
+let oebb_deselectedGattungen = new Set();  // Abgewählte Gattungen
+
+const OEBB_GATTUNGEN = ['RJX', 'RJ', 'ICE', 'IC', 'EC', 'NJ', 'EN', 'D'];
 
 // ==================== DOM ====================
 const stepRegion = document.getElementById('stepRegion');
@@ -2863,9 +3139,15 @@ function updateBreadcrumb() {
   
   if (selectedRegion) {
     html += `<span class="breadcrumb-sep">›</span>`;
-    html += `<span class="breadcrumb-item ${currentStep === 'network' ? 'active' : ''}" onclick="goBack('network')">${REGIONS[selectedRegion].name}</span>`;
+    html += `<span class="breadcrumb-item ${currentStep === 'network' && !selectedSubRegion ? 'active' : ''}" onclick="goBack('network')">${REGIONS[selectedRegion].name}</span>`;
   }
-  
+
+  if (selectedSubRegion && REGIONS[selectedRegion]?.subRegions?.[selectedSubRegion]) {
+    html += `<span class="breadcrumb-sep">›</span>`;
+    const subName = REGIONS[selectedRegion].subRegions[selectedSubRegion].name;
+    html += `<span class="breadcrumb-item ${currentStep === 'network' && selectedSubRegion ? 'active' : ''}">${subName}</span>`;
+  }
+
   if (selectedNetwork) {
     html += `<span class="breadcrumb-sep">›</span>`;
     const isJourney = NETWORKS[selectedNetwork].isJourneyBased;
@@ -2905,8 +3187,11 @@ function goBack(step) {
     wienSelectedStation = null;
     wienSelectedDirections = [];
     wienOtherLines = [];
+    oebb_toStop = null;
+    oebb_deselectedGattungen = new Set();
   } else if (step === 'network') {
     selectedNetwork = null;
+    selectedSubRegion = null;
     selectedStop = null;
     journeyFromStop = null;
     journeyToStop = null;
@@ -2918,8 +3203,12 @@ function goBack(step) {
     // Hide products section
     const productsSection = document.getElementById('journeyProductsSection');
     if (productsSection) productsSection.classList.add('hidden');
+    // Bundesland-Grid neu rendern
+    renderNetworkGrid();
   } else if (step === 'search') {
     selectedStop = null;
+    oebb_toStop = null;
+    oebb_deselectedGattungen = new Set();
     searchInput.value = '';
     searchResults.classList.remove('show');
   } else if (step === 'journeySearch') {
@@ -2957,9 +3246,53 @@ function selectRegion(region) {
   showStep('network');
 }
 
+// Kürzel für Bundesland-Wappen
+const WAPPEN = {
+  wien: 'W',
+  ooe: 'OÖ',
+  sbg: 'S',
+  oebb: 'ÖBB'
+};
+
 function renderNetworkGrid() {
-  const networks = REGIONS[selectedRegion].networks;
-  
+  const region = REGIONS[selectedRegion];
+  const titleEl = document.getElementById('networkStepTitle');
+  const backBtn = document.getElementById('networkBackBtn');
+
+  // Hat diese Region Sub-Regionen (Bundesländer)?
+  if (region.subRegions && !selectedSubRegion) {
+    // Zeige Bundesland-Auswahl
+    if (titleEl) titleEl.textContent = 'Bundesland wählen';
+    if (backBtn) backBtn.setAttribute('onclick', "goBack('region')");
+    const subs = Object.entries(region.subRegions);
+    networkGrid.innerHTML = subs.map(([id, sub]) => {
+      return `
+        <button class="selection-btn" onclick="selectSubRegion('${id}')">
+          <div class="wappen-badge ${sub.wappen}">${WAPPEN[sub.wappen] || ''}</div>
+          <div class="name">${sub.name}</div>
+          <div class="desc">${sub.desc || sub.networks.map(n => NETWORKS[n]?.name || n).join(', ')}</div>
+        </button>
+      `;
+    }).join('');
+    return;
+  }
+
+  // Bestimme welche Netzwerke angezeigt werden
+  if (titleEl) titleEl.textContent = 'Netzwerk wählen';
+  // Zurück-Button: Wenn Sub-Region ausgewählt, gehe zurück zur Bundesland-Auswahl
+  if (backBtn && selectedSubRegion) {
+    backBtn.setAttribute('onclick', "goBackToSubRegions()");
+  } else if (backBtn) {
+    backBtn.setAttribute('onclick', "goBack('region')");
+  }
+
+  let networks;
+  if (selectedSubRegion && region.subRegions) {
+    networks = region.subRegions[selectedSubRegion].networks;
+  } else {
+    networks = region.networks;
+  }
+
   networkGrid.innerHTML = networks.map(id => {
     const net = NETWORKS[id];
     const badgeClass = id.toLowerCase();
@@ -2971,6 +3304,29 @@ function renderNetworkGrid() {
       </button>
     `;
   }).join('');
+}
+
+function goBackToSubRegions() {
+  selectedSubRegion = null;
+  selectedNetwork = null;
+  renderNetworkGrid();
+}
+
+function selectSubRegion(subId) {
+  const region = REGIONS[selectedRegion];
+  const sub = region.subRegions[subId];
+  if (!sub) return;
+
+  selectedSubRegion = subId;
+
+  // Wenn nur ein Netzwerk → direkt weiterleiten
+  if (sub.networks.length === 1) {
+    selectNetwork(sub.networks[0]);
+    return;
+  }
+
+  // Mehrere Netzwerke → Netzwerk-Grid anzeigen
+  renderNetworkGrid();
 }
 
 // ==================== NETWORK SELECTION ====================
@@ -3569,7 +3925,53 @@ async function performSearch(query) {
     } else {
       results = await searchViaProxy(selectedNetwork, query);
     }
-    
+
+    // OEBB Fernverkehr: Nur Fernverkehrshalte + Duplikate entfernen
+    if (selectedNetwork === 'OEBB') {
+      results = results.filter(s => (s.info || '').includes('Fernverkehr'));
+      // Deduplizieren: 1191201 "Meidling (Wien)" und 1291201 "Wien Meidling Bahnhof (U)"
+      // haben die gleichen letzten 4 Ziffern → nur den mit "Wien" im Namen behalten
+      const seen = new Map(); // letzte 4 Ziffern → bester Eintrag
+      results.forEach(s => {
+        const suffix = String(s.id).slice(-4);
+        const existing = seen.get(suffix);
+        if (!existing) {
+          seen.set(suffix, s);
+        } else {
+          // "Wien ..." bevorzugen, oder den mit längerem Namen (mehr Info)
+          const sHasWien = s.name.startsWith('Wien ');
+          const eHasWien = existing.name.startsWith('Wien ');
+          if (sHasWien && !eHasWien) {
+            seen.set(suffix, s);
+          }
+        }
+      });
+      results = Array.from(seen.values());
+    }
+
+    // OEBB S-Bahn Wien: Nur Stationen in Wien anzeigen
+    if (selectedNetwork === 'OEBB_SBAHN') {
+      results = results.filter(s => {
+        const name = s.name || '';
+        return name.includes('Wien') || name.includes('(Wien)');
+      });
+    }
+
+    // OEBB Regional NÖ/OÖ: Duplikate entfernen (gleiche Logik wie OEBB FV)
+    if (selectedNetwork === 'OEBB_REG_NOE' || selectedNetwork === 'OEBB_REG_OOE') {
+      const seen = new Map();
+      results.forEach(s => {
+        const suffix = String(s.id).slice(-4);
+        const existing = seen.get(suffix);
+        if (!existing) {
+          seen.set(suffix, s);
+        } else if (s.name.length > existing.name.length) {
+          seen.set(suffix, s);
+        }
+      });
+      results = Array.from(seen.values());
+    }
+
     displaySearchResults(results);
   } catch (e) {
     console.error('Search error:', e);
@@ -3663,13 +4065,27 @@ async function selectStop(id, name) {
   document.getElementById('selectedStationInfo').textContent = `${NETWORKS[selectedNetwork].name} · ID: ${id}`;
 
   searchResults.classList.remove('show');
+
+  // OEBB Fernverkehr: Direkt Ziel-Suche anzeigen (kein Departures-Call nötig)
+  if (selectedNetwork === 'OEBB') {
+    oebb_toStop = null;
+    oebb_deselectedGattungen = new Set();
+    showStep('lines');
+    linesLoading.classList.add('hidden');
+    linesContainer.classList.remove('hidden');
+    renderOebbDestSearch();
+    return;
+  }
+
   showStep('lines');
 
   // Load departures to get available lines
   linesLoading.classList.remove('hidden');
   linesContainer.classList.add('hidden');
   addStationBtn.disabled = true;
-  addStationBtn.textContent = 'Weiter';  // Button-Text zurücksetzen
+  addStationBtn.style.display = '';
+  addStationBtn.textContent = 'Weiter';
+  document.getElementById('selectAllBtn').style.display = '';
 
   try {
     const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
@@ -3724,11 +4140,34 @@ function extractLines(data) {
             return; // Nicht erlaubte Linie überspringen
           }
 
+          // Bei OEBB_SBAHN: Nur S-Bahnen anzeigen (S1, S2, S45, etc.)
+          if (selectedNetwork === 'OEBB_SBAHN' && !/^S\d/.test(name)) {
+            return;
+          }
+
+          // Bei OEBB Fernverkehr: Nur Züge, keine S-Bahn/Bus/Tram/U-Bahn
+          if (selectedNetwork === 'OEBB') {
+            const lineType = (line.type || '').toLowerCase();
+            // Nur Fernverkehr und Regional (ptTrain, ptTrainR) - kein ptTrainS, ptMetro, ptBus, ptTram
+            if (lineType === 'pttrains' || lineType === 'ptmetro' || lineType.includes('bus') || lineType.includes('tram')) {
+              return;
+            }
+          }
+
+          // Bei OEBB Regional NÖ/OÖ: S-Bahn + REX + R, kein Fernverkehr
+          if (selectedNetwork === 'OEBB_REG_NOE' || selectedNetwork === 'OEBB_REG_OOE') {
+            // Nur S-Bahn (S1, S2...), REX, R-Züge (R1, R12...) und CJX
+            if (!/^(S\d|REX|R\d|CJX)/.test(name)) {
+              return;
+            }
+          }
+
           if (!linesMap.has(key)) {
             linesMap.set(key, {
               name,
               towards,
-              type: line.type || ''
+              type: line.type || '',
+              stopovers: line.stopovers || []
             });
           }
         });
@@ -3780,12 +4219,31 @@ function renderLines() {
     
     directions.forEach(dir => {
       const selected = selectedLines.has(dir.idx);
+      const hasVia = selected && dir.stopovers && dir.stopovers.length > 0 && (selectedNetwork === 'OEBB' || selectedNetwork === 'DB');
+      const currentVia = selectedVias.get(dir.idx) || null;
+
       html += `
         <div class="direction-option ${selected ? 'selected' : ''}" onclick="toggleLine(${dir.idx})">
           <div class="checkbox">${selected ? '✓' : ''}</div>
-          <div class="direction-text">${dir.towards || 'Alle Richtungen'}</div>
+          <div class="direction-text">
+            → ${dir.towards || 'Alle Richtungen'}
+            ${currentVia ? `<span class="via-active">via ${currentVia}</span>` : ''}
+          </div>
         </div>
       `;
+
+      // Stopovers als "via" Auswahl anzeigen (nur wenn Richtung ausgewählt)
+      if (hasVia) {
+        html += `<div class="stopovers-row" onclick="event.stopPropagation()">`;
+        html += `<span class="stopovers-label">Via:</span>`;
+        dir.stopovers.forEach(stop => {
+          // Stopname kürzen: "Linz/Donau Hauptbahnhof 1" → "Linz"
+          const shortName = shortenStopName(stop);
+          const isActive = currentVia === stop;
+          html += `<span class="stopover-chip ${isActive ? 'active' : ''}" onclick="event.stopPropagation(); toggleVia(${dir.idx}, '${stop.replace(/'/g, "\\'")}')">${shortName}</span>`;
+        });
+        html += `</div>`;
+      }
     });
     
     html += `
@@ -3892,7 +4350,7 @@ function toggleLineGroup(lineName) {
   const allSelected = directions.every(d => selectedLines.has(d.idx));
   
   if (allSelected) {
-    directions.forEach(d => selectedLines.delete(d.idx));
+    directions.forEach(d => { selectedLines.delete(d.idx); selectedVias.delete(d.idx); });
   } else {
     directions.forEach(d => selectedLines.add(d.idx));
   }
@@ -3903,15 +4361,234 @@ function toggleLineGroup(lineName) {
 function toggleLine(idx) {
   if (selectedLines.has(idx)) {
     selectedLines.delete(idx);
+    selectedVias.delete(idx);  // Via auch entfernen
   } else {
     selectedLines.add(idx);
   }
   renderLines();
 }
 
+function toggleVia(idx, stopName) {
+  if (selectedVias.get(idx) === stopName) {
+    selectedVias.delete(idx);  // Deselect
+  } else {
+    selectedVias.set(idx, stopName);  // Select
+  }
+  renderLines();
+}
+
+function shortenStopName(name) {
+  return name
+    .replace(/\s+Hauptbahnhof\s*\d*/g, '')
+    .replace(/\s+Bahnhof\s*\d*/g, '')
+    .replace(/\s+Bahnhst\.?/g, '')
+    .replace(/\s+Bhf\.?/g, '')
+    .replace(/\s+Hbf\s*\d*/g, '')
+    .replace(/\/Donau/g, '')
+    .replace(/\/Mur/g, '')
+    .replace(/\/Drau/g, '')
+    .replace(/\/Thaya/g, '')
+    .replace(/\/Wörthersee/g, '')
+    .trim();
+}
+
+// ==================== OEBB VON-NACH MODUS ====================
+
+function renderOebbDestSearch() {
+  const linesList = document.getElementById('linesList');
+  const stationName = selectedStop?.name || '';
+
+  // Header anpassen
+  document.querySelector('#linesContainer .lines-header h3').textContent = 'Züge nach...';
+  document.getElementById('selectAllBtn').style.display = 'none';
+  addStationBtn.style.display = '';
+  addStationBtn.disabled = !oebb_toStop;
+  addStationBtn.textContent = 'Weiter';
+
+  let html = '';
+
+  // Von-Station (fix)
+  html += `<div class="oebb-from-label">Von: <strong>${stationName}</strong></div>`;
+
+  // Ziel-Suchfeld
+  html += `
+    <div class="oebb-dest-section">
+      <div class="oebb-dest-label">Nach:</div>
+      <div class="oebb-dest-input-wrap">
+        <input type="text" id="oebbDestInput" class="oebb-dest-input"
+          placeholder="z.B. Linz, Salzburg, Graz..."
+          value="${oebb_toStop ? oebb_toStop.name : ''}"
+          oninput="searchOebbDest(this.value)"
+          autocomplete="off" />
+        ${oebb_toStop ? `<span class="oebb-dest-clear" onclick="clearOebbDest()">✕</span>` : ''}
+      </div>
+      <div id="oebbDestResults" class="oebb-dest-results"></div>
+    </div>
+  `;
+
+  // Gewähltes Ziel anzeigen
+  if (oebb_toStop) {
+    html += `<div class="oebb-dest-chosen">Ziel: <strong>${oebb_toStop.name}</strong></div>`;
+  }
+
+  // Gattungs-Filter
+  html += `<div class="strecke-section-title">Zuggattungen</div>`;
+  html += `<div class="strecke-gattungen-filter">`;
+  for (const g of OEBB_GATTUNGEN) {
+    const isOn = !oebb_deselectedGattungen.has(g);
+    html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleOebbGattung('${g}')">${g}</span>`;
+  }
+  html += `</div>`;
+
+  linesList.innerHTML = html;
+
+  // Focus auf Input
+  setTimeout(() => {
+    const input = document.getElementById('oebbDestInput');
+    if (input && !oebb_toStop) input.focus();
+  }, 100);
+}
+
+let oebbDestTimeout = null;
+async function searchOebbDest(query) {
+  const resultsDiv = document.getElementById('oebbDestResults');
+  if (!resultsDiv) return;
+
+  if (query.length < 2) {
+    resultsDiv.innerHTML = '';
+    return;
+  }
+
+  clearTimeout(oebbDestTimeout);
+  oebbDestTimeout = setTimeout(async () => {
+    try {
+      const params = new URLSearchParams({ network: 'OEBB', q: query });
+      const response = await fetch(`${SEARCH_API}?${params}`);
+      const data = await response.json();
+      // Nur Fernverkehrshalte + deduplizieren
+      let fvStops = (data.stops || []).filter(s => (s.info || '').includes('Fernverkehr'));
+      const seen = new Map();
+      fvStops.forEach(s => {
+        const suffix = String(s.id).slice(-4);
+        const existing = seen.get(suffix);
+        if (!existing) {
+          seen.set(suffix, s);
+        } else if (s.name.startsWith('Wien ') && !existing.name.startsWith('Wien ')) {
+          seen.set(suffix, s);
+        }
+      });
+      const stops = Array.from(seen.values()).slice(0, 8);
+
+      if (stops.length === 0) {
+        resultsDiv.innerHTML = '<div class="oebb-dest-no-result">Keine Station gefunden</div>';
+        return;
+      }
+
+      resultsDiv.innerHTML = stops.map(s => `
+        <div class="oebb-dest-item" onclick="selectOebbDest('${s.id}', '${s.name.replace(/'/g, "\\'")}')">
+          <div class="oebb-dest-item-name">${s.name}</div>
+        </div>
+      `).join('');
+    } catch (e) {
+      resultsDiv.innerHTML = '<div class="oebb-dest-no-result">Fehler bei der Suche</div>';
+    }
+  }, 300);
+}
+
+function selectOebbDest(id, name) {
+  oebb_toStop = { id, name };
+  renderOebbDestSearch();
+}
+
+function clearOebbDest() {
+  oebb_toStop = null;
+  renderOebbDestSearch();
+}
+
+function toggleOebbGattung(gattung) {
+  if (oebb_deselectedGattungen.has(gattung)) {
+    oebb_deselectedGattungen.delete(gattung);
+  } else {
+    oebb_deselectedGattungen.add(gattung);
+  }
+  // Nur Chips updaten, nicht das ganze Form (sonst verliert Input den Focus)
+  const chips = document.querySelectorAll('.gattung-chip');
+  chips.forEach(chip => {
+    const g = chip.textContent;
+    if (oebb_deselectedGattungen.has(g)) {
+      chip.classList.remove('on');
+      chip.classList.add('off');
+    } else {
+      chip.classList.add('on');
+      chip.classList.remove('off');
+    }
+  });
+}
+
+function addStationFromOebb() {
+  if (!selectedStop || !oebb_toStop) return;
+
+  // Aktive Gattungen
+  const activeGattungen = OEBB_GATTUNGEN.filter(g => !oebb_deselectedGattungen.has(g));
+  if (activeGattungen.length === 0) {
+    alert('Bitte mindestens eine Zuggattung auswählen!');
+    return;
+  }
+
+  // Format: OEBB:fromId>toId
+  // Server macht departures(fromId) und filtert per GTFS nach Zügen die über toId fahren
+  // Gattungen-Filter wird separat als filter gespeichert (ESP filtert)
+  const fullId = `${selectedNetwork}:${selectedStop.id}>${oebb_toStop.id}`;
+  const filter = activeGattungen.join(',');
+
+  // Directions: Eine pro aktiver Gattung, alle mit gleichem Ziel
+  const selectedDirections = activeGattungen.map(g => ({
+    line: g,
+    towards: oebb_toStop.name,
+    type: 'ptTrain'
+  }));
+
+  // Duplikat prüfen
+  if (editingStationIndex === null && stations.some(s => s.fullId === fullId)) {
+    alert('Diese Verbindung ist bereits hinzugefügt!');
+    return;
+  }
+
+  if (editingStationIndex !== null) {
+    const existingStation = stations[editingStationIndex];
+    existingStation.filter = filter;
+    existingStation.directions = selectedDirections;
+    const editedFullId = existingStation.fullId;
+    stations = stations.filter((s, idx) => idx === editingStationIndex || s.fullId !== editedFullId);
+    editingStationIndex = null;
+    resetFinetuningData();
+  } else {
+    stations.push({
+      network: selectedNetwork,
+      networkName: NETWORKS[selectedNetwork].name,
+      stopId: selectedStop.id,
+      stopName: `${selectedStop.name} → ${oebb_toStop.name}`,
+      filter: filter,
+      fullId: fullId,
+      isExisting: false,
+      directions: selectedDirections
+    });
+  }
+
+  // Reset
+  selectedStop = null;
+  oebb_toStop = null;
+  oebb_deselectedGattungen = new Set();
+  selectedLines = new Set();
+  selectedVias = new Map();
+  goBack('region');
+  updateStationsList();
+}
+
 function toggleSelectAll() {
   if (selectedLines.size === availableLines.length) {
     selectedLines.clear();
+    selectedVias.clear();
   } else {
     availableLines.forEach((_, idx) => selectedLines.add(idx));
   }
@@ -3935,6 +4612,11 @@ function showGroupingStep() {
 
 // ==================== ADD STATION ====================
 function addStation() {
+  // OEBB Von-Nach Modus
+  if (selectedNetwork === 'OEBB' && oebb_toStop) {
+    return addStationFromOebb();
+  }
+
   if (!selectedNetwork || !selectedStop || selectedLines.size === 0) return;
 
   const selectedLineNames = Array.from(selectedLines).map(idx => availableLines[idx].name);
@@ -3943,11 +4625,12 @@ function addStation() {
 
   const fullId = `${selectedNetwork}:${selectedStop.id}`;
 
-  // Ausgewaehlte Richtungen speichern (Linie + towards)
+  // Ausgewaehlte Richtungen speichern (Linie + towards + optionaler via-Filter)
   const selectedDirections = Array.from(selectedLines).map(idx => ({
     line: availableLines[idx].name,
     towards: availableLines[idx].towards || '',
-    type: availableLines[idx].type || ''
+    type: availableLines[idx].type || '',
+    ...(selectedVias.has(idx) ? { via: selectedVias.get(idx) } : {})
   }));
 
   if (editingStationIndex !== null) {
@@ -3987,6 +4670,7 @@ function addStation() {
   // Reset and go back
   selectedStop = null;
   selectedLines = new Set();
+  selectedVias = new Map();
   goBack('region');
   updateStationsList();
 }
@@ -4087,8 +4771,12 @@ function updateStationsList() {
     if (group.isJourney) {
       const uniqueFilters = [...new Set(group.filters)];
       filterLabel = `Produkte: ${uniqueFilters.join(', ') || 'Alle'}`;
+    } else if (group.network === 'OEBB' && group.directions && group.directions.length > 0) {
+      // OEBB: Nur Gattungen auflisten (Ziel steht schon im stopName)
+      const gattungen = [...new Set(group.directions.map(d => d.line))];
+      filterLabel = gattungen.join(', ');
     } else if (group.directions && group.directions.length > 0) {
-      // Zeige Linien mit Richtungen: "1 → Böfingen, 2 → Kuhberg"
+      // Andere Netze: Linien mit Richtungen: "1 → Böfingen, 2 → Kuhberg"
       const directionLabels = group.directions.map(d => {
         if (d.towards) {
           return `${d.line} → ${d.towards}`;
@@ -4179,6 +4867,35 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
   searchResults.classList.remove('show');
   showStep('lines');
 
+  // OEBB Fernverkehr: Direkt Von-Nach Ansicht (kein Departures-Call nötig)
+  if (selectedNetwork === 'OEBB') {
+    oebb_toStop = null;
+    oebb_deselectedGattungen = new Set();
+    // Versuche das Ziel aus existierenden Directions zu rekonstruieren
+    if (existingDirections && existingDirections.length > 0) {
+      const firstDir = existingDirections[0];
+      if (firstDir.towards) {
+        // Format: OEBB:fromId>toId
+        const existingFullId = stations[editingStationIndex]?.fullId || '';
+        const toIdMatch = existingFullId.match(/>(.+)$/);
+        if (toIdMatch) {
+          oebb_toStop = { id: toIdMatch[1], name: firstDir.towards };
+        }
+      }
+      const existingGattungen = existingDirections.map(d => d.line);
+      OEBB_GATTUNGEN.forEach(g => {
+        if (!existingGattungen.includes(g)) {
+          oebb_deselectedGattungen.add(g);
+        }
+      });
+    }
+    linesLoading.classList.add('hidden');
+    linesContainer.classList.remove('hidden');
+    renderOebbDestSearch();
+    addStationBtn.textContent = 'Aktualisieren';
+    return;
+  }
+
   // Load departures to get available lines
   linesLoading.classList.remove('hidden');
   linesContainer.classList.add('hidden');
@@ -4192,9 +4909,6 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
     extractLines(data);
 
     // Vorauswahl: Markiere Linien die bereits ausgewählt waren
-    console.log('[editStation] existingDirections:', existingDirections);
-    console.log('[editStation] existingFilter:', existingFilter);
-    console.log('[editStation] availableLines:', availableLines);
 
     availableLines.forEach((line, idx) => {
       let isSelected = false;
@@ -4241,8 +4955,6 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
 
     linesLoading.classList.add('hidden');
     linesContainer.classList.remove('hidden');
-
-    // Button-Status und -Text aktualisieren
     addStationBtn.disabled = selectedLines.size === 0;
     addStationBtn.textContent = 'Aktualisieren';
   } catch (e) {
@@ -4261,7 +4973,12 @@ const NETWORK_COLORS = {
   BERLIN: { id: 3, name: 'VBB Berlin', color: '#F0AB00' },
   BODO: { id: 7, name: 'BODO Bodensee', color: '#005BBB' },
   SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
-  PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' }
+  PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
+  STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
+  OEBB: { id: 6, name: 'ÖBB Fernverkehr', color: '#E2001A' },
+  OEBB_SBAHN: { id: 5, name: 'ÖBB S-Bahn', color: '#009640' },
+  OEBB_REG_NOE: { id: 5, name: 'ÖBB Regional NÖ', color: '#0055A4' },
+  OEBB_REG_OOE: { id: 5, name: 'ÖBB Regional OÖ', color: '#0055A4' }
 };
 
 let suggestedColor = 1;
@@ -4287,6 +5004,32 @@ function calculateRecommendedConfig() {
   let displayType = capabilities.defaultColour;
   let displayName = NETWORK_COLORS[dominantNetwork]?.name || 'Wiener Linien';
   let description = `Optimiert für ${NETWORKS[dominantNetwork]?.name || dominantNetwork}`;
+
+  // Spezialfall OEBB Fernverkehr: Gleiche Logik wie DB
+  if (dominantNetwork === 'OEBB') {
+    displayType = 6;
+    displayName = 'ÖBB Fernverkehr';
+    description = 'Optimiert für Railjet, ICE, IC Anzeige';
+  }
+
+  // Spezialfall OEBB S-Bahn
+  if (dominantNetwork === 'OEBB_SBAHN') {
+    displayType = 5;
+    displayName = 'ÖBB S-Bahn';
+    description = 'Optimiert für S-Bahn Anzeige';
+  }
+
+  // Spezialfall OEBB Regional NÖ/OÖ
+  if (dominantNetwork === 'OEBB_REG_NOE') {
+    displayType = 5;
+    displayName = 'ÖBB Regional NÖ';
+    description = 'Optimiert für S-Bahn, REX Anzeige';
+  }
+  if (dominantNetwork === 'OEBB_REG_OOE') {
+    displayType = 5;
+    displayName = 'ÖBB Regional OÖ';
+    description = 'Optimiert für S-Bahn, REX Anzeige';
+  }
 
   // Spezialfall DB/ÖBB: S-Bahn vs Fernverkehr vs Regionalverkehr
   if (dominantNetwork === 'DB') {
@@ -4571,6 +5314,22 @@ function suggestDisplayConfig() {
       colorName = 'DB/ÖBB Fernverkehr';
       description = 'Gemischte Zug-Verbindungen';
     }
+  } else if (dominantNetwork === 'OEBB') {
+    colorId = 6;
+    colorName = 'ÖBB Fernverkehr';
+    description = 'Optimiert für Railjet, ICE, IC Anzeige';
+  } else if (dominantNetwork === 'OEBB_SBAHN') {
+    colorId = 5;
+    colorName = 'ÖBB S-Bahn';
+    description = 'Optimiert für S-Bahn Anzeige';
+  } else if (dominantNetwork === 'OEBB_REG_NOE') {
+    colorId = 5;
+    colorName = 'ÖBB Regional NÖ';
+    description = 'Optimiert für S-Bahn, REX Anzeige';
+  } else if (dominantNetwork === 'OEBB_REG_OOE') {
+    colorId = 5;
+    colorName = 'ÖBB Regional OÖ';
+    description = 'Optimiert für S-Bahn, REX Anzeige';
   } else {
     const netColor = NETWORK_COLORS[dominantNetwork] || NETWORK_COLORS.WL;
     colorId = netColor.id;
@@ -4659,6 +5418,12 @@ function updateRealisticPreview(config) {
       text: '#ffcd00',
       highlight: '#003B80',
       name: 'RATP Paris'
+    },
+    10: { // Straba Ansicht
+      bg: '#1e1e1e',
+      text: '#ffffff',
+      highlight: '#ffffff',
+      name: 'Straba Ansicht'
     }
   };
 
@@ -4699,7 +5464,8 @@ function updateRealisticPreview(config) {
       6: [{ line: 'ICE', dest: 'Berlin Hbf', time: 12 }, { line: 'RJ', dest: 'Wien Hbf', time: 28 }],
       7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }],
       8: [{ line: '1', dest: 'Hellbrunn', time: 3 }, { line: 'S3', dest: 'Salzburg Hbf', time: 7 }, { line: '22', dest: 'Aigen', time: 11 }],
-      9: [{ line: '1', dest: 'La Defense', time: 2 }, { line: '4', dest: 'Porte de Clignan.', time: 4 }, { line: '14', dest: 'Saint-Denis', time: 6 }]
+      9: [{ line: '1', dest: 'La Defense', time: 2 }, { line: '4', dest: 'Porte de Clignan.', time: 4 }, { line: '14', dest: 'Saint-Denis', time: 6 }],
+      10: [{ line: 'U2', dest: 'Aspernstrasse', time: 6, dest2: 'Seestadt', time2: 8 }, { line: '46', dest: 'Ring, Volksthea', time: 6, dest2: 'Ring, Volksthea', time2: 8 }]
     };
     sampleData = (fallbackData[colour] || fallbackData[1]).slice(0, rows);
   }
@@ -4762,6 +5528,34 @@ function updateRealisticPreview(config) {
             <span style="color:#ffcd00;font-size:18px;font-weight:bold;">${dep2.time}</span>
           </div>
         </div>
+      </div>
+    `;
+  } else if (colour === 10) {
+    // Straba Ansicht: Große + kleine Zeile pro Gruppe
+    previewEl.style.background = '#1e1e1e';
+    previewEl.style.backgroundImage = 'none';
+
+    previewEl.innerHTML = `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+        ${sampleData.slice(0, rows).map((dep, i) => {
+          const lineColor = dep.line.startsWith('U') ? '#5a3782' : (dep.line.length <= 2 && !isNaN(dep.line) ? '#dc2828' : '#005a8c');
+          const time2 = dep.time2 || (dep.time + 2);
+          const dest2 = dep.dest2 || dep.dest;
+          return `
+            <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:1px 4px;${i < rows - 1 ? 'border-bottom:1px solid #333;' : ''}">
+              <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;">
+                <div style="background:${lineColor};border-radius:4px;padding:1px 4px;min-width:22px;text-align:center;font-weight:bold;font-size:11px;color:#fff;">${dep.line}</div>
+                <span style="flex:1;font-size:10px;color:#fff;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
+                <span style="font-weight:bold;font-size:13px;color:#fff;">${dep.time}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;padding-left:6px;">
+                <div style="background:${lineColor};border-radius:3px;padding:0px 3px;min-width:16px;text-align:center;font-weight:bold;font-size:7px;color:#fff;">${dep.line}</div>
+                <span style="flex:1;font-size:7px;color:#b4b4b4;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dest2}</span>
+                <span style="font-weight:bold;font-size:8px;color:#b4b4b4;">${time2}</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
       </div>
     `;
   } else {
@@ -4845,11 +5639,16 @@ function updateQuickPreview() {
   else if (colour === 7) networkForCapabilities = 'BODO';
   else if (colour === 8) networkForCapabilities = 'SALZBURG';
   else if (colour === 9) networkForCapabilities = 'PARIS';
+  else if (colour === 10) networkForCapabilities = 'WL';
+  else if (networkForCapabilities === 'OEBB') networkForCapabilities = 'OEBB';
+  else if (networkForCapabilities === 'OEBB_SBAHN') networkForCapabilities = 'OEBB_SBAHN';
+  else if (networkForCapabilities === 'OEBB_REG_NOE') networkForCapabilities = 'OEBB_REG_NOE';
+  else if (networkForCapabilities === 'OEBB_REG_OOE') networkForCapabilities = 'OEBB_REG_OOE';
 
   const caps = CITY_CAPABILITIES[networkForCapabilities] || CITY_CAPABILITIES.WL;
 
   // Settings Tags aktualisieren
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO'};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -5472,7 +6271,7 @@ function updateFinetuningPreview() {
         // Farben für verschiedene Zuggattungen
         let lineColor = '#666';  // Default grau
         const ln = dep.line;
-        if (ln.startsWith('S')) lineColor = '#009640';  // S-Bahn grün
+        if (ln.startsWith('S')) lineColor = '#0055A4';  // S-Bahn blau
         else if (/^(ICE|IC|EC)/.test(ln)) lineColor = '#c80000';  // DB Fernverkehr rot
         else if (/^(RJ|RJX|NJ)/.test(ln)) lineColor = '#c80000';  // ÖBB Fernverkehr rot
         else if (/^(RE|RB|IRE)/.test(ln)) lineColor = '#1E5A9C';  // DE Regional blau
@@ -5542,6 +6341,33 @@ function updateFinetuningPreview() {
           <span style="color:#ffcd00;font-size:28px;font-weight:bold;">${dep2.time}</span>
         </div>
       </div>
+    </div>`;
+  }
+  else if (colour === 10) {
+    // Straba Ansicht: Große + kleine Zeile pro Gruppe
+    previewEl.style.background = '#1e1e1e';
+    previewEl.style.backgroundImage = 'none';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+      ${data.map((dep, i) => {
+        const lineColor = dep.line.startsWith('U') ? '#5a3782' : (dep.line.length <= 2 && !isNaN(dep.line) ? '#dc2828' : '#005a8c');
+        const time2 = dep.time2 || (dep.time + 2);
+        const dest2 = dep.dest2 || dep.dest;
+        return `
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:2px 8px;${i < data.length - 1 ? 'border-bottom:1px solid #333;' : ''}">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+              <div style="background:${lineColor};border-radius:5px;padding:2px 6px;min-width:30px;text-align:center;font-weight:bold;font-size:16px;color:#fff;">${dep.line}</div>
+              <span style="flex:1;font-size:14px;color:#fff;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
+              <span style="font-weight:bold;font-size:20px;color:#fff;">${dep.time}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;padding-left:8px;">
+              <div style="background:${lineColor};border-radius:3px;padding:1px 4px;min-width:20px;text-align:center;font-weight:bold;font-size:9px;color:#fff;">${dep.line}</div>
+              <span style="flex:1;font-size:10px;color:#b4b4b4;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dest2}</span>
+              <span style="font-weight:bold;font-size:12px;color:#b4b4b4;">${time2}</span>
+            </div>
+          </div>
+        `;
+      }).join('')}
     </div>`;
   }
 
