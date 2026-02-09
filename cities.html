@@ -4850,8 +4850,10 @@ async function editStation(idx) {
     showStep('wienLine');
   } else {
     // Andere Netzwerke: Direkt zur Linienauswahl
-    selectedStop = { id: station.stopId, name: station.stopName };
-    await selectStopForEdit(station.stopId, station.stopName, station.directions || [], station.filter || '');
+    // Bei OEBB Fernverkehr: stopName ist "Wien Meidling → Linz Hbf" - nur den Von-Teil verwenden
+    const displayName = station.stopName.includes(' → ') ? station.stopName.split(' → ')[0] : station.stopName;
+    selectedStop = { id: station.stopId, name: displayName };
+    await selectStopForEdit(station.stopId, displayName, station.directions || [], station.filter || '');
   }
 }
 
@@ -6396,27 +6398,22 @@ function isLinzNetwork() {
 }
 
 function collectFtLineFilter() {
-  // Generiere Filter aus allen aktuell verfügbaren Richtungen
-  // Format: "1:Universität,2:Solarcity,27:Chemiepark"
-  // WICHTIG: Gruppierte Linien werden im Display sowieso nicht gefiltert,
-  // daher hier nur die ungruppierten Richtungen sammeln
+  // Generiere Filter aus ALLEN Richtungen die im Feintuning sichtbar sind
+  // Format: "43:Hessenplatz,S5:Linz/Donau Hbf"
+  // WICHTIG: Dies ist der echte Richtungs-Filter den das ESP32 nutzt (lineFilterDestination)!
+  // Alle Richtungen (gruppierte UND ungegruppierte) müssen enthalten sein,
+  // da bei LINZ/OEBB die API ALLE Linien zurückgibt und das ESP filtern muss.
 
   const filterParts = [];
 
-  // Sammle alle Keys die in Gruppen sind
-  const groupedKeys = new Set();
   for (const group of ftLineGroups) {
     if (group.directions) {
       for (const key of group.directions) {
-        groupedKeys.add(key);
+        const dirInfo = ftAllDirections.find(d => d.key === key);
+        if (dirInfo && dirInfo.line && dirInfo.towards) {
+          filterParts.push(dirInfo.line + ':' + dirInfo.towards);
+        }
       }
-    }
-  }
-
-  // Nur ungroupierte Richtungen zum Filter hinzufügen
-  for (const dir of ftAllDirections) {
-    if (dir.line && dir.towards && !groupedKeys.has(dir.key)) {
-      filterParts.push(dir.line + ':' + dir.towards);
     }
   }
 
@@ -6674,65 +6671,67 @@ function parseFtExistingGroups(lineGroupsStr) {
   const usedKeys = new Set();  // Verhindert Duplikate über alle Gruppen
   console.log('[parseFtExistingGroups] Eingabe:', lineGroupsStr);
 
-  // Format: "1:Auwiesen+2:solarCity,1:Uni+2:Uni"
+  // Format: "1:Auwiesen+2:solarCity,1:Uni+2:Uni" oder auch "S5:Linz/Donau Hbf" (1er-Gruppe)
   const groups = lineGroupsStr.split(',');
 
   groups.forEach((groupStr, groupIdx) => {
-    if (groupStr.includes('+')) {
-      const rawDirections = groupStr.split('+').map(d => d.trim()).filter(d => d);
+    const rawDirections = groupStr.split('+').map(d => d.trim()).filter(d => d);
 
-      // Mappe auf verfügbare Keys in ftAllDirections
-      const mappedDirections = rawDirections.map(rawKey => {
-        // Parse Linie:Ziel
-        const colonIdx = rawKey.indexOf(':');
-        if (colonIdx > 0) {
-          const line = rawKey.substring(0, colonIdx);
-          let dest = rawKey.substring(colonIdx + 1);
+    // Mappe auf verfügbare Keys in ftAllDirections
+    const mappedDirections = rawDirections.map(rawKey => {
+      return mapRawKeyToDirection(rawKey, usedKeys);
+    }).filter(k => k !== null && !usedKeys.has(k));
 
-          // Falls altes Format mit :R (richtungsId), extrahiere nur die Linie
-          if (dest.startsWith('R') && /^\d+$/.test(dest.substring(1))) {
-            // Altes richtungsId-Format - suche nach Linie
-            const lineMatch = ftAllDirections.find(d => d.line === line);
-            if (lineMatch) {
-              console.log(`[parseFtExistingGroups] '${rawKey}' -> Linien-Migration: ${lineMatch.key}`);
-              return lineMatch.key;
-            }
-          }
+    // Alle gemappten Keys als verwendet markieren
+    mappedDirections.forEach(k => usedKeys.add(k));
 
-          // Suche exakten Match Linie:Ziel
-          const match = ftAllDirections.find(d => d.line === line && d.towards === dest);
-          if (match) {
-            console.log(`[parseFtExistingGroups] '${rawKey}' -> Match: ${match.key}`);
-            return match.key;
-          }
-
-          // Partial Match (Ziel enthält oder ist enthalten)
-          const partialMatch = ftAllDirections.find(d =>
-            d.line === line && (d.towards.includes(dest) || dest.includes(d.towards))
-          );
-          if (partialMatch) {
-            console.log(`[parseFtExistingGroups] '${rawKey}' -> Partial: ${partialMatch.key}`);
-            return partialMatch.key;
-          }
-        }
-
-        // Direkter Key-Match
-        const directMatch = ftAllDirections.find(d => d.key === rawKey);
-        if (directMatch) return directMatch.key;
-
-        console.log(`[parseFtExistingGroups] '${rawKey}' -> NICHT gefunden`);
-        return null;
-      }).filter(k => k !== null && !usedKeys.has(k));  // Filter Duplikate
-
-      // Alle gemappten Keys als verwendet markieren
-      mappedDirections.forEach(k => usedKeys.add(k));
-
-      if (mappedDirections.length >= 2) {
-        ftLineGroups.push({ directions: mappedDirections });
-        console.log(`[parseFtExistingGroups] Gruppe ${groupIdx}:`, mappedDirections);
-      }
+    if (mappedDirections.length >= 1) {
+      ftLineGroups.push({ directions: mappedDirections });
+      console.log(`[parseFtExistingGroups] Gruppe ${groupIdx}:`, mappedDirections);
     }
   });
+}
+
+// Mappt einen gespeicherten Key (z.B. "S5:Linz/Donau Hbf") auf einen verfügbaren Key in ftAllDirections
+function mapRawKeyToDirection(rawKey, usedKeys) {
+  // Parse Linie:Ziel
+  const colonIdx = rawKey.indexOf(':');
+  if (colonIdx > 0) {
+    const line = rawKey.substring(0, colonIdx);
+    let dest = rawKey.substring(colonIdx + 1);
+
+    // Falls altes Format mit :R (richtungsId), extrahiere nur die Linie
+    if (dest.startsWith('R') && /^\d+$/.test(dest.substring(1))) {
+      const lineMatch = ftAllDirections.find(d => d.line === line);
+      if (lineMatch) {
+        console.log(`[parseFtExistingGroups] '${rawKey}' -> Linien-Migration: ${lineMatch.key}`);
+        return lineMatch.key;
+      }
+    }
+
+    // Suche exakten Match Linie:Ziel
+    const match = ftAllDirections.find(d => d.line === line && d.towards === dest);
+    if (match) {
+      console.log(`[parseFtExistingGroups] '${rawKey}' -> Match: ${match.key}`);
+      return match.key;
+    }
+
+    // Partial Match (Ziel enthält oder ist enthalten)
+    const partialMatch = ftAllDirections.find(d =>
+      d.line === line && (d.towards.includes(dest) || dest.includes(d.towards))
+    );
+    if (partialMatch) {
+      console.log(`[parseFtExistingGroups] '${rawKey}' -> Partial: ${partialMatch.key}`);
+      return partialMatch.key;
+    }
+  }
+
+  // Direkter Key-Match
+  const directMatch = ftAllDirections.find(d => d.key === rawKey);
+  if (directMatch) return directMatch.key;
+
+  console.log(`[parseFtExistingGroups] '${rawKey}' -> NICHT gefunden`);
+  return null;
 }
 
 function renderFtGroupingUI() {
@@ -7497,7 +7496,7 @@ function saveConfig() {
 // ==================== LOAD EXISTING ====================
 // linefilterdestination: Linz-Format "1:Auwiesen,2:solarCity,27:Chemiepark" mit Line:Destination
 // roworderdestination: Wien-Format "4A:Karlsplatz U,4A:Wittelsbachstraße,59A:Bhf. Meidling S U" mit Line:Destination
-async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination) {
+async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination, linegroups) {
   if (!rbl || rbl.trim() === '') return;
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
@@ -7526,6 +7525,26 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
       });
     });
   }
+
+  // linegroups als Fallback-Filter: Enthält "S5:Linz/Donau Hbf,REX:Wien Hbf+S1:Wien Hbf"
+  // Wenn kein filter und kein linefilterdestination vorhanden, nutze linegroups als Richtungs-Filter
+  if (lineDestinations.length === 0 && linegroups) {
+    linegroups.split(',').forEach(groupOrEntry => {
+      const parts = groupOrEntry.split('+');
+      parts.forEach(entry => {
+        const colonIdx = entry.indexOf(':');
+        if (colonIdx > 0) {
+          const line = entry.substring(0, colonIdx).trim();
+          const towards = entry.substring(colonIdx + 1).trim();
+          if (!lineDestinations.some(ld => ld.line === line && ld.towards === towards)) {
+            lineDestinations.push({ line, towards });
+          }
+        }
+      });
+    });
+    console.log('[loadExistingConfig] lineDestinations aus linegroups:', lineDestinations);
+  }
+
   console.log('[loadExistingConfig] lineDestinations:', lineDestinations);
 
   for (let idx = 0; idx < rblParts.length; idx++) {
@@ -7568,7 +7587,7 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
     const station = {
       network,
       networkName: NETWORKS[network]?.name || network,
-      stopId,
+      stopId: isJourney ? stopId.split('>')[0] : stopId,
       stopName,
       filter: stationFilter,
       fullId,
@@ -7577,54 +7596,85 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
       directions: []  // Wird unten befüllt
     };
 
-    // Directions aus API laden (gefiltert)
-    try {
-      const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
-      const data = await response.json();
-
-      if (data.data && data.data.monitors) {
-        data.data.monitors.forEach(monitor => {
-          if (monitor.lines && Array.isArray(monitor.lines)) {
-            monitor.lines.forEach(line => {
-              const lineName = line.name || '';
-              const towards = line.towards || monitor.towards || '';
-              const type = line.type || '';
-
-              // Prüfen ob diese Linie+Richtung ausgewählt werden soll
-              let shouldInclude = false;
-
-              if (lineDestinations.length > 0) {
-                // Linz-Modus: Prüfe gegen linefilterdestination (Line + Destination)
-                shouldInclude = lineDestinations.some(ld =>
-                  ld.line === lineName && ld.towards === towards
-                );
-              } else if (filterLines.length > 0) {
-                // Fallback: Nur Liniennummer prüfen
-                shouldInclude = filterLines.includes(lineName);
-              } else {
-                // Kein Filter: Alle Linien einschließen
-                shouldInclude = true;
-              }
-
-              if (shouldInclude) {
-                // Duplikate vermeiden
-                const exists = station.directions.some(d =>
-                  d.line === lineName && d.towards === towards
-                );
-                if (!exists) {
-                  station.directions.push({
-                    line: lineName,
-                    towards: towards,
-                    type: type
-                  });
-                }
-              }
-            });
-          }
+    // OEBB Fernverkehr (Von-Nach): Directions direkt aus Filter + Zielname aufbauen
+    // Die API gibt Zugnamen wie "RJX 161" zurück, aber der Filter enthält nur Gattungen "RJX"
+    // Deshalb können wir nicht per API matchen - stattdessen Gattungen direkt als Directions verwenden
+    if (network === 'OEBB' && isJourney) {
+      const toName = stopName.split(' → ')[1] || '';
+      if (filterLines.length > 0) {
+        filterLines.forEach(gattung => {
+          station.directions.push({
+            line: gattung,
+            towards: toName,
+            type: 'ptTrain'
+          });
+        });
+      } else {
+        // Kein Filter: Alle OEBB-Gattungen als Directions
+        OEBB_GATTUNGEN.forEach(g => {
+          station.directions.push({
+            line: g,
+            towards: toName,
+            type: 'ptTrain'
+          });
         });
       }
-    } catch (e) {
-      // API error - station will have empty directions
+    } else {
+      // Andere Netze: Directions aus API laden (gefiltert)
+      try {
+        const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
+        const data = await response.json();
+
+        if (data.data && data.data.monitors) {
+          data.data.monitors.forEach(monitor => {
+            if (monitor.lines && Array.isArray(monitor.lines)) {
+              monitor.lines.forEach(line => {
+                const lineName = line.name || '';
+                const towards = line.towards || monitor.towards || '';
+                const type = line.type || '';
+
+                // Prüfen ob diese Linie+Richtung ausgewählt werden soll
+                let shouldInclude = false;
+
+                if (lineDestinations.length > 0) {
+                  // Prüfe gegen Linie + Destination (aus linefilterdestination oder linegroups)
+                  shouldInclude = lineDestinations.some(ld => {
+                    if (ld.line !== lineName) return false;
+                    if (!ld.towards || !towards) return true;  // Ohne Richtung: nur Linie matchen
+                    // Exakter Match
+                    if (ld.towards === towards) return true;
+                    // Partieller Match (API gibt z.B. "Linz/Donau Hauptbahnhof", linegroups hat "Linz/Donau Hbf")
+                    if (ld.towards.includes(towards) || towards.includes(ld.towards)) return true;
+                    return false;
+                  });
+                } else if (filterLines.length > 0) {
+                  // Fallback: Nur Liniennummer prüfen
+                  shouldInclude = filterLines.includes(lineName);
+                } else {
+                  // Kein Filter: Alle Linien einschließen
+                  shouldInclude = true;
+                }
+
+                if (shouldInclude) {
+                  // Duplikate vermeiden
+                  const exists = station.directions.some(d =>
+                    d.line === lineName && d.towards === towards
+                  );
+                  if (!exists) {
+                    station.directions.push({
+                      line: lineName,
+                      towards: towards,
+                      type: type
+                    });
+                  }
+                }
+              });
+            }
+          });
+        }
+      } catch (e) {
+        // API error - station will have empty directions
+      }
     }
 
     stations.push(station);
@@ -7677,7 +7727,7 @@ async function handleConfigMessage(data) {
     if (data.rbl && !data.rbl.includes(':')) {
       await loadWienData();
     }
-    await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '');
+    await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '', data.linegroups || '');
     return;
   }
 
@@ -7700,7 +7750,8 @@ async function handleConfigMessage(data) {
     if (rblId && !rblId.includes(':')) {
       await loadWienData();
     }
-    await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest);
+    const lineGroupsStr = data.config.linegroups || '';
+    await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest, lineGroupsStr);
 
     // Initialisiere recommendedConfig falls noch nicht vorhanden
     if (!recommendedConfig) {
