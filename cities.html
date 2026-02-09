@@ -2562,6 +2562,33 @@
           <!-- Wird dynamisch gefüllt mit drag & drop Items (Gruppen + einzelne Linien) -->
         </div>
       </div>
+
+      <!-- Anzeige-Modus: Gemischt/Slideshow (nur Wien/BODO) -->
+      <div id="ftDisplayModeSection" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid #e0e0e0;">
+        <div class="form-row">
+          <div>
+            <div class="form-label">Anzeige-Modus</div>
+            <div class="form-hint">Gemischt zeigt alle Linien zusammen, Slideshow wechselt durch</div>
+          </div>
+          <div class="toggle-row" id="ftDisplayModeToggle">
+            <button class="toggle-btn active" data-value="1" onclick="setFtDisplayMode(1)">Gemischt</button>
+            <button class="toggle-btn" data-value="2" onclick="setFtDisplayMode(2)">Slideshow</button>
+          </div>
+        </div>
+        <div id="ftSlideshowSettings" style="display:none; margin-top:12px;">
+          <div class="form-row">
+            <div>
+              <div class="form-label">Wechsel-Intervall</div>
+            </div>
+            <div class="toggle-row" id="ftStopIntervalToggle">
+              <button class="toggle-btn" data-value="5" onclick="setFtStopInterval(5)">5s</button>
+              <button class="toggle-btn active" data-value="10" onclick="setFtStopInterval(10)">10s</button>
+              <button class="toggle-btn" data-value="15" onclick="setFtStopInterval(15)">15s</button>
+              <button class="toggle-btn" data-value="30" onclick="setFtStopInterval(30)">30s</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Nachtmodus -->
@@ -3954,6 +3981,14 @@ async function performSearch(query) {
       results = results.filter(s => {
         const name = s.name || '';
         return name.includes('Wien') || name.includes('(Wien)');
+      });
+    }
+
+    // OEBB Regional NÖ/OÖ: Wien-Stationen ausfiltern (gleicher Ansatz wie OEBB_SBAHN, nur invertiert)
+    if (selectedNetwork === 'OEBB_REG_NOE' || selectedNetwork === 'OEBB_REG_OOE') {
+      results = results.filter(s => {
+        const name = (s.name || '').toLowerCase();
+        return !name.startsWith('wien ') && !name.includes('(wien)');
       });
     }
 
@@ -5817,6 +5852,15 @@ async function initFinetuningStep() {
   // Sortierungsmodus initialisieren (NACH initFtGrouping!)
   setFtSortMode(config.sortMode || 1);
 
+  // Anzeige-Modus (Gemischt/Slideshow) - nur für Wien und BODO
+  const displayModeSection = document.getElementById('ftDisplayModeSection');
+  const isWienOrBodo = stations.some(s => s.network === 'WL' || s.network === 'BODO');
+  if (displayModeSection) {
+    displayModeSection.style.display = isWienOrBodo ? 'block' : 'none';
+  }
+  setFtDisplayMode(config.displayMode || 1);
+  setFtStopInterval(config.stopInterval || 10);
+
   // Preview aktualisieren
   updateFinetuningPreview();
 }
@@ -5908,6 +5952,26 @@ function setFtTextColor(value) {
 function getFtTextColor() {
   const active = document.querySelector('#ftTextColorToggle .toggle-btn.active');
   return active ? parseInt(active.dataset.value) : 1;  // Default: Gelb
+}
+
+// ==================== ANZEIGE-MODUS (GEMISCHT/SLIDESHOW) ====================
+let ftDisplayMode = 1;   // 1=Gemischt, 2=Slideshow
+let ftStopInterval = 10; // Sekunden pro Stop bei Slideshow
+
+function setFtDisplayMode(value) {
+  ftDisplayMode = value;
+  document.querySelectorAll('#ftDisplayModeToggle .toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.value) === value);
+  });
+  const settings = document.getElementById('ftSlideshowSettings');
+  if (settings) settings.style.display = value === 2 ? 'block' : 'none';
+}
+
+function setFtStopInterval(value) {
+  ftStopInterval = value;
+  document.querySelectorAll('#ftStopIntervalToggle .toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.value) === value);
+  });
 }
 
 // ==================== SORTIERUNG & ZEILEN-REIHENFOLGE ====================
@@ -7146,6 +7210,8 @@ function saveFromFinetuning() {
   recommendedConfig.sortMode = sortMode;
   recommendedConfig.rowOrder = rowOrder;
   recommendedConfig.rowOrderDestination = rowOrderDestination;
+  recommendedConfig.displayMode = ftDisplayMode;
+  recommendedConfig.stopInterval = ftStopInterval;
 
   // Speichern
   showSavingOverlay('Speichere Einstellungen...');
@@ -7776,6 +7842,13 @@ async function handleConfigMessage(data) {
     }
     if (data.config.roworderdestination) {
       recommendedConfig.rowOrderDestination = data.config.roworderdestination;
+    }
+    // Anzeige-Modus (Gemischt/Slideshow)
+    if (data.config.display_mode !== undefined) {
+      recommendedConfig.displayMode = parseInt(data.config.display_mode) || 1;
+    }
+    if (data.config.stop_interval !== undefined) {
+      recommendedConfig.stopInterval = parseInt(data.config.stop_interval) || 10;
     }
     // Weitere Feintuning-Einstellungen
     if (data.config.colour !== undefined) {
