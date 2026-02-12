@@ -275,6 +275,31 @@
     .gehweg-error{font-size:11px;color:#ff453a;margin-top:4px;display:none}
     .gehweg-error.show{display:block}
     .gehweg-item .unit{color:#888;font-size:13px;margin-left:8px;flex-shrink:0}
+
+    /* Wien-Only Badge */
+    .wien-only-badge{
+      font-size:10px;
+      background:#E20613;
+      color:#fff;
+      padding:2px 6px;
+      border-radius:4px;
+      margin-left:8px;
+      font-weight:500;
+      text-transform:none;
+      letter-spacing:0;
+    }
+
+    /* Disabled/Hidden Feature Rows */
+    .control-row.feature-disabled{
+      opacity:0.4;
+      pointer-events:none;
+    }
+    .control-row.feature-hidden{
+      display:none;
+    }
+    .card.feature-hidden{
+      display:none;
+    }
     
     /* Number inputs */
     input[type="number"]{
@@ -428,23 +453,25 @@
     </div>
   </div>
   
-  <!-- ==================== BARRIEREFREIHEIT ==================== -->
-  <div class="card">
-    <h2>♿ Barrierefreiheit</h2>
-    
-    <div class="control-row">
+  <!-- ==================== BARRIEREFREIHEIT (Wien-spezifisch) ==================== -->
+  <div class="card" id="cardBarrierefreiheit">
+    <h2>♿ Barrierefreiheit <span id="wienOnlyBadge1" class="wien-only-badge" style="display:none;">Wien</span></h2>
+
+    <div class="control-row" id="rowChopper">
       <div class="control-label">
         <span>Hochflurer markieren</span>
+        <small>Zeigt Warnfarbe bei nicht barrierefreien Fahrzeugen</small>
       </div>
       <div class="segmented" data-name="chopper">
         <div class="seg-btn" data-value="0">Aus</div>
         <div class="seg-btn active" data-value="1">An</div>
       </div>
     </div>
-    
-    <div class="control-row">
+
+    <div class="control-row" id="rowSilberpfeil">
       <div class="control-label">
         <span>U-Bahnen mit Klimaanlage</span>
+        <small>Markiert klimatisierte U-Bahn-Züge</small>
       </div>
       <div class="segmented" data-name="silberpfeil">
         <div class="seg-btn" data-value="0">Aus</div>
@@ -452,12 +479,12 @@
       </div>
     </div>
   </div>
-  
+
   <!-- ==================== DESIGN ==================== -->
-  <div class="card">
+  <div class="card" id="cardDesign">
     <h2>🎨 Design</h2>
-    
-    <div class="control-row">
+
+    <div class="control-row" id="rowTextfarbe">
       <div class="control-label"><span>Textfarbe</span></div>
       <div class="color-row" data-name="colour">
         <div class="color-dot color-amber active" data-value="1" title="Gelb/Amber"></div>
@@ -465,7 +492,7 @@
         <div class="color-dot color-orange" data-value="3" title="Orange"></div>
       </div>
     </div>
-    
+
     <div class="control-row">
       <div class="control-label"><span>Helligkeit</span></div>
       <div class="segmented" data-name="displaylight">
@@ -621,6 +648,65 @@
 let pendingRbl = '';
 let pendingFilter = '';
 let currentConfig = {};
+let currentCapabilities = null;  // City Capabilities für Feature-Anzeige
+
+// City Capabilities (kopiert aus cities.html für Konsistenz)
+const CITY_CAPABILITIES = {
+  WL: {
+    textColorChangeable: true,
+    showHighFloor: true,
+    showAirCondition: true,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 1,
+    defaultBrightness: 3
+  },
+  WLB: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 4,
+    defaultBrightness: 3
+  },
+  LINZ: {
+    textColorChangeable: true,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 2,
+    defaultBrightness: 3
+  },
+  DB: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 6,
+    defaultBrightness: 3
+  },
+  BERLIN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 3,
+    defaultBrightness: 3
+  },
+  BODO: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 7,
+    defaultBrightness: 3
+  }
+};
 
 // ==================== EXPAND TOGGLE ====================
 function toggleExpand() {
@@ -927,6 +1013,12 @@ function setSegmentValue(name, value) {
 function applyConfig(config) {
   console.log('Config anwenden:', config);
   currentConfig = config;
+
+  // Capabilities aus RBL ableiten (falls nicht bereits gesetzt)
+  if (!currentCapabilities && config.rbl_id) {
+    const network = detectNetworkFromRbl(config.rbl_id);
+    updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
+  }
   
   // Anzeige
   setSegmentValue('anzeige', config.lines_count || '2');
@@ -997,45 +1089,77 @@ function applyConfig(config) {
 // ==================== SPEICHERN (via postMessage an Parent/ESP32) ====================
 document.getElementById('saveBtn').addEventListener('click', () => {
   document.getElementById('loading').classList.add('show');
-  
+
+  const rblString = pendingRbl || currentConfig.rbl_id || '';
+  const filterString = pendingFilter || currentConfig.lines_filter || '';
+
+  // Wien rowOrder generieren: "stopId:Linie,stopId:Linie"
+  // z.B. aus rbl="272,692,1370" und filter="2|13A|44" -> "272:2,692:13A,1370:44"
+  let rowOrder = '';
+  let lineGroups = '';
+  if (rblString && filterString) {
+    const stopIds = rblString.split(',').map(s => s.trim());
+    const filters = filterString.split('|').map(s => s.trim());
+
+    // rowOrder und lineGroups im Wien-Format erstellen
+    const rowOrderParts = [];
+    const lineGroupParts = [];
+    stopIds.forEach((stopId, i) => {
+      // Filter enthält die Linien pro Stop (kommagetrennt)
+      const linesForStop = filters[i] ? filters[i].split(',').map(l => l.trim()) : [];
+      linesForStop.forEach(line => {
+        if (line) {
+          rowOrderParts.push(`${stopId}:${line}`);
+          lineGroupParts.push(`${stopId}:${line}`);
+        }
+      });
+    });
+    rowOrder = rowOrderParts.join(',');
+    lineGroups = lineGroupParts.join(',');
+  }
+
   // Config-Daten sammeln
   const configData = {
     type: 'setRBL',
-    
+
     // Stop-IDs (entweder pending oder bestehende)
-    rbl: pendingRbl || currentConfig.rbl_id || '',
-    filter: pendingFilter || currentConfig.lines_filter || '',
-    
+    rbl: rblString,
+    filter: filterString,
+
     // Anzeige
     zeilen: getSegmentValue('anzeige'),
     sortmode: getSegmentValue('sortmode'),
-    
+
     // Barrierefreiheit
     chopper: getSegmentValue('chopper'),
     silberpfeil: getSegmentValue('silberpfeil'),
-    
+
     // Design
     colour: getSegmentValue('colour'),
     displaylight: getSegmentValue('displaylight'),
-    
+
     // Nachtmodus
     nightmode: document.getElementById('nightmodeToggle').classList.contains('on') ? '1' : '0',
     nightstart: document.getElementById('nightstart').value,
     nightend: document.getElementById('nightend').value,
-    
+
     // Fun-Nachrichten
     showfunmessages: document.getElementById('funMessagesToggle').classList.contains('on') ? '1' : '0',
-    
+
     // Erweiterte
     displaymode: getSegmentValue('displaymode'),
     stopinterval: getSegmentValue('stopinterval'),
-    
+
     // Gehweg
-    gehweg: document.getElementById('gehwegToggle').classList.contains('on') ? getGehwegString() : '0'
+    gehweg: document.getElementById('gehwegToggle').classList.contains('on') ? getGehwegString() : '0',
+
+    // NEU: Wien rowOrder und lineGroups (Format: stopId:Linie)
+    roworder: rowOrder,
+    linegroups: lineGroups
   };
-  
+
   console.log('Sende Config an ESP32:', configData);
-  
+
   // Sende an Parent (ESP32-Seite)
   if (window.parent && window.parent !== window) {
     window.parent.postMessage(configData, '*');
@@ -1045,12 +1169,12 @@ document.getElementById('saveBtn').addEventListener('click', () => {
     document.getElementById('loading').classList.remove('show');
     return;
   }
-  
+
   // Status-Updates
   setTimeout(() => {
     document.querySelector('.loading-text').textContent = 'Neustart läuft...';
   }, 2000);
-  
+
   setTimeout(() => {
     document.querySelector('.loading-text').textContent = 'Fertig! Seite wird neu geladen...';
   }, 5000);
@@ -1099,48 +1223,204 @@ window.addEventListener('message', function(event) {
   }
 });
 
+// ==================== FEATURE VISIBILITY BASIEREND AUF CAPABILITIES ====================
+function updateFeatureVisibility(capabilities) {
+  currentCapabilities = capabilities;
+
+  // Hochflurer-Option
+  const rowChopper = document.getElementById('rowChopper');
+  if (rowChopper) {
+    if (capabilities && capabilities.showHighFloor) {
+      rowChopper.classList.remove('feature-hidden', 'feature-disabled');
+    } else {
+      rowChopper.classList.add('feature-hidden');
+    }
+  }
+
+  // Klimaanlage-Option (Silberpfeil)
+  const rowSilberpfeil = document.getElementById('rowSilberpfeil');
+  if (rowSilberpfeil) {
+    if (capabilities && capabilities.showAirCondition) {
+      rowSilberpfeil.classList.remove('feature-hidden', 'feature-disabled');
+    } else {
+      rowSilberpfeil.classList.add('feature-hidden');
+    }
+  }
+
+  // Textfarbe-Option
+  const rowTextfarbe = document.getElementById('rowTextfarbe');
+  if (rowTextfarbe) {
+    if (capabilities && capabilities.textColorChangeable) {
+      rowTextfarbe.classList.remove('feature-hidden', 'feature-disabled');
+    } else {
+      rowTextfarbe.classList.add('feature-hidden');
+    }
+  }
+
+  // Wien-Badge anzeigen wenn Wien-Features aktiv
+  const wienBadge1 = document.getElementById('wienOnlyBadge1');
+  if (wienBadge1) {
+    const isWien = capabilities && (capabilities.showHighFloor || capabilities.showAirCondition);
+    wienBadge1.style.display = isWien ? 'inline' : 'none';
+  }
+
+  // Barrierefreiheit-Karte komplett verstecken wenn keine Features
+  const cardBarrierefreiheit = document.getElementById('cardBarrierefreiheit');
+  if (cardBarrierefreiheit) {
+    const hasAnyFeature = capabilities && (capabilities.showHighFloor || capabilities.showAirCondition);
+    if (!hasAnyFeature) {
+      cardBarrierefreiheit.classList.add('feature-hidden');
+    } else {
+      cardBarrierefreiheit.classList.remove('feature-hidden');
+    }
+  }
+
+  console.log('Feature visibility updated:', capabilities);
+}
+
+// Erkennt das Netzwerk aus der RBL-ID
+function detectNetworkFromRbl(rbl) {
+  if (!rbl) return 'WL';  // Default
+  const firstId = rbl.split(',')[0].trim();
+  if (firstId.includes(':')) {
+    const network = firstId.split(':')[0].toUpperCase();
+    return network;
+  }
+  // Nur Zahlen = Wiener Linien
+  return 'WL';
+}
+
+// ==================== PRECONFIG VON CITIES.HTML ÜBERNEHMEN ====================
+function applyPreConfig(preConfig) {
+  console.log('Übernehme PreConfig von cities:', preConfig);
+
+  // Capabilities übernehmen
+  if (preConfig.capabilities) {
+    updateFeatureVisibility(preConfig.capabilities);
+  } else {
+    // Capabilities aus Netzwerk ableiten
+    const network = detectNetworkFromRbl(preConfig.rbl);
+    updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
+  }
+
+  // Display-Einstellungen
+  if (preConfig.colour) setSegmentValue('colour', preConfig.colour);
+  if (preConfig.rows) setSegmentValue('anzeige', preConfig.rows);
+  if (preConfig.sortMode) setSegmentValue('sortmode', preConfig.sortMode);
+  if (preConfig.displayLight) setSegmentValue('displaylight', preConfig.displayLight);
+
+  // Barrierefreiheit
+  if (preConfig.chopper !== undefined) setSegmentValue('chopper', preConfig.chopper);
+  if (preConfig.silberpfeil !== undefined) setSegmentValue('silberpfeil', preConfig.silberpfeil);
+
+  // Nachtmodus
+  if (preConfig.nightMode) {
+    document.getElementById('nightmodeToggle').classList.add('on');
+  }
+  if (preConfig.nightStart) document.getElementById('nightstart').value = preConfig.nightStart;
+  if (preConfig.nightEnd) document.getElementById('nightend').value = preConfig.nightEnd;
+
+  // Erweiterte Einstellungen
+  if (preConfig.displayMode) setSegmentValue('displaymode', preConfig.displayMode);
+  if (preConfig.stopInterval) setSegmentValue('stopinterval', preConfig.stopInterval);
+
+  // Fun-Nachrichten
+  if (preConfig.showFunMessages === false) {
+    document.getElementById('funMessagesToggle').classList.remove('on');
+  }
+
+  // Gehweg-Werte
+  if (preConfig.gehweg && Array.isArray(preConfig.gehweg)) {
+    const stopIds = preConfig.rbl ? preConfig.rbl.split(',').map(s => s.trim()).filter(s => s) : [];
+    updateGehwegList(stopIds, preConfig.gehweg, preConfig.details || []);
+
+    // Gehweg-Toggle aktivieren wenn Werte > 0
+    const hasValues = preConfig.gehweg.some(v => v > 0);
+    if (hasValues) {
+      document.getElementById('gehwegToggle').classList.add('on');
+    }
+  }
+
+  updateUI();
+}
+
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
   updatePreview();
   updateUI();
-  
+
   // Frage Parent nach bestehender Config
   if (window.parent && window.parent !== window) {
     console.log('In iframe - frage Parent nach Config');
     window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
     window.parent.postMessage({ type: 'requestFullConfig' }, '*');
   }
-  
-  // Fallback: Prüfe localStorage (für lokales Testen)
-  const localPendingRbl = localStorage.getItem('straba_pending_rbl');
-  if (localPendingRbl) {
-    pendingRbl = localPendingRbl;
-    pendingFilter = localStorage.getItem('straba_pending_filter') || '';
-    
-    const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
-    let details = [];
-    
-    const pendingDetails = localStorage.getItem('straba_pending_details');
-    if (pendingDetails) {
-      try {
-        details = JSON.parse(pendingDetails);
-      } catch (e) {
-        console.error('Fehler beim Parsen der Station Details:', e);
-      }
+
+  // Prüfe localStorage für PreConfig von cities.html
+  const pendingConfigStr = localStorage.getItem('straba_pending_config');
+  if (pendingConfigStr) {
+    try {
+      const preConfig = JSON.parse(pendingConfigStr);
+      applyPreConfig(preConfig);
+
+      pendingRbl = preConfig.rbl || '';
+      pendingFilter = preConfig.filter || '';
+
+      const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
+
+      // Zeige Banner
+      document.getElementById('pendingBanner').style.display = 'block';
+      document.getElementById('pendingText').textContent =
+        `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
+
+      // Lösche localStorage nach dem Laden
+      localStorage.removeItem('straba_pending_config');
+      localStorage.removeItem('straba_pending_rbl');
+      localStorage.removeItem('straba_pending_filter');
+      localStorage.removeItem('straba_pending_details');
+
+    } catch (e) {
+      console.error('Fehler beim Parsen der PreConfig:', e);
     }
-    
-    // Zeige Banner
-    document.getElementById('pendingBanner').style.display = 'block';
-    document.getElementById('pendingText').textContent = 
-      `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
-    
-    // Aktualisiere Gehweg-Liste
-    updateGehwegList(stopIds, [], details);
-    
-    // Lösche localStorage nach dem Laden
-    localStorage.removeItem('straba_pending_rbl');
-    localStorage.removeItem('straba_pending_filter');
-    localStorage.removeItem('straba_pending_details');
+  } else {
+    // Fallback: Alte Methode (nur RBL/Filter)
+    const localPendingRbl = localStorage.getItem('straba_pending_rbl');
+    if (localPendingRbl) {
+      pendingRbl = localPendingRbl;
+      pendingFilter = localStorage.getItem('straba_pending_filter') || '';
+
+      const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
+      let details = [];
+
+      const pendingDetails = localStorage.getItem('straba_pending_details');
+      if (pendingDetails) {
+        try {
+          details = JSON.parse(pendingDetails);
+        } catch (e) {
+          console.error('Fehler beim Parsen der Station Details:', e);
+        }
+      }
+
+      // Capabilities aus Netzwerk ableiten
+      const network = detectNetworkFromRbl(pendingRbl);
+      updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
+
+      // Zeige Banner
+      document.getElementById('pendingBanner').style.display = 'block';
+      document.getElementById('pendingText').textContent =
+        `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
+
+      // Aktualisiere Gehweg-Liste
+      updateGehwegList(stopIds, [], details);
+
+      // Lösche localStorage nach dem Laden
+      localStorage.removeItem('straba_pending_rbl');
+      localStorage.removeItem('straba_pending_filter');
+      localStorage.removeItem('straba_pending_details');
+    } else {
+      // Keine pending Config - Default zu Wien (alle Features)
+      updateFeatureVisibility(CITY_CAPABILITIES.WL);
+    }
   }
 });
 </script>
