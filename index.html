@@ -486,7 +486,7 @@
 
     <div class="control-row" id="rowTextfarbe">
       <div class="control-label"><span>Textfarbe</span></div>
-      <div class="color-row" data-name="colour">
+      <div class="color-row" data-name="textcolor">
         <div class="color-dot color-amber active" data-value="1" title="Gelb/Amber"></div>
         <div class="color-dot color-white" data-value="2" title="Weiß"></div>
         <div class="color-dot color-orange" data-value="3" title="Orange"></div>
@@ -903,13 +903,13 @@ function updateUI() {
 }
 
 function updatePreview() {
-  const colourVal = getSegmentValue('colour');
+  const textColorVal = getSegmentValue('textcolor');
   const colors = {
-    '1': '#ffb340',
-    '2': '#ffffff',
-    '3': '#ff9500'
+    '1': '#ffb340',  // Gelb/Amber
+    '2': '#ffffff',  // Weiß
+    '3': '#ff9500'   // Orange
   };
-  const textColor = colors[colourVal] || '#ffb340';
+  const textColor = colors[textColorVal] || '#ffb340';
   
   // Helligkeit
   const brightness = getSegmentValue('displaylight');
@@ -1029,7 +1029,8 @@ function applyConfig(config) {
   setSegmentValue('silberpfeil', config.silberpfeil || '1');
   
   // Design
-  setSegmentValue('colour', config.colour || '1');
+  // text_color ist die Wien-Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
+  setSegmentValue('textcolor', config.text_color || '1');
   setSegmentValue('displaylight', config.displaylight || '3');
   
   // Nachtmodus
@@ -1135,7 +1136,8 @@ document.getElementById('saveBtn').addEventListener('click', () => {
     silberpfeil: getSegmentValue('silberpfeil'),
 
     // Design
-    colour: getSegmentValue('colour'),
+    colour: '1',  // Immer Wien (1) - index.html ist nur für Wien
+    textcolor: getSegmentValue('textcolor'),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
     displaylight: getSegmentValue('displaylight'),
 
     // Nachtmodus
