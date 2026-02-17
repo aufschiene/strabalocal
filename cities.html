@@ -2543,8 +2543,8 @@
             <div class="form-hint">Dynamisch nach Zeit oder feste Reihenfolge</div>
           </div>
           <div class="toggle-row" id="ftSortModeToggle">
-            <button class="toggle-btn active" data-value="1" onclick="setFtSortMode(1)">Zeit</button>
-            <button class="toggle-btn" data-value="2" onclick="setFtSortMode(2)">Statisch</button>
+            <button class="toggle-btn active" data-value="1" onclick="setFtSortMode(1)">Statisch</button>
+            <button class="toggle-btn" data-value="2" onclick="setFtSortMode(2)">Zeit</button>
           </div>
         </div>
         <!-- Info-Box für Sortierungsmodi -->
@@ -5161,7 +5161,7 @@ function calculateRecommendedConfig() {
     stopInterval: 10,
     gehweg: gehwegValues,
     showFunMessages: true,
-    sortMode: 1,           // 1 = Zeit (dynamisch), 2 = Statisch
+    sortMode: 1,           // 1 = Statisch, 2 = Zeit (dynamisch)
     rowOrder: '',          // Zeilen-Reihenfolge einfach (für Wien)
     rowOrderDestination: '',  // Zeilen-Reihenfolge mit Ziel (für Linz)
 
@@ -5436,8 +5436,8 @@ function updateRealisticPreview(config) {
       highlight: '#ffffff',
       name: 'DB S-Bahn'
     },
-    6: { // DB Fernverkehr
-      bg: '#1a1a2e',
+    6: { // DB Fernverkehr Zugzielanzeiger
+      bg: '#0A1E6E',
       text: '#ffffff',
       highlight: '#EC0016',
       name: 'DB Fernverkehr'
@@ -5805,6 +5805,8 @@ function sendWithSuggestion() {
     return;
   }
 
+  console.log('[sendWithSuggestion] recommendedConfig.sortMode:', recommendedConfig.sortMode, '(1=Statisch, 2=Zeit)');
+
   // Zeige Lade-Animation
   showSavingOverlay('Speichere Einstellungen...');
 
@@ -5991,11 +5993,12 @@ function setFtStopInterval(value) {
 }
 
 // ==================== SORTIERUNG & ZEILEN-REIHENFOLGE ====================
-let ftSortMode = 1;  // 1 = Zeit (dynamisch), 2 = Statisch
+let ftSortMode = 1;  // 1 = Statisch, 2 = Zeit (dynamisch)
 // NEUES KONZEPT: ftLineGroups IST die Reihenfolge (ftRowOrder wird nicht mehr benötigt)
 // Die Reihenfolge von ftLineGroups entspricht der Anzeigereihenfolge auf dem Display
 
 function setFtSortMode(value) {
+  console.log('[setFtSortMode] value:', value, '(1=Statisch, 2=Zeit)');
   ftSortMode = value;
   document.querySelectorAll('#ftSortModeToggle .toggle-btn').forEach(btn => {
     btn.classList.toggle('active', parseInt(btn.dataset.value) === value);
@@ -6005,13 +6008,13 @@ function setFtSortMode(value) {
   const infoTime = document.getElementById('ftSortModeInfoTime');
   const infoStatic = document.getElementById('ftSortModeInfoStatic');
   if (infoTime && infoStatic) {
-    infoTime.style.display = (value === 1) ? 'block' : 'none';
-    infoStatic.style.display = (value === 2) ? 'block' : 'none';
+    infoTime.style.display = (value === 2) ? 'block' : 'none';
+    infoStatic.style.display = (value === 1) ? 'block' : 'none';
   }
 
-  // Zeilen-Reihenfolge Sektion ein-/ausblenden
+  // Zeilen-Reihenfolge Sektion ein-/ausblenden (bei Statisch=1 anzeigen)
   const rowOrderSection = document.getElementById('ftRowOrderSection');
-  if (value === 2) {
+  if (value === 1) {
     rowOrderSection.style.display = 'block';
     initRowOrderList();
   } else {
@@ -6168,61 +6171,56 @@ function moveRowOrder(index, direction) {
 
 function getRowOrderString() {
   // NEUES KONZEPT: ftLineGroups ist die Reihenfolge
-  // Prüfe ob Wien-Modus (WL Netzwerk)
-  const isWien = stations.some(s => s.network === 'WL');
+  // Kombiniert Wien-Format (stopId:Linie) und Nicht-Wien-Format (Linie:Ziel)
+  // So können Wien und BODO/Linz auf einem Display gemischt werden!
 
-  if (isWien) {
-    // WIEN: Format "stopId:Linie,stopId:Linie" (z.B. "4430:13A,381:U6")
-    // Bei Wien ist jede stopId = ein Bahnsteig für eine Linie
-    const items = [];
-    ftLineGroups.forEach(group => {
-      if (group.directions && group.directions.length > 0) {
-        group.directions.forEach(key => {
-          const dirInfo = ftAllDirections.find(d => d.key === key);
-          if (dirInfo) {
-            // Finde die stopId für diese Linie aus den Stationen
-            stations.forEach(station => {
-              if (station.network === 'WL' && station.directions) {
-                station.directions.forEach(dir => {
-                  if (dir.line === dirInfo.line) {
-                    // Wien: stopId kann mehrere sein (kommagetrennt), nimm die erste
-                    const stopIdParts = station.stopId.split(',');
-                    const stopId = stopIdParts[0];
-                    const item = `${stopId}:${dirInfo.line}`;
-                    if (!items.includes(item)) {
-                      items.push(item);
-                    }
-                  }
-                });
+  const items = [];
+
+  ftLineGroups.forEach(group => {
+    if (group.directions && group.directions.length > 0) {
+      group.directions.forEach(key => {
+        const dirInfo = ftAllDirections.find(d => d.key === key);
+        if (!dirInfo) return;
+
+        // Finde die Station für diese Richtung
+        let stationForDir = null;
+        stations.forEach(station => {
+          if (station.directions) {
+            station.directions.forEach(dir => {
+              if (dir.line === dirInfo.line && dir.destination === dirInfo.destination) {
+                stationForDir = station;
               }
             });
           }
         });
-      }
-    });
-    return items.join(',');
-  }
 
-  // STANDARD (Linz, etc.): Einfaches Format "1,2,43" - nur Linien
-  const lines = [];
-  ftLineGroups.forEach(group => {
-    if (group.directions && group.directions.length > 0) {
-      // Alle Linien der Gruppe hinzufügen
-      group.directions.forEach(key => {
-        const dirInfo = ftAllDirections.find(d => d.key === key);
-        const line = dirInfo ? dirInfo.line : key.split(':')[0];
-        if (!lines.includes(line)) {
-          lines.push(line);
+        if (!stationForDir) return;
+
+        let item;
+        if (stationForDir.network === 'WL') {
+          // WIEN: Format "stopId:Linie" (z.B. "4430:13A")
+          const stopIdParts = stationForDir.stopId.split(',');
+          const stopId = stopIdParts[0];
+          item = `${stopId}:${dirInfo.line}`;
+        } else {
+          // NICHT-WIEN (BODO, Linz, etc.): Format "Linie:Ziel" (z.B. "1:Auwiesen")
+          item = `${dirInfo.line}:${dirInfo.destination}`;
+        }
+
+        if (!items.includes(item)) {
+          items.push(item);
         }
       });
     }
   });
-  return lines.join(',');
+
+  return items.join(',');
 }
 
 function getRowOrderDestinationString() {
-  // VEREINFACHT: Format ist immer "Linie:Ziel+Linie:Ziel,..."
-  // ftLineGroups = [{ directions: ['1:Auwiesen', '2:solarCity'] }, { directions: ['3:Solarc'] }, ...]
+  // NUR für Nicht-Wien-Daten (BODO, Linz, etc.)
+  // Format: "Linie:Ziel+Linie:Ziel,..." (Gruppen mit +, Zeilen mit ,)
+  // Wien-Daten werden über rowOrder (stopId:Linie) abgedeckt
 
   if (ftLineGroups.length === 0) {
     return '';
@@ -6231,8 +6229,33 @@ function getRowOrderDestinationString() {
   const items = [];
   ftLineGroups.forEach(group => {
     if (group.directions && group.directions.length > 0) {
-      // Keys sind bereits im "Linie:Ziel" Format
-      items.push(group.directions.join('+'));
+      // Nur Nicht-Wien-Einträge sammeln
+      const nonWienDirs = [];
+      group.directions.forEach(key => {
+        const dirInfo = ftAllDirections.find(d => d.key === key);
+        if (!dirInfo) return;
+
+        // Prüfe ob diese Richtung zu einer Wien-Station gehört
+        let isWien = false;
+        stations.forEach(station => {
+          if (station.network === 'WL' && station.directions) {
+            station.directions.forEach(dir => {
+              if (dir.line === dirInfo.line && dir.destination === dirInfo.destination) {
+                isWien = true;
+              }
+            });
+          }
+        });
+
+        // Nur Nicht-Wien hinzufügen
+        if (!isWien) {
+          nonWienDirs.push(key);  // key ist bereits "Linie:Ziel"
+        }
+      });
+
+      if (nonWienDirs.length > 0) {
+        items.push(nonWienDirs.join('+'));
+      }
     }
   });
   return items.join(',');
@@ -7059,7 +7082,7 @@ function removeFromGroup(gIdx, key) {
 function updateRowOrderAfterGroupChange() {
   // NEUES KONZEPT: ftLineGroups IST die Reihenfolge
   // Bei Gruppenänderung: einfach die Liste neu rendern
-  if (ftSortMode === 2) {
+  if (ftSortMode === 1) {
     renderRowOrderList();
   }
 }
@@ -7261,7 +7284,7 @@ function sendConfigToDeviceDirect(config) {
   }
 
   // Config-Daten für ESP32
-  console.log('[sendConfigToDeviceDirect] config.rows:', config.rows);
+  console.log('[sendConfigToDeviceDirect] config.sortMode:', config.sortMode, '(1=Statisch, 2=Zeit)');
   const configData = {
     type: 'setRBL',
     rbl: config.rbl,
@@ -7849,8 +7872,10 @@ async function handleConfigMessage(data) {
       recommendedConfig.lineGroups = data.config.linegroups;
     }
     // Sortierungsmodus aus Config übernehmen
+    // ESP32: 1=Statisch, 2=Zeit (dynamisch)
     if (data.config.sort_mode !== undefined) {
       recommendedConfig.sortMode = parseInt(data.config.sort_mode) || 1;
+      console.log('[loadFullConfig] sort_mode vom ESP32:', data.config.sort_mode, '-> recommendedConfig.sortMode:', recommendedConfig.sortMode, '(1=Statisch, 2=Zeit)');
     }
     // Zeilen-Reihenfolge aus Config übernehmen
     if (data.config.roworder) {
