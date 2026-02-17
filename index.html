@@ -300,118 +300,7 @@
     .card.feature-hidden{
       display:none;
     }
-
-    /* Zeilen-Reihenfolge Drag & Drop */
-    .row-order-section{
-      margin-top:16px;
-      padding-top:16px;
-      border-top:1px solid rgba(255,255,255,0.1);
-      display:none;
-    }
-    .row-order-section.show{display:block}
-    .row-order-label{
-      font-size:13px;
-      color:#ffd700;
-      margin-bottom:8px;
-      font-weight:600;
-    }
-    .row-order-hint{
-      font-size:12px;
-      color:#888;
-      margin-bottom:12px;
-    }
-    .row-order-list{
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-    }
-    .row-order-item{
-      display:flex;
-      align-items:center;
-      gap:12px;
-      padding:12px;
-      background:rgba(0,0,0,0.3);
-      border:1px solid rgba(255,255,255,0.1);
-      border-radius:10px;
-      cursor:grab;
-      transition:all 0.15s;
-    }
-    .row-order-item:hover{
-      border-color:rgba(255,215,0,0.4);
-      background:rgba(0,0,0,0.4);
-    }
-    .row-order-item.dragging{
-      opacity:0.5;
-      border-color:#ffd700;
-      cursor:grabbing;
-    }
-    .row-order-item.drag-over{
-      border-color:#ffd700;
-      background:rgba(255,215,0,0.1);
-    }
-    .row-order-item .drag-handle{
-      color:#666;
-      font-size:16px;
-      cursor:grab;
-    }
-    .row-order-item .row-number{
-      min-width:24px;
-      height:24px;
-      background:#ffd700;
-      color:#1a1a2e;
-      border-radius:50%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight:700;
-      font-size:12px;
-    }
-    .row-order-item .line-badge{
-      padding:4px 10px;
-      border-radius:6px;
-      font-weight:700;
-      font-size:13px;
-      background:#ffd700;
-      color:#1a1a2e;
-    }
-    .row-order-item .direction-text{
-      flex:1;
-      color:#ccc;
-      font-size:13px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-    .row-order-item .move-buttons{
-      display:flex;
-      gap:4px;
-    }
-    .row-order-item .move-btn{
-      width:28px;
-      height:28px;
-      border:none;
-      background:rgba(255,255,255,0.1);
-      color:#888;
-      border-radius:6px;
-      cursor:pointer;
-      font-size:12px;
-      transition:all 0.15s;
-    }
-    .row-order-item .move-btn:hover:not(:disabled){
-      background:rgba(255,215,0,0.2);
-      color:#ffd700;
-    }
-    .row-order-item .move-btn:disabled{
-      opacity:0.3;
-      cursor:not-allowed;
-    }
-    .row-order-empty{
-      text-align:center;
-      padding:20px;
-      color:#666;
-      font-style:italic;
-    }
-
+    
     /* Number inputs */
     input[type="number"]{
       width:80px;
@@ -562,18 +451,8 @@
         <div class="seg-btn" data-value="2">Nach Zeit</div>
       </div>
     </div>
-
-    <!-- Zeilen-Reihenfolge (nur bei Statisch sichtbar) -->
-    <div class="row-order-section show" id="rowOrderSection">
-      <div class="row-order-label">Zeilen-Reihenfolge festlegen</div>
-      <div class="row-order-hint">Ziehe die Linien in die gewünschte Reihenfolge (Zeile 1 = oben)</div>
-      <div class="row-order-list" id="rowOrderList">
-        <!-- Wird dynamisch gefüllt -->
-        <div class="row-order-empty">Keine Linien konfiguriert</div>
-      </div>
-    </div>
   </div>
-
+  
   <!-- ==================== BARRIEREFREIHEIT (Wien-spezifisch) ==================== -->
   <div class="card" id="cardBarrierefreiheit">
     <h2>♿ Barrierefreiheit <span id="wienOnlyBadge1" class="wien-only-badge" style="display:none;">Wien</span></h2>
@@ -607,7 +486,7 @@
 
     <div class="control-row" id="rowTextfarbe">
       <div class="control-label"><span>Textfarbe</span></div>
-      <div class="color-row" data-name="textcolor">
+      <div class="color-row" data-name="colour">
         <div class="color-dot color-amber active" data-value="1" title="Gelb/Amber"></div>
         <div class="color-dot color-white" data-value="2" title="Weiß"></div>
         <div class="color-dot color-orange" data-value="3" title="Orange"></div>
@@ -982,7 +861,7 @@ function getGehwegString() {
   // z.B. "5903:5|5939:0" statt "5|0"
   const inputs = document.querySelectorAll('#gehwegList input[type="number"]');
   if (inputs.length === 0) return '0';
-
+  
   const entries = [];
   inputs.forEach(inp => {
     const stopId = inp.dataset.stopId;
@@ -991,179 +870,9 @@ function getGehwegString() {
       entries.push(`${stopId}:${value}`);
     }
   });
-
+  
   if (entries.length === 0) return '0';
   return entries.join('|');
-}
-
-// ==================== ZEILEN-REIHENFOLGE (DRAG & DROP) ====================
-let rowOrderItems = [];  // Array mit {stopId, line, direction} Objekten
-let draggedRowItem = null;
-let draggedRowIndex = -1;
-
-function updateRowOrderList() {
-  const container = document.getElementById('rowOrderList');
-  const section = document.getElementById('rowOrderSection');
-  const sortMode = getSegmentValue('sortmode');
-
-  // Nur bei statischer Sortierung anzeigen
-  if (sortMode !== '1') {
-    section.classList.remove('show');
-    return;
-  }
-  section.classList.add('show');
-
-  // Erstelle Items aus den Pending/Current Daten
-  const rblString = pendingRbl || currentConfig.rbl_id || '';
-  const filterString = pendingFilter || currentConfig.lines_filter || '';
-
-  if (!rblString || !filterString) {
-    container.innerHTML = '<div class="row-order-empty">Keine Linien konfiguriert</div>';
-    rowOrderItems = [];
-    return;
-  }
-
-  // Nur neu aufbauen wenn sich die Daten geändert haben
-  const newItemsKey = `${rblString}|${filterString}`;
-  if (container.dataset.itemsKey !== newItemsKey || rowOrderItems.length === 0) {
-    // Items aus RBL und Filter erstellen
-    const stopIds = rblString.split(',').map(s => s.trim());
-    const filters = filterString.split('|').map(s => s.trim());
-
-    rowOrderItems = [];
-    stopIds.forEach((stopId, i) => {
-      const linesForStop = filters[i] ? filters[i].split(',').map(l => l.trim()) : [];
-      linesForStop.forEach(line => {
-        if (line) {
-          // Direction aus currentStationDetails holen wenn vorhanden
-          let direction = '';
-          if (currentStationDetails && currentStationDetails[i]) {
-            const station = currentStationDetails[i];
-            if (station.lines) {
-              const lineInfo = station.lines.find(l => l.name === line);
-              if (lineInfo) direction = lineInfo.direction || '';
-            }
-          }
-          rowOrderItems.push({ stopId, line, direction });
-        }
-      });
-    });
-    container.dataset.itemsKey = newItemsKey;
-  }
-
-  renderRowOrderList();
-}
-
-function renderRowOrderList() {
-  const container = document.getElementById('rowOrderList');
-
-  if (rowOrderItems.length === 0) {
-    container.innerHTML = '<div class="row-order-empty">Keine Linien konfiguriert</div>';
-    return;
-  }
-
-  container.innerHTML = rowOrderItems.map((item, idx) => {
-    const isFirst = idx === 0;
-    const isLast = idx === rowOrderItems.length - 1;
-    const dirText = item.direction || '';
-
-    return `
-      <div class="row-order-item" draggable="true" data-index="${idx}">
-        <span class="drag-handle">☰</span>
-        <span class="row-number">${idx + 1}</span>
-        <span class="line-badge">${item.line}</span>
-        <span class="direction-text">${dirText}</span>
-        <span class="move-buttons">
-          <button class="move-btn" onclick="moveRowOrderItem(${idx}, -1)" ${isFirst ? 'disabled' : ''}>▲</button>
-          <button class="move-btn" onclick="moveRowOrderItem(${idx}, 1)" ${isLast ? 'disabled' : ''}>▼</button>
-        </span>
-      </div>
-    `;
-  }).join('');
-
-  // Drag & Drop Events hinzufügen
-  const items = container.querySelectorAll('.row-order-item');
-  items.forEach(item => {
-    item.addEventListener('dragstart', handleRowDragStart);
-    item.addEventListener('dragend', handleRowDragEnd);
-    item.addEventListener('dragover', handleRowDragOver);
-    item.addEventListener('drop', handleRowDrop);
-    item.addEventListener('dragenter', handleRowDragEnter);
-    item.addEventListener('dragleave', handleRowDragLeave);
-  });
-}
-
-function handleRowDragStart(e) {
-  draggedRowItem = this;
-  draggedRowIndex = parseInt(this.dataset.index);
-  this.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', draggedRowIndex);
-}
-
-function handleRowDragEnd(e) {
-  this.classList.remove('dragging');
-  document.querySelectorAll('.row-order-item').forEach(item => {
-    item.classList.remove('drag-over');
-  });
-  draggedRowItem = null;
-  draggedRowIndex = -1;
-}
-
-function handleRowDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-}
-
-function handleRowDragEnter(e) {
-  e.preventDefault();
-  if (this !== draggedRowItem) {
-    this.classList.add('drag-over');
-  }
-}
-
-function handleRowDragLeave(e) {
-  this.classList.remove('drag-over');
-}
-
-function handleRowDrop(e) {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const targetIndex = parseInt(this.dataset.index);
-
-  if (draggedRowIndex !== -1 && draggedRowIndex !== targetIndex) {
-    // Item verschieben
-    const movedItem = rowOrderItems.splice(draggedRowIndex, 1)[0];
-    rowOrderItems.splice(targetIndex, 0, movedItem);
-
-    // Liste neu rendern
-    renderRowOrderList();
-  }
-
-  this.classList.remove('drag-over');
-}
-
-// Mobile-freundliche Alternative zu Drag & Drop
-function moveRowOrderItem(index, direction) {
-  const newIndex = index + direction;
-
-  // Prüfe Grenzen
-  if (newIndex < 0 || newIndex >= rowOrderItems.length) return;
-
-  // Tausche Elemente
-  const temp = rowOrderItems[index];
-  rowOrderItems[index] = rowOrderItems[newIndex];
-  rowOrderItems[newIndex] = temp;
-
-  // Neu rendern
-  renderRowOrderList();
-}
-
-// Generiere rowOrder String aus der aktuellen Reihenfolge
-function getRowOrderString() {
-  if (rowOrderItems.length === 0) return '';
-  return rowOrderItems.map(item => `${item.stopId}:${item.line}`).join(',');
 }
 
 // ==================== UI UPDATES ====================
@@ -1172,13 +881,10 @@ function updateUI() {
   const displayMode = getSegmentValue('displaymode');
   const slideshowSettings = document.getElementById('slideshowSettings');
   slideshowSettings.classList.toggle('disabled', displayMode !== '2');
-
+  
   // Gehweg Settings
   const gehwegOn = document.getElementById('gehwegToggle').classList.contains('on');
   document.getElementById('gehwegSettings').classList.toggle('disabled', !gehwegOn);
-
-  // Zeilen-Reihenfolge aktualisieren (zeigt/versteckt je nach Sortier-Modus)
-  updateRowOrderList();
   
   // Night Settings
   const nightOn = document.getElementById('nightmodeToggle').classList.contains('on');
@@ -1197,13 +903,13 @@ function updateUI() {
 }
 
 function updatePreview() {
-  const textColorVal = getSegmentValue('textcolor');
+  const colourVal = getSegmentValue('colour');
   const colors = {
-    '1': '#ffb340',  // Gelb/Amber
-    '2': '#ffffff',  // Weiß
-    '3': '#ff9500'   // Orange
+    '1': '#ffb340',
+    '2': '#ffffff',
+    '3': '#ff9500'
   };
-  const textColor = colors[textColorVal] || '#ffb340';
+  const textColor = colors[colourVal] || '#ffb340';
   
   // Helligkeit
   const brightness = getSegmentValue('displaylight');
@@ -1323,8 +1029,7 @@ function applyConfig(config) {
   setSegmentValue('silberpfeil', config.silberpfeil || '1');
   
   // Design
-  // text_color ist die Wien-Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
-  setSegmentValue('textcolor', config.text_color || '1');
+  setSegmentValue('colour', config.colour || '1');
   setSegmentValue('displaylight', config.displaylight || '3');
   
   // Nachtmodus
@@ -1370,116 +1075,59 @@ function applyConfig(config) {
   }
   
   updateGehwegList(stopIds, gehwegValues);
-
+  
   if (config.gehweg && config.gehweg !== '0' && config.gehweg !== '') {
     const hasValue = gehwegValues.some(v => v > 0);
     if (hasValue) {
       document.getElementById('gehwegToggle').classList.add('on');
     }
   }
-
-  // Zeilen-Reihenfolge aus bestehender Config laden
-  // Format: "stopId:Linie,stopId:Linie" (z.B. "272:2,692:13A")
-  const savedRowOrder = config.roworder || config.linegroups || '';
-  if (savedRowOrder) {
-    rowOrderItems = [];
-    savedRowOrder.split(',').forEach(entry => {
-      const colonPos = entry.indexOf(':');
-      if (colonPos > 0) {
-        const stopId = entry.substring(0, colonPos).trim();
-        const line = entry.substring(colonPos + 1).trim();
-        if (stopId && line) {
-          rowOrderItems.push({ stopId, line, direction: '' });
-        }
-      }
-    });
-    // Container als "nicht frisch" markieren, damit renderRowOrderList aufgerufen wird
-    const container = document.getElementById('rowOrderList');
-    if (container) container.dataset.itemsKey = '';
-  }
-
+  
   updateUI();
 }
 
 // ==================== SPEICHERN (via postMessage an Parent/ESP32) ====================
 document.getElementById('saveBtn').addEventListener('click', () => {
   document.getElementById('loading').classList.add('show');
-
-  const rblString = pendingRbl || currentConfig.rbl_id || '';
-  const filterString = pendingFilter || currentConfig.lines_filter || '';
-
-  // Wien rowOrder generieren: Verwende die Drag & Drop Reihenfolge wenn verfügbar
-  // Format: "stopId:Linie,stopId:Linie" (z.B. "272:2,692:13A,1370:44")
-  let rowOrder = '';
-  let lineGroups = '';
-
-  // Bei statischer Sortierung: Verwende die vom User festgelegte Reihenfolge
-  const sortMode = getSegmentValue('sortmode');
-  if (sortMode === '1' && rowOrderItems.length > 0) {
-    // Benutzer hat Reihenfolge festgelegt
-    rowOrder = getRowOrderString();
-    lineGroups = rowOrder;  // lineGroups = gleiche Reihenfolge wie rowOrder
-  } else if (rblString && filterString) {
-    // Fallback: Standard-Reihenfolge aus RBL/Filter
-    const stopIds = rblString.split(',').map(s => s.trim());
-    const filters = filterString.split('|').map(s => s.trim());
-
-    const rowOrderParts = [];
-    stopIds.forEach((stopId, i) => {
-      const linesForStop = filters[i] ? filters[i].split(',').map(l => l.trim()) : [];
-      linesForStop.forEach(line => {
-        if (line) {
-          rowOrderParts.push(`${stopId}:${line}`);
-        }
-      });
-    });
-    rowOrder = rowOrderParts.join(',');
-    lineGroups = rowOrder;
-  }
-
+  
   // Config-Daten sammeln
   const configData = {
     type: 'setRBL',
-
+    
     // Stop-IDs (entweder pending oder bestehende)
-    rbl: rblString,
-    filter: filterString,
-
+    rbl: pendingRbl || currentConfig.rbl_id || '',
+    filter: pendingFilter || currentConfig.lines_filter || '',
+    
     // Anzeige
     zeilen: getSegmentValue('anzeige'),
     sortmode: getSegmentValue('sortmode'),
-
+    
     // Barrierefreiheit
     chopper: getSegmentValue('chopper'),
     silberpfeil: getSegmentValue('silberpfeil'),
-
+    
     // Design
-    colour: '1',  // Immer Wien (1) - index.html ist nur für Wien
-    textcolor: getSegmentValue('textcolor'),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
+    colour: getSegmentValue('colour'),
     displaylight: getSegmentValue('displaylight'),
-
+    
     // Nachtmodus
     nightmode: document.getElementById('nightmodeToggle').classList.contains('on') ? '1' : '0',
     nightstart: document.getElementById('nightstart').value,
     nightend: document.getElementById('nightend').value,
-
+    
     // Fun-Nachrichten
     showfunmessages: document.getElementById('funMessagesToggle').classList.contains('on') ? '1' : '0',
-
+    
     // Erweiterte
     displaymode: getSegmentValue('displaymode'),
     stopinterval: getSegmentValue('stopinterval'),
-
+    
     // Gehweg
-    gehweg: document.getElementById('gehwegToggle').classList.contains('on') ? getGehwegString() : '0',
-
-    // Wien rowOrder und lineGroups (Format: stopId:Linie) - Reihenfolge vom User
-    roworder: rowOrder,
-    linegroups: lineGroups
+    gehweg: document.getElementById('gehwegToggle').classList.contains('on') ? getGehwegString() : '0'
   };
-
+  
   console.log('Sende Config an ESP32:', configData);
-
+  
   // Sende an Parent (ESP32-Seite)
   if (window.parent && window.parent !== window) {
     window.parent.postMessage(configData, '*');
@@ -1489,12 +1137,12 @@ document.getElementById('saveBtn').addEventListener('click', () => {
     document.getElementById('loading').classList.remove('show');
     return;
   }
-
+  
   // Status-Updates
   setTimeout(() => {
     document.querySelector('.loading-text').textContent = 'Neustart läuft...';
   }, 2000);
-
+  
   setTimeout(() => {
     document.querySelector('.loading-text').textContent = 'Fertig! Seite wird neu geladen...';
   }, 5000);
