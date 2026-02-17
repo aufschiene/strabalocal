@@ -2375,6 +2375,8 @@
           <option value="8">Salzburg AG</option>
           <option value="9">RATP Paris</option>
           <option value="10">Straba Ansicht</option>
+          <option value="11">ÖBB Fernverkehr</option>
+          <option value="12">ÖBB S-Bahn</option>
         </select>
       </div>
 
@@ -2455,6 +2457,8 @@
           <option value="8">Salzburg AG</option>
           <option value="9">RATP Paris</option>
           <option value="10">Straba Ansicht</option>
+          <option value="11">ÖBB Fernverkehr</option>
+          <option value="12">ÖBB S-Bahn</option>
         </select>
       </div>
       <div class="form-row">
@@ -2794,7 +2798,7 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 5,             // S-Bahn Anzeige
+    defaultColour: 12,            // ÖBB S-Bahn Anzeige
     defaultBrightness: 3
   },
   OEBB_REG_NOE: {
@@ -5013,7 +5017,7 @@ const NETWORK_COLORS = {
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
   STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
   OEBB: { id: 6, name: 'ÖBB Fernverkehr', color: '#E2001A' },
-  OEBB_SBAHN: { id: 5, name: 'ÖBB S-Bahn', color: '#009640' },
+  OEBB_SBAHN: { id: 12, name: 'ÖBB S-Bahn', color: '#003366' },
   OEBB_REG_NOE: { id: 5, name: 'ÖBB Regional NÖ', color: '#0055A4' },
   OEBB_REG_OOE: { id: 5, name: 'ÖBB Regional OÖ', color: '#0055A4' }
 };
@@ -5051,7 +5055,7 @@ function calculateRecommendedConfig() {
 
   // Spezialfall OEBB S-Bahn
   if (dominantNetwork === 'OEBB_SBAHN') {
-    displayType = 5;
+    displayType = 12;
     displayName = 'ÖBB S-Bahn';
     description = 'Optimiert für S-Bahn Anzeige';
   }
@@ -5356,7 +5360,7 @@ function suggestDisplayConfig() {
     colorName = 'ÖBB Fernverkehr';
     description = 'Optimiert für Railjet, ICE, IC Anzeige';
   } else if (dominantNetwork === 'OEBB_SBAHN') {
-    colorId = 5;
+    colorId = 12;
     colorName = 'ÖBB S-Bahn';
     description = 'Optimiert für S-Bahn Anzeige';
   } else if (dominantNetwork === 'OEBB_REG_NOE') {
@@ -5461,6 +5465,18 @@ function updateRealisticPreview(config) {
       text: '#ffffff',
       highlight: '#ffffff',
       name: 'Straba Ansicht'
+    },
+    11: { // ÖBB Fernverkehr
+      bg: '#204baf',
+      text: '#ffffff',
+      highlight: '#E2001A',
+      name: 'ÖBB Fernverkehr'
+    },
+    12: { // ÖBB S-Bahn
+      bg: '#003366',
+      text: '#ffffff',
+      highlight: '#E50012',
+      name: 'ÖBB S-Bahn'
     }
   };
 
@@ -5685,7 +5701,7 @@ function updateQuickPreview() {
   const caps = CITY_CAPABILITIES[networkForCapabilities] || CITY_CAPABILITIES.WL;
 
   // Settings Tags aktualisieren
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht'};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
