@@ -1802,15 +1802,53 @@ function removeFromGroup(gIdx, key) {
 
 // Sammelt lineGroups String für den Save-Handler
 // Format: "stopId:Linie+stopId:Linie,stopId:Linie,..."
+// Reihenfolge folgt der Drag&Drop-Liste (rowOrderItems)
 function collectFtLineGroups() {
   if (ftLineGroups.length === 0) return '';
 
   const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 1);
   if (validGroups.length === 0) return '';
 
-  return validGroups.map(g => {
-    return g.directions.join('+');
-  }).join(',');
+  // Nur echte Gruppen (2+ Richtungen) sammeln
+  const realGroups = validGroups.filter(g => g.directions.length >= 2);
+  if (realGroups.length === 0) return '';  // Keine Gruppierungen = leer (Fallback auf rowOrder)
+
+  // Erstelle ein Mapping: Key -> Gruppen-String (für echte Gruppen)
+  // z.B. "4131:U1" -> "4131:U1+4136:U1"
+  const keyToGroupStr = {};
+  realGroups.forEach(g => {
+    const groupStr = g.directions.join('+');
+    g.directions.forEach(key => {
+      keyToGroupStr[key] = groupStr;
+    });
+  });
+
+  // Durchlaufe rowOrderItems in Drag&Drop-Reihenfolge
+  const result = [];
+  const usedGroups = new Set();
+
+  rowOrderItems.forEach(item => {
+    const firstStopId = (item.stopIds && item.stopIds.length > 0) ? item.stopIds[0] : '';
+    const key = `${firstStopId}:${item.line}`;
+
+    if (keyToGroupStr[key]) {
+      // Dieses Item gehört zu einer echten Gruppe
+      const groupStr = keyToGroupStr[key];
+      if (!usedGroups.has(groupStr)) {
+        result.push(groupStr);
+        usedGroups.add(groupStr);
+      }
+    } else {
+      // Einzelne Linie - alle stopIds ausgeben
+      if (item.stopIds && item.stopIds.length > 0) {
+        item.stopIds.forEach(stopId => {
+          result.push(`${stopId}:${item.line}`);
+        });
+      }
+    }
+  });
+
+  return result.join(',');
 }
 
 // Event Delegation für Gruppierung
@@ -2205,12 +2243,19 @@ document.getElementById('saveBtn').addEventListener('click', () => {
   // sortMode 1 = Statisch
   const sortMode = getSegmentValue('sortmode');
   if (sortMode === '1' && rowOrderItems.length > 0) {
-    // Benutzer hat Reihenfolge festgelegt
-    rowOrder = getRowOrderString();
-    // lineGroups: Wenn Gruppierung vorhanden, verwende diese (mit + für Gruppen)
-    // Sonst Fallback auf rowOrder
+    // Wenn Gruppierung vorhanden, verwende lineGroups als rowOrder
+    // (rowOrder mit + Syntax = Firmware erkennt Gruppen im statischen Modus)
     const ftGroups = collectFtLineGroups();
-    lineGroups = ftGroups || rowOrder;
+    if (ftGroups) {
+      // ftGroups enthält die Gruppierung mit + Syntax
+      // z.B. "4407:U4,4131:U1+4136:U1"
+      rowOrder = ftGroups;
+      lineGroups = ftGroups;
+    } else {
+      // Keine Gruppierung → einfache Reihenfolge
+      rowOrder = getRowOrderString();
+      lineGroups = rowOrder;
+    }
   } else if (rblString && filterString) {
     // Fallback: Standard-Reihenfolge aus RBL/Filter
     const stopIds = rblString.split(',').map(s => s.trim());
