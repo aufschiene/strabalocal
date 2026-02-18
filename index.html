@@ -720,6 +720,74 @@
       color:#666;
       cursor:not-allowed;
     }
+
+    /* Info-Button */
+    .info-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background:rgba(255,215,0,0.2);
+      border:1.5px solid rgba(255,215,0,0.5);
+      color:#ffd700;
+      font-size:12px;
+      font-weight:700;
+      cursor:pointer;
+      margin-left:8px;
+      transition:all 0.15s;
+      flex-shrink:0;
+    }
+    .info-btn:hover{
+      background:rgba(255,215,0,0.35);
+    }
+
+    /* Video Overlay */
+    .video-overlay{
+      display:none;
+      position:fixed;
+      top:0;left:0;right:0;bottom:0;
+      background:rgba(0,0,0,0.85);
+      z-index:2000;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+    }
+    .video-overlay.show{
+      display:flex;
+    }
+    .video-container{
+      position:relative;
+      max-width:400px;
+      width:100%;
+      border-radius:16px;
+      overflow:hidden;
+      background:#000;
+    }
+    .video-container video{
+      width:100%;
+      display:block;
+      border-radius:16px;
+    }
+    .video-close{
+      position:absolute;
+      top:10px;right:10px;
+      width:32px;height:32px;
+      border-radius:50%;
+      background:rgba(0,0,0,0.6);
+      border:none;
+      color:#fff;
+      font-size:18px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:10;
+    }
+    .video-close:hover{
+      background:rgba(255,255,255,0.2);
+    }
   </style>
 </head>
 <body>
@@ -783,7 +851,7 @@
 
     <!-- Gruppierung (nur bei Statisch sichtbar) -->
     <div class="ft-grouping-section" id="ftGroupingSection">
-      <div class="ft-grouping-label">Richtungen gruppieren</div>
+      <div class="ft-grouping-label">Richtungen gruppieren <span class="info-btn" onclick="showGroupingInfo()">?</span></div>
       <div class="ft-grouping-hint">Gruppiere Linien die die gleiche Strecke fahren (z.B. Linie 1 und 62). Nicht gruppierte Linien werden einzeln angezeigt.</div>
 
       <div class="ft-grouping-area">
@@ -985,6 +1053,16 @@
   
 </div>
 
+<!-- ==================== VIDEO OVERLAY (Gruppierung Info) ==================== -->
+<div class="video-overlay" id="videoOverlay" onclick="closeGroupingInfo(event)">
+  <div class="video-container">
+    <button class="video-close" onclick="closeGroupingInfo(event)">✕</button>
+    <video id="infoVideo" playsinline controls>
+      <source src="straba anmination.mp4" type="video/mp4">
+    </video>
+  </div>
+</div>
+
 <!-- ==================== LOADING OVERLAY ==================== -->
 <div class="loading" id="loading">
   <div class="spinner"></div>
@@ -1056,6 +1134,25 @@ const CITY_CAPABILITIES = {
     defaultBrightness: 3
   }
 };
+
+// ==================== GRUPPIERUNG INFO VIDEO ====================
+function showGroupingInfo() {
+  const overlay = document.getElementById('videoOverlay');
+  const video = document.getElementById('infoVideo');
+  overlay.classList.add('show');
+  video.currentTime = 0;
+  video.play();
+}
+
+function closeGroupingInfo(e) {
+  // Nur schließen wenn auf Overlay-Hintergrund oder Close-Button geklickt
+  if (e.target.classList.contains('video-overlay') || e.target.classList.contains('video-close')) {
+    const overlay = document.getElementById('videoOverlay');
+    const video = document.getElementById('infoVideo');
+    video.pause();
+    overlay.classList.remove('show');
+  }
+}
 
 // ==================== EXPAND TOGGLE ====================
 function toggleExpand() {
@@ -1934,8 +2031,11 @@ function updateUI() {
     const sortModeVal = getSegmentValue('sortmode');
     if (sortModeVal === '1' && rowOrderItems.length >= 2) {
       ftGroupingSection.classList.add('show');
-      // Gruppierung initialisieren wenn noch nicht geschehen
-      if (ftAllDirections.length === 0 || ftAllDirections.length !== rowOrderItems.length) {
+      // Gruppierung (neu) initialisieren wenn rowOrderItems sich geändert haben
+      const currentKeys = rowOrderItems.map(i => `${(i.stopIds||[])[0]}:${i.line}`).join(',');
+      const lastKeys = ftGroupingSection.dataset.lastKeys || '';
+      if (currentKeys !== lastKeys) {
+        ftGroupingSection.dataset.lastKeys = currentKeys;
         initFtGrouping();
       }
     } else {
