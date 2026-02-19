@@ -147,6 +147,7 @@
     .wappen-badge.ooe { background: linear-gradient(180deg, #fff 50%, #ED2939 50%); color: #333; }
     .wappen-badge.sbg { background: linear-gradient(180deg, #ED2939 50%, #fff 50%); color: #fff; }
     .wappen-badge.oebb { background: #E2001A; color: #fff; }
+    .wappen-badge.stmk { background: linear-gradient(180deg, #fff 50%, #009640 50%); color: #009640; }
 
     .selection-btn.disabled {
       opacity: 0.4;
@@ -2377,6 +2378,7 @@
           <option value="10">Straba Ansicht</option>
           <option value="11">ÖBB Fernverkehr</option>
           <option value="12">ÖBB S-Bahn</option>
+          <option value="13">Holding Graz</option>
         </select>
       </div>
 
@@ -2386,6 +2388,7 @@
           <option value="1">1 Zeile</option>
           <option value="2">2 Zeilen</option>
           <option value="3">3 Zeilen</option>
+          <option value="4">4 Zeilen</option>
         </select>
       </div>
 
@@ -2459,6 +2462,7 @@
           <option value="10">Straba Ansicht</option>
           <option value="11">ÖBB Fernverkehr</option>
           <option value="12">ÖBB S-Bahn</option>
+          <option value="13">Holding Graz</option>
         </select>
       </div>
       <div class="form-row">
@@ -2470,6 +2474,7 @@
           <button class="toggle-btn" data-value="1" onclick="setFtRows(1)">1</button>
           <button class="toggle-btn active" data-value="2" onclick="setFtRows(2)">2</button>
           <button class="toggle-btn" data-value="3" onclick="setFtRows(3)">3</button>
+          <button class="toggle-btn" data-value="4" onclick="setFtRows(4)">4</button>
         </div>
       </div>
       <div class="form-row">
@@ -2680,12 +2685,13 @@ window.addEventListener('message', function(event) {
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'LINZ', 'SALZBURG', 'OEBB', 'OEBB_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE'],
+    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'OEBB', 'OEBB_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE'],
     // Bundesländer-Struktur für schönere Auswahl
     subRegions: {
       AT_W: { name: 'Wien', wappen: 'wien', desc: 'U-Bahn, Tram, Bus, S-Bahn, Badner Bahn', networks: ['WL', 'OEBB_SBAHN', 'WLB'] },
       AT_NOE: { name: 'Niederösterreich', wappen: 'noe', desc: 'S-Bahn, REX, Regionalzug', networks: ['OEBB_REG_NOE'] },
       AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus, S-Bahn, REX', networks: ['LINZ', 'OEBB_REG_OOE'] },
+      AT_STMK: { name: 'Steiermark', wappen: 'stmk', desc: 'Straßenbahn, Bus', networks: ['STV'] },
       AT_SBG: { name: 'Salzburg', wappen: 'sbg', desc: 'Obus, Lokalbahn', networks: ['SALZBURG'] },
       AT_FERN: { name: 'Fernverkehr', wappen: 'oebb', desc: 'RJ, ICE, IC, REX, Nightjet', networks: ['OEBB'] }
     }
@@ -2817,6 +2823,15 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 5,
+    defaultBrightness: 3
+  },
+  STV: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 13,            // Holding Graz
     defaultBrightness: 3
   }
 };
@@ -3069,6 +3084,15 @@ const NETWORKS = {
       { id: 'st-michael-im-lungau', name: 'St. Michael im Lungau', info: 'Bus' }
     ]
   },
+  STV: {
+    name: 'Verbundlinie Steiermark',
+    shortName: 'STV',
+    region: 'AT',
+    desc: 'Straßenbahn, Bus (Graz & Steiermark)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Hauptplatz, Jakominiplatz...',
+    isJourneyBased: false
+  },
   PARIS: {
     name: 'RATP Paris',
     shortName: 'RATP',
@@ -3281,6 +3305,7 @@ function selectRegion(region) {
 const WAPPEN = {
   wien: 'W',
   ooe: 'OÖ',
+  stmk: 'ST',
   sbg: 'S',
   oebb: 'ÖBB'
 };
@@ -4206,6 +4231,7 @@ function extractLines(data) {
               name,
               towards,
               type: line.type || '',
+              richtungsId: line.richtungsId || '',
               stopovers: line.stopovers || []
             });
           }
@@ -4664,11 +4690,12 @@ function addStation() {
 
   const fullId = `${selectedNetwork}:${selectedStop.id}`;
 
-  // Ausgewaehlte Richtungen speichern (Linie + towards + optionaler via-Filter)
+  // Ausgewaehlte Richtungen speichern (Linie + towards + optionaler via-Filter + richtungsId)
   const selectedDirections = Array.from(selectedLines).map(idx => ({
     line: availableLines[idx].name,
     towards: availableLines[idx].towards || '',
     type: availableLines[idx].type || '',
+    richtungsId: availableLines[idx].richtungsId || '',
     ...(selectedVias.has(idx) ? { via: selectedVias.get(idx) } : {})
   }));
 
@@ -5104,10 +5131,11 @@ function calculateRecommendedConfig() {
       totalDirections += 1;
     }
   });
-  // Zeilen = Anzahl Richtungen, aber max 3
+  // Zeilen = Anzahl Richtungen, max abhängig vom Display-Typ
+  const maxRows = (displayType === 2 || displayType === 13) ? 4 : 3;  // Linz + Graz: 4 Zeilen, sonst 3
   let rows;
-  if (totalDirections > 3) {
-    rows = 3;
+  if (totalDirections > maxRows) {
+    rows = maxRows;
   } else if (totalDirections < 1) {
     rows = 1;
   } else {
@@ -5166,7 +5194,24 @@ function calculateRecommendedConfig() {
     rowOrderDestination: '',  // Zeilen-Reihenfolge mit Ziel (für Linz)
 
     // Linien-Gruppierung (Format: "1+62,U1+U2" bedeutet Gruppe1=1&62, Gruppe2=U1&U2)
-    lineGroups: stations.map(s => s.lineGroups || '').join('|'),
+    // STV/Graz: Automatisch "Linie:H" oder "Linie:R" aus richtungsId (stabil bei Kurzführungen)
+    lineGroups: stations.map(s => {
+      if (s.lineGroups) return s.lineGroups;  // Fine-Tuning hat Vorrang
+      // Auto-Build für STV: directions mit richtungsId → "5:R,1:R,4:H"
+      if (s.network === 'STV' && s.directions && s.directions.length > 0) {
+        return s.directions
+          .map(d => {
+            // Bevorzugt richtungsId (H/R) — stabil bei Kurzführungen
+            if (d.richtungsId && (d.richtungsId === 'H' || d.richtungsId === 'R')) {
+              return `${d.line}:${d.richtungsId}`;
+            }
+            // Fallback: Zieltext (wenn richtungsId fehlt oder ungültiges Format)
+            return d.towards ? `${d.line}:${d.towards}` : d.line;
+          })
+          .join(',');
+      }
+      return '';
+    }).join('|'),
 
     // Linien+Ziel Filter für Linz (automatisch aus ausgewählten directions)
     // Format: "1:Auwiesen,2:Universität" - wird automatisch aus den directions gebaut
@@ -5477,6 +5522,12 @@ function updateRealisticPreview(config) {
       text: '#ffffff',
       highlight: '#E50012',
       name: 'ÖBB S-Bahn'
+    },
+    13: { // Holding Graz
+      bg: '#19191e',
+      text: '#ffffff',
+      highlight: '#78787e',
+      name: 'Holding Graz'
     }
   };
 
@@ -5518,7 +5569,8 @@ function updateRealisticPreview(config) {
       7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }],
       8: [{ line: '1', dest: 'Hellbrunn', time: 3 }, { line: 'S3', dest: 'Salzburg Hbf', time: 7 }, { line: '22', dest: 'Aigen', time: 11 }],
       9: [{ line: '1', dest: 'La Defense', time: 2 }, { line: '4', dest: 'Porte de Clignan.', time: 4 }, { line: '14', dest: 'Saint-Denis', time: 6 }],
-      10: [{ line: 'U2', dest: 'Aspernstrasse', time: 6, dest2: 'Seestadt', time2: 8 }, { line: '46', dest: 'Ring, Volksthea', time: 6, dest2: 'Ring, Volksthea', time2: 8 }]
+      10: [{ line: 'U2', dest: 'Aspernstrasse', time: 6, dest2: 'Seestadt', time2: 8 }, { line: '46', dest: 'Ring, Volksthea', time: 6, dest2: 'Ring, Volksthea', time2: 8 }],
+      13: [{ line: '1', dest: 'Eggenberg/UKH', time: 3 }, { line: '3', dest: 'Krenngasse', time: 5 }, { line: '5', dest: 'Puntigam', time: 7 }, { line: '7', dest: 'LKH Med Uni', time: 10 }]
     };
     sampleData = (fallbackData[colour] || fallbackData[1]).slice(0, rows);
   }
@@ -5611,6 +5663,22 @@ function updateRealisticPreview(config) {
         }).join('')}
       </div>
     `;
+  } else if (colour === 13) {
+    // Holding Graz: Schlicht, weiß auf schwarzgrau
+    previewEl.style.background = '#19191e';
+    previewEl.style.backgroundImage = 'none';
+
+    previewEl.innerHTML = `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+        ${sampleData.slice(0, rows).map((dep, i) => `
+          <div style="flex:1;display:flex;align-items:center;padding:0 4px;${i < rows - 1 ? 'border-bottom:1px solid #32323a;' : ''}">
+            <span style="font-size:10px;font-weight:bold;color:#fff;min-width:22px;">${dep.line}</span>
+            <span style="flex:1;font-size:8px;color:#fff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-left:4px;">${dep.dest}</span>
+            <span style="font-size:11px;font-weight:bold;color:#fff;margin-left:4px;">${dep.time}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
   } else {
     // Standard Display Style (Wien, etc.)
     previewEl.style.background = style.bg;
@@ -5678,9 +5746,21 @@ function updateQuickPreview() {
   const colour = parseInt(colorSelect.value);
   const rows = parseInt(rowsSelect.value);
 
+  // 4-Zeilen-Option nur bei Linz (2) und Graz (13)
+  const allows4Rows = (colour === 2 || colour === 13);
+  const opt4 = rowsSelect.querySelector('option[value="4"]');
+  if (opt4) {
+    opt4.style.display = allows4Rows ? '' : 'none';
+  }
+  // Falls 4 gewählt aber nicht erlaubt → auf 3 zurücksetzen
+  const actualRows = (!allows4Rows && rows === 4) ? 3 : rows;
+  if (actualRows !== rows) {
+    rowsSelect.value = String(actualRows);
+  }
+
   // Update recommendedConfig mit neuen Werten
   recommendedConfig.colour = colour;
-  recommendedConfig.rows = rows;
+  recommendedConfig.rows = actualRows;
 
   // Finde das passende Netzwerk für die Capabilities
   let networkForCapabilities = recommendedConfig.dominantNetwork;
@@ -5693,6 +5773,7 @@ function updateQuickPreview() {
   else if (colour === 8) networkForCapabilities = 'SALZBURG';
   else if (colour === 9) networkForCapabilities = 'PARIS';
   else if (colour === 10) networkForCapabilities = 'WL';
+  else if (colour === 13) networkForCapabilities = 'STV';
   else if (networkForCapabilities === 'OEBB') networkForCapabilities = 'OEBB';
   else if (networkForCapabilities === 'OEBB_SBAHN') networkForCapabilities = 'OEBB_SBAHN';
   else if (networkForCapabilities === 'OEBB_REG_NOE') networkForCapabilities = 'OEBB_REG_NOE';
@@ -5701,7 +5782,7 @@ function updateQuickPreview() {
   const caps = CITY_CAPABILITIES[networkForCapabilities] || CITY_CAPABILITIES.WL;
 
   // Settings Tags aktualisieren
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn'};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -5786,7 +5867,7 @@ function initializeQuickPreview() {
   if (!settingsList) return;
 
   const caps = recommendedConfig.capabilities || {};
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO'};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -6249,7 +6330,12 @@ function getRowOrderDestinationString() {
 
         // Nur Nicht-Wien hinzufügen
         if (!isWien) {
-          nonWienDirs.push(key);  // key ist bereits "Linie:Ziel"
+          // STV/Graz: "Linie:richtungsId" statt "Linie:Ziel" (stabil bei Kurzführungen)
+          if (dirInfo.richtungsId && (dirInfo.richtungsId === 'H' || dirInfo.richtungsId === 'R')) {
+            nonWienDirs.push(`${dirInfo.line}:${dirInfo.richtungsId}`);
+          } else {
+            nonWienDirs.push(key);  // key ist bereits "Linie:Ziel"
+          }
         }
       });
 
@@ -6263,6 +6349,18 @@ function getRowOrderDestinationString() {
 
 function updateFinetuningPreview() {
   const colour = parseInt(document.getElementById('ftColorSelect').value);
+
+  // 4-Zeilen-Button nur bei Linz (2) und Graz (13) anzeigen
+  const allows4Rows = (colour === 2 || colour === 13);
+  const btn4 = document.querySelector('#ftRowsToggle .toggle-btn[data-value="4"]');
+  if (btn4) {
+    btn4.style.display = allows4Rows ? '' : 'none';
+  }
+  // Falls aktuell 4 gewählt aber nicht erlaubt → auf 3 zurücksetzen
+  if (!allows4Rows && getFtRows() === 4) {
+    setFtRows(3);
+  }
+
   const rows = getFtRows();
   const previewEl = document.getElementById('finetuningPreview');
 
@@ -6300,7 +6398,8 @@ function updateFinetuningPreview() {
       6: [{ line: 'RJX', dest: 'Wien Hbf', time: 8 }, { line: 'ICE', dest: 'Berlin Hbf', time: 15 }, { line: 'NJ', dest: 'Hamburg', time: 32 }],
       7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
       8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }],
-      9: [{ line: '1', dest: 'La Defense', time: 2, timeStr: '14:22' }, { line: '4', dest: 'Porte de Clignancourt', time: 4, timeStr: '14:24' }, { line: '14', dest: 'Saint-Denis Pleyel', time: 6, timeStr: '14:26' }]
+      9: [{ line: '1', dest: 'La Defense', time: 2, timeStr: '14:22' }, { line: '4', dest: 'Porte de Clignancourt', time: 4, timeStr: '14:24' }, { line: '14', dest: 'Saint-Denis Pleyel', time: 6, timeStr: '14:26' }],
+      13: [{ line: '1', dest: 'Eggenberg/UKH', time: 3 }, { line: '3', dest: 'Krenngasse', time: 5 }, { line: '5', dest: 'Puntigam', time: 7 }, { line: '7', dest: 'LKH Med Uni', time: 10 }]
     };
     data = fallbackData[colour] || fallbackData[1];
   }
@@ -6475,6 +6574,21 @@ function updateFinetuningPreview() {
       }).join('')}
     </div>`;
   }
+  else if (colour === 13) {
+    // Holding Graz: Schlicht, weiß auf schwarzgrau, 4 Zeilen
+    previewEl.style.background = '#19191e';
+    previewEl.style.backgroundImage = 'none';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+      ${data.map((dep, i) => `
+        <div style="flex:1;display:flex;align-items:center;padding:0 8px;${i < data.length - 1 ? 'border-bottom:1px solid #32323a;' : ''}">
+          <span style="font-size:14px;font-weight:bold;color:#fff;min-width:30px;">${dep.line}</span>
+          <span style="flex:1;font-size:13px;color:#fff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-left:8px;">${dep.dest}</span>
+          <span style="font-size:16px;font-weight:bold;color:#fff;margin-left:8px;">${dep.time}</span>
+        </div>
+      `).join('')}
+    </div>`;
+  }
 
   previewEl.innerHTML = html;
 
@@ -6514,7 +6628,12 @@ function collectFtLineFilter() {
       for (const key of group.directions) {
         const dirInfo = ftAllDirections.find(d => d.key === key);
         if (dirInfo && dirInfo.line && dirInfo.towards) {
-          filterParts.push(dirInfo.line + ':' + dirInfo.towards);
+          // STV/Graz: "Linie:richtungsId" statt "Linie:Ziel" (stabil bei Kurzführungen)
+          if (dirInfo.richtungsId && (dirInfo.richtungsId === 'H' || dirInfo.richtungsId === 'R')) {
+            filterParts.push(dirInfo.line + ':' + dirInfo.richtungsId);
+          } else {
+            filterParts.push(dirInfo.line + ':' + dirInfo.towards);
+          }
         }
       }
     }
@@ -6734,12 +6853,14 @@ async function loadFtDirectionsFromStations() {
           if (!isAllowed) return;
         }
 
-        // VEREINFACHT: Key ist immer Linie:Ziel (keine richtungsId mehr)
+        // Key für UI-Anzeige: Linie:Ziel
         const key = `${lineName}:${towards}`;
-        console.log(`[loadFtDirectionsFromStations] Key: ${key}`);
+        const richtungsId = dir.richtungsId || '';
+        console.log(`[loadFtDirectionsFromStations] Key: ${key}, richtungsId: ${richtungsId}`);
         if (!ftAllDirections.some(d => d.key === key)) {
           ftAllDirections.push({
             key, line: lineName, towards, type,
+            richtungsId,
             station: station.stopName, network: station.network
           });
         }
@@ -6803,12 +6924,21 @@ function mapRawKeyToDirection(rawKey, usedKeys) {
     const line = rawKey.substring(0, colonIdx);
     let dest = rawKey.substring(colonIdx + 1);
 
-    // Falls altes Format mit :R (richtungsId), extrahiere nur die Linie
-    if (dest.startsWith('R') && /^\d+$/.test(dest.substring(1))) {
+    // Falls altes Format mit :R + Ziffern (alte Hash-richtungsId), extrahiere nur die Linie
+    if (dest.startsWith('R') && dest.length > 1 && /^\d+$/.test(dest.substring(1))) {
       const lineMatch = ftAllDirections.find(d => d.line === line);
       if (lineMatch) {
         console.log(`[parseFtExistingGroups] '${rawKey}' -> Linien-Migration: ${lineMatch.key}`);
         return lineMatch.key;
+      }
+    }
+
+    // STV/Graz: "5:H" oder "5:R" → matche per richtungsId
+    if (dest === 'H' || dest === 'R') {
+      const richtungsMatch = ftAllDirections.find(d => d.line === line && d.richtungsId === dest);
+      if (richtungsMatch) {
+        console.log(`[parseFtExistingGroups] '${rawKey}' -> richtungsId-Match: ${richtungsMatch.key}`);
+        return richtungsMatch.key;
       }
     }
 
@@ -7104,9 +7234,16 @@ function collectFtLineGroups() {
   }
 
   // Format: "Linie:Ziel+Linie:Ziel,Linie:Ziel,..." (+ für Gruppen, , für Trennung)
+  // STV/Graz: "Linie:H" oder "Linie:R" statt "Linie:Ziel" (richtungsId-basiert)
   return validGroups.map(g => {
     return g.directions.map(key => {
-      // Key ist bereits im Format "Linie:Ziel"
+      // Prüfe ob diese Direction eine richtungsId hat (STV)
+      const dir = ftAllDirections.find(d => d.key === key);
+      if (dir && dir.richtungsId && (dir.richtungsId === 'H' || dir.richtungsId === 'R')) {
+        // STV: "5:R" statt "5:Andritz" — stabil bei Kurzführungen
+        return `${dir.line}:${dir.richtungsId}`;
+      }
+      // Fallback: Key ist bereits im Format "Linie:Ziel"
       return key;
     }).join('+');
   }).join(',');
@@ -7746,6 +7883,10 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
                   shouldInclude = lineDestinations.some(ld => {
                     if (ld.line !== lineName) return false;
                     if (!ld.towards || !towards) return true;  // Ohne Richtung: nur Linie matchen
+                    // STV/Graz: richtungsId-basiert (H oder R)
+                    if ((ld.towards === 'H' || ld.towards === 'R') && line.richtungsId) {
+                      return ld.towards === line.richtungsId;
+                    }
                     // Exakter Match
                     if (ld.towards === towards) return true;
                     // Partieller Match (API gibt z.B. "Linz/Donau Hauptbahnhof", linegroups hat "Linz/Donau Hbf")
@@ -7769,7 +7910,8 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
                     station.directions.push({
                       line: lineName,
                       towards: towards,
-                      type: type
+                      type: type,
+                      richtungsId: line.richtungsId || ''
                     });
                   }
                 }
