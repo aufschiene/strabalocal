@@ -686,6 +686,7 @@ let selectedDirections = [];
 let selectedOtherLines = [];
 let addedStations = [];
 let existingConfigLoaded = false;
+let configLoaded = false;
 let pendingConfig = null;
 
 // DOM Elements
@@ -710,6 +711,10 @@ const existingConfigBanner = document.getElementById('existingConfigBanner');
 
 // ========== BESTEHENDE CONFIG LADEN ==========
 function loadExistingConfig(rbl, filter) {
+  if (configLoaded) {
+    console.log('Config bereits geladen - ignoriere erneutes Laden');
+    return;
+  }
   if (!rbl || rbl.trim() === '') {
     console.log('Keine bestehende Config - starte leer');
     return;
@@ -788,6 +793,7 @@ function loadExistingConfig(rbl, filter) {
   });
   
   if (addedCount > 0) {
+    configLoaded = true;
     existingConfigLoaded = true;
     existingConfigBanner.classList.add('show');
     updateStationsList();
@@ -805,8 +811,9 @@ function processPendingConfig() {
 
 window.addEventListener('message', function(event) {
   console.log('Message empfangen:', event.data);
-  
+
   if (event.data && event.data.type === 'loadExistingConfig') {
+    if (configLoaded) return;
     loadExistingConfig(event.data.rbl, event.data.filter);
   }
 });
@@ -1454,11 +1461,12 @@ window.addEventListener('message', function(event) {
   
   // ESP32 sendet bestehende Konfiguration
   if (event.data && event.data.type === 'loadExistingConfig') {
+    if (configLoaded) return;
     console.log('Bestehende Config erhalten:', event.data);
-    
+
     const rbl = event.data.rbl || '';
     const filter = event.data.filter || '';
-    
+
     if (rbl && rbl.trim().length > 0) {
       // Verwende die loadExistingConfig Funktion die die echten Namen von der API holt
       // Falls API-Daten noch nicht geladen, speichere für später
