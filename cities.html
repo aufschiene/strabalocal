@@ -6285,7 +6285,7 @@ function getRowOrderString() {
           item = `${stopId}:${dirInfo.line}`;
         } else {
           // NICHT-WIEN (BODO, Linz, etc.): Format "Linie:Ziel" (z.B. "1:Auwiesen")
-          item = `${dirInfo.line}:${dirInfo.destination}`;
+          item = `${dirInfo.line}:${dirInfo.towards}`;
         }
 
         if (!items.includes(item)) {
