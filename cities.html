@@ -107,6 +107,7 @@
     .network-badge.paris { background: #003B80; color: #fff; }
     .network-badge.oebb { background: #E2001A; color: #fff; }
     .network-badge.oebb_sbahn { background: #0055A4; color: #fff; }
+    .network-badge.oebb_stamm_sbahn { background: #009640; color: #fff; }
     .network-badge.oebb_reg_noe { background: #0055A4; color: #fff; }
     .network-badge.oebb_reg_ooe { background: #0055A4; color: #fff; }
 
@@ -580,6 +581,7 @@
     .station-chip .network-badge.paris { background: #003B80; color: #fff; }
     .station-chip .network-badge.oebb { background: #E2001A; color: #fff; }
     .station-chip .network-badge.oebb_sbahn { background: #009640; color: #fff; }
+    .station-chip .network-badge.oebb_stamm_sbahn { background: #009640; color: #fff; }
     .station-chip .network-badge.oebb_reg_noe { background: #0055A4; color: #fff; }
     .station-chip .network-badge.oebb_reg_ooe { background: #0055A4; color: #fff; }
     .station-chip .info { flex: 1; min-width: 0; }
@@ -2685,10 +2687,10 @@ window.addEventListener('message', function(event) {
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'OEBB', 'OEBB_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE'],
+    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'OEBB', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE'],
     // Bundesländer-Struktur für schönere Auswahl
     subRegions: {
-      AT_W: { name: 'Wien', wappen: 'wien', desc: 'U-Bahn, Tram, Bus, S-Bahn, Badner Bahn', networks: ['WL', 'OEBB_SBAHN', 'WLB'] },
+      AT_W: { name: 'Wien', wappen: 'wien', desc: 'U-Bahn, Tram, Bus, S-Bahn, Badner Bahn', networks: ['WL', 'OEBB_STAMM_SBAHN', 'WLB'] },
       AT_NOE: { name: 'Niederösterreich', wappen: 'noe', desc: 'S-Bahn, REX, Regionalzug', networks: ['OEBB_REG_NOE'] },
       AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus, S-Bahn, REX', networks: ['LINZ', 'OEBB_REG_OOE'] },
       AT_STMK: { name: 'Steiermark', wappen: 'stmk', desc: 'Straßenbahn, Bus', networks: ['STV'] },
@@ -2805,6 +2807,15 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 12,            // ÖBB S-Bahn Anzeige
+    defaultBrightness: 3
+  },
+  OEBB_STAMM_SBAHN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 12,            // ÖBB Stammstrecke S-Bahn
     defaultBrightness: 3
   },
   OEBB_REG_NOE: {
@@ -2989,6 +3000,15 @@ const NETWORKS = {
     placeholder: 'z.B. Meidling, Handelskai, Floridsdorf...',
     isJourneyBased: false
   },
+  OEBB_STAMM_SBAHN: {
+    name: 'ÖBB Stammstrecke',
+    shortName: 'Stamm',
+    region: 'AT',
+    desc: 'S-Bahn Wien Stammstrecke (Meidling↔Floridsdorf)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Meidling, Rennweg, Praterstern, Floridsdorf...',
+    isJourneyBased: false
+  },
   OEBB_REG_NOE: {
     name: 'S-Bahn/Regional NÖ',
     shortName: 'REG',
@@ -3108,6 +3128,14 @@ const SEARCH_API = 'https://api.straba.at/api/v1/stops/search';
 const DEPARTURES_API = 'https://api.straba.at/api/v1/wl/departures';
 const WIEN_DATA_URL = 'https://straba-983965425140.europe-west3.run.app/search/';
 
+// Netzwerk-Alias für API-Calls (lokale Varianten → existierender Server-Endpoint)
+const API_NETWORK_MAP = {
+  'OEBB_STAMM_SBAHN': 'OEBB_SBAHN',
+};
+function mapNetworkForApi(network) {
+  return API_NETWORK_MAP[network] || network;
+}
+
 // ==================== STATE ====================
 let currentStep = 'region';
 let selectedRegion = null;
@@ -3142,6 +3170,15 @@ let oebb_toStop = null;              // {id, name} - gewähltes Ziel
 let oebb_deselectedGattungen = new Set();  // Abgewählte Gattungen
 
 const OEBB_GATTUNGEN = ['RJX', 'RJ', 'ICE', 'IC', 'EC', 'NJ', 'EN', 'D'];
+
+// Stammstrecke: Produktkategorien für S-Bahn Wien
+const STAMM_PRODUKTE = ['S-Bahn', 'REX', 'R', 'CJX'];
+let stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']); // Default: beide
+let stamm_deselectedProdukte = new Set(); // Default: alle an
+
+// Stammstrecke richtungsIds (müssen mit Server übereinstimmen: R1=1, R2=2)
+const STAMM_RICHTUNG_R1 = '1';  // Richtung Meidling (Gleis 1-2)
+const STAMM_RICHTUNG_R2 = '2';  // Richtung Floridsdorf (Gleis 3-4)
 
 // ==================== DOM ====================
 const stepRegion = document.getElementById('stepRegion');
@@ -4005,8 +4042,8 @@ async function performSearch(query) {
       results = Array.from(seen.values());
     }
 
-    // OEBB S-Bahn Wien: Nur Stationen in Wien anzeigen
-    if (selectedNetwork === 'OEBB_SBAHN') {
+    // OEBB S-Bahn Wien / Stammstrecke: Nur Stationen in Wien anzeigen
+    if (selectedNetwork === 'OEBB_SBAHN' || selectedNetwork === 'OEBB_STAMM_SBAHN') {
       results = results.filter(s => {
         const name = s.name || '';
         return name.includes('Wien') || name.includes('(Wien)');
@@ -4087,7 +4124,7 @@ function searchWien(query) {
 }
 
 async function searchViaProxy(network, query) {
-  const params = new URLSearchParams({ network, q: query });
+  const params = new URLSearchParams({ network: mapNetworkForApi(network), q: query });
   const response = await fetch(`${SEARCH_API}?${params}`);
   const data = await response.json();
   return (data.stops || []).map(s => ({ id: s.id, name: s.name, info: s.info || '' }));
@@ -4141,6 +4178,17 @@ async function selectStop(id, name) {
     return;
   }
 
+  // OEBB Stammstrecke: Richtung + Produktfilter (kein Departures-Call nötig)
+  if (selectedNetwork === 'OEBB_STAMM_SBAHN') {
+    stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']);
+    stamm_deselectedProdukte = new Set();
+    showStep('lines');
+    linesLoading.classList.add('hidden');
+    linesContainer.classList.remove('hidden');
+    renderStammstreckeConfig();
+    return;
+  }
+
   showStep('lines');
 
   // Load departures to get available lines
@@ -4152,7 +4200,10 @@ async function selectStop(id, name) {
   document.getElementById('selectAllBtn').style.display = '';
 
   try {
-    const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
+    // Netzwerk-Alias für API (Production-kompatibel)
+    const apiNetwork = mapNetworkForApi(selectedNetwork);
+    const apiFullId = `${apiNetwork}:${selectedStop.id}`;
+    const response = await fetch(`${DEPARTURES_API}?stopId=${apiFullId}`);
     const data = await response.json();
 
     extractLines(data);
@@ -4204,8 +4255,8 @@ function extractLines(data) {
             return; // Nicht erlaubte Linie überspringen
           }
 
-          // Bei OEBB_SBAHN: Nur S-Bahnen anzeigen (S1, S2, S45, etc.)
-          if (selectedNetwork === 'OEBB_SBAHN' && !/^S\d/.test(name)) {
+          // Bei OEBB_SBAHN / Stammstrecke: Nur S-Bahnen anzeigen (S1, S2, S45, etc.)
+          if ((selectedNetwork === 'OEBB_SBAHN' || selectedNetwork === 'OEBB_STAMM_SBAHN') && !/^S\d/.test(name)) {
             return;
           }
 
@@ -4590,6 +4641,160 @@ function toggleOebbGattung(gattung) {
   });
 }
 
+// ==================== STAMMSTRECKE CONFIG ====================
+function renderStammstreckeConfig() {
+  const linesList = document.getElementById('linesList');
+  const stationName = selectedStop?.name || '';
+
+  // Header anpassen
+  document.querySelector('#linesContainer .lines-header h3').textContent = 'Stammstrecke konfigurieren';
+  document.getElementById('selectAllBtn').style.display = 'none';
+  addStationBtn.style.display = '';
+  addStationBtn.disabled = stamm_selectedRichtungen.size === 0;
+  addStationBtn.textContent = 'Weiter';
+
+  let html = '';
+
+  // Station
+  html += `<div class="oebb-from-label">Station: <strong>${stationName}</strong></div>`;
+
+  // Richtungswahl
+  html += `<div class="strecke-section-title">Richtung</div>`;
+  html += `<div class="strecke-gattungen-filter">`;
+  const richtungen = [
+    { id: 'floridsdorf', label: 'Richtung Floridsdorf' },
+    { id: 'meidling', label: 'Richtung Meidling' }
+  ];
+  for (const r of richtungen) {
+    const isOn = stamm_selectedRichtungen.has(r.id);
+    html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleStammRichtung('${r.id}')">${r.label}</span>`;
+  }
+  html += `</div>`;
+
+  // Produktfilter
+  html += `<div class="strecke-section-title">Zugarten</div>`;
+  html += `<div class="strecke-gattungen-filter">`;
+  for (const p of STAMM_PRODUKTE) {
+    const isOn = !stamm_deselectedProdukte.has(p);
+    html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleStammProdukt('${p}')">${p}</span>`;
+  }
+  html += `</div>`;
+
+  linesList.innerHTML = html;
+}
+
+function toggleStammRichtung(id) {
+  if (stamm_selectedRichtungen.has(id)) {
+    stamm_selectedRichtungen.delete(id);
+  } else {
+    stamm_selectedRichtungen.add(id);
+  }
+  addStationBtn.disabled = stamm_selectedRichtungen.size === 0;
+  // Update chips
+  document.querySelectorAll('.gattung-chip').forEach(chip => {
+    const text = chip.textContent;
+    const richtungMatch = text.startsWith('Richtung ');
+    if (richtungMatch) {
+      const rid = text.includes('Floridsdorf') ? 'floridsdorf' : 'meidling';
+      if (stamm_selectedRichtungen.has(rid)) {
+        chip.classList.add('on'); chip.classList.remove('off');
+      } else {
+        chip.classList.remove('on'); chip.classList.add('off');
+      }
+    }
+  });
+}
+
+function toggleStammProdukt(produkt) {
+  if (stamm_deselectedProdukte.has(produkt)) {
+    stamm_deselectedProdukte.delete(produkt);
+  } else {
+    stamm_deselectedProdukte.add(produkt);
+  }
+  // Update chips
+  document.querySelectorAll('.gattung-chip').forEach(chip => {
+    const text = chip.textContent;
+    if (STAMM_PRODUKTE.includes(text)) {
+      if (stamm_deselectedProdukte.has(text)) {
+        chip.classList.remove('on'); chip.classList.add('off');
+      } else {
+        chip.classList.add('on'); chip.classList.remove('off');
+      }
+    }
+  });
+}
+
+function addStationFromStamm() {
+  if (!selectedStop) return;
+  if (stamm_selectedRichtungen.size === 0) {
+    alert('Bitte mindestens eine Richtung auswählen!');
+    return;
+  }
+
+  // Kein Linienfilter — Server liefert alle Züge, Display gruppiert per richtungsId
+  const filter = '';
+
+  // Produktfilter: Nur ausgewählte Produkte an Server senden (via ~Suffix in Stop-ID)
+  // Alle ausgewählt = kein Suffix (Standard), sonst z.B. ~S oder ~S~REX
+  const STAMM_PRODUKT_CODES = { 'S-Bahn': 'S', 'REX': 'REX', 'R': 'R', 'CJX': 'CJX' };
+  const selectedProdukte = STAMM_PRODUKTE.filter(p => !stamm_deselectedProdukte.has(p));
+  let productSuffix = '';
+  if (selectedProdukte.length < STAMM_PRODUKTE.length && selectedProdukte.length > 0) {
+    productSuffix = selectedProdukte.map(p => `~${STAMM_PRODUKT_CODES[p]}`).join('');
+  }
+  const fullId = `${selectedNetwork}:${selectedStop.id}${productSuffix}`;
+
+  // Directions: LEER lassen (keine Linienfilterung!)
+  // Die Gruppierung läuft über lineGroups mit richtungsId
+  const selectedDirections = [];
+
+  // lineGroups: richtungsIds für die gewählten Richtungen
+  // Alle Linien mit gleicher richtungsId werden zusammengefasst
+  const lineGroupParts = [];
+  if (stamm_selectedRichtungen.has('meidling')) {
+    lineGroupParts.push(STAMM_RICHTUNG_R1);  // R1 = Meidling
+  }
+  if (stamm_selectedRichtungen.has('floridsdorf')) {
+    lineGroupParts.push(STAMM_RICHTUNG_R2);  // R2 = Floridsdorf
+  }
+
+  if (editingStationIndex !== null) {
+    const existingStation = stations[editingStationIndex];
+    existingStation.filter = filter;
+    existingStation.directions = selectedDirections;
+    existingStation.lineGroups = lineGroupParts.join(',');
+    const editedFullId = existingStation.fullId;
+    stations = stations.filter((s, idx) => idx === editingStationIndex || s.fullId !== editedFullId);
+    editingStationIndex = null;
+    resetFinetuningData();
+  } else {
+    if (stations.some(s => s.fullId === fullId)) {
+      alert('Diese Station ist bereits hinzugefügt!');
+      return;
+    }
+    stations.push({
+      network: selectedNetwork,
+      networkName: NETWORKS[selectedNetwork].name,
+      stopId: selectedStop.id,
+      stopName: selectedStop.name,
+      filter: filter,
+      fullId: fullId,
+      isExisting: false,
+      directions: selectedDirections,
+      lineGroups: lineGroupParts.join(',')
+    });
+  }
+
+  // Reset
+  selectedStop = null;
+  stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']);
+  stamm_deselectedProdukte = new Set();
+  selectedLines = new Set();
+  selectedVias = new Map();
+  goBack('region');
+  updateStationsList();
+}
+
 function addStationFromOebb() {
   if (!selectedStop || !oebb_toStop) return;
 
@@ -4680,6 +4885,11 @@ function addStation() {
   // OEBB Von-Nach Modus
   if (selectedNetwork === 'OEBB' && oebb_toStop) {
     return addStationFromOebb();
+  }
+
+  // OEBB Stammstrecke Modus
+  if (selectedNetwork === 'OEBB_STAMM_SBAHN') {
+    return addStationFromStamm();
   }
 
   if (!selectedNetwork || !selectedStop || selectedLines.size === 0) return;
@@ -4964,13 +5174,47 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
     return;
   }
 
+  // OEBB Stammstrecke: Richtung + Produktfilter
+  if (selectedNetwork === 'OEBB_STAMM_SBAHN') {
+    stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']);
+    stamm_deselectedProdukte = new Set();
+
+    // Richtungen aus lineGroups rekonstruieren
+    const station = stations[editingStationIndex];
+    if (station && station.lineGroups) {
+      const groups = station.lineGroups.split(',');
+      stamm_selectedRichtungen = new Set();
+      if (groups.includes(STAMM_RICHTUNG_R1)) stamm_selectedRichtungen.add('meidling');
+      if (groups.includes(STAMM_RICHTUNG_R2)) stamm_selectedRichtungen.add('floridsdorf');
+    }
+
+    // Produktfilter aus fullId rekonstruieren: "OEBB_STAMM_SBAHN:1290201~S~REX"
+    if (station && station.fullId && station.fullId.indexOf('~') > 0) {
+      const tildeIdx = station.fullId.indexOf('~');
+      const productCodes = station.fullId.substring(tildeIdx + 1).split('~');
+      const CODE_TO_PRODUKT = { 'S': 'S-Bahn', 'REX': 'REX', 'R': 'R', 'CJX': 'CJX' };
+      const selectedProducts = new Set(productCodes.map(c => CODE_TO_PRODUKT[c.toUpperCase()]).filter(Boolean));
+      // Alle nicht-ausgewählten als deselected markieren
+      stamm_deselectedProdukte = new Set();
+      STAMM_PRODUKTE.forEach(p => {
+        if (!selectedProducts.has(p)) stamm_deselectedProdukte.add(p);
+      });
+    }
+
+    linesLoading.classList.add('hidden');
+    linesContainer.classList.remove('hidden');
+    renderStammstreckeConfig();
+    addStationBtn.textContent = 'Aktualisieren';
+    return;
+  }
+
   // Load departures to get available lines
   linesLoading.classList.remove('hidden');
   linesContainer.classList.add('hidden');
   addStationBtn.disabled = true;
 
   try {
-    const fullId = `${selectedNetwork}:${id}`;
+    const fullId = `${mapNetworkForApi(selectedNetwork)}:${id}`;
     const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
     const data = await response.json();
 
@@ -5045,6 +5289,7 @@ const NETWORK_COLORS = {
   STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
   OEBB: { id: 6, name: 'ÖBB Fernverkehr', color: '#E2001A' },
   OEBB_SBAHN: { id: 12, name: 'ÖBB S-Bahn', color: '#003366' },
+  OEBB_STAMM_SBAHN: { id: 12, name: 'ÖBB Stammstrecke', color: '#003366' },
   OEBB_REG_NOE: { id: 5, name: 'ÖBB Regional NÖ', color: '#0055A4' },
   OEBB_REG_OOE: { id: 5, name: 'ÖBB Regional OÖ', color: '#0055A4' }
 };
@@ -5080,11 +5325,13 @@ function calculateRecommendedConfig() {
     description = 'Optimiert für Railjet, ICE, IC Anzeige';
   }
 
-  // Spezialfall OEBB S-Bahn
-  if (dominantNetwork === 'OEBB_SBAHN') {
+  // Spezialfall OEBB S-Bahn / Stammstrecke
+  let stammstreckeSortMode = false;
+  if (dominantNetwork === 'OEBB_SBAHN' || dominantNetwork === 'OEBB_STAMM_SBAHN') {
     displayType = 12;
-    displayName = 'ÖBB S-Bahn';
+    displayName = dominantNetwork === 'OEBB_STAMM_SBAHN' ? 'ÖBB Stammstrecke' : 'ÖBB S-Bahn';
     description = 'Optimiert für S-Bahn Anzeige';
+    if (dominantNetwork === 'OEBB_STAMM_SBAHN') stammstreckeSortMode = true;
   }
 
   // Spezialfall OEBB Regional NÖ/OÖ
@@ -5121,7 +5368,10 @@ function calculateRecommendedConfig() {
   // Zeilenanzahl bestimmen: Anzahl der verschiedenen Linien/Richtungen
   let totalDirections = 0;
   stations.forEach(s => {
-    if (s.directions && s.directions.length > 0) {
+    if (s.lineGroups && s.lineGroups.length > 0) {
+      // lineGroups vorhanden (z.B. Stammstrecke "1,2") → Gruppen zählen
+      totalDirections += s.lineGroups.split(',').length;
+    } else if (s.directions && s.directions.length > 0) {
       // Neue Struktur: directions Array zaehlen
       totalDirections += s.directions.length;
     } else if (s.filter) {
@@ -5140,6 +5390,10 @@ function calculateRecommendedConfig() {
     rows = 1;
   } else {
     rows = totalDirections;
+  }
+  // ÖBB S-Bahn (colour 12): IMMER mindestens 2 Zeilen (Hauptzeile + Kompaktzeile)
+  if (displayType === 12) {
+    rows = Math.max(rows, 2);
   }
 
   // Einzigartige Stationen für stationDetails (gruppiert nach Name+Netzwerk)
@@ -5189,7 +5443,7 @@ function calculateRecommendedConfig() {
     stopInterval: 10,
     gehweg: gehwegValues,
     showFunMessages: true,
-    sortMode: 1,           // 1 = Statisch, 2 = Zeit (dynamisch)
+    sortMode: stammstreckeSortMode ? 2 : 1,  // Stammstrecke: dynamisch (richtungsId-Gruppierung), sonst statisch
     rowOrder: '',          // Zeilen-Reihenfolge einfach (für Wien)
     rowOrderDestination: '',  // Zeilen-Reihenfolge mit Ziel (für Linz)
 
@@ -5404,9 +5658,9 @@ function suggestDisplayConfig() {
     colorId = 6;
     colorName = 'ÖBB Fernverkehr';
     description = 'Optimiert für Railjet, ICE, IC Anzeige';
-  } else if (dominantNetwork === 'OEBB_SBAHN') {
+  } else if (dominantNetwork === 'OEBB_SBAHN' || dominantNetwork === 'OEBB_STAMM_SBAHN') {
     colorId = 12;
-    colorName = 'ÖBB S-Bahn';
+    colorName = dominantNetwork === 'OEBB_STAMM_SBAHN' ? 'ÖBB Stammstrecke' : 'ÖBB S-Bahn';
     description = 'Optimiert für S-Bahn Anzeige';
   } else if (dominantNetwork === 'OEBB_REG_NOE') {
     colorId = 5;
@@ -5776,6 +6030,7 @@ function updateQuickPreview() {
   else if (colour === 13) networkForCapabilities = 'STV';
   else if (networkForCapabilities === 'OEBB') networkForCapabilities = 'OEBB';
   else if (networkForCapabilities === 'OEBB_SBAHN') networkForCapabilities = 'OEBB_SBAHN';
+  else if (networkForCapabilities === 'OEBB_STAMM_SBAHN') networkForCapabilities = 'OEBB_STAMM_SBAHN';
   else if (networkForCapabilities === 'OEBB_REG_NOE') networkForCapabilities = 'OEBB_REG_NOE';
   else if (networkForCapabilities === 'OEBB_REG_OOE') networkForCapabilities = 'OEBB_REG_OOE';
 
@@ -7861,10 +8116,15 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
           });
         });
       }
+    } else if (network === 'OEBB_STAMM_SBAHN') {
+      // Stammstrecke: Keine Directions (keine Linienfilterung)
+      // Gruppierung läuft über lineGroups mit richtungsId (1=R1/Meidling, 2=R2/Floridsdorf)
+      station.lineGroups = `${STAMM_RICHTUNG_R1},${STAMM_RICHTUNG_R2}`;
     } else {
       // Andere Netze: Directions aus API laden (gefiltert)
       try {
-        const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
+        const apiFullId = `${mapNetworkForApi(network)}:${stopId}`;
+        const response = await fetch(`${DEPARTURES_API}?stopId=${apiFullId}`);
         const data = await response.json();
 
         if (data.data && data.data.monitors) {
@@ -7952,7 +8212,7 @@ async function resolveStationName(network, stopId) {
     }
     
     // Für externe Netze - Departure API nutzen
-    const response = await fetch(`${DEPARTURES_API}?stopId=${network}:${stopId}`);
+    const response = await fetch(`${DEPARTURES_API}?stopId=${mapNetworkForApi(network)}:${stopId}`);
     const data = await response.json();
     
     if (data.data?.monitors?.[0]?.locationStop?.properties?.title) {
