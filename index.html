@@ -1063,10 +1063,16 @@
   </div>
 </div>
 
-<!-- ==================== LOADING OVERLAY ==================== -->
+<!-- ==================== LOADING OVERLAY (Speichern) ==================== -->
 <div class="loading" id="loading">
   <div class="spinner"></div>
   <div class="loading-text">Speichere & starte neu...</div>
+</div>
+
+<!-- ==================== LOADING OVERLAY (Config laden) ==================== -->
+<div class="loading show" id="configLoading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="configLoadingText">Lade Einstellungen...</div>
 </div>
 
 <script>
@@ -1076,6 +1082,7 @@ let pendingFilter = '';
 let currentConfig = {};
 let currentCapabilities = null;  // City Capabilities für Feature-Anzeige
 let configLoaded = false;
+let settingsLoaded = false;  // true = Settings (sort_mode etc.) vom ESP32 erhalten
 
 // City Capabilities (kopiert aus cities.html für Konsistenz)
 const CITY_CAPABILITIES = {
@@ -2174,8 +2181,8 @@ function setSegmentValue(name, value) {
 
 // ==================== CONFIG LADEN (vom Parent via postMessage) ====================
 function applyConfig(config) {
-  if (configLoaded) {
-    console.log('Config bereits geladen - ignoriere erneutes Laden');
+  if (settingsLoaded) {
+    console.log('Settings bereits geladen - ignoriere erneutes Laden');
     return;
   }
   console.log('Config anwenden:', config);
@@ -2186,11 +2193,11 @@ function applyConfig(config) {
     const network = detectNetworkFromRbl(config.rbl_id);
     updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
   }
-  
+
   // Anzeige
   setSegmentValue('anzeige', config.lines_count || '2');
-  // ESP32: sort_mode 1=Statisch, 2=Zeit. Default zu Statisch (1)
-  setSegmentValue('sortmode', config.sort_mode || '1');
+  // ESP32: sort_mode ODER sortmode (Kompatibilität) 1=Statisch, 2=Zeit
+  setSegmentValue('sortmode', config.sort_mode || config.sortmode || '1');
   
   // Barrierefreiheit
   setSegmentValue('chopper', config.chopper || '1');
@@ -2323,7 +2330,13 @@ function applyConfig(config) {
     if (container) container.dataset.itemsKey = '';
   }
 
+  settingsLoaded = true;
   configLoaded = true;
+
+  // Loading-Overlay ausblenden
+  const configLoadingEl = document.getElementById('configLoading');
+  if (configLoadingEl) configLoadingEl.classList.remove('show');
+
   updateUI();
 }
 
@@ -2442,25 +2455,25 @@ document.getElementById('saveBtn').addEventListener('click', () => {
 window.addEventListener('message', function(event) {
   console.log('Nachricht empfangen:', event.data);
   
-  // ESP32 sendet bestehende Konfiguration
+  // ESP32 sendet bestehende Konfiguration (nur Stations-Daten)
   if (event.data && event.data.type === 'loadExistingConfig') {
-    if (configLoaded) return;
+    if (settingsLoaded) return;  // Nur blockieren wenn Settings bereits geladen
     console.log('Bestehende Config vom ESP32 erhalten');
-    
-    // Speichere RBL/Filter für später
-    if (event.data.rbl) {
+
+    // Speichere RBL/Filter für später (nur wenn keine pending Stations aus localStorage)
+    if (event.data.rbl && !pendingRbl) {
       currentConfig.rbl_id = event.data.rbl;
       currentConfig.lines_filter = event.data.filter || '';
-      
+
       // Gehweg-Liste aktualisieren
       const stopIds = event.data.rbl.split(',').map(s => s.trim()).filter(s => s);
       updateGehwegList(stopIds, []);
     }
   }
-  
-  // Empfange volle Config (JSON) vom ESP32
+
+  // Empfange volle Config (JSON) vom ESP32 — hier kommen die Settings!
   if (event.data && event.data.type === 'loadFullConfig') {
-    if (configLoaded) return;
+    if (settingsLoaded) return;  // Settings nur 1x laden
     applyConfig(event.data.config);
   }
   
@@ -2615,16 +2628,10 @@ document.addEventListener('DOMContentLoaded', () => {
   updatePreview();
   updateUI();
 
-  // Frage Parent nach bestehender Config
-  if (window.parent && window.parent !== window) {
-    console.log('In iframe - frage Parent nach Config');
-    window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
-    window.parent.postMessage({ type: 'requestFullConfig' }, '*');
-  }
-
-  // Prüfe localStorage für PreConfig von cities.html
+  // Prüfe localStorage für Stations-Daten (von localmainpage oder cities.html)
   const pendingConfigStr = localStorage.getItem('straba_pending_config');
   if (pendingConfigStr) {
+    // PreConfig von cities.html (enthält ALLE Settings)
     try {
       const preConfig = JSON.parse(pendingConfigStr);
       applyPreConfig(preConfig);
@@ -2634,25 +2641,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
 
-      // Zeige Banner
       document.getElementById('pendingBanner').style.display = 'block';
       document.getElementById('pendingText').textContent =
         `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
 
-      // Lösche localStorage nach dem Laden
       localStorage.removeItem('straba_pending_config');
       localStorage.removeItem('straba_pending_rbl');
       localStorage.removeItem('straba_pending_filter');
       localStorage.removeItem('straba_pending_details');
 
-      // Pending Daten haben Priorität - ESP32 Config nicht mehr überschreiben lassen
+      // cities.html PreConfig hat Settings dabei → fertig
       configLoaded = true;
+      settingsLoaded = true;
+      const cle = document.getElementById('configLoading');
+      if (cle) cle.classList.remove('show');
 
     } catch (e) {
       console.error('Fehler beim Parsen der PreConfig:', e);
     }
   } else {
-    // Fallback: Alte Methode (nur RBL/Filter)
+    // Alte Methode: Nur Stations-Daten aus localStorage (von localmainpage)
+    // Settings kommen SEPARAT vom ESP32 via postMessage!
     const localPendingRbl = localStorage.getItem('straba_pending_rbl');
     if (localPendingRbl) {
       pendingRbl = localPendingRbl;
@@ -2670,32 +2679,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // Capabilities aus Netzwerk ableiten
       const network = detectNetworkFromRbl(pendingRbl);
       updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
 
-      // Zeige Banner
       document.getElementById('pendingBanner').style.display = 'block';
       document.getElementById('pendingText').textContent =
         `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
 
-      // Aktualisiere Gehweg-Liste
       updateGehwegList(stopIds, [], details);
 
-      // Lösche localStorage nach dem Laden
       localStorage.removeItem('straba_pending_rbl');
       localStorage.removeItem('straba_pending_filter');
       localStorage.removeItem('straba_pending_details');
 
-      // Row Order Liste aktualisieren nachdem Details geladen wurden
       updateRowOrderList();
 
-      // Pending Daten haben Priorität - ESP32 Config nicht mehr überschreiben lassen
+      // NUR Stations-Daten geladen — Settings NOCH NICHT!
+      // settingsLoaded bleibt false → loadFullConfig vom ESP32 wird akzeptiert
       configLoaded = true;
     } else {
       // Keine pending Config - Default zu Wien (alle Features)
       updateFeatureVisibility(CITY_CAPABILITIES.WL);
     }
+  }
+
+  // Config vom ESP32-Parent anfordern (1x, mit 2 Retries)
+  let configRetries = 0;
+  const MAX_CONFIG_RETRIES = 2;
+
+  function requestConfigFromParent() {
+    if (settingsLoaded) return;  // Bereits erhalten
+    if (window.parent && window.parent !== window) {
+      configRetries++;
+      console.log('Frage Parent nach Config (Versuch ' + configRetries + ')...');
+      window.parent.postMessage({ type: 'requestFullConfig' }, '*');
+      window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
+
+      if (configRetries <= MAX_CONFIG_RETRIES) {
+        // Retry nach 1.5s wenn keine Antwort
+        setTimeout(() => {
+          if (!settingsLoaded) {
+            console.log('Keine Antwort - retry...');
+            requestConfigFromParent();
+          }
+        }, 1500);
+      } else {
+        // Alle Versuche fehlgeschlagen → mit Defaults weitermachen
+        console.log('Keine Config vom ESP32 erhalten - verwende Standardwerte');
+        const cle = document.getElementById('configLoading');
+        if (cle) cle.classList.remove('show');
+      }
+    } else {
+      // Nicht in iframe → Loading ausblenden
+      const cle = document.getElementById('configLoading');
+      if (cle) cle.classList.remove('show');
+    }
+  }
+
+  // Starte Config-Anfrage (mit kleinem Delay damit iframe stabil ist)
+  if (!settingsLoaded) {
+    setTimeout(requestConfigFromParent, 100);
   }
 
   // Finale Aktualisierung der Row Order Liste
