@@ -374,10 +374,21 @@
       background:#ffd700;
       color:#1a1a2e;
     }
-    .row-order-item .direction-text{
+    .row-order-item .direction-info{
       flex:1;
+      overflow:hidden;
+    }
+    .row-order-item .direction-text{
       color:#ccc;
       font-size:13px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .row-order-item .station-text{
+      display:block;
+      color:#888;
+      font-size:11px;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
@@ -1373,18 +1384,20 @@ function updateRowOrderList() {
     const filters = filterString.split('|').map(s => s.trim());
 
     // Sammle alle Linien mit ihren Stop-IDs und Directions
-    // NEUE LOGIK: Jede Linie+Richtung Kombination = separate Zeile
-    // Key ist "linie|richtung", so dass U1 Oberlaa und U1 Leopoldau getrennt sind
-    const lineDirectionMap = {};  // "line|direction" -> { stopIds: Set, firstIndex }
+    // Key ist "stopId|linie|richtung" — gleiche Linie von verschiedenen Stops = separate Zeilen
+    // (z.B. 39A von Stop 1192 und 39A von Stop 1374 = 2 Einträge)
+    const lineEntries = [];
 
     stopIds.forEach((stopId, i) => {
       const linesForStop = filters[i] ? filters[i].split(',').map(l => l.trim()) : [];
       linesForStop.forEach(line => {
         if (line) {
-          // Direction aus currentStationDetails holen
+          // Direction und Station aus currentStationDetails holen
           let direction = '';
+          let stationName = '';
           if (currentStationDetails && currentStationDetails[i]) {
             const station = currentStationDetails[i];
+            stationName = station.name || station.stationName || '';
             if (station.lines) {
               const lineInfo = station.lines.find(l => l.name === line);
               if (lineInfo && lineInfo.direction) {
@@ -1393,38 +1406,22 @@ function updateRowOrderList() {
             }
           }
 
-          // Key ist Linie + Richtung (oder nur Linie wenn keine Richtung bekannt)
-          const key = direction ? `${line}|${direction}` : line;
-
-          if (!lineDirectionMap[key]) {
-            lineDirectionMap[key] = {
-              line: line,
-              direction: direction,
-              stopIds: new Set(),
-              firstIndex: i
-            };
-          }
-
-          lineDirectionMap[key].stopIds.add(stopId);
+          lineEntries.push({
+            line: line,
+            direction: direction,
+            stationName: stationName,
+            stopIds: [stopId],
+            firstIndex: i
+          });
         }
       });
     });
 
-    // Debug: Zeige lineDirectionMap
-    console.log('lineDirectionMap (pro Linie+Richtung):', lineDirectionMap);
+    // Debug: Zeige lineEntries
+    console.log('lineEntries (pro Stop+Linie):', lineEntries);
 
-    // Konvertiere Map zu Array, sortiert nach erstem Vorkommen
-    const lineEntries = Object.values(lineDirectionMap)
-      .sort((a, b) => a.firstIndex - b.firstIndex);
-
-    console.log('lineEntries (sortiert):', lineEntries);
-
-    // Erstelle rowOrderItems - EINE Zeile pro Linie+Richtung!
-    rowOrderItems = lineEntries.map(data => ({
-      line: data.line,
-      direction: data.direction,
-      stopIds: Array.from(data.stopIds)
-    }));
+    // Erstelle rowOrderItems - EINE Zeile pro Stop+Linie!
+    rowOrderItems = lineEntries;
 
     container.dataset.itemsKey = newItemsKey;
     console.log('rowOrderItems erstellt (finale Liste):', rowOrderItems);
@@ -1445,13 +1442,17 @@ function renderRowOrderList() {
     const isFirst = idx === 0;
     const isLast = idx === rowOrderItems.length - 1;
     const dirText = item.direction || '';
+    const stationText = item.stationName || '';
 
     return `
       <div class="row-order-item" draggable="true" data-index="${idx}">
         <span class="drag-handle">☰</span>
         <span class="row-number">${idx + 1}</span>
         <span class="line-badge">${item.line}</span>
-        <span class="direction-text">${dirText}</span>
+        <span class="direction-info">
+          <span class="direction-text">${dirText}</span>
+          ${stationText ? `<span class="station-text">${stationText}</span>` : ''}
+        </span>
         <span class="move-buttons">
           <button class="move-btn" onclick="moveRowOrderItem(${idx}, -1)" ${isFirst ? 'disabled' : ''}>▲</button>
           <button class="move-btn" onclick="moveRowOrderItem(${idx}, 1)" ${isLast ? 'disabled' : ''}>▼</button>
@@ -1646,6 +1647,7 @@ function loadFtDirectionsFromRowOrder() {
         key: key,
         line: item.line,
         direction: item.direction || '',
+        stationName: item.stationName || '',
         stopIds: item.stopIds || [firstStopId]
       });
     }
