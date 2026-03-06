@@ -5302,6 +5302,18 @@ let recommendedConfig = null;  // Vollständige empfohlene Konfiguration
 function calculateRecommendedConfig() {
   if (stations.length === 0) return null;
 
+  // DEDUP: Entferne Stationen mit doppelter fullId (kann durch Race Conditions bei Config-Laden entstehen)
+  const seenFullIds = new Set();
+  const beforeCount = stations.length;
+  stations = stations.filter(s => {
+    if (seenFullIds.has(s.fullId)) return false;
+    seenFullIds.add(s.fullId);
+    return true;
+  });
+  if (stations.length !== beforeCount) {
+    console.warn('[calculateRecommendedConfig] DEDUP: ' + beforeCount + ' -> ' + stations.length + ' Stationen (Duplikate entfernt)');
+  }
+
   // Dominantes Netzwerk finden
   const networkCounts = {};
   stations.forEach(s => {
@@ -7624,6 +7636,17 @@ function saveFromFinetuning() {
   // Linz Linien+Ziel Filter sammeln (linefilterdestination)
   const lineFilterDestStr = collectFtLineFilter();
 
+  // WICHTIG: rbl und filter IMMER frisch aus stations berechnen (nicht stale Werte verwenden!)
+  // Dedupliziere stations zuerst (Sicherheitsnetz gegen Race Conditions)
+  const seenIds = new Set();
+  stations = stations.filter(s => {
+    if (seenIds.has(s.fullId)) return false;
+    seenIds.add(s.fullId);
+    return true;
+  });
+  recommendedConfig.rbl = stations.map(s => s.fullId).join(',');
+  recommendedConfig.filter = stations.map(s => s.filter || '').join('|');
+
   // Update recommendedConfig
   recommendedConfig.colour = colour;
   recommendedConfig.rows = rows;
@@ -7993,8 +8016,22 @@ function saveConfig() {
 // ==================== LOAD EXISTING ====================
 // linefilterdestination: Linz-Format "1:Auwiesen,2:solarCity,27:Chemiepark" mit Line:Destination
 // roworderdestination: Wien-Format "4A:Karlsplatz U,4A:Wittelsbachstraße,59A:Bhf. Meidling S U" mit Line:Destination
+let _loadExistingConfigPromise = null;
 async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination, linegroups) {
   if (!rbl || rbl.trim() === '') return;
+
+  // Serialisierung: Warte auf vorherigen Aufruf bevor neuer startet
+  // Verhindert Race Conditions wenn mehrere loadFullConfig/loadExistingConfig Messages gleichzeitig ankommen
+  if (_loadExistingConfigPromise) {
+    console.log('[loadExistingConfig] Warte auf vorherigen Aufruf...');
+    await _loadExistingConfigPromise;
+  }
+  _loadExistingConfigPromise = _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups);
+  await _loadExistingConfigPromise;
+  _loadExistingConfigPromise = null;
+}
+
+async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups) {
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
   const filterParts = filter ? filter.split('|') : [];
