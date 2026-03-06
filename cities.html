@@ -5459,29 +5459,49 @@ function calculateRecommendedConfig() {
     rowOrder: '',          // Zeilen-Reihenfolge einfach (für Wien)
     rowOrderDestination: '',  // Zeilen-Reihenfolge mit Ziel (für Linz)
 
-    // Linien-Gruppierung (Format: "1+62,U1+U2" bedeutet Gruppe1=1&62, Gruppe2=U1&U2)
-    // STV/Graz: Automatisch "Linie:H" oder "Linie:R" aus richtungsId (stabil bei Kurzführungen)
-    lineGroups: stations.map(s => {
-      if (s.lineGroups) return s.lineGroups;  // Fine-Tuning hat Vorrang
-      // Auto-Build für STV: directions mit richtungsId → "5:R,1:R,4:H"
-      if (s.network === 'STV' && s.directions && s.directions.length > 0) {
-        return s.directions
-          .map(d => {
-            // Bevorzugt richtungsId (H/R) — stabil bei Kurzführungen
+    // Linien-Gruppierung: Flat-Format "1:H,1:R,2:H,2:R,REX:Passau Hbf"
+    // WICHTIG: ALLE Stationen (nicht nur STV!) — sonst bricht "Ja passt" Speichern
+    lineGroups: (function() {
+      const allGroups = [];
+      stations.forEach(s => {
+        if (s.lineGroups) {
+          allGroups.push(s.lineGroups);
+        } else if (s.directions && s.directions.length > 0) {
+          const dirGroups = s.directions.map(d => {
             if (d.richtungsId && (d.richtungsId === 'H' || d.richtungsId === 'R')) {
               return `${d.line}:${d.richtungsId}`;
             }
-            // Fallback: Zieltext (wenn richtungsId fehlt oder ungültiges Format)
             return d.towards ? `${d.line}:${d.towards}` : d.line;
-          })
-          .join(',');
-      }
-      return '';
-    }).join('|'),
+          });
+          allGroups.push(dirGroups.join(','));
+        }
+      });
+      return allGroups.filter(g => g).join(',');
+    })(),
 
     // Linien+Ziel Filter für Linz (automatisch aus ausgewählten directions)
     // Format: "1:Auwiesen,2:Universität" - wird automatisch aus den directions gebaut
     lineFilterDestination: buildLineFilterDestination(stations),
+
+    // Zeilen-Reihenfolge: Auto-Build aus directions (für "Ja passt" Speichern)
+    rowOrderDestination: (function() {
+      const items = [];
+      stations.forEach(s => {
+        if (s.network === 'WL') return;  // Wien nutzt rowOrder (stopId:Linie)
+        if (s.directions && s.directions.length > 0) {
+          s.directions.forEach(d => {
+            let item;
+            if (d.richtungsId && (d.richtungsId === 'H' || d.richtungsId === 'R')) {
+              item = `${d.line}:${d.richtungsId}`;
+            } else {
+              item = d.towards ? `${d.line}:${d.towards}` : d.line;
+            }
+            if (!items.includes(item)) items.push(item);
+          });
+        }
+      });
+      return items.join(',');
+    })(),
 
     // Capabilities (für UI)
     capabilities: capabilities,
