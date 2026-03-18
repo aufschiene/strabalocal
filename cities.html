@@ -5486,7 +5486,8 @@ const NETWORK_COLORS = {
   OEBB_SBAHN: { id: 12, name: 'ÖBB S-Bahn', color: '#003366' },
   OEBB_STAMM_SBAHN: { id: 12, name: 'ÖBB Stammstrecke', color: '#003366' },
   OEBB_REG_NOE: { id: 12, name: 'ÖBB Regional NÖ', color: '#0055A4' },
-  OEBB_REG_OOE: { id: 12, name: 'ÖBB Regional OÖ', color: '#0055A4' }
+  OEBB_REG_OOE: { id: 12, name: 'ÖBB Regional OÖ', color: '#0055A4' },
+  WESTBAHN: { id: 14, name: 'Westbahn', color: '#0055A4' }
 };
 
 let suggestedColor = 1;
@@ -5556,6 +5557,13 @@ function calculateRecommendedConfig() {
     displayType = 12;
     displayName = 'ÖBB Regional OÖ';
     description = 'S-Bahn, REX Anzeige';
+  }
+
+  // Spezialfall Westbahn
+  if (dominantNetwork === 'WESTBAHN') {
+    displayType = 14;
+    displayName = 'Westbahn';
+    description = 'Optimiert für Westbahn Anzeige';
   }
 
   // Spezialfall DB/ÖBB: S-Bahn vs Fernverkehr vs Regionalverkehr
@@ -5664,6 +5672,7 @@ function calculateRecommendedConfig() {
     lineGroups: (function() {
       const allGroups = [];
       stations.forEach(s => {
+        if (s.allDepartures) return;  // "Alle Abfahrten" → kein Gruppierung
         if (s.lineGroups) {
           allGroups.push(s.lineGroups);
         } else if (s.directions && s.directions.length > 0) {
@@ -5688,6 +5697,7 @@ function calculateRecommendedConfig() {
       const items = [];
       stations.forEach(s => {
         if (s.network === 'WL') return;  // Wien nutzt rowOrder (stopId:Linie)
+        if (s.allDepartures) return;  // "Alle Abfahrten" → keine Reihenfolge
         if (s.directions && s.directions.length > 0) {
           s.directions.forEach(d => {
             let item;
@@ -8017,6 +8027,8 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('linegroups', configData.linegroups);
     formData.append('linefilter', configData.linefilter);
     formData.append('linefilterdestination', configData.linefilterdestination);
+    formData.append('roworder', configData.roworder);
+    formData.append('roworderdestination', configData.roworderdestination);
 
     updateSavingOverlay('Speichere Einstellungen...');
 
