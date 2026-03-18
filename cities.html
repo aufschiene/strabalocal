@@ -2281,8 +2281,11 @@
     </div>
 
     <div class="lines-container hidden" id="linesContainer">
+      <button class="btn" id="allDeparturesBtn" onclick="addStationAllDepartures()" style="width:100%;margin-bottom:12px;padding:14px;background:#0055a4;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">
+        Alle Abfahrten anzeigen
+      </button>
       <div class="lines-header">
-        <h3>Welche Linien anzeigen?</h3>
+        <h3>Oder Linien auswählen:</h3>
         <button class="select-all-btn" id="selectAllBtn" onclick="toggleSelectAll()">Alle auswählen</button>
       </div>
       <div id="linesList"></div>
@@ -5056,6 +5059,45 @@ function showGroupingStep() {
 }
 
 // ==================== ADD STATION ====================
+function addStationAllDepartures() {
+  // Alle Abfahrten ohne Filter — zeigt die nächsten N Züge chronologisch
+  if (!selectedNetwork || !selectedStop) return;
+
+  const fullId = `${selectedNetwork}:${selectedStop.id}`;
+
+  if (editingStationIndex !== null) {
+    const existingStation = stations[editingStationIndex];
+    existingStation.filter = '';
+    existingStation.directions = [];
+    existingStation.allDepartures = true;
+    stations = stations.filter((s, idx) => idx === editingStationIndex || s.fullId !== existingStation.fullId);
+    editingStationIndex = null;
+    resetFinetuningData();
+  } else {
+    if (stations.some(s => s.fullId === fullId)) {
+      alert('Diese Station ist bereits hinzugefügt!');
+      return;
+    }
+    stations.push({
+      network: selectedNetwork,
+      networkName: NETWORKS[selectedNetwork].name,
+      stopId: selectedStop.id,
+      stopName: selectedStop.name,
+      filter: '',
+      fullId: fullId,
+      isExisting: false,
+      directions: [],
+      allDepartures: true
+    });
+  }
+
+  selectedStop = null;
+  selectedLines = new Set();
+  selectedVias = new Map();
+  goBack('region');
+  updateStationsList();
+}
+
 function addStation() {
   // OEBB Von-Nach Modus
   if (selectedNetwork === 'OEBB' && oebb_toStop) {
@@ -5219,7 +5261,11 @@ function updateStationsList() {
 
   const chips = Array.from(groupedStations.values()).map((group) => {
     let filterLabel;
-    if (group.isJourney) {
+    // Prüfe ob eine der Stationen "Alle Abfahrten" ist
+    const isAllDeps = group.indices.some(idx => stations[idx]?.allDepartures);
+    if (isAllDeps) {
+      filterLabel = 'Alle Abfahrten';
+    } else if (group.isJourney) {
       const uniqueFilters = [...new Set(group.filters)];
       filterLabel = `Produkte: ${uniqueFilters.join(', ') || 'Alle'}`;
     } else if (group.network === 'OEBB' && group.directions && group.directions.length > 0) {
@@ -5609,7 +5655,7 @@ function calculateRecommendedConfig() {
     stopInterval: 10,
     gehweg: gehwegValues,
     showFunMessages: true,
-    sortMode: stammstreckeSortMode ? 2 : 1,  // Stammstrecke: dynamisch (richtungsId-Gruppierung), sonst statisch
+    sortMode: (stammstreckeSortMode || stations.some(s => s.allDepartures)) ? 2 : 1,  // dynamisch wenn Stammstrecke oder "Alle Abfahrten"
     rowOrder: '',          // Zeilen-Reihenfolge einfach (für Wien)
     rowOrderDestination: '',  // Zeilen-Reihenfolge mit Ziel (für Linz)
 
