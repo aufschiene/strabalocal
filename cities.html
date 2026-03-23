@@ -418,7 +418,53 @@
       color: #fff;
     }
 
-    /* === OEBB VON-NACH MODUS === */
+    /* === POINT-TO-POINT (ÖBB Fernverkehr) === */
+    .p2p-section {
+      margin-bottom: 16px;
+    }
+    .p2p-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .p2p-station {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      padding: 8px 0;
+    }
+    .p2p-change {
+      font-size: 12px;
+      font-weight: 400;
+      color: #0055a4;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+    .p2p-search-wrap {
+      position: relative;
+    }
+    .p2p-search-wrap .search-input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .p2p-search-wrap .search-results {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    /* === OEBB VON-NACH MODUS (legacy) === */
     .oebb-from-label {
       font-size: 14px;
       color: #555;
@@ -1286,10 +1332,10 @@
 
     /* Success Button */
     .btn-success {
-      background: #28a745 !important;
+      background: #1e7e34 !important;
     }
     .btn-success:hover {
-      background: #218838 !important;
+      background: #186429 !important;
     }
 
     /* Config Hint */
@@ -1299,6 +1345,84 @@
       color: #888;
       margin-top: 15px;
       line-height: 1.5;
+    }
+
+    /* Schnellansicht Box */
+    .quick-config-box {
+      background: #f5f5f5;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .quick-config-box h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #222;
+      margin-bottom: 16px;
+    }
+
+    /* Display Choice Segmented */
+    .display-choice-seg {
+      display: flex;
+      background: #e8e8e8;
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+      margin-bottom: 16px;
+    }
+    .display-choice-seg button {
+      flex: 1;
+      padding: 12px 10px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      font-size: 14px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .display-choice-seg button.active {
+      background: #fff;
+      color: #222;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    }
+
+    /* Station Summary */
+    .station-summary-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .station-summary-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+    }
+    .station-summary-item .ss-network-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .station-summary-item .ss-text {
+      font-size: 14px;
+      color: #444;
+    }
+    .station-summary-item .ss-text strong {
+      color: #222;
+    }
+    .station-summary-item .ss-lines {
+      font-size: 12px;
+      color: #999;
+      margin-left: auto;
+    }
+    .quick-sort-info {
+      font-size: 12px;
+      color: #999;
+      text-align: center;
+      margin-top: 4px;
     }
 
     /* Quick Settings Preview */
@@ -1840,7 +1964,7 @@
     }
 
     /* Toggle Switches - Helles Design */
-    .finetuning-step .toggle-switch {
+    .toggle-switch {
       position: relative;
       width: 52px;
       height: 28px;
@@ -1850,10 +1974,10 @@
       transition: background 0.3s;
       flex-shrink: 0;
     }
-    .finetuning-step .toggle-switch.active {
+    .toggle-switch.active {
       background: #0055a4;
     }
-    .finetuning-step .toggle-switch::after {
+    .toggle-switch::after {
       content: '';
       position: absolute;
       width: 22px;
@@ -1865,7 +1989,7 @@
       transition: transform 0.3s;
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    .finetuning-step .toggle-switch.active::after {
+    .toggle-switch.active::after {
       transform: translateX(24px);
     }
 
@@ -2094,14 +2218,14 @@
     }
 
     /* Toggle Row (Zeilen, Helligkeit) */
-    .finetuning-step .toggle-row {
+    .toggle-row {
       display: flex;
       background: #f0f0f0;
       border-radius: 10px;
       padding: 4px;
       gap: 4px;
     }
-    .finetuning-step .toggle-btn {
+    .toggle-btn {
       padding: 10px 18px;
       border: none;
       background: transparent;
@@ -2112,10 +2236,10 @@
       cursor: pointer;
       transition: all 0.2s;
     }
-    .finetuning-step .toggle-btn:hover {
+    .toggle-btn:hover {
       background: #e0e0e0;
     }
-    .finetuning-step .toggle-btn.active {
+    .toggle-btn.active {
       background: #0055a4;
       color: #fff;
     }
@@ -2311,125 +2435,70 @@
     </button>
   </div>
   
-  <!-- Step: Display Config -->
+  <!-- Step: Schnellansicht nach Station-Auswahl -->
   <div class="card hidden" id="stepDisplayConfig">
     <button class="back-btn" onclick="backFromDisplayConfig()">Zurück</button>
-    <h2>Display-Einstellungen</h2>
-    
-    <div class="config-suggestion">
-      <div class="suggestion-header">
-        <span class="suggestion-label">Empfohlen für deine Auswahl:</span>
-      </div>
-      
-      <div class="suggestion-preview" id="suggestionPreview">
-        <div class="preview-image" id="previewImage">
-          <!-- Animated preview -->
-        </div>
-        <div class="preview-info">
-          <div class="preview-title" id="previewTitle">Wiener Linien Ansicht</div>
-          <div class="preview-desc" id="previewDesc">2 Zeilen, optimal für U-Bahn und Tram</div>
+    <h2>Dein Display</h2>
+
+    <div class="quick-config-box">
+      <p style="font-size:13px;color:#888;margin-bottom:6px;">Du hast Stationen aus verschiedenen Netzwerken ausgewählt.</p>
+      <h3 id="quickConfigTitle">Wie soll dein Display aussehen?</h3>
+
+      <!-- Multi-Display Auswahl (nur bei verschiedenen Netzwerken) -->
+      <div id="multiDisplayChoice" style="display:none;">
+        <div class="display-choice-seg">
+          <button class="active" id="choiceSeparate" onclick="setQuickDisplayMode('separate')">Getrennt</button>
+          <button id="choiceCompact" onclick="setQuickDisplayMode('compact')">Kompakt</button>
         </div>
       </div>
-      
-      <div class="suggestion-details">
-        <div class="detail-row">
-          <span class="detail-label">Display-Typ:</span>
-          <span class="detail-value" id="suggestedColorName">Wiener Linien</span>
+
+      <!-- Personalisierte Station-Zusammenfassung -->
+      <div class="station-summary-list" id="stationSummary">
+        <!-- Dynamisch gefüllt -->
+      </div>
+
+      <div class="quick-sort-info" id="quickSortInfo"></div>
+    </div>
+
+    <!-- Schnelleinstellungen -->
+    <div id="quickSettingsSection" style="margin-top:16px;">
+      <!-- Wechselgeschwindigkeit (nur bei Multi-Display) -->
+      <div id="quickSpeedRow" style="display:none;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:14px;font-weight:600;">Wechseln</div>
+          </div>
+          <div class="toggle-row" id="quickSpeed" style="gap:0;">
+            <button class="toggle-btn" data-value="5" onclick="setFtToggleVal('quickSpeed',5)" style="border-radius:8px 0 0 8px;">Schnell</button>
+            <button class="toggle-btn active" data-value="10" onclick="setFtToggleVal('quickSpeed',10)">Normal</button>
+            <button class="toggle-btn" data-value="20" onclick="setFtToggleVal('quickSpeed',20)" style="border-radius:0 8px 8px 0;">Langsam</button>
+          </div>
         </div>
-        <div class="detail-row">
-          <span class="detail-label">Zeilen:</span>
-          <span class="detail-value" id="suggestedRows">2</span>
+      </div>
+
+      <!-- Nachtmodus -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">
+        <div>
+          <div style="font-size:14px;font-weight:600;">Nachtmodus</div>
+          <div style="font-size:12px;color:#999;">Display aus zwischen 22–7 Uhr</div>
         </div>
+        <div class="toggle-switch" id="quickNightMode" onclick="toggleFtSwitch('quickNightMode')"></div>
       </div>
     </div>
-    
+
+    <!-- Aktions-Buttons -->
     <div class="config-actions">
       <button class="btn btn-primary btn-large btn-success" onclick="sendWithSuggestion()">
-        ✓ Ja, passt – fertig
+        Ja, fertig
       </button>
       <button class="btn btn-secondary btn-large" onclick="goToFinetuning()">
-        Nein / Feintuning
+        Feintuning
       </button>
     </div>
 
-    <p class="config-hint">
-      "Ja, passt" speichert die Einstellungen direkt auf deinem Straba.<br>
-      "Feintuning" öffnet erweiterte Optionen für individuelle Anpassungen.
+    <p class="config-hint" style="margin-top:12px;">
+      Helligkeit, Gehweg und mehr.
     </p>
-
-    <!-- Quick Preview der gewählten Optionen -->
-    <div class="quick-settings-preview" id="quickSettingsPreview">
-      <h4>Zusammenfassung</h4>
-      <div class="settings-list" id="settingsList">
-        <!-- Wird dynamisch gefüllt -->
-      </div>
-    </div>
-
-    <!-- Kompakter Feintuning-Bereich (optional, versteckt) -->
-    <div class="finetuning-section hidden" id="finetuningSection">
-      <h3>Quick-Anpassung</h3>
-
-      <div class="finetuning-row">
-        <label>Display-Typ:</label>
-        <select id="colorSelect" onchange="updateQuickPreview()">
-          <option value="1">Wiener Linien</option>
-          <option value="2">Linz AG</option>
-          <option value="3">VBB Berlin</option>
-          <option value="4">WLB Badner Bahn</option>
-          <option value="5">DB S-Bahn</option>
-          <option value="6">DB Fernverkehr</option>
-          <option value="7">BODO Bodensee</option>
-          <option value="8">Salzburg AG</option>
-          <option value="9">RATP Paris</option>
-          <option value="10">Straba Ansicht</option>
-          <option value="11">ÖBB Fernverkehr</option>
-          <option value="12">ÖBB S-Bahn</option>
-          <option value="13">Holding Graz</option>
-          <option value="14">Westbahn</option>
-        </select>
-      </div>
-
-      <div class="finetuning-row">
-        <label>Anzahl Zeilen:</label>
-        <select id="rowsSelect" onchange="updateQuickPreview()">
-          <option value="1">1 Zeile</option>
-          <option value="2">2 Zeilen</option>
-          <option value="3">3 Zeilen</option>
-          <option value="4">4 Zeilen</option>
-        </select>
-      </div>
-
-      <!-- Wien-spezifische Optionen (werden dynamisch ein-/ausgeblendet) -->
-      <div class="wien-options" id="wienOptions" style="display:none;">
-        <div class="finetuning-row">
-          <label>Hochflurer markieren:</label>
-          <select id="chopperSelect">
-            <option value="1">An</option>
-            <option value="0">Aus</option>
-          </select>
-        </div>
-        <div class="finetuning-row">
-          <label>Klimaanlage (U-Bahn):</label>
-          <select id="silberpfeilSelect">
-            <option value="1">An</option>
-            <option value="0">Aus</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Gehweg für ALLE Städte -->
-      <div class="gehweg-quick" id="gehwegQuick">
-        <h4>Gehweg zur Haltestelle</h4>
-        <p class="gehweg-hint">Abfahrten unter der Minutenzahl werden ausgeblendet</p>
-        <div id="gehwegQuickList">
-          <!-- Wird dynamisch gefüllt -->
-        </div>
-      </div>
-
-      <button class="btn btn-primary" onclick="applyQuickSettings()">
-        Mit Anpassungen speichern
-      </button>
-    </div>
   </div>
 </div><!-- Ende .container -->
 
@@ -2448,162 +2517,53 @@
       </div>
     </div>
 
-    <!-- Display Typ -->
-    <div class="config-card">
+    <!-- 1. Anzeige-Stil: Kompakt / Getrennt -->
+    <div class="config-card" id="ftDisplayStyleCard">
       <h3>Anzeige-Stil</h3>
-      <div class="form-row">
+      <div class="form-row" id="ftCompactSeparateRow" style="display:none;">
         <div>
-          <div class="form-label">Display-Typ</div>
-          <div class="form-hint">Farbschema des Displays</div>
+          <div class="form-label">Ansicht</div>
         </div>
-        <select id="ftColorSelect" onchange="updateFinetuningPreview()">
-          <option value="1">Wiener Linien</option>
-          <option value="2">Linz AG</option>
-          <option value="3">VBB Berlin</option>
-          <option value="4">WLB Badner Bahn</option>
-          <option value="5">DB S-Bahn</option>
-          <option value="6">DB Fernverkehr</option>
-          <option value="7">BODO Bodensee</option>
-          <option value="8">Salzburg AG</option>
-          <option value="9">RATP Paris</option>
-          <option value="10">Straba Ansicht</option>
-          <option value="11">ÖBB Fernverkehr</option>
-          <option value="12">ÖBB S-Bahn</option>
-          <option value="13">Holding Graz</option>
-          <option value="14">Westbahn</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <div>
-          <div class="form-label">Zeilen</div>
-          <div class="form-hint">Anzahl der Abfahrten</div>
-        </div>
-        <div class="toggle-row" id="ftRowsToggle">
-          <button class="toggle-btn" data-value="1" onclick="setFtRows(1)">1</button>
-          <button class="toggle-btn active" data-value="2" onclick="setFtRows(2)">2</button>
-          <button class="toggle-btn" data-value="3" onclick="setFtRows(3)">3</button>
-          <button class="toggle-btn" data-value="4" onclick="setFtRows(4)">4</button>
+        <div class="toggle-row" id="ftCompactSeparateToggle">
+          <button class="toggle-btn active" data-value="separate" onclick="setFtCompactSeparate('separate')">Getrennt</button>
+          <button class="toggle-btn" data-value="compact" onclick="setFtCompactSeparate('compact')">Kompakt</button>
         </div>
       </div>
       <div class="form-row">
         <div>
-          <div class="form-label">Helligkeit</div>
+          <div class="form-label">Zuordnung</div>
+        </div>
+        <div class="toggle-row" id="ftAutoManualToggle">
+          <button class="toggle-btn active" data-value="auto" onclick="setFtAutoManual('auto')">Automatisch</button>
+          <button class="toggle-btn" data-value="manual" onclick="setFtAutoManual('manual')">Manuell</button>
+        </div>
+      </div>
+      <!-- Manuelle Zuordnung: Pro Station Display-Typ -->
+      <div id="ftManualAssignment" style="display:none; margin-top:12px;">
+        <div id="ftStationDisplayList">
+          <!-- Dynamisch: pro Station ein Dropdown -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Per-Display-Typ Sektionen (dynamisch generiert) -->
+    <div id="ftDisplayTypeSections">
+      <!-- Wird von renderDisplayTypeSections() gefüllt -->
+    </div>
+
+    <!-- 3. Gemeinsame Einstellungen -->
+
+    <!-- Helligkeit -->
+    <div class="config-card">
+      <h3>Helligkeit</h3>
+      <div class="form-row">
+        <div>
+          <div class="form-label">Display-Helligkeit</div>
         </div>
         <div class="toggle-row" id="ftBrightnessToggle">
           <button class="toggle-btn" data-value="1" onclick="setFtBrightness(1)">Dunkel</button>
           <button class="toggle-btn" data-value="2" onclick="setFtBrightness(2)">Mittel</button>
           <button class="toggle-btn active" data-value="3" onclick="setFtBrightness(3)">Hell</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Wien-spezifische Optionen -->
-    <div class="config-card" id="ftWienOptions" style="display:none;">
-      <h3>Wien-Optionen <span class="wien-only-badge">WL</span></h3>
-      <div class="form-row" id="ftRowTextColor">
-        <div>
-          <div class="form-label">Schriftfarbe</div>
-          <div class="form-hint">Textfarbe für Wien-Display</div>
-        </div>
-        <div class="toggle-row" id="ftTextColorToggle">
-          <button class="toggle-btn active" data-value="1" onclick="setFtTextColor(1)" style="background:#FFD700;color:#000">Gelb</button>
-          <button class="toggle-btn" data-value="2" onclick="setFtTextColor(2)" style="background:#FFF;color:#000">Weiß</button>
-          <button class="toggle-btn" data-value="3" onclick="setFtTextColor(3)" style="background:#FF8C00;color:#000">Orange</button>
-        </div>
-      </div>
-      <div class="form-row" id="ftRowChopper">
-        <div>
-          <div class="form-label">Hochflurer markieren</div>
-          <div class="form-hint">Hebt altere Garnituren hervor</div>
-        </div>
-        <div class="toggle-switch active" id="ftChopperToggle" onclick="toggleFtSwitch('ftChopperToggle')"></div>
-      </div>
-      <div class="form-row" id="ftRowSilberpfeil">
-        <div>
-          <div class="form-label">Klimaanlage anzeigen</div>
-          <div class="form-hint">U-Bahn Silberpfeil-Warnung</div>
-        </div>
-        <div class="toggle-switch active" id="ftSilberpfeilToggle" onclick="toggleFtSwitch('ftSilberpfeilToggle')"></div>
-      </div>
-    </div>
-
-    <!-- Richtungs-Gruppierung & Sortierung -->
-    <div class="config-card" id="ftGroupingCard">
-      <h3>Richtungen gruppieren</h3>
-      <p class="form-hint" style="margin-bottom:12px;">
-        Gruppiere Linien die die gleiche Strecke fahren (z.B. Linie 1 und 62).
-        Nicht gruppierte Linien werden einzeln angezeigt.
-      </p>
-
-      <div class="ft-grouping-area">
-        <div class="ft-groups-container" id="ftGroupsContainer">
-          <!-- Gruppen werden hier gerendert -->
-        </div>
-
-        <div class="ft-directions-pool" id="ftDirectionsPool">
-          <div class="pool-header">Verfuegbare Richtungen:</div>
-          <div class="pool-items" id="ftPoolItems">
-            <!-- Richtungen werden hier gerendert -->
-          </div>
-        </div>
-      </div>
-
-      <!-- Sortierung Toggle -->
-      <div style="margin-top:20px; padding-top:16px; border-top:1px solid #e0e0e0;">
-        <div class="form-row">
-          <div>
-            <div class="form-label">Sortierung</div>
-            <div class="form-hint">Dynamisch nach Zeit oder feste Reihenfolge</div>
-          </div>
-          <div class="toggle-row" id="ftSortModeToggle">
-            <button class="toggle-btn active" data-value="1" onclick="setFtSortMode(1)">Statisch</button>
-            <button class="toggle-btn" data-value="2" onclick="setFtSortMode(2)">Zeit</button>
-          </div>
-        </div>
-        <!-- Info-Box für Sortierungsmodi -->
-        <div id="ftSortModeInfo" style="margin-top:12px; padding:12px; background:#f5f5f5; border-radius:8px; font-size:13px; color:#555;">
-          <div id="ftSortModeInfoTime" style="display:block;">
-            <strong>Zeit:</strong> Die nächsten Abfahrten werden immer oben angezeigt - egal welche Linie. Ideal wenn du einfach den nächsten Zug/Bus nehmen willst.
-          </div>
-          <div id="ftSortModeInfoStatic" style="display:none;">
-            <strong>Statisch:</strong> Jede Linie hat eine feste Zeile auf dem Display. Du kannst unten die Reihenfolge festlegen. Ideal wenn du immer dieselbe Linie im Blick haben willst.
-          </div>
-        </div>
-      </div>
-
-      <!-- Zeilen-Reihenfolge (nur bei Statisch sichtbar) -->
-      <div id="ftRowOrderSection" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid #e0e0e0;">
-        <div class="form-label" style="margin-bottom:12px;">Zeilen-Reihenfolge festlegen</div>
-        <div class="form-hint" style="margin-bottom:12px;">Ziehe die Gruppen/Linien in die gewünschte Reihenfolge (Zeile 1 = oben)</div>
-        <div class="ft-row-order-list" id="ftRowOrderList">
-          <!-- Wird dynamisch gefüllt mit drag & drop Items (Gruppen + einzelne Linien) -->
-        </div>
-      </div>
-
-      <!-- Anzeige-Modus: Gemischt/Slideshow (nur Wien/BODO) -->
-      <div id="ftDisplayModeSection" style="display:none; margin-top:20px; padding-top:16px; border-top:1px solid #e0e0e0;">
-        <div class="form-row">
-          <div>
-            <div class="form-label">Anzeige-Modus</div>
-            <div class="form-hint">Gemischt zeigt alle Linien zusammen, Slideshow wechselt durch</div>
-          </div>
-          <div class="toggle-row" id="ftDisplayModeToggle">
-            <button class="toggle-btn active" data-value="1" onclick="setFtDisplayMode(1)">Gemischt</button>
-            <button class="toggle-btn" data-value="2" onclick="setFtDisplayMode(2)">Slideshow</button>
-          </div>
-        </div>
-        <div id="ftSlideshowSettings" style="display:none; margin-top:12px;">
-          <div class="form-row">
-            <div>
-              <div class="form-label">Wechsel-Intervall</div>
-            </div>
-            <div class="toggle-row" id="ftStopIntervalToggle">
-              <button class="toggle-btn" data-value="5" onclick="setFtStopInterval(5)">5s</button>
-              <button class="toggle-btn active" data-value="10" onclick="setFtStopInterval(10)">10s</button>
-              <button class="toggle-btn" data-value="15" onclick="setFtStopInterval(15)">15s</button>
-              <button class="toggle-btn" data-value="30" onclick="setFtStopInterval(30)">30s</button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -2650,12 +2610,64 @@
       </div>
     </div>
 
+    <!-- Hidden fields for backwards compatibility -->
+    <select id="ftColorSelect" style="display:none;">
+      <option value="1">Wiener Linien</option>
+      <option value="2">Linz AG</option>
+      <option value="3">VBB Berlin</option>
+      <option value="4">WLB Badner Bahn</option>
+      <option value="5">DB S-Bahn</option>
+      <option value="6">DB Fernverkehr</option>
+      <option value="7">BODO Bodensee</option>
+      <option value="8">Salzburg AG</option>
+      <option value="9">RATP Paris</option>
+      <option value="10">Straba Ansicht</option>
+      <option value="11">ÖBB Fernverkehr</option>
+      <option value="12">ÖBB S-Bahn</option>
+      <option value="13">Holding Graz</option>
+      <option value="14">Westbahn</option>
+    </select>
+    <div id="ftWienOptions" style="display:none;"></div>
+    <div id="ftGroupingCard" style="display:none;">
+      <div class="ft-grouping-area">
+        <div class="ft-groups-container" id="ftGroupsContainer"></div>
+        <div class="ft-directions-pool" id="ftDirectionsPool">
+          <div class="pool-items" id="ftPoolItems"></div>
+        </div>
+      </div>
+      <div id="ftRowOrderSection" style="display:none;">
+        <div class="ft-row-order-list" id="ftRowOrderList"></div>
+      </div>
+    </div>
+    <div id="ftDisplayModeSection" style="display:none;"></div>
+    <div id="ftSortModeToggle" style="display:none;">
+      <button class="toggle-btn active" data-value="1">Statisch</button>
+      <button class="toggle-btn" data-value="2">Zeit</button>
+    </div>
+    <div id="ftRowsToggle" style="display:none;">
+      <button class="toggle-btn" data-value="1">1</button>
+      <button class="toggle-btn active" data-value="2">2</button>
+      <button class="toggle-btn" data-value="3">3</button>
+      <button class="toggle-btn" data-value="4">4</button>
+    </div>
+    <div id="ftChopperToggle" class="toggle-switch" style="display:none;"></div>
+    <div id="ftSilberpfeilToggle" class="toggle-switch" style="display:none;"></div>
+    <div id="ftTextColorToggle" style="display:none;">
+      <button class="toggle-btn active" data-value="1">Gelb</button>
+    </div>
+    <div id="ftDisplayModeToggle" style="display:none;">
+      <button class="toggle-btn active" data-value="1">Gemischt</button>
+    </div>
+    <div id="ftStopIntervalToggle" style="display:none;">
+      <button class="toggle-btn active" data-value="10">10s</button>
+    </div>
+
     <!-- Spacer für Bottom Actions -->
     <div style="height: 100px;"></div>
   </div><!-- Ende ft-container -->
 
-  <!-- Bottom Actions -->
-  <div class="bottom-actions">
+  <!-- Bottom Actions (hidden by default, shown when finetuning active) -->
+  <div class="bottom-actions" id="ftBottomActions" style="display:none;">
     <div style="max-width:500px;margin:0 auto;display:flex;gap:12px;width:100%;">
       <button class="btn btn-back-finetuning" onclick="backFromFinetuning()">Zurück</button>
       <button class="btn btn-save-finetuning" onclick="saveFromFinetuning()">Speichern</button>
@@ -2693,7 +2705,7 @@ window.addEventListener('message', function(event) {
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'OEBB', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
+    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
     // Verkehrsart → dann Bundesland oder direkt Netzwerk
     verkehrsarten: {
       stadt: {
@@ -2711,7 +2723,7 @@ const REGIONS = {
         name: 'Zugverkehr',
         icon: '\uD83D\uDE86',
         desc: 'ÖBB, Westbahn',
-        networks: ['OEBB', 'WESTBAHN']
+        networks: ['OEBB_FERN', 'OEBB', 'WESTBAHN']
       }
     },
     // Legacy subRegions für Kompatibilität (wird von verkehrsarten ersetzt)
@@ -2817,6 +2829,15 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 12,            // ÖBB Display (unterstützt EC, IC, RJ etc.)
+    defaultBrightness: 3
+  },
+  OEBB_FERN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 12,            // ÖBB Display
     defaultBrightness: 3
   },
   OEBB_REGIONAL: {
@@ -3028,6 +3049,17 @@ const NETWORKS = {
     placeholder: 'z.B. Freistadt, Wien Hbf, Linz Hbf, Salzburg...',
     isJourneyBased: false
   },
+  OEBB_FERN: {
+    name: 'ÖBB Fernverkehr',
+    shortName: 'Fern',
+    region: 'AT',
+    desc: 'Railjet, IC, EC, Nightjet — Von A nach B',
+    searchType: 'server_proxy',
+    placeholder: 'Von wo? z.B. Wien Meidling, Linz Hbf...',
+    isJourneyBased: false,
+    isPointToPoint: true,
+    defaultGattungen: ['RJX', 'RJ', 'ICE', 'IC', 'EC', 'NJ', 'EN', 'D']
+  },
   OEBB_REGIONAL: {
     name: 'ÖBB Regionalverkehr',
     shortName: 'REG',
@@ -3200,6 +3232,7 @@ const WIEN_DATA_URL = 'https://straba-983965425140.europe-west3.run.app/search/'
 const API_NETWORK_MAP = {
   'OEBB_STAMM_SBAHN': 'OEBB_SBAHN',
   'OEBB_REGIONAL': 'OEBB_SBAHN',
+  'OEBB_FERN': 'OEBB',
 };
 function mapNetworkForApi(network) {
   return API_NETWORK_MAP[network] || network;
@@ -3240,6 +3273,7 @@ let selectedProducts = new Set();
 // OEBB Von-Nach Modus
 let oebb_toStop = null;              // {id, name} - gewähltes Ziel
 let oebb_deselectedGattungen = new Set();  // Abgewählte Gattungen
+let p2pDestinations = [];            // Erreichbare Ziele von "Von"-Station
 
 const OEBB_GATTUNGEN = ['RJX', 'RJ', 'ICE', 'IC', 'EC', 'NJ', 'EN', 'D'];
 
@@ -4300,10 +4334,16 @@ async function searchViaProxy(network, query) {
 }
 
 function displaySearchResults(results) {
-  if (results.length === 0) {
+  // Point-to-Point: Nur Fernverkehrshalte zeigen
+  let filtered = results;
+  if (NETWORKS[selectedNetwork]?.isPointToPoint) {
+    filtered = results.filter(r => (r.info || '').includes('Fernverkehr'));
+  }
+
+  if (filtered.length === 0) {
     searchResults.innerHTML = '<div class="no-results">Keine Stationen gefunden</div>';
   } else {
-    searchResults.innerHTML = results.map(r => `
+    searchResults.innerHTML = filtered.map(r => `
       <div class="search-result-item" onclick="selectStop('${r.id}', '${r.name.replace(/'/g, "\\'")}')">
         <div class="stop-name">${r.name}</div>
         <div class="stop-info">${r.info || `ID: ${r.id}`}</div>
@@ -4336,8 +4376,57 @@ async function selectStop(id, name) {
 
   searchResults.classList.remove('show');
 
-  // OEBB: Normaler Departures-Flow (zeigt alle Linien: S-Bahn, REX, EC, IC etc.)
-  // (Früher war hier Von-Nach Fernverkehr — jetzt unified)
+  // Point-to-Point Modus (ÖBB Fernverkehr: Von → Nach)
+  if (NETWORKS[selectedNetwork]?.isPointToPoint) {
+    oebb_toStop = null;
+    oebb_deselectedGattungen = new Set();
+    p2pDestinations = [];  // Erreichbare Ziele werden geladen
+    showStep('lines');
+    linesLoading.classList.remove('hidden');
+    linesContainer.classList.add('hidden');
+
+    // Lade Abfahrten um erreichbare Ziele zu sammeln
+    try {
+      const apiNetwork = mapNetworkForApi(selectedNetwork);
+      const response = await fetch(`${DEPARTURES_API}?stopId=${apiNetwork}:${id}`);
+      const data = await response.json();
+      const dests = new Map();  // id → name
+      if (data?.data?.monitors) {
+        for (const monitor of data.data.monitors) {
+          for (const line of (monitor.lines || [])) {
+            // Nur Fernverkehr-Gattungen
+            const ln = (line.name || '').trim();
+            const isFern = OEBB_GATTUNGEN.some(g => ln.startsWith(g));
+            if (!isFern) continue;
+            // Ziel (towards)
+            const towards = line.towards || '';
+            if (towards && !dests.has(towards)) dests.set(towards, towards);
+            // Stopovers (Via-Halte)
+            if (line.stopovers && Array.isArray(line.stopovers)) {
+              for (const via of line.stopovers) {
+                if (via && !dests.has(via)) dests.set(via, via);
+              }
+            }
+            // Per-Departure towards (falls unterschiedlich)
+            if (line.departures?.departure) {
+              for (const dep of line.departures.departure) {
+                if (dep.towards && !dests.has(dep.towards)) dests.set(dep.towards, dep.towards);
+              }
+            }
+          }
+        }
+      }
+      p2pDestinations = Array.from(dests.values()).sort();
+    } catch(e) {
+      console.error('Failed to load P2P destinations:', e);
+      p2pDestinations = [];
+    }
+
+    linesLoading.classList.add('hidden');
+    linesContainer.classList.remove('hidden');
+    renderPointToPointConfig();
+    return;
+  }
 
   // OEBB Stammstrecke: Richtung + Produktfilter (kein Departures-Call nötig)
   if (selectedNetwork === 'OEBB_STAMM_SBAHN') {
@@ -4973,6 +5062,145 @@ function addStationFromStamm() {
   updateStationsList();
 }
 
+// ==================== POINT-TO-POINT CONFIG (ÖBB Fernverkehr) ====================
+function renderPointToPointConfig() {
+  const linesList = document.getElementById('linesList');
+  const stationName = selectedStop?.name || '';
+
+  // Header anpassen
+  document.querySelector('#linesContainer .lines-header h3').textContent = 'Fernverkehr konfigurieren';
+  document.getElementById('selectAllBtn').style.display = 'none';
+  document.getElementById('allDeparturesBtn').style.display = 'none';
+  addStationBtn.style.display = '';
+  addStationBtn.disabled = !oebb_toStop;
+  addStationBtn.textContent = 'Weiter';
+  addStationBtn.onclick = function() { addStationFromOebb(); };
+
+  const gattungen = NETWORKS[selectedNetwork]?.defaultGattungen || OEBB_GATTUNGEN;
+
+  let html = '';
+
+  // "Von" Station
+  html += `<div class="p2p-section">`;
+  html += `<div class="p2p-label">Von</div>`;
+  html += `<div class="p2p-station">${stationName}</div>`;
+  html += `</div>`;
+
+  // "Nach" Station — Suchfeld
+  html += `<div class="p2p-section">`;
+  html += `<div class="p2p-label">Nach</div>`;
+  if (oebb_toStop) {
+    html += `<div class="p2p-station">${oebb_toStop.name} <span class="p2p-change" onclick="clearOebbDest()">ändern</span></div>`;
+  } else {
+    html += `<div class="p2p-search-wrap">`;
+    html += `<input type="text" id="p2pSearchInput" class="search-input" placeholder="Wohin? z.B. Linz Hbf, Salzburg..." oninput="searchP2PDest(this.value)" onfocus="searchP2PDest(this.value)">`;
+    html += `<div id="p2pSearchResults" class="search-results"></div>`;
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  // Zugkategorien
+  html += `<div class="p2p-section">`;
+  html += `<div class="p2p-label">Zugkategorien</div>`;
+  html += `<div class="strecke-gattungen-filter">`;
+  for (const g of gattungen) {
+    const isOn = !oebb_deselectedGattungen.has(g);
+    html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleOebbGattung('${g}')">${g}</span>`;
+  }
+  html += `</div>`;
+  html += `</div>`;
+
+  linesList.innerHTML = html;
+
+  // Fokus auf Suchfeld
+  setTimeout(() => {
+    const inp = document.getElementById('p2pSearchInput');
+    if (inp) inp.focus();
+  }, 100);
+}
+
+let p2pSearchTimeout = null;
+function searchP2PDest(query) {
+  const resultsDiv = document.getElementById('p2pSearchResults');
+  if (!resultsDiv) return;
+
+  const q = query.toLowerCase().trim();
+
+  if (q.length < 1) {
+    // Zeige alle erreichbaren Ziele
+    if (p2pDestinations.length > 0) {
+      resultsDiv.innerHTML = p2pDestinations.slice(0, 12).map(name => `
+        <div class="search-result-item" onclick="selectP2PDestByName('${name.replace(/'/g, "\\'")}')">
+          <div class="stop-name">${name}</div>
+        </div>
+      `).join('');
+      resultsDiv.classList.add('show');
+    } else {
+      resultsDiv.innerHTML = '';
+      resultsDiv.classList.remove('show');
+    }
+    return;
+  }
+
+  // Filtere erreichbare Ziele nach Eingabe
+  const filtered = p2pDestinations.filter(d => d.toLowerCase().includes(q));
+
+  if (filtered.length > 0) {
+    resultsDiv.innerHTML = filtered.slice(0, 10).map(name => `
+      <div class="search-result-item" onclick="selectP2PDestByName('${name.replace(/'/g, "\\'")}')">
+        <div class="stop-name">${name}</div>
+      </div>
+    `).join('');
+    resultsDiv.classList.add('show');
+  } else {
+    resultsDiv.innerHTML = '<div class="search-result-item" style="color:#999">Kein Fernverkehrs-Ziel gefunden</div>';
+    resultsDiv.classList.add('show');
+  }
+}
+
+function selectP2PDestByName(name) {
+  // Für GTFS Via-Filter brauchen wir die Stop-ID des Ziels
+  // Suche per API nach dem Namen um die ID zu bekommen
+  (async () => {
+    try {
+      const apiNetwork = mapNetworkForApi(selectedNetwork);
+      const response = await fetch(`${SEARCH_API}?q=${encodeURIComponent(name)}&network=${apiNetwork}`);
+      const data = await response.json();
+      const results = (data.stops || data).filter(r => (r.info || '').includes('Fernverkehr'));
+      if (results.length > 0) {
+        selectP2PDest(results[0].id, results[0].name);
+      } else {
+        // Fallback: Name als ID verwenden (Server matched per Name)
+        selectP2PDest(name, name);
+      }
+    } catch(e) {
+      selectP2PDest(name, name);
+    }
+  })();
+}
+
+function selectP2PDest(id, name) {
+  oebb_toStop = { id, name };
+  addStationBtn.disabled = false;
+  renderPointToPointConfig();
+}
+
+function clearOebbDest() {
+  oebb_toStop = null;
+  addStationBtn.disabled = true;
+  renderPointToPointConfig();
+}
+
+function toggleOebbGattung(g) {
+  if (oebb_deselectedGattungen.has(g)) {
+    oebb_deselectedGattungen.delete(g);
+  } else {
+    oebb_deselectedGattungen.add(g);
+  }
+  // Update chip state
+  renderPointToPointConfig();
+}
+
 function addStationFromOebb() {
   if (!selectedStop || !oebb_toStop) return;
 
@@ -4986,7 +5214,8 @@ function addStationFromOebb() {
   // Format: OEBB:fromId>toId
   // Server macht departures(fromId) und filtert per GTFS nach Zügen die über toId fahren
   // Gattungen-Filter wird separat als filter gespeichert (ESP filtert)
-  const fullId = `${selectedNetwork}:${selectedStop.id}>${oebb_toStop.id}`;
+  const apiNetwork = mapNetworkForApi(selectedNetwork);
+  const fullId = `${apiNetwork}:${selectedStop.id}>${oebb_toStop.id}`;
   const filter = activeGattungen.join(',');
 
   // Directions: Eine pro aktiver Gattung, alle mit gleichem Ziel
@@ -5481,7 +5710,8 @@ const NETWORK_COLORS = {
   SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
   STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
-  OEBB: { id: 12, name: 'ÖBB Fernverkehr', color: '#E2001A' },
+  OEBB: { id: 12, name: 'ÖBB', color: '#E2001A' },
+  OEBB_FERN: { id: 12, name: 'ÖBB Fernverkehr', color: '#E2001A' },
   OEBB_REGIONAL: { id: 12, name: 'ÖBB Regionalverkehr', color: '#0055A4' },
   OEBB_SBAHN: { id: 12, name: 'ÖBB S-Bahn', color: '#003366' },
   OEBB_STAMM_SBAHN: { id: 12, name: 'ÖBB Stammstrecke', color: '#003366' },
@@ -5526,12 +5756,23 @@ function calculateRecommendedConfig() {
   let displayName = NETWORK_COLORS[dominantNetwork]?.name || 'Wiener Linien';
   let description = `Optimiert für ${NETWORKS[dominantNetwork]?.name || dominantNetwork}`;
 
-  // Spezialfall OEBB Fernverkehr
+  // Spezialfall OEBB Fernverkehr (Point-to-Point)
+  if (dominantNetwork === 'OEBB_FERN') {
+    displayType = 12;
+    displayName = 'ÖBB Fernverkehr';
+    description = 'Von A nach B (Railjet, IC, EC, Nightjet)';
+  }
+
+  // Spezialfall OEBB (alle Züge)
   if (dominantNetwork === 'OEBB') {
     displayType = 12;
     displayName = 'ÖBB';
     description = 'Optimiert für ÖBB Anzeige (EC, IC, S-Bahn, REX)';
   }
+
+  // Zug-Netzwerke immer chronologisch sortieren
+  const TRAIN_NETWORKS = ['OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'];
+  const isTrainNetwork = TRAIN_NETWORKS.includes(dominantNetwork);
 
   // Spezialfall OEBB S-Bahn / Stammstrecke
   let stammstreckeSortMode = false;
@@ -5635,6 +5876,18 @@ function calculateRecommendedConfig() {
   // Gehweg-Werte (alle auf 0 als Default) - WICHTIG: basiert auf uniqueStationDetails!
   const gehwegValues = uniqueStationDetails.map(() => 0);
 
+  // Multi-Display: Per-Station colour berechnen
+  const perStationColours = stations.map(s => {
+    const nc = NETWORK_COLORS[s.network];
+    return nc ? nc.id : displayType;
+  });
+  const uniqueColours = [...new Set(perStationColours)];
+  const hasMultipleDisplayTypes = uniqueColours.length > 1;
+
+  // colourStr: Wenn verschiedene Netzwerke → komma-separiert pro Station
+  // z.B. "1,14" für WL + Westbahn
+  const colourStr = hasMultipleDisplayTypes ? perStationColours.join(',') : String(displayType);
+
   return {
     // Station-Daten
     rbl: stations.map(s => s.fullId).join(','),
@@ -5642,7 +5895,9 @@ function calculateRecommendedConfig() {
     stationDetails: uniqueStationDetails,
 
     // Display-Einstellungen
-    colour: displayType,
+    colour: colourStr,  // "1" oder "1,14" für Multi-Display
+    colourSingle: displayType,  // Fallback: einzelner Wert (dominantes Netzwerk)
+    multiDisplay: hasMultipleDisplayTypes,
     colourName: displayName,
     description: description,
     rows: rows,
@@ -5663,25 +5918,44 @@ function calculateRecommendedConfig() {
     stopInterval: 10,
     gehweg: gehwegValues,
     showFunMessages: true,
-    sortMode: (stammstreckeSortMode || stations.some(s => s.allDepartures)) ? 2 : 1,  // dynamisch wenn Stammstrecke oder "Alle Abfahrten"
-    rowOrder: '',          // Zeilen-Reihenfolge einfach (für Wien)
-    rowOrderDestination: '',  // Zeilen-Reihenfolge mit Ziel (für Linz)
+    sortMode: (stammstreckeSortMode || stations.some(s => s.allDepartures) || isTrainNetwork) ? 2 : 1,  // dynamisch wenn Zug-Netzwerk, Stammstrecke oder "Alle Abfahrten"
+    // Zeilen-Reihenfolge: Wien nutzt stopId:Linie Format
+    rowOrder: (function() {
+      const items = [];
+      stations.forEach(s => {
+        if (s.network !== 'WL') return;  // Nur Wien
+        if (s.allDepartures) return;
+        if (s.directions && s.directions.length > 0) {
+          s.directions.forEach(d => {
+            // Wien: stopId:Linie (z.B. "250:5", "4621:U6")
+            const rbl = s.stopId || '';
+            const item = `${rbl}:${d.line}`;
+            if (!items.includes(item)) items.push(item);
+          });
+        }
+      });
+      return items.join(',');
+    })(),
+    rowOrderDestination: '',  // Wird unten für Nicht-Wien Stationen gebaut
 
-    // Linien-Gruppierung: Flat-Format "1:H,1:R,2:H,2:R,REX:Passau Hbf"
-    // WICHTIG: ALLE Stationen (nicht nur STV!) — sonst bricht "Ja passt" Speichern
+    // Linien-Gruppierung: Flat-Format
+    // Wien: "250:5,250:2,4621:U6" (stopId:Linie)
+    // Andere: "1:H,1:R,2:H,REX:Passau Hbf" (Linie:Richtung)
     lineGroups: (function() {
       const allGroups = [];
       stations.forEach(s => {
-        if (s.allDepartures) return;  // "Alle Abfahrten" → kein Gruppierung
+        if (s.allDepartures) return;
+        // Point-to-Point (OEBB Fern): Server filtert per GTFS, keine Gruppierung nötig
+        if (NETWORKS[s.network]?.isPointToPoint) return;
         if (s.lineGroups) {
           allGroups.push(s.lineGroups);
+        } else if (s.network === 'WL' && s.directions && s.directions.length > 0) {
+          // Wien: stopId:Linie Format
+          const rbl = s.stopId || '';
+          const dirGroups = s.directions.map(d => `${rbl}:${d.line}`);
+          allGroups.push(dirGroups.join(','));
         } else if (s.directions && s.directions.length > 0) {
-          const dirGroups = s.directions.map(d => {
-            if (d.richtungsId) {
-              return `${d.line}:${d.richtungsId}`;
-            }
-            return d.towards ? `${d.line}:${d.towards}` : d.line;
-          });
+          const dirGroups = s.directions.map(d => getDirectionKey(d, s.network));
           allGroups.push(dirGroups.join(','));
         }
       });
@@ -5698,14 +5972,10 @@ function calculateRecommendedConfig() {
       stations.forEach(s => {
         if (s.network === 'WL') return;  // Wien nutzt rowOrder (stopId:Linie)
         if (s.allDepartures) return;  // "Alle Abfahrten" → keine Reihenfolge
+        if (NETWORKS[s.network]?.isPointToPoint) return;  // Fern: Server filtert, keine Reihenfolge
         if (s.directions && s.directions.length > 0) {
           s.directions.forEach(d => {
-            let item;
-            if (d.richtungsId) {
-              item = `${d.line}:${d.richtungsId}`;
-            } else {
-              item = d.towards ? `${d.line}:${d.towards}` : d.line;
-            }
+            const item = getDirectionKey(d, s.network);
             if (!items.includes(item)) items.push(item);
           });
         }
@@ -5731,27 +6001,48 @@ function calculateRecommendedConfig() {
  * Das löst das Problem, dass abends Trams als "Remise" statt "Auwiesen" fahren,
  * aber trotzdem angezeigt werden sollen.
  */
+// ÖBB HAFAS richtungsIds sind instabil (ändern sich täglich).
+// Nur diese Netzwerke haben stabile richtungsIds:
+function hasStableRichtungsId(network) {
+  return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN'].includes(network);
+}
+
+// Für ÖBB: Zieltext verwenden statt richtungsId
+function getDirectionKey(dir, network) {
+  if (dir.richtungsId && hasStableRichtungsId(network)) {
+    return `${dir.line}:${dir.richtungsId}`;
+  }
+  return dir.towards ? `${dir.line}:${dir.towards}` : dir.line;
+}
+
 function buildLineFilterDestination(stationsList) {
-  // Gruppiere nach Linie: { "1": ["Auwiesen", "Remise Kleinmünchen"], "2": ["Universität"] }
+  // Gruppiere nach Linie: { "1": ["Auwiesen", "Remise Kleinmünchen"], "S3": ["Summerau Bahnhof"] }
   const lineToDestinations = {};
 
   stationsList.forEach(station => {
-    // Für Linz: Sammle Linien+Ziele
-    if (station.network === 'LINZ' && station.directions && station.directions.length > 0) {
-      station.directions.forEach(dir => {
-        if (dir.line && dir.towards) {
-          const line = dir.line;
-          const dest = dir.towards;
+    if (station.network === 'WL') return;  // Wien nutzt stopId:Linie Format
+    if (station.allDepartures) return;
+    if (NETWORKS[station.network]?.isPointToPoint) return;  // Fern: eigenes Format
+    if (!station.directions || station.directions.length === 0) return;
 
-          if (!lineToDestinations[line]) {
-            lineToDestinations[line] = [];
-          }
-          if (!lineToDestinations[line].includes(dest)) {
-            lineToDestinations[line].push(dest);
-          }
+    station.directions.forEach(dir => {
+      if (!dir.line) return;
+      const line = dir.line;
+
+      // Für Netzwerke mit stabilen richtungsIds: richtungsId verwenden
+      if (dir.richtungsId && hasStableRichtungsId(station.network)) {
+        if (!lineToDestinations[line]) lineToDestinations[line] = [];
+        if (!lineToDestinations[line].includes(dir.richtungsId)) {
+          lineToDestinations[line].push(dir.richtungsId);
         }
-      });
-    }
+      } else if (dir.towards) {
+        // ÖBB und andere: Zieltext verwenden
+        if (!lineToDestinations[line]) lineToDestinations[line] = [];
+        if (!lineToDestinations[line].includes(dir.towards)) {
+          lineToDestinations[line].push(dir.towards);
+        }
+      }
+    });
   });
 
   // Baue Filter-String: "1:Auwiesen|Remise,2:Uni|Auhof"
@@ -5794,21 +6085,18 @@ function goToDisplayConfig() {
   // Übernehme vorherige Einstellungen (wenn vom Gerät geladen)
   if (previousSettings) {
     // WICHTIG: Gruppen/Reihenfolge NUR wiederherstellen wenn Richtungen NICHT geändert wurden!
-    // Wenn directionsChanged=true, müssen diese neu berechnet werden
-    if (!directionsChanged) {
-      if (previousSettings.lineGroups) recommendedConfig.lineGroups = previousSettings.lineGroups;
-      if (previousSettings.rowOrder) recommendedConfig.rowOrder = previousSettings.rowOrder;
-      if (previousSettings.rowOrderDestination) recommendedConfig.rowOrderDestination = previousSettings.rowOrderDestination;
-      if (previousSettings.lineFilterDestination) recommendedConfig.lineFilterDestination = previousSettings.lineFilterDestination;
-    } else {
-      console.log('[goToDisplayConfig] directionsChanged=true -> Gruppen/Reihenfolge werden neu berechnet');
-    }
+    // Station-abhängige Werte IMMER frisch berechnen (nicht aus alten Settings übernehmen!)
+    // Sonst bleiben alte Filter von vorherigen Configs hängen.
+    console.log('[goToDisplayConfig] lineGroups/rowOrder/filter werden immer frisch berechnet');
 
     // Diese Einstellungen immer übernehmen (sind unabhängig von Richtungen)
     if (previousSettings.sortMode !== undefined) recommendedConfig.sortMode = previousSettings.sortMode;
     if (previousSettings.gehweg) recommendedConfig.gehweg = previousSettings.gehweg;
     if (previousSettings.rows) recommendedConfig.rows = previousSettings.rows;
-    if (previousSettings.colour !== undefined) recommendedConfig.colour = previousSettings.colour;
+    // colour: Nur single-colour übernehmen, Multi-Display wird neu berechnet
+    if (previousSettings.colour !== undefined && !recommendedConfig.multiDisplay) {
+      recommendedConfig.colour = previousSettings.colour;
+    }
     if (previousSettings.displayLight !== undefined) recommendedConfig.displayLight = previousSettings.displayLight;
     if (previousSettings.chopper !== undefined) recommendedConfig.chopper = previousSettings.chopper;
     if (previousSettings.silberpfeil !== undefined) recommendedConfig.silberpfeil = previousSettings.silberpfeil;
@@ -5821,30 +6109,37 @@ function goToDisplayConfig() {
   // Flag zurücksetzen
   directionsChanged = false;
 
-  suggestedColor = recommendedConfig.colour;
+  suggestedColor = recommendedConfig.colourSingle || recommendedConfig.colour;
   suggestedRows = recommendedConfig.rows;
 
-  // Update UI
-  document.getElementById('suggestedColorName').textContent = recommendedConfig.colourName;
-  document.getElementById('suggestedRows').textContent = recommendedConfig.rows + ' Zeile' + (recommendedConfig.rows > 1 ? 'n' : '');
-  document.getElementById('previewTitle').textContent = recommendedConfig.colourName + ' Ansicht';
-  document.getElementById('previewDesc').textContent = recommendedConfig.description;
+  // Schnellansicht: Personalisierte Zusammenfassung generieren
+  buildStationSummary();
 
-  // Update selects
-  document.getElementById('colorSelect').value = recommendedConfig.colour;
-  document.getElementById('rowsSelect').value = recommendedConfig.rows;
+  // Multi-Display Auswahl zeigen wenn verschiedene Netzwerke
+  var multiChoice = document.getElementById('multiDisplayChoice');
+  if (multiChoice) {
+    if (recommendedConfig.multiDisplay) {
+      multiChoice.style.display = '';
+      // Default: Getrennt
+      setQuickDisplayMode('separate');
+    } else {
+      multiChoice.style.display = 'none';
+    }
+  }
 
-  // Update realistische Preview
-  updateRealisticPreview(recommendedConfig);
+  // Wechselgeschwindigkeit nur bei Multi-Display zeigen
+  var speedRow = document.getElementById('quickSpeedRow');
+  if (speedRow) {
+    speedRow.style.display = recommendedConfig.multiDisplay ? '' : 'none';
+  }
 
-  // Feintuning ausblenden
-  document.getElementById('finetuningSection').classList.add('hidden');
-
-  // Quick Preview initialisieren
-  initializeQuickPreview();
-
-  // Show config step, hide others
+  // Show config step, hide others (inkl. Regions-Card)
   document.getElementById('stationsCard').classList.add('hidden');
+  var regionsCard = document.querySelector('.card:not(.hidden):not(#stepDisplayConfig):not(#stationsCard)');
+  // Verstecke alle Cards außer stepDisplayConfig
+  document.querySelectorAll('.container > .card').forEach(function(c) {
+    if (c.id !== 'stepDisplayConfig') c.classList.add('hidden');
+  });
   document.getElementById('stepDisplayConfig').classList.remove('hidden');
   document.querySelector('.bottom-bar').style.display = 'none';
 }
@@ -6216,7 +6511,13 @@ function updatePreviewAnimation(suggestion) {
 
 function backFromDisplayConfig() {
   document.getElementById('stepDisplayConfig').classList.add('hidden');
+  // Alle vorherigen Cards wieder zeigen
   document.getElementById('stationsCard').classList.remove('hidden');
+  // Regions-Card (erste Card) wieder zeigen
+  var firstCard = document.querySelector('.container > .card');
+  if (firstCard && firstCard.id !== 'stationsCard' && firstCard.id !== 'stepDisplayConfig') {
+    firstCard.classList.remove('hidden');
+  }
   document.querySelector('.bottom-bar').style.display = 'block';
 }
 
@@ -6376,11 +6677,114 @@ function initializeQuickPreview() {
   `;
 }
 
+// ==================== SCHNELLANSICHT: STATION SUMMARY ====================
+function buildStationSummary() {
+  var container = document.getElementById('stationSummary');
+  if (!container || stations.length === 0) return;
+
+  // Stationen nach Netzwerk gruppieren
+  var byNetwork = {};
+  var networkOrder = [];
+  stations.forEach(function(s) {
+    if (!byNetwork[s.network]) {
+      byNetwork[s.network] = [];
+      networkOrder.push(s.network);
+    }
+    byNetwork[s.network].push(s);
+  });
+
+  var html = '';
+  networkOrder.forEach(function(network) {
+    var stns = byNetwork[network];
+    var nc = NETWORK_COLORS[network];
+    var netName = nc ? nc.name : network;
+    var netColor = nc ? nc.color : '#666';
+
+    // Stationsnamen + alle Linien sammeln
+    var stationNames = stns.map(function(s) { return s.stopName || 'Station'; });
+    var allLines = [];
+    stns.forEach(function(s) {
+      if (s.filter) s.filter.split(',').forEach(function(l) { if (l.trim() && allLines.indexOf(l.trim()) === -1) allLines.push(l.trim()); });
+    });
+    var linesStr = allLines.slice(0, 5).join(', ');
+    if (allLines.length > 5) linesStr += ' ...';
+
+    html += '<div class="station-summary-item" style="flex-direction:column;align-items:flex-start;gap:4px;padding:10px 12px;background:#f8f9fa;border-radius:10px;margin-bottom:6px;">';
+    html += '<div style="display:flex;align-items:center;gap:8px;width:100%;">';
+    html += '<span class="ss-network-dot" style="background:' + netColor + '"></span>';
+    html += '<span style="font-size:14px;"><strong>' + stationNames.join(', ') + '</strong></span>';
+    html += '<span style="margin-left:auto;font-size:11px;color:#999;">' + netName + '</span>';
+    html += '</div>';
+    if (linesStr) {
+      html += '<div style="font-size:12px;color:#888;padding-left:18px;">' + linesStr + '</div>';
+    }
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+
+  // Sort-Info unten
+  var sortInfo = document.getElementById('quickSortInfo');
+  if (sortInfo) {
+    if (networkOrder.length > 1) {
+      sortInfo.textContent = 'Wechselt automatisch zwischen den Ansichten';
+    } else {
+      sortInfo.textContent = 'Sortiert nach Zeit';
+    }
+  }
+}
+
+function setQuickDisplayMode(mode) {
+  var btnSeparate = document.getElementById('choiceSeparate');
+  var btnCompact = document.getElementById('choiceCompact');
+
+  if (mode === 'separate') {
+    btnSeparate.classList.add('active');
+    btnCompact.classList.remove('active');
+    // Multi-Display: komma-separierte colour-Werte
+    if (recommendedConfig) {
+      // Per-Station colour neu berechnen
+      var perStationColours = stations.map(function(s) {
+        var nc = NETWORK_COLORS[s.network];
+        return nc ? nc.id : (recommendedConfig.colourSingle || 1);
+      });
+      recommendedConfig.colour = perStationColours.join(',');
+      recommendedConfig.multiDisplay = true;
+    }
+  } else {
+    btnCompact.classList.add('active');
+    btnSeparate.classList.remove('active');
+    // Single Display: ein colour-Wert
+    if (recommendedConfig) {
+      recommendedConfig.colour = recommendedConfig.colourSingle || 1;
+      recommendedConfig.multiDisplay = false;
+    }
+  }
+  console.log('[setQuickDisplayMode]', mode, '-> colour:', recommendedConfig ? recommendedConfig.colour : 'null');
+}
+
 // ==================== JA PASST - DIREKT SPEICHERN ====================
 function sendWithSuggestion() {
   if (!recommendedConfig) {
     alert('Fehler: Keine Konfiguration berechnet');
     return;
+  }
+
+  // Schnelleinstellungen auslesen
+  // Wechselgeschwindigkeit
+  var speedVal = getFtToggleVal('quickSpeed');
+  if (speedVal && recommendedConfig.multiDisplay) {
+    recommendedConfig.stopInterval = parseInt(speedVal) || 10;
+  }
+
+  // Nachtmodus
+  var nightToggle = document.getElementById('quickNightMode');
+  if (nightToggle) {
+    recommendedConfig.nightMode = nightToggle.classList.contains('active');
+    if (recommendedConfig.nightMode) {
+      recommendedConfig.nightStart = 22;
+      recommendedConfig.nightEnd = 7;
+    }
   }
 
   console.log('[sendWithSuggestion] recommendedConfig.sortMode:', recommendedConfig.sortMode, '(1=Statisch, 2=Zeit)');
@@ -6399,35 +6803,555 @@ function goToFinetuning() {
   // Verstecke Display-Config, zeige Finetuning
   document.getElementById('stepDisplayConfig').classList.add('hidden');
   document.getElementById('stepFinetuning').classList.remove('hidden');
+  var ftBottom = document.getElementById('ftBottomActions');
+  if (ftBottom) ftBottom.style.display = '';
 
   // Initialisiere Finetuning-Felder mit aktueller Config
   initFinetuningStep();
+}
+
+// ==================== DISPLAY TYPE FEATURES ====================
+const DISPLAY_TYPE_FEATURES = {
+  1:  { rows: true, sorting: true, grouping: true, textColor: true, chopper: true, silberpfeil: true, name: 'Wiener Linien' },
+  2:  { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Linz AG' },
+  3:  { rows: true, sorting: true, grouping: true, name: 'VBB Berlin' },
+  4:  { rows: true, sorting: true, grouping: true, name: 'WLB Badner Bahn' },
+  5:  { rows: false, sorting: false, grouping: false, name: 'DB S-Bahn' },
+  6:  { rows: false, sorting: false, grouping: false, name: 'DB Fernverkehr' },
+  7:  { rows: true, sorting: true, grouping: true, name: 'BODO Bodensee' },
+  8:  { rows: true, sorting: true, grouping: true, name: 'Salzburg AG' },
+  9:  { rows: true, sorting: true, grouping: true, name: 'RATP Paris' },
+  10: { rows: true, sorting: true, grouping: true, name: 'Straba' },
+  11: { rows: false, sorting: false, grouping: false, name: 'ÖBB Fernverkehr' },
+  12: { rows: false, sorting: false, grouping: false, name: 'ÖBB S-Bahn' },
+  13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz' },
+  14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' }
+};
+
+let ftIsMultiDisplay = false;
+let ftIsManualAssignment = false;
+let ftPerStationColour = [];  // Pro Station der Display-Typ
+
+function setFtCompactSeparate(mode) {
+  var btns = document.querySelectorAll('#ftCompactSeparateToggle .toggle-btn');
+  btns.forEach(function(b) { b.classList.toggle('active', b.dataset.value === mode); });
+  ftIsMultiDisplay = (mode === 'separate');
+  renderDisplayTypeSections();
+}
+
+function setFtAutoManual(mode) {
+  var btns = document.querySelectorAll('#ftAutoManualToggle .toggle-btn');
+  btns.forEach(function(b) { b.classList.toggle('active', b.dataset.value === mode); });
+  ftIsManualAssignment = (mode === 'manual');
+  var manualDiv = document.getElementById('ftManualAssignment');
+  if (manualDiv) manualDiv.style.display = ftIsManualAssignment ? '' : 'none';
+  if (ftIsManualAssignment) renderStationDisplayList();
+  renderDisplayTypeSections();
+}
+
+function renderStationDisplayList() {
+  var container = document.getElementById('ftStationDisplayList');
+  if (!container) return;
+  var html = '';
+  stations.forEach(function(s, i) {
+    var nc = NETWORK_COLORS[s.network];
+    var defaultColour = nc ? nc.id : 1;
+    var currentColour = ftPerStationColour[i] || defaultColour;
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee;">';
+    html += '<span style="font-size:14px;font-weight:500;">' + (s.stopName || 'Station ' + (i+1)) + '</span>';
+    html += '<select onchange="ftPerStationColour[' + i + ']=parseInt(this.value);renderDisplayTypeSections()" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;">';
+    Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
+      var f = DISPLAY_TYPE_FEATURES[k];
+      html += '<option value="' + k + '"' + (parseInt(k) === currentColour ? ' selected' : '') + '>' + f.name + '</option>';
+    });
+    html += '</select></div>';
+  });
+  container.innerHTML = html;
+}
+
+function getUniqueDisplayTypes() {
+  if (!ftIsMultiDisplay) {
+    // Kompakt: ein Display-Typ
+    var col = parseInt(document.getElementById('ftColorSelect').value) || 1;
+    return [{ colour: col, stations: stations.slice() }];
+  }
+  // Getrennt: pro unique colour
+  var byColour = {};
+  stations.forEach(function(s, i) {
+    var nc = NETWORK_COLORS[s.network];
+    var col = ftIsManualAssignment ? (ftPerStationColour[i] || (nc ? nc.id : 1)) : (nc ? nc.id : 1);
+    if (!byColour[col]) byColour[col] = { colour: col, stations: [] };
+    byColour[col].stations.push(s);
+  });
+  return Object.values(byColour);
+}
+
+function renderDisplayTypeSections() {
+  var container = document.getElementById('ftDisplayTypeSections');
+  if (!container) return;
+  var types = getUniqueDisplayTypes();
+  var html = '';
+
+  types.forEach(function(dt) {
+    var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
+    var netColor = '#666';
+    // Finde Netzwerk-Farbe
+    for (var nk in NETWORK_COLORS) {
+      if (NETWORK_COLORS[nk].id === dt.colour) { netColor = NETWORK_COLORS[nk].color; break; }
+    }
+    html += '<div class="config-card">';
+    html += '<h3><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + netColor + ';margin-right:8px;"></span>' + (f.name || 'Display') + '</h3>';
+    // Stationen mit Netzwerk-Herkunft auflisten
+    dt.stations.forEach(function(s) {
+      var snc = NETWORK_COLORS[s.network];
+      var netName = snc ? snc.name : s.network;
+      var lines = s.filter ? s.filter.split(',').slice(0, 3).join(', ') : '';
+      if (s.filter && s.filter.split(',').length > 3) lines += ' ...';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0;">';
+      html += '<span style="font-size:14px;font-weight:500;">' + (s.stopName || 'Station') + '</span>';
+      html += '<span style="font-size:11px;color:#999;margin-left:auto;">' + netName + (lines ? ' · ' + lines : '') + '</span>';
+      html += '</div>';
+    });
+
+    // Zeilen (nur Stadt-Displays)
+    if (f.rows) {
+      var maxR = f.maxRows || 3;
+      html += '<div class="form-row"><div><div class="form-label">Zeilen</div></div>';
+      html += '<div class="toggle-row" id="ftRows_' + dt.colour + '">';
+      for (var r = 1; r <= maxR; r++) {
+        html += '<button class="toggle-btn' + (r === 2 ? ' active' : '') + '" data-value="' + r + '" onclick="setFtToggleVal(\'ftRows_' + dt.colour + '\',' + r + ')">' + r + '</button>';
+      }
+      html += '</div></div>';
+    }
+
+    // Sortierung (nur Stadt-Displays)
+    if (f.sorting) {
+      var cid = dt.colour;
+      html += '<div class="form-row"><div><div class="form-label">Sortierung</div><div class="form-hint">Statisch = Feste Reihenfolge der Linien</div></div>';
+      html += '<div class="toggle-row" id="ftSort_' + cid + '">';
+      html += '<button class="toggle-btn active" data-value="1" onclick="setFtToggleVal(\'ftSort_' + cid + '\',1);toggleDtSubsections(' + cid + ')">Statisch</button>';
+      html += '<button class="toggle-btn" data-value="2" onclick="setFtToggleVal(\'ftSort_' + cid + '\',2);toggleDtSubsections(' + cid + ')">Zeit</button>';
+      html += '</div></div>';
+
+      // Reihenfolge: Automatisch / Manuell
+      html += '<div id="ftOrderRow_' + cid + '">';
+      html += '<div class="form-row"><div><div class="form-label">Reihenfolge</div></div>';
+      html += '<div class="toggle-row" id="ftOrder_' + cid + '">';
+      html += '<button class="toggle-btn active" data-value="auto" onclick="setFtToggleVal(\'ftOrder_' + cid + '\',\'auto\');toggleDtSubsections(' + cid + ')">Automatisch</button>';
+      html += '<button class="toggle-btn" data-value="manual" onclick="setFtToggleVal(\'ftOrder_' + cid + '\',\'manual\');toggleDtSubsections(' + cid + ')">Manuell</button>';
+      html += '</div></div>';
+      // Alle Richtungen für diesen Display-Typ sammeln
+      var allDirs = [];
+      dt.stations.forEach(function(s) {
+        if (s.directions && s.directions.length > 0) {
+          s.directions.forEach(function(d) {
+            allDirs.push({ line: d.line, towards: d.towards || '', richtungsId: d.richtungsId || '', station: s.stopName || '', stopId: s.stopId || '' });
+          });
+        } else if (s.filter) {
+          s.filter.split(',').forEach(function(line) {
+            if (line.trim()) allDirs.push({ line: line.trim(), towards: '', richtungsId: '', station: s.stopName || '', stopId: s.stopId || '' });
+          });
+        }
+      });
+
+      // === GRUPPIERUNG (VOR Reihenfolge) ===
+      html += '<div id="ftGroupRow_' + cid + '">';
+      html += '<div class="form-row"><div><div class="form-label">Gruppierung</div><div class="form-hint">Richtungen zusammenfassen die gleiche Strecke fahren</div></div>';
+      html += '<div class="toggle-row" id="ftGroup_' + cid + '">';
+      html += '<button class="toggle-btn active" data-value="off" onclick="setFtToggleVal(\'ftGroup_' + cid + '\',\'off\');toggleDtSubsections(' + cid + ')">Aus</button>';
+      html += '<button class="toggle-btn" data-value="on" onclick="setFtToggleVal(\'ftGroup_' + cid + '\',\'on\');toggleDtSubsections(' + cid + ')">An</button>';
+      html += '</div></div>';
+      // Gruppierung Panel — Boxen-System wie index.html
+      html += '<div id="ftGroupPanel_' + cid + '" style="display:none;margin-top:8px;">';
+      // Gruppen-Container (hier werden erstellte Gruppen angezeigt)
+      html += '<div id="ftDtGroups_' + cid + '" style="margin-bottom:10px;"></div>';
+      // Neue Gruppe Button
+      html += '<button onclick="startDtGroup(' + cid + ')" id="ftDtNewGroupBtn_' + cid + '" style="width:100%;padding:10px;background:rgba(66,133,244,0.08);border:1px dashed rgba(66,133,244,0.4);border-radius:8px;color:#4285f4;font-size:13px;cursor:pointer;margin-bottom:10px;">+ Neue Gruppe erstellen</button>';
+      // Neue Gruppe erstellen Panel (hidden)
+      html += '<div id="ftDtNewGroupPanel_' + cid + '" style="display:none;background:#fff;border:2px solid #4285f4;border-radius:10px;margin-bottom:10px;overflow:hidden;">';
+      html += '<div style="padding:8px 12px;background:rgba(66,133,244,0.1);font-weight:600;font-size:13px;color:#4285f4;">Neue Gruppe <span id="ftDtNewGroupCount_' + cid + '">(0 ausgewählt)</span></div>';
+      html += '<div id="ftDtNewGroupSelected_' + cid + '" style="padding:10px;min-height:30px;display:flex;flex-wrap:wrap;gap:6px;"></div>';
+      html += '<div style="display:flex;gap:8px;padding:10px;border-top:1px solid #eee;">';
+      html += '<button onclick="cancelDtGroup(' + cid + ')" style="flex:1;padding:8px;border:none;background:#f0f0f0;border-radius:8px;cursor:pointer;font-size:13px;">Abbrechen</button>';
+      html += '<button onclick="confirmDtGroup(' + cid + ')" id="ftDtConfirmBtn_' + cid + '" disabled style="flex:1;padding:8px;border:none;background:#4285f4;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Gruppe erstellen</button>';
+      html += '</div></div>';
+      // Pool: Verfügbare Richtungen
+      html += '<div style="background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:10px;">';
+      html += '<div style="font-size:12px;color:#888;margin-bottom:8px;">Verfügbare Richtungen:</div>';
+      html += '<div id="ftDtPool_' + cid + '" style="display:flex;flex-wrap:wrap;gap:6px;">';
+      allDirs.forEach(function(d, idx) {
+        html += '<div class="ft-dt-chip" data-cid="' + cid + '" data-idx="' + idx + '" onclick="toggleDtPoolChip(this,' + cid + ')" style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer;font-size:12px;transition:all 0.15s;">';
+        html += '<span style="font-weight:700;background:#4285f4;color:#fff;padding:1px 6px;border-radius:4px;font-size:11px;">' + d.line + '</span>';
+        html += '<span style="color:#666;">' + (d.towards || d.station) + '</span>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+      html += '</div>';
+      html += '</div>';
+
+      // === REIHENFOLGE (NACH Gruppierung) ===
+      html += '<div id="ftOrderRow_' + cid + '">';
+      html += '<div class="form-row"><div><div class="form-label">Reihenfolge</div></div>';
+      html += '<div class="toggle-row" id="ftOrder_' + cid + '">';
+      html += '<button class="toggle-btn active" data-value="auto" onclick="setFtToggleVal(\'ftOrder_' + cid + '\',\'auto\');toggleDtSubsections(' + cid + ')">Automatisch</button>';
+      html += '<button class="toggle-btn" data-value="manual" onclick="setFtToggleVal(\'ftOrder_' + cid + '\',\'manual\');toggleDtSubsections(' + cid + ')">Manuell</button>';
+      html += '</div></div>';
+      // Manuelle Reihenfolge Liste (dynamisch gerendert)
+      html += '<div id="ftManualOrder_' + cid + '" style="display:none;margin-top:8px;padding:12px;background:#f8f9fa;border-radius:10px;">';
+      html += '<div class="form-hint" style="margin-bottom:8px;">Reihenfolge festlegen (Zeile 1 = oben)</div>';
+      html += '<div id="ftOrderList_' + cid + '"></div>';
+      html += '</div>';
+      html += '</div>';
+      // allDirs für diese cid speichern für dynamisches Rendern
+      if (!window._dtAllDirs) window._dtAllDirs = {};
+      window._dtAllDirs[cid] = allDirs;
+    }
+
+    // Wien-spezifisch
+    if (f.textColor) {
+      html += '<div class="form-row"><div><div class="form-label">Schriftfarbe</div></div>';
+      html += '<div class="toggle-row" id="ftTxtCol_' + dt.colour + '">';
+      html += '<button class="toggle-btn active" data-value="1" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',1)" style="background:#FFD700;color:#000">Gelb</button>';
+      html += '<button class="toggle-btn" data-value="2" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',2)" style="background:#FFF;color:#000">Weiß</button>';
+      html += '<button class="toggle-btn" data-value="3" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',3)" style="background:#FF8C00;color:#000">Orange</button>';
+      html += '</div></div>';
+    }
+    if (f.chopper) {
+      html += '<div class="form-row"><div><div class="form-label">Hochflurer markieren</div></div>';
+      html += '<div class="toggle-switch active" id="ftChopper_' + dt.colour + '" onclick="toggleFtSwitch(\'ftChopper_' + dt.colour + '\')"></div></div>';
+    }
+    if (f.silberpfeil) {
+      html += '<div class="form-row"><div><div class="form-label">Klimaanlage anzeigen</div></div>';
+      html += '<div class="toggle-switch active" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
+    }
+
+    // Info für Zug-Displays
+    if (!f.rows && !f.sorting) {
+      html += '<p class="form-hint">Chronologisch sortiert, keine weiteren Einstellungen nötig.</p>';
+    }
+
+    // Anzeigedauer (nur bei Multi-Display)
+    if (types.length > 1) {
+      html += '<div class="form-row"><div><div class="form-label">Anzeigedauer</div><div class="form-hint">Wie lange diese Ansicht angezeigt wird</div></div>';
+      html += '<div class="toggle-row" id="ftInterval_' + dt.colour + '">';
+      [5, 10, 15, 20].forEach(function(sec) {
+        html += '<button class="toggle-btn' + (sec === 10 ? ' active' : '') + '" data-value="' + sec + '" onclick="setFtToggleVal(\'ftInterval_' + dt.colour + '\',' + sec + ')">' + sec + 's</button>';
+      });
+      html += '</div></div>';
+    }
+
+    // Zeitfenster (nur bei Multi-Display)
+    if (types.length > 1) {
+      html += '<div class="form-row"><div><div class="form-label">Zeitfenster</div><div class="form-hint">Nur in bestimmten Stunden anzeigen</div></div>';
+      html += '<div class="toggle-switch" id="ftTimeWindow_' + dt.colour + '" onclick="toggleFtSwitch(\'ftTimeWindow_' + dt.colour + '\');toggleTimeWindow(' + dt.colour + ')"></div></div>';
+      html += '<div id="ftTimeWindowPanel_' + dt.colour + '" style="display:none;margin-top:4px;padding:12px;background:#f8f9fa;border-radius:10px;">';
+      html += '<div style="display:flex;align-items:center;gap:10px;">';
+      html += '<span style="font-size:13px;">Von</span>';
+      html += '<select id="ftTimeFrom_' + dt.colour + '" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;font-size:14px;">';
+      for (var h = 0; h < 24; h++) {
+        var hh = (h < 10 ? '0' : '') + h;
+        html += '<option value="' + h + '"' + (h === 6 ? ' selected' : '') + '>' + hh + ':00</option>';
+      }
+      html += '</select>';
+      html += '<span style="font-size:13px;">Bis</span>';
+      html += '<select id="ftTimeTo_' + dt.colour + '" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;font-size:14px;">';
+      for (var h = 0; h < 24; h++) {
+        var hh = (h < 10 ? '0' : '') + h;
+        html += '<option value="' + h + '"' + (h === 22 ? ' selected' : '') + '>' + hh + ':00</option>';
+      }
+      html += '</select>';
+      html += '</div>';
+      html += '<div class="form-hint" style="margin-top:6px;">Außerhalb dieser Zeit wird diese Ansicht übersprungen.</div>';
+      html += '</div>';
+    }
+
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+
+  // Reihenfolge initial rendern für alle Display-Typen
+  types.forEach(function(dt) {
+    var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
+    if (f.sorting) renderDtOrderList(dt.colour);
+  });
+}
+
+function setFtToggleVal(containerId, val) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  container.querySelectorAll('.toggle-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.value === String(val));
+  });
+}
+
+// ==================== PER-DISPLAY-TYP GRUPPIERUNG ====================
+var dtGroupData = {};  // cid -> { groups: [[idx,...]], creating: false, selected: [] }
+
+function getDtGroupData(cid) {
+  if (!dtGroupData[cid]) dtGroupData[cid] = { groups: [], creating: false, selected: [] };
+  return dtGroupData[cid];
+}
+
+function startDtGroup(cid) {
+  var gd = getDtGroupData(cid);
+  gd.creating = true;
+  gd.selected = [];
+  document.getElementById('ftDtNewGroupPanel_' + cid).style.display = '';
+  document.getElementById('ftDtNewGroupBtn_' + cid).style.display = 'none';
+  updateDtGroupUI(cid);
+}
+
+function cancelDtGroup(cid) {
+  var gd = getDtGroupData(cid);
+  gd.creating = false;
+  gd.selected = [];
+  document.getElementById('ftDtNewGroupPanel_' + cid).style.display = 'none';
+  document.getElementById('ftDtNewGroupBtn_' + cid).style.display = '';
+  // Pool chips zurücksetzen
+  document.querySelectorAll('#ftDtPool_' + cid + ' .ft-dt-chip').forEach(function(c) {
+    c.style.background = '#fff'; c.style.borderColor = '#ddd';
+  });
+}
+
+function confirmDtGroup(cid) {
+  var gd = getDtGroupData(cid);
+  if (gd.selected.length < 2) return;
+  gd.groups.push(gd.selected.slice());
+  gd.creating = false;
+  gd.selected = [];
+  document.getElementById('ftDtNewGroupPanel_' + cid).style.display = 'none';
+  document.getElementById('ftDtNewGroupBtn_' + cid).style.display = '';
+  renderDtGroups(cid);
+  // Pool chips zurücksetzen
+  document.querySelectorAll('#ftDtPool_' + cid + ' .ft-dt-chip').forEach(function(c) {
+    c.style.background = '#fff'; c.style.borderColor = '#ddd';
+  });
+}
+
+function deleteDtGroup(cid, gIdx) {
+  var gd = getDtGroupData(cid);
+  gd.groups.splice(gIdx, 1);
+  renderDtGroups(cid);
+}
+
+function toggleDtPoolChip(el, cid) {
+  var gd = getDtGroupData(cid);
+  if (!gd.creating) { startDtGroup(cid); }
+  var idx = parseInt(el.dataset.idx);
+  var pos = gd.selected.indexOf(idx);
+  if (pos === -1) {
+    gd.selected.push(idx);
+    el.style.background = '#e8f0fe'; el.style.borderColor = '#4285f4';
+  } else {
+    gd.selected.splice(pos, 1);
+    el.style.background = '#fff'; el.style.borderColor = '#ddd';
+  }
+  updateDtGroupUI(cid);
+}
+
+function updateDtGroupUI(cid) {
+  var gd = getDtGroupData(cid);
+  // Update selected count + confirm button
+  var countEl = document.getElementById('ftDtNewGroupCount_' + cid);
+  if (countEl) countEl.textContent = '(' + gd.selected.length + ' ausgewählt)';
+  var confirmBtn = document.getElementById('ftDtConfirmBtn_' + cid);
+  if (confirmBtn) confirmBtn.disabled = gd.selected.length < 2;
+  // Show selected chips in new group panel
+  var selContainer = document.getElementById('ftDtNewGroupSelected_' + cid);
+  if (selContainer) {
+    if (gd.selected.length === 0) {
+      selContainer.innerHTML = '<span style="color:#999;font-size:12px;font-style:italic;">Wähle mindestens 2 Richtungen aus dem Pool</span>';
+    } else {
+      // Get allDirs for this cid from the pool
+      var poolChips = document.querySelectorAll('#ftDtPool_' + cid + ' .ft-dt-chip');
+      selContainer.innerHTML = gd.selected.map(function(idx) {
+        var chip = poolChips[idx];
+        return chip ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#e8f0fe;border:1px solid #4285f4;border-radius:6px;font-size:12px;">' + chip.innerHTML + '</span>' : '';
+      }).join('');
+    }
+  }
+}
+
+function renderDtOrderList(cid) {
+  var container = document.getElementById('ftOrderList_' + cid);
+  if (!container) return;
+  var allDirs = (window._dtAllDirs && window._dtAllDirs[cid]) || [];
+  var gd = getDtGroupData(cid);
+
+  // Baue Reihenfolge-Items: Gruppen als eine Zeile, Einzelne als eigene Zeile
+  var usedIdxs = new Set();
+  var orderItems = [];  // { type:'group'|'single', indices:[], label:'', sublabel:'' }
+
+  // Erst Gruppen
+  gd.groups.forEach(function(group, gIdx) {
+    var lines = group.map(function(idx) { return allDirs[idx] ? allDirs[idx].line : '?'; });
+    var towards = group.map(function(idx) { return allDirs[idx] ? allDirs[idx].towards : ''; });
+    // Unique towards
+    var uniqueTowards = [...new Set(towards.filter(function(t) { return t; }))];
+    orderItems.push({
+      type: 'group',
+      indices: group,
+      label: lines.join('+'),
+      sublabel: uniqueTowards.join(', ') || 'Gruppe ' + (gIdx + 1)
+    });
+    group.forEach(function(i) { usedIdxs.add(i); });
+  });
+
+  // Dann Einzelne (nicht gruppierte)
+  allDirs.forEach(function(d, idx) {
+    if (usedIdxs.has(idx)) return;
+    orderItems.push({
+      type: 'single',
+      indices: [idx],
+      label: d.line,
+      sublabel: d.towards || d.station
+    });
+  });
+
+  // Rendern
+  var html = '';
+  orderItems.forEach(function(item, i) {
+    var isGroup = item.type === 'group';
+    var bgColor = isGroup ? 'rgba(66,133,244,0.05)' : '#fff';
+    var borderColor = isGroup ? 'rgba(66,133,244,0.3)' : '#e0e0e0';
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:4px;background:' + bgColor + ';border:1px solid ' + borderColor + ';border-radius:8px;" data-order-idx="' + i + '">';
+    html += '<span style="color:#999;font-size:14px;">&#9776;</span>';
+    if (isGroup) {
+      item.indices.forEach(function(idx, j) {
+        if (j > 0) html += '<span style="color:#999;font-size:10px;">+</span>';
+        html += '<span style="font-weight:600;background:#4285f4;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;">' + (allDirs[idx] ? allDirs[idx].line : '?') + '</span>';
+      });
+    } else {
+      html += '<span style="font-weight:600;background:#4285f4;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;">' + item.label + '</span>';
+    }
+    html += '<span style="font-size:13px;color:#666;flex:1;">' + item.sublabel + '</span>';
+    html += '<span style="display:flex;gap:2px;">';
+    html += '<button onclick="moveFtOrderItem(\'ftOrderList_' + cid + '\',' + i + ',-1)" style="width:28px;height:28px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:12px;">&#9650;</button>';
+    html += '<button onclick="moveFtOrderItem(\'ftOrderList_' + cid + '\',' + i + ',1)" style="width:28px;height:28px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:12px;">&#9660;</button>';
+    html += '</span>';
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function renderDtGroups(cid) {
+  var gd = getDtGroupData(cid);
+  var container = document.getElementById('ftDtGroups_' + cid);
+  if (!container) return;
+  var poolChips = document.querySelectorAll('#ftDtPool_' + cid + ' .ft-dt-chip');
+  var html = '';
+  gd.groups.forEach(function(group, gIdx) {
+    html += '<div style="background:#fff;border:1px solid #e0e0e0;border-radius:10px;margin-bottom:8px;overflow:hidden;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(66,133,244,0.08);font-size:13px;font-weight:600;color:#4285f4;">';
+    html += '<span>Gruppe ' + (gIdx + 1) + '</span>';
+    html += '<button onclick="deleteDtGroup(' + cid + ',' + gIdx + ')" style="background:none;border:none;color:#999;cursor:pointer;font-size:12px;padding:2px 6px;">Löschen</button>';
+    html += '</div>';
+    html += '<div style="padding:10px;display:flex;flex-wrap:wrap;gap:6px;">';
+    group.forEach(function(idx) {
+      var chip = poolChips[idx];
+      if (chip) {
+        html += '<span style="display:inline-flex;align-items:center;gap:4px;padding:5px 10px;background:#f8f9fa;border:1px solid #e0e0e0;border-radius:6px;font-size:12px;">' + chip.innerHTML + '</span>';
+      }
+    });
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+
+  // Pool: Bereits gruppierte Chips ausblenden
+  var usedIdxs = new Set();
+  gd.groups.forEach(function(g) { g.forEach(function(i) { usedIdxs.add(i); }); });
+  poolChips.forEach(function(chip, i) {
+    chip.style.display = usedIdxs.has(i) ? 'none' : '';
+  });
+
+  // Reihenfolge aktualisieren (Gruppen als eine Zeile)
+  renderDtOrderList(cid);
+}
+
+function moveFtOrderItem(listId, idx, dir) {
+  var list = document.getElementById(listId);
+  if (!list) return;
+  var items = Array.from(list.children);
+  var newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= items.length) return;
+  // Tausche DOM-Elemente
+  if (dir === -1) {
+    list.insertBefore(items[idx], items[newIdx]);
+  } else {
+    list.insertBefore(items[newIdx], items[idx]);
+  }
+  // data-order-idx aktualisieren
+  Array.from(list.children).forEach(function(el, i) {
+    el.dataset.orderIdx = i;
+    var btns = el.querySelectorAll('button');
+    if (btns.length >= 2) {
+      btns[0].setAttribute('onclick', "moveFtOrderItem('" + listId + "'," + i + ",-1)");
+      btns[1].setAttribute('onclick', "moveFtOrderItem('" + listId + "'," + i + ",1)");
+    }
+  });
+}
+
+function toggleDtSubsections(cid) {
+  var sortVal = getFtToggleVal('ftSort_' + cid);
+  var orderVal = getFtToggleVal('ftOrder_' + cid);
+  var groupVal = getFtToggleVal('ftGroup_' + cid);
+
+  // Reihenfolge + Gruppierung nur bei Statisch sichtbar
+  var orderRow = document.getElementById('ftOrderRow_' + cid);
+  var groupRow = document.getElementById('ftGroupRow_' + cid);
+  if (orderRow) orderRow.style.display = sortVal === '1' ? '' : 'none';
+  if (groupRow) groupRow.style.display = sortVal === '1' ? '' : 'none';
+
+  // Manuelle Reihenfolge Liste nur bei Manuell sichtbar
+  var manualOrder = document.getElementById('ftManualOrder_' + cid);
+  if (manualOrder) manualOrder.style.display = (sortVal === '1' && orderVal === 'manual') ? '' : 'none';
+
+  // Gruppierung Panel nur bei An sichtbar
+  var groupPanel = document.getElementById('ftGroupPanel_' + cid);
+  if (groupPanel) groupPanel.style.display = (sortVal === '1' && groupVal === 'on') ? '' : 'none';
+}
+
+function getFtToggleVal(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return '1';
+  var active = container.querySelector('.toggle-btn.active');
+  return active ? active.dataset.value : '1';
 }
 
 async function initFinetuningStep() {
   const config = recommendedConfig;
   if (!config) return;
 
-  // Display-Typ
-  document.getElementById('ftColorSelect').value = config.colour;
+  // Display-Typ für Hidden Select (Kompatibilität)
+  var colourForSelect = config.multiDisplay ? (config.colourSingle || config.colour) : config.colour;
+  document.getElementById('ftColorSelect').value = colourForSelect;
 
-  // Zeilen-Toggle setzen
-  setFtRows(config.rows || 2);
+  // Kompakt/Getrennt Toggle initialisieren
+  var uniqueNetworks = [...new Set(stations.map(function(s) { return s.network; }))];
+  var hasMultipleNetworks = uniqueNetworks.length > 1;
+  var compactRow = document.getElementById('ftCompactSeparateRow');
+  if (compactRow) compactRow.style.display = hasMultipleNetworks ? '' : 'none';
+
+  // Per-Station colours initialisieren
+  ftPerStationColour = stations.map(function(s) {
+    var nc = NETWORK_COLORS[s.network];
+    return nc ? nc.id : 1;
+  });
+
+  // Multi-Display Status aus Schnellansicht übernehmen
+  ftIsMultiDisplay = !!config.multiDisplay;
+  if (hasMultipleNetworks) {
+    setFtCompactSeparate(ftIsMultiDisplay ? 'separate' : 'compact');
+  } else {
+    ftIsMultiDisplay = false;
+  }
+
+  // Display-Typ Sektionen rendern
+  renderDisplayTypeSections();
 
   // Helligkeit-Toggle setzen
   setFtBrightness(config.displayLight || 3);
-
-  // Wien-spezifische Optionen
-  const caps = config.capabilities || {};
-  const wienOptions = document.getElementById('ftWienOptions');
-  if (caps.showHighFloor || caps.showAirCondition || caps.textColorChangeable) {
-    wienOptions.style.display = 'block';
-    setFtToggle('ftChopperToggle', config.chopper === 1);
-    setFtToggle('ftSilberpfeilToggle', config.silberpfeil === 1);
-    setFtTextColor(config.textColor || 1);  // Default: Gelb (1)
-  } else {
-    wienOptions.style.display = 'none';
-  }
 
   // Nachtmodus
   setFtToggle('ftNightModeToggle', config.nightMode);
@@ -6476,6 +7400,14 @@ function toggleFtSwitch(id) {
   const el = document.getElementById(id);
   if (el) {
     el.classList.toggle('active');
+  }
+}
+
+function toggleTimeWindow(cid) {
+  var panel = document.getElementById('ftTimeWindowPanel_' + cid);
+  var toggle = document.getElementById('ftTimeWindow_' + cid);
+  if (panel && toggle) {
+    panel.style.display = toggle.classList.contains('active') ? '' : 'none';
   }
 }
 
@@ -6756,6 +7688,8 @@ function getRowOrderString() {
 
   ftLineGroups.forEach(group => {
     if (group.directions && group.directions.length > 0) {
+      // Sammle alle Einträge dieser Gruppe
+      const groupItems = [];
       group.directions.forEach(key => {
         const dirInfo = ftAllDirections.find(d => d.key === key);
         if (!dirInfo) return;
@@ -6776,19 +7710,21 @@ function getRowOrderString() {
 
         let item;
         if (stationForDir.network === 'WL') {
-          // WIEN: Format "stopId:Linie" (z.B. "4430:13A")
           const stopIdParts = stationForDir.stopId.split(',');
           const stopId = stopIdParts[0];
           item = `${stopId}:${dirInfo.line}`;
         } else {
-          // NICHT-WIEN (BODO, Linz, etc.): Format "Linie:Ziel" (z.B. "1:Auwiesen")
           item = `${dirInfo.line}:${dirInfo.towards}`;
         }
 
-        if (!items.includes(item)) {
-          items.push(item);
+        if (!groupItems.includes(item)) {
+          groupItems.push(item);
         }
       });
+      // Gruppe mit + zusammenfassen (Multi-Linie-Zeile)
+      if (groupItems.length > 0) {
+        items.push(groupItems.join('+'));
+      }
     }
   });
 
@@ -7100,6 +8036,8 @@ function updateFinetuningPreview() {
 
 function backFromFinetuning() {
   document.getElementById('stepFinetuning').classList.add('hidden');
+  var ftBottom = document.getElementById('ftBottomActions');
+  if (ftBottom) ftBottom.style.display = 'none';
   document.getElementById('stepDisplayConfig').classList.remove('hidden');
 }
 
@@ -7717,30 +8655,71 @@ function updateRowOrderAfterGroupChange() {
 
 function collectFtLineGroups() {
   // linegroups Format: "1:Universität+2:Universität,41:Hessenplatz,43:Stadtfriedhof"
-  // ALLE Gruppen (auch 1er-Gruppen) - jede Zeile ist eine Gruppe!
-  // Das sagt der Straba welche Richtungen angezeigt werden sollen
+  // + für zusammengefasste Richtungen, , für Trennung zwischen Gruppen
+
+  // Bei Multi-Display: dtGroupData der per-Display-Typ Sektionen berücksichtigen
+  if (ftIsMultiDisplay && Object.keys(dtGroupData).length > 0) {
+    const allParts = [];
+    const types = getUniqueDisplayTypes();
+    types.forEach(function(dt) {
+      var gd = dtGroupData[dt.colour];
+      var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
+      if (!f.sorting) return;  // Zug-Displays: keine Gruppierung
+
+      // allDirs für diesen Display-Typ
+      var allDirs = window._dtAllDirs ? window._dtAllDirs[dt.colour] : [];
+      if (!allDirs || allDirs.length === 0) return;
+
+      // Gruppierungs-Toggle: An oder Aus?
+      var groupVal = getFtToggleVal('ftGroup_' + dt.colour);
+      if (groupVal === 'on' && gd && gd.groups && gd.groups.length > 0) {
+        // Gruppen vorhanden: Zusammengefasste mit +, Rest einzeln
+        var usedIndices = new Set();
+        gd.groups.forEach(function(grp) {
+          var parts = grp.map(function(idx) {
+            usedIndices.add(idx);
+            var d = allDirs[idx];
+            if (!d) return '';
+            // richtungsId bevorzugen (STV: H/R, WB: 1/2)
+            var val = d.richtungsId ? (d.line + ':' + d.richtungsId) : (d.line + ':' + (d.towards || ''));
+            return val;
+          }).filter(function(p) { return p; });
+          if (parts.length > 0) allParts.push(parts.join('+'));
+        });
+        // Ungroupierte Richtungen als Einzeleinträge
+        allDirs.forEach(function(d, idx) {
+          if (!usedIndices.has(idx)) {
+            var val = d.richtungsId ? (d.line + ':' + d.richtungsId) : (d.line + ':' + (d.towards || ''));
+            allParts.push(val);
+          }
+        });
+      } else {
+        // Keine Gruppierung: jede Richtung einzeln
+        allDirs.forEach(function(d) {
+          var val = d.richtungsId ? (d.line + ':' + d.richtungsId) : (d.line + ':' + (d.towards || ''));
+          allParts.push(val);
+        });
+      }
+    });
+    if (allParts.length > 0) return allParts.join(',');
+  }
+
+  // Single-Display Modus: ftLineGroups verwenden
   if (ftLineGroups.length === 0) {
     return '';
   }
 
-  // ALLE Gruppen mit mindestens 1 Richtung (auch Einzellinien!)
   const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 1);
-
   if (validGroups.length === 0) {
     return '';
   }
 
-  // Format: "Linie:Ziel+Linie:Ziel,Linie:Ziel,..." (+ für Gruppen, , für Trennung)
-  // STV/Graz: "Linie:H" oder "Linie:R" statt "Linie:Ziel" (richtungsId-basiert)
   return validGroups.map(g => {
     return g.directions.map(key => {
-      // Prüfe ob diese Direction eine richtungsId hat (STV, Westbahn, etc.)
       const dir = ftAllDirections.find(d => d.key === key);
       if (dir && dir.richtungsId) {
-        // richtungsId-basiert: "5:R", "WB:1" — stabil bei Kurzführungen
         return `${dir.line}:${dir.richtungsId}`;
       }
-      // Fallback: Key ist bereits im Format "Linie:Ziel"
       return key;
     }).join('+');
   }).join(',');
@@ -7836,18 +8815,52 @@ function setupFtGroupingEvents() {
 // Event-Listener werden in initFtGrouping() angehaengt
 
 function saveFromFinetuning() {
-  // Sammle alle Finetuning-Werte
-  const colour = parseInt(document.getElementById('ftColorSelect').value);
-  const rows = getFtRows();
+  // Multi-Display: colour pro Station sammeln
+  let colour;
+  if (ftIsMultiDisplay) {
+    const perStation = stations.map(function(s, i) {
+      var nc = NETWORK_COLORS[s.network];
+      return ftIsManualAssignment ? (ftPerStationColour[i] || (nc ? nc.id : 1)) : (nc ? nc.id : 1);
+    });
+    colour = perStation.join(',');
+  } else {
+    colour = parseInt(document.getElementById('ftColorSelect').value);
+  }
+
+  // Per-Display-Typ Werte sammeln (verwende ersten Stadt-Display für rows/sort)
+  const types = getUniqueDisplayTypes();
+  let rows = getFtRows();  // Fallback
+  let sortMode = getFtSortMode();  // Fallback
+  let textColor = getFtTextColor();
+  let chopper = isFtToggleActive('ftChopperToggle') ? 1 : 0;
+  let silberpfeil = isFtToggleActive('ftSilberpfeilToggle') ? 1 : 0;
+
+  // Werte aus per-Display-Typ Sektionen lesen
+  types.forEach(function(dt) {
+    var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
+    if (f.rows) {
+      rows = parseInt(getFtToggleVal('ftRows_' + dt.colour)) || rows;
+    }
+    if (f.sorting) {
+      sortMode = parseInt(getFtToggleVal('ftSort_' + dt.colour)) || sortMode;
+    }
+    if (f.textColor) {
+      textColor = parseInt(getFtToggleVal('ftTxtCol_' + dt.colour)) || textColor;
+    }
+    if (f.chopper) {
+      chopper = isFtToggleActive('ftChopper_' + dt.colour) ? 1 : 0;
+    }
+    if (f.silberpfeil) {
+      silberpfeil = isFtToggleActive('ftSilber_' + dt.colour) ? 1 : 0;
+    }
+  });
+
   const displayLight = getFtBrightness();
-  const textColor = getFtTextColor();  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
-  const chopper = isFtToggleActive('ftChopperToggle') ? 1 : 0;
-  const silberpfeil = isFtToggleActive('ftSilberpfeilToggle') ? 1 : 0;
   const nightMode = isFtToggleActive('ftNightModeToggle');
   const nightStart = parseInt(document.getElementById('ftNightStart').value) || 22;
   const nightEnd = parseInt(document.getElementById('ftNightEnd').value) || 6;
   const showFunMessages = isFtToggleActive('ftFunMessagesToggle');
-  const sortMode = getFtSortMode();
+  // sortMode already declared above from per-display-type sections
   const rowOrder = getRowOrderString();  // Einfach für Wien
   const rowOrderDestination = getRowOrderDestinationString();  // Mit Ziel für Linz
 
@@ -7878,7 +8891,8 @@ function saveFromFinetuning() {
   recommendedConfig.filter = stations.map(s => s.filter || '').join('|');
 
   // Update recommendedConfig
-  recommendedConfig.colour = colour;
+  recommendedConfig.colour = colour;  // Kann "14,2,12" (multi) oder "1" (single) sein
+  recommendedConfig.multiDisplay = ftIsMultiDisplay;
   recommendedConfig.rows = rows;
   recommendedConfig.displayLight = displayLight;
   recommendedConfig.textColor = textColor;  // Wien Schriftfarbe
@@ -7896,6 +8910,35 @@ function saveFromFinetuning() {
   recommendedConfig.rowOrderDestination = rowOrderDestination;
   recommendedConfig.displayMode = ftDisplayMode;
   recommendedConfig.stopInterval = ftStopInterval;
+
+  // Pro-Display Intervalle berechnen (nur bei Multi-Display)
+  // 'types' already declared above as const
+  if (types.length > 1) {
+    var intervals = [];
+    types.forEach(function(dt) {
+      var el = document.getElementById('ftInterval_' + dt.colour);
+      var val = el ? getFtToggleVal('ftInterval_' + dt.colour) : 10;
+      intervals.push(val || 10);
+    });
+    recommendedConfig.stopIntervals = intervals.join(',');
+
+    // Zeitfenster pro Display-Typ sammeln
+    var timeWindows = [];
+    types.forEach(function(dt) {
+      var twToggle = document.getElementById('ftTimeWindow_' + dt.colour);
+      if (twToggle && twToggle.classList.contains('active')) {
+        var from = document.getElementById('ftTimeFrom_' + dt.colour);
+        var to = document.getElementById('ftTimeTo_' + dt.colour);
+        timeWindows.push((from ? from.value : '6') + '-' + (to ? to.value : '22'));
+      } else {
+        timeWindows.push('');  // Leer = immer anzeigen
+      }
+    });
+    recommendedConfig.timeWindows = timeWindows.join(',');
+  } else {
+    recommendedConfig.stopIntervals = '';
+    recommendedConfig.timeWindows = '';
+  }
 
   // Speichern
   showSavingOverlay('Speichere Einstellungen...');
@@ -7947,6 +8990,8 @@ function sendConfigToDeviceDirect(config) {
     showfunmessages: config.showFunMessages ? '1' : '0',
     displaymode: String(config.displayMode),
     stopinterval: String(config.stopInterval),
+    stopintervals: config.stopIntervals || '',
+    timewindows: config.timeWindows || '',
     gehweg: gehwegString,
     linegroups: config.lineGroups || '',  // NEU: Linien-Gruppierung
     linefilter: config.lineFilter || '',  // Linien-Filter (nur Linienname)
@@ -8023,6 +9068,8 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('showfunmessages', configData.showfunmessages);
     formData.append('displaymode', configData.displaymode);
     formData.append('stopinterval', configData.stopinterval);
+    formData.append('stopintervals', configData.stopintervals);
+    formData.append('timewindows', configData.timewindows);
     formData.append('gehweg', configData.gehweg);
     formData.append('linegroups', configData.linegroups);
     formData.append('linefilter', configData.linefilter);
@@ -8564,7 +9611,9 @@ async function handleConfigMessage(data) {
     }
     // Weitere Feintuning-Einstellungen
     if (data.config.colour !== undefined) {
-      recommendedConfig.colour = parseInt(data.config.colour) || 1;
+      // Multi-Display: colour kann "1,14" sein → als String behalten
+      var colVal = String(data.config.colour);
+      recommendedConfig.colour = colVal.indexOf(',') > 0 ? colVal : (parseInt(colVal) || 1);
     }
     if (data.config.lines_count !== undefined) {
       recommendedConfig.rows = parseInt(data.config.lines_count) || 2;
