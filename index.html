@@ -6,12 +6,13 @@
   <title>Straba - Erweiterte Features</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
+    html{background:#1a1a2e}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;padding:20px;color:#fff}
     .container{max-width:440px;margin:0 auto}
-    
+
     .logo{display:block;max-width:200px;height:auto;margin:0 auto 12px auto}
     .subtitle{text-align:center;color:#aaa;margin-bottom:16px;font-size:14px;text-transform:uppercase;letter-spacing:1px}
-    
+
     /* Intro Box */
     .intro-box{
       text-align:center;
@@ -43,18 +44,18 @@
       background:rgba(255,255,255,0.2);
       text-decoration:none !important;
     }
-    
+
     /* Cards */
     .card{background:rgba(255,255,255,0.08);border-radius:16px;padding:20px;margin-bottom:16px;border:1px solid rgba(255,255,255,0.1)}
     .card h2{font-size:14px;margin-bottom:16px;color:#ffd700;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:8px}
-    
+
     /* Control Rows */
     .control-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.08)}
     .control-row:last-child{border-bottom:none}
     .control-label{flex:1}
     .control-label span{display:block;font-size:15px;font-weight:500}
     .control-label small{color:#888;font-size:12px;margin-top:3px;display:block;line-height:1.4}
-    
+
     /* Segmented Control */
     .segmented{display:flex;background:rgba(0,0,0,0.3);border-radius:10px;padding:3px;gap:3px}
     .seg-btn{
@@ -73,7 +74,7 @@
     }
     .seg-btn:hover{color:#ccc}
     .seg-btn.active{background:#ffd700;color:#1a1a2e}
-    
+
     /* Segmented mit Label darunter */
     .seg-btn-with-label{
       flex:1;
@@ -102,11 +103,11 @@
       opacity:0.7;
     }
     .seg-btn-with-label.active .badge{opacity:1}
-    
-    /* Breitere Segmented für Zeilen */
+
+    /* Breitere Segmented fuer Zeilen */
     .segmented.wide{min-width:180px}
     .segmented.wide .seg-btn{padding:12px 20px;font-size:15px}
-    
+
     /* Toggle */
     .toggle{
       width:52px;
@@ -132,7 +133,7 @@
       box-shadow:0 2px 4px rgba(0,0,0,0.2);
     }
     .toggle.on::after{transform:translateX(20px)}
-    
+
     /* Color Picker */
     .color-row{display:flex;gap:12px}
     .color-dot{
@@ -148,8 +149,8 @@
     .color-amber{background:#ffb340}
     .color-white{background:#ffffff}
     .color-orange{background:#ff9500}
-    
-    /* Expandable Card - Eine zusammenhängende Bubble */
+
+    /* Expandable Card */
     .expand-card{
       background:rgba(255,255,255,0.08);
       border-radius:16px;
@@ -182,19 +183,19 @@
       transition:transform 0.3s;
     }
     .expand-header.open .expand-arrow{transform:rotate(180deg);color:#ffd700}
-    
+
     .expand-content{
       max-height:0;
       overflow:hidden;
       transition:max-height 0.4s ease-out;
     }
-    .expand-content.open{max-height:2000px}
-    
+    .expand-content.open{max-height:3000px}
+
     .expand-inner{
       padding:0 20px 20px 20px;
       border-top:1px solid rgba(255,255,255,0.08);
     }
-    
+
     /* Sections innerhalb der erweiterten Einstellungen */
     .inner-section{
       padding-top:20px;
@@ -212,7 +213,7 @@
       align-items:center;
       gap:8px;
     }
-    
+
     /* Feature Description */
     .feature-desc{
       font-size:13px;
@@ -223,7 +224,7 @@
       background:rgba(0,0,0,0.15);
       border-radius:10px;
     }
-    
+
     /* Subsections */
     .sub-section{
       background:rgba(0,0,0,0.2);
@@ -234,7 +235,7 @@
     }
     .sub-section.disabled{opacity:0.4;pointer-events:none;transform:scale(0.98)}
     .sub-section h4{font-size:12px;color:#aaa;margin-bottom:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.3px}
-    
+
     /* Gehweg Liste */
     .gehweg-item{
       display:flex;
@@ -435,7 +436,7 @@
       font-size:15px;
     }
     input[type="number"]:focus{outline:none;border-color:#ffd700}
-    
+
     /* Hints */
     .hint-small{
       font-size:12px;
@@ -443,27 +444,7 @@
       margin-top:10px;
       line-height:1.4;
     }
-    
-    /* Preview Box */
-    .preview-box{
-      background:#000;
-      border-radius:8px;
-      padding:16px;
-      font-family:"SF Mono",Monaco,"Courier New",monospace;
-      border:2px solid #333;
-      margin-bottom:12px;
-    }
-    .preview-row{
-      display:flex;
-      justify-content:space-between;
-      padding:8px 0;
-      font-size:15px;
-      letter-spacing:0.5px;
-    }
-    .preview-row .line-num{font-weight:bold;min-width:36px}
-    .preview-row .destination{flex:1;margin-left:8px}
-    .preview-row .countdown{font-weight:bold}
-    
+
     /* Buttons */
     .btn-primary{
       width:100%;
@@ -481,7 +462,71 @@
     }
     .btn-primary:hover{background:#ffed4a;transform:translateY(-2px);box-shadow:0 4px 20px rgba(255,215,0,0.3)}
     .btn-primary:active{transform:translateY(0)}
-    
+
+    /* Manual Sort Toggle Button */
+    .sort-toggle-btn{
+      width:100%;
+      padding:12px 16px;
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.15);
+      border-radius:10px;
+      color:#aaa;
+      font-size:14px;
+      font-weight:500;
+      cursor:pointer;
+      transition:all 0.2s;
+      text-align:center;
+      margin-top:12px;
+    }
+    .sort-toggle-btn:hover{
+      background:rgba(255,255,255,0.12);
+      color:#fff;
+      border-color:rgba(255,215,0,0.3);
+    }
+    .sort-toggle-btn.active{
+      background:rgba(255,215,0,0.15);
+      border-color:rgba(255,215,0,0.4);
+      color:#ffd700;
+    }
+
+    /* Manual Sort Content */
+    .manual-sort-content{
+      max-height:0;
+      overflow:hidden;
+      transition:max-height 0.4s ease-out;
+    }
+    .manual-sort-content.open{
+      max-height:2000px;
+    }
+    .manual-sort-inner{
+      padding-top:16px;
+    }
+
+    /* Auto-Sort Info */
+    .auto-sort-info{
+      font-size:13px;
+      color:#aaa;
+      line-height:1.6;
+      padding:12px 14px;
+      background:rgba(0,0,0,0.15);
+      border-radius:10px;
+    }
+    .auto-sort-info .category{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:4px 0;
+    }
+    .auto-sort-info .cat-icon{
+      font-size:16px;
+      width:24px;
+      text-align:center;
+    }
+    .auto-sort-info .cat-label{
+      color:#ccc;
+      font-weight:500;
+    }
+
     /* Loading Overlay */
     .loading{
       position:fixed;
@@ -504,7 +549,7 @@
     }
     @keyframes spin{to{transform:rotate(360deg)}}
     .loading-text{font-size:16px;color:#fff}
-    
+
     /* Pending Stations Banner */
     .pending-banner{
       background:linear-gradient(135deg,rgba(56,239,125,0.2),rgba(17,153,142,0.2));
@@ -603,7 +648,7 @@
     .pool-header{
       font-size:12px;
       color:#888;
-      margin-bottom:10px;
+      margin-bottom:8px;
       font-weight:500;
     }
     .pool-items{
@@ -614,87 +659,58 @@
     .pool-empty{
       color:#666;
       font-size:12px;
-      padding:8px;
+      font-style:italic;
     }
     .ft-direction-chip{
       display:inline-flex;
       align-items:center;
       gap:6px;
-      padding:8px 12px;
+      padding:6px 10px;
       background:rgba(255,255,255,0.08);
-      border:2px solid rgba(255,255,255,0.15);
-      border-radius:10px;
-      font-size:13px;
-      transition:all 0.15s;
-      user-select:none;
-      touch-action:manipulation;
-    }
-    .ft-direction-chip.clickable{
-      cursor:pointer;
-    }
-    .ft-direction-chip.clickable:hover,
-    .ft-direction-chip.clickable:active{
-      border-color:#ffd700;
-      background:rgba(255,215,0,0.1);
-    }
-    .ft-direction-chip.selected{
-      border-color:#ffd700;
-      background:#ffd700;
-      color:#1a1a2e;
-    }
-    .ft-direction-chip.selected .dir-dest{
-      color:#1a1a2e;
+      border:1px solid rgba(255,255,255,0.15);
+      border-radius:8px;
+      font-size:12px;
+      cursor:default;
     }
     .ft-direction-chip .line-badge{
-      padding:3px 8px;
-      border-radius:5px;
+      padding:2px 6px;
+      border-radius:4px;
       font-weight:700;
-      font-size:12px;
-      min-width:28px;
-      text-align:center;
+      font-size:11px;
       background:#ffd700;
       color:#1a1a2e;
     }
     .ft-direction-chip .dir-dest{
       color:#aaa;
-      font-size:12px;
     }
     .ft-direction-chip .chip-remove{
-      margin-left:4px;
       color:#888;
-      font-weight:bold;
       cursor:pointer;
+      font-size:14px;
+      margin-left:4px;
     }
-    .ft-direction-chip:hover .chip-remove{
+    .ft-direction-chip .chip-remove:hover{
       color:#ff6b6b;
     }
-    .ft-create-group-btn{
-      display:block;
-      width:100%;
-      padding:14px;
-      margin-top:12px;
-      background:rgba(255,215,0,0.08);
-      border:2px dashed rgba(255,215,0,0.4);
-      border-radius:10px;
-      color:#ffd700;
-      font-size:14px;
-      font-weight:600;
+    .ft-direction-chip.clickable{
       cursor:pointer;
       transition:all 0.15s;
     }
-    .ft-create-group-btn:hover,
-    .ft-create-group-btn:active{
+    .ft-direction-chip.clickable:hover{
+      border-color:rgba(255,215,0,0.5);
+      background:rgba(255,215,0,0.1);
+    }
+    .ft-direction-chip.selected{
       background:rgba(255,215,0,0.15);
+      border-color:rgba(255,215,0,0.4);
     }
     .ft-group-creating{
-      border:2px solid #ffd700;
-      background:rgba(255,215,0,0.05);
+      border-color:rgba(255,215,0,0.4);
     }
     .ft-group-creating .ft-group-header{
-      background:#ffd700;
-      color:#1a1a2e;
+      background:rgba(255,215,0,0.2);
     }
-    .ft-group-creating .hint{
+    .hint{
       color:#888;
       font-size:12px;
       font-style:italic;
@@ -730,6 +746,21 @@
       background:rgba(255,255,255,0.1);
       color:#666;
       cursor:not-allowed;
+    }
+    .ft-create-group-btn{
+      width:100%;
+      padding:10px;
+      background:rgba(255,215,0,0.1);
+      border:1px dashed rgba(255,215,0,0.4);
+      border-radius:8px;
+      color:#ffd700;
+      font-size:13px;
+      cursor:pointer;
+      transition:all 0.15s;
+      margin-bottom:12px;
+    }
+    .ft-create-group-btn:hover{
+      background:rgba(255,215,0,0.2);
     }
 
     /* Info-Button */
@@ -805,32 +836,51 @@
 <div class="container">
   <img src="straba.png" alt="Straba" class="logo">
   <p class="subtitle">Erweiterte Features</p>
-  
+
   <!-- ==================== INTRO ==================== -->
   <div class="intro-box">
-    Nun kannst du dein Straba ganz nach deinen Wünschen einstellen.<br>
-    <a href="localmainpage.html" class="back-link">← Zurück zu Linien einstellen</a>
+    Nun kannst du dein Straba ganz nach deinen Wuenschen einstellen.<br>
+    <a href="localmainpage.html" class="back-link">&larr; Zurueck zu Linien einstellen</a>
   </div>
-  
-  <!-- Banner für neue Stationen -->
+
+  <!-- Banner fuer neue Stationen -->
   <div class="pending-banner" id="pendingBanner" style="display:none;">
-    <div class="pending-title">✓ Neue Stationen bereit</div>
-    <div class="pending-text" id="pendingText">Deine ausgewählten Stationen werden beim Speichern übernommen.</div>
+    <div class="pending-title">&#10003; Neue Stationen bereit</div>
+    <div class="pending-text" id="pendingText">Deine ausgewaehlten Stationen werden beim Speichern uebernommen.</div>
   </div>
-  
-  <!-- ==================== VORSCHAU ==================== -->
-  <div class="card">
-    <h2>📺 Vorschau <span style="font-weight:400;font-size:12px;color:#888;text-transform:none;letter-spacing:0">– Beispiel Linien</span></h2>
-    <div class="preview-box" id="preview">
-      <!-- Wird dynamisch generiert -->
+
+  <!-- ==================== 1. BARRIEREFREIHEIT (Wien) ==================== -->
+  <div class="card" id="cardBarrierefreiheit">
+    <h2>Features <span id="wienOnlyBadge1" class="wien-only-badge" style="display:none;">Wien</span></h2>
+
+    <div class="control-row" id="rowChopper">
+      <div class="control-label">
+        <span>Hochflurer markieren</span>
+        <small>Zeigt nicht barrierefreie Fahrzeuge in hellblau</small>
+      </div>
+      <div class="segmented" data-name="chopper">
+        <div class="seg-btn active" data-value="0">Aus</div>
+        <div class="seg-btn" data-value="1">An</div>
+      </div>
+    </div>
+
+    <div class="control-row" id="rowSilberpfeil">
+      <div class="control-label">
+        <span>U-Bahnen mit Klimaanlage</span>
+        <small>Markiert klimatisierte U-Bahn-Zuege</small>
+      </div>
+      <div class="segmented" data-name="silberpfeil">
+        <div class="seg-btn active" data-value="0">Aus</div>
+        <div class="seg-btn" data-value="1">An</div>
+      </div>
     </div>
   </div>
-  
-  <!-- ==================== ANZEIGE ==================== -->
+
+  <!-- ==================== 2. ZEILEN ==================== -->
   <div class="card">
-    <h2>📊 Anzeige</h2>
-    
-    <div class="control-row">
+    <h2>Zeilen</h2>
+
+    <div class="control-row" style="border-bottom:none">
       <div class="control-label"><span>Anzahl Zeilen</span></div>
       <div class="segmented wide" data-name="anzeige">
         <div class="seg-btn" data-value="1">1</div>
@@ -838,102 +888,69 @@
         <div class="seg-btn" data-value="3">3</div>
       </div>
     </div>
-    
+  </div>
+
+  <!-- ==================== 2. SORTIERUNG ==================== -->
+  <div class="card" id="cardSortierung">
+    <h2>Sortierung</h2>
+
     <div class="control-row">
       <div class="control-label">
-        <span>Sortierung</span>
+        <span>Sortier-Modus</span>
         <small id="sortmodeHint">Statisch = Feste Reihenfolge der Linien</small>
       </div>
       <div class="segmented" data-name="sortmode">
-        <div class="seg-btn" data-value="2">Nach Zeit</div>
         <div class="seg-btn active" data-value="1">Statisch</div>
+        <div class="seg-btn" data-value="2">Nach Zeit</div>
       </div>
     </div>
 
-    <!-- Zeilen-Reihenfolge (nur bei Statisch sichtbar) -->
-    <div class="row-order-section show" id="rowOrderSection">
-      <div class="row-order-label">Zeilen-Reihenfolge festlegen</div>
-      <div class="row-order-hint">Ziehe die Linien in die gewünschte Reihenfolge (Zeile 1 = oben)</div>
-      <div class="row-order-list" id="rowOrderList">
-        <!-- Wird dynamisch gefüllt -->
-        <div class="row-order-empty">Keine Linien konfiguriert</div>
+    <div class="control-row" id="autoManualRow">
+      <div class="control-label">
+        <span>Reihenfolge</span>
+      </div>
+      <div class="segmented" data-name="sortorder" id="sortOrderSegmented">
+        <div class="seg-btn active" data-value="auto">Automatisch</div>
+        <div class="seg-btn" data-value="manual">Manuell</div>
       </div>
     </div>
 
-    <!-- Gruppierung (nur bei Statisch sichtbar) -->
-    <div class="ft-grouping-section" id="ftGroupingSection">
-      <div class="ft-grouping-label">Richtungen gruppieren <span class="info-btn" onclick="showGroupingInfo()">?</span></div>
-      <div class="ft-grouping-hint">Gruppiere Linien die die gleiche Strecke fahren (z.B. Linie 1 und 62). Nicht gruppierte Linien werden einzeln angezeigt.</div>
+    <div class="manual-sort-content" id="manualSortContent">
+      <div class="manual-sort-inner">
 
-      <div class="ft-grouping-area">
-        <div class="ft-groups-container" id="ftGroupsContainer">
-          <!-- Gruppen werden hier gerendert -->
+        <!-- Zeilen-Reihenfolge (Drag & Drop) -->
+        <div class="row-order-section" id="rowOrderSection">
+          <div class="row-order-label">Zeilen-Reihenfolge festlegen</div>
+          <div class="row-order-hint">Ziehe die Linien in die gewuenschte Reihenfolge (Zeile 1 = oben)</div>
+          <div class="row-order-list" id="rowOrderList">
+            <div class="row-order-empty">Keine Linien konfiguriert</div>
+          </div>
         </div>
 
-        <div class="ft-directions-pool" id="ftDirectionsPool">
-          <div class="pool-header">Verfuegbare Richtungen:</div>
-          <div class="pool-items" id="ftPoolItems">
-            <!-- Richtungen werden hier gerendert -->
+        <!-- Gruppierung -->
+        <div class="ft-grouping-section" id="ftGroupingSection">
+          <div class="ft-grouping-label">Richtungen gruppieren <span class="info-btn" onclick="showGroupingInfo()">?</span></div>
+          <div class="ft-grouping-hint">Gruppiere Linien die die gleiche Strecke fahren (z.B. Linie 1 und 62). Nicht gruppierte Linien werden einzeln angezeigt.</div>
+
+          <div class="ft-grouping-area">
+            <div class="ft-groups-container" id="ftGroupsContainer">
+            </div>
+
+            <div class="ft-directions-pool" id="ftDirectionsPool">
+              <div class="pool-header">Verfuegbare Richtungen:</div>
+              <div class="pool-items" id="ftPoolItems">
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ==================== BARRIEREFREIHEIT (Wien-spezifisch) ==================== -->
-  <div class="card" id="cardBarrierefreiheit">
-    <h2>♿ Barrierefreiheit <span id="wienOnlyBadge1" class="wien-only-badge" style="display:none;">Wien</span></h2>
-
-    <div class="control-row" id="rowChopper">
-      <div class="control-label">
-        <span>Hochflurer markieren</span>
-        <small>Zeigt Warnfarbe bei nicht barrierefreien Fahrzeugen</small>
-      </div>
-      <div class="segmented" data-name="chopper">
-        <div class="seg-btn" data-value="0">Aus</div>
-        <div class="seg-btn active" data-value="1">An</div>
-      </div>
-    </div>
-
-    <div class="control-row" id="rowSilberpfeil">
-      <div class="control-label">
-        <span>U-Bahnen mit Klimaanlage</span>
-        <small>Markiert klimatisierte U-Bahn-Züge</small>
-      </div>
-      <div class="segmented" data-name="silberpfeil">
-        <div class="seg-btn" data-value="0">Aus</div>
-        <div class="seg-btn active" data-value="1">An</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== DESIGN ==================== -->
-  <div class="card" id="cardDesign">
-    <h2>🎨 Design</h2>
-
-    <div class="control-row" id="rowTextfarbe">
-      <div class="control-label"><span>Textfarbe</span></div>
-      <div class="color-row" data-name="textcolor">
-        <div class="color-dot color-amber active" data-value="1" title="Gelb/Amber"></div>
-        <div class="color-dot color-white" data-value="2" title="Weiß"></div>
-        <div class="color-dot color-orange" data-value="3" title="Orange"></div>
-      </div>
-    </div>
-
-    <div class="control-row">
-      <div class="control-label"><span>Helligkeit</span></div>
-      <div class="segmented" data-name="displaylight">
-        <div class="seg-btn" data-value="1">Dunkel</div>
-        <div class="seg-btn" data-value="2">Mittel</div>
-        <div class="seg-btn active" data-value="3">Hell</div>
-      </div>
-    </div>
-  </div>
-  
-  <!-- ==================== NACHTMODUS ==================== -->
+  <!-- ==================== 3. NACHTMODUS ==================== -->
   <div class="card">
-    <h2>🌙 Nachtmodus</h2>
-    
+    <h2>Nachtmodus</h2>
+
     <div class="control-row">
       <div class="control-label">
         <span>Nachtmodus aktivieren</span>
@@ -941,7 +958,7 @@
       </div>
       <div class="toggle" id="nightmodeToggle"></div>
     </div>
-    
+
     <div class="sub-section disabled" id="nightSettings">
       <div class="control-row">
         <div class="control-label"><span>Display aus ab</span></div>
@@ -954,30 +971,81 @@
         <span style="color:#888;margin-left:8px">Uhr</span>
       </div>
     </div>
-    
+
     <div class="hint-small">
       Im Nachtmodus schaltet sich das Display komplett ab.
     </div>
   </div>
-  
-  <!-- ==================== ERWEITERTE EINSTELLUNGEN (Eine Bubble) ==================== -->
+
+  <!-- ==================== 4. GEHWEG ==================== -->
+  <div class="card">
+    <h2>Gehweg zur Haltestelle</h2>
+
+    <div class="control-row">
+      <div class="control-label">
+        <span>Gehweg-Filter aktivieren</span>
+        <small>Blendet unerreichbare Abfahrten aus.<br>Die Gehzeit kann bis zu 15 Minuten eingestellt werden.</small>
+      </div>
+      <div class="toggle" id="gehwegToggle"></div>
+    </div>
+
+    <div class="sub-section disabled" id="gehwegSettings">
+      <h4>Gehzeit pro Haltestelle</h4>
+      <div id="gehwegList">
+        <div class="gehweg-item">
+          <div class="stop-info">
+            <div class="stop-name" style="color:#888">Lade Haltestellen...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint-small">
+      Abfahrten unter der Minutenzahl werden ausgeblendet. 0 = kein Filter.
+    </div>
+  </div>
+
+  <!-- ==================== 5. ERWEITERTE EINSTELLUNGEN ==================== -->
   <div class="expand-card">
     <div class="expand-header" id="expandHeader" onclick="toggleExpand()">
-      <h2>⚙️ Erweiterte Einstellungen</h2>
-      <span class="expand-arrow">▼</span>
+      <h2>Erweiterte Einstellungen</h2>
+      <span class="expand-arrow">&#9660;</span>
     </div>
-    
+
     <div class="expand-content" id="expandContent">
       <div class="expand-inner">
-        
+
+        <!-- DESIGN -->
+        <div class="inner-section" id="sectionDesign">
+          <h3>Design</h3>
+
+          <div class="control-row" id="rowTextfarbe">
+            <div class="control-label"><span>Textfarbe</span></div>
+            <div class="color-row" data-name="textcolor">
+              <div class="color-dot color-amber active" data-value="1" title="Gelb/Amber"></div>
+              <div class="color-dot color-white" data-value="2" title="Weiss"></div>
+              <div class="color-dot color-orange" data-value="3" title="Orange"></div>
+            </div>
+          </div>
+
+          <div class="control-row">
+            <div class="control-label"><span>Helligkeit</span></div>
+            <div class="segmented" data-name="displaylight">
+              <div class="seg-btn" data-value="1">Dunkel</div>
+              <div class="seg-btn" data-value="2">Mittel</div>
+              <div class="seg-btn active" data-value="3">Hell</div>
+            </div>
+          </div>
+        </div>
+
         <!-- ANZEIGE-MODUS -->
         <div class="inner-section">
-          <h3>🔄 Anzeige-Modus</h3>
-          
+          <h3>Anzeige-Modus</h3>
+
           <div class="feature-desc">
-            Straba nimmt alle Stationen und mischt sie auf ein geordnetes Display, sodass du auf einer Anzeige alle deine Verbindungen gleichzeitig im Blick hast. Falls du das nicht willst, wähle „Slideshow" – hier wird jede Haltestelle einzeln angezeigt.
+            Straba nimmt alle Stationen und mischt sie auf ein geordnetes Display, sodass du auf einer Anzeige alle deine Verbindungen gleichzeitig im Blick hast. Falls du das nicht willst, waehle &bdquo;Slideshow&ldquo; &ndash; hier wird jede Haltestelle einzeln angezeigt.
           </div>
-          
+
           <div class="control-row">
             <div class="control-label">
               <span>Modus</span>
@@ -993,7 +1061,7 @@
               </div>
             </div>
           </div>
-          
+
           <div class="sub-section disabled" id="slideshowSettings">
             <h4>Slideshow-Einstellungen</h4>
             <div class="control-row">
@@ -1009,65 +1077,37 @@
             </div>
           </div>
         </div>
-        
-        <!-- GEHWEG -->
-        <div class="inner-section">
-          <h3>🚶 Gehweg zur Haltestelle</h3>
-          
-          <div class="control-row">
-            <div class="control-label">
-              <span>Gehweg-Filter aktivieren</span>
-              <small>Blendet unerreichbare Abfahrten aus.<br>Die Gehzeit kann bis zu 15 Minuten eingestellt werden.</small>
-            </div>
-            <div class="toggle" id="gehwegToggle"></div>
-          </div>
-          
-          <div class="sub-section disabled" id="gehwegSettings">
-            <h4>Gehzeit pro Haltestelle</h4>
-            <div id="gehwegList">
-              <div class="gehweg-item">
-                <div class="stop-info">
-                  <div class="stop-name" style="color:#888">Lade Haltestellen...</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="hint-small">
-            Abfahrten unter der Minutenzahl werden ausgeblendet. 0 = kein Filter.
-          </div>
-        </div>
-        
+
         <!-- INFOTAINMENT -->
         <div class="inner-section">
-          <h3>💡 Infotainment</h3>
-          
+          <h3>Infotainment</h3>
+
           <div class="feature-desc">
-            Dein Straba sagt dir "Frohe Weihnachten" oder "Alles Gute zum Öffi-Jahrestag" ;)
+            Dein Straba sagt dir &bdquo;Frohe Weihnachten&ldquo; oder &bdquo;Alles Gute zum Oeffi-Jahrestag&ldquo; ;)
           </div>
-          
+
           <div class="control-row">
             <div class="control-label">
               <span>Infotainment aktivieren</span>
-              <small>Störungstexte werden immer angezeigt</small>
+              <small>Stoerungstexte werden immer angezeigt</small>
             </div>
             <div class="toggle on" id="funMessagesToggle"></div>
           </div>
         </div>
-        
+
       </div>
     </div>
   </div>
-  
+
   <!-- ==================== SPEICHERN ==================== -->
-  <button class="btn-primary" id="saveBtn">💾 Speichern & Neustarten</button>
-  
+  <button class="btn-primary" id="saveBtn">Speichern &amp; Neustarten</button>
+
 </div>
 
 <!-- ==================== VIDEO OVERLAY (Gruppierung Info) ==================== -->
 <div class="video-overlay" id="videoOverlay" onclick="closeGroupingInfo(event)">
   <div class="video-container">
-    <button class="video-close" onclick="closeGroupingInfo(event)">✕</button>
+    <button class="video-close" onclick="closeGroupingInfo(event)">&times;</button>
     <video id="infoVideo" playsinline controls>
       <source src="straba anmination.mp4" type="video/mp4">
     </video>
@@ -1077,7 +1117,7 @@
 <!-- ==================== LOADING OVERLAY (Speichern) ==================== -->
 <div class="loading" id="loading">
   <div class="spinner"></div>
-  <div class="loading-text">Speichere & starte neu...</div>
+  <div class="loading-text">Speichere &amp; starte neu...</div>
 </div>
 
 <!-- ==================== LOADING OVERLAY (Config laden) ==================== -->
@@ -1091,11 +1131,12 @@
 let pendingRbl = '';
 let pendingFilter = '';
 let currentConfig = {};
-let currentCapabilities = null;  // City Capabilities für Feature-Anzeige
+let currentCapabilities = null;
 let configLoaded = false;
-let settingsLoaded = false;  // true = Settings (sort_mode etc.) vom ESP32 erhalten
+let settingsLoaded = false;
+let manualSortEnabled = false;
 
-// City Capabilities (kopiert aus cities.html für Konsistenz)
+// City Capabilities
 const CITY_CAPABILITIES = {
   WL: {
     textColorChangeable: true,
@@ -1155,18 +1196,17 @@ const CITY_CAPABILITIES = {
 
 // ==================== GRUPPIERUNG INFO VIDEO ====================
 function showGroupingInfo() {
-  const overlay = document.getElementById('videoOverlay');
-  const video = document.getElementById('infoVideo');
+  var overlay = document.getElementById('videoOverlay');
+  var video = document.getElementById('infoVideo');
   overlay.classList.add('show');
   video.currentTime = 0;
   video.play();
 }
 
 function closeGroupingInfo(e) {
-  // Nur schließen wenn auf Overlay-Hintergrund oder Close-Button geklickt
   if (e.target.classList.contains('video-overlay') || e.target.classList.contains('video-close')) {
-    const overlay = document.getElementById('videoOverlay');
-    const video = document.getElementById('infoVideo');
+    var overlay = document.getElementById('videoOverlay');
+    var video = document.getElementById('infoVideo');
     video.pause();
     overlay.classList.remove('show');
   }
@@ -1174,200 +1214,205 @@ function closeGroupingInfo(e) {
 
 // ==================== EXPAND TOGGLE ====================
 function toggleExpand() {
-  const header = document.getElementById('expandHeader');
-  const content = document.getElementById('expandContent');
+  var header = document.getElementById('expandHeader');
+  var content = document.getElementById('expandContent');
   header.classList.toggle('open');
   content.classList.toggle('open');
 }
 
+// ==================== MANUAL SORT TOGGLE ====================
+function updateManualSortState() {
+  var val = getSegmentValue('sortorder');
+  var content = document.getElementById('manualSortContent');
+  manualSortEnabled = (val === 'manual');
+
+  if (manualSortEnabled) {
+    content.classList.add('open');
+  } else {
+    content.classList.remove('open');
+    autoSortRowOrderItems();
+  }
+  updateUI();
+}
+
+// ==================== AUTO-SORT LOGIK ====================
+function getLineCategory(lineName) {
+  if (!lineName) return { cat: 99, num: 0 };
+  var name = lineName.trim().toUpperCase();
+
+  // U-Bahn: U1, U2, U3, U4, U5, U6
+  if (name.match(/^U\d/)) {
+    return { cat: 1, num: parseInt(name.substring(1)) || 0 };
+  }
+
+  // Nachtbus: N25, N29, N38 etc.
+  if (name.match(/^N\d/)) {
+    return { cat: 4, num: parseInt(name.substring(1)) || 0 };
+  }
+
+  // Strassenbahn: reine Zahlen (1, 2, 5, 6, 18, 25, 31...) oder D, O
+  if (name.match(/^\d+$/)) {
+    return { cat: 2, num: parseInt(name) || 0 };
+  }
+  if (name === 'D' || name === 'O') {
+    return { cat: 2, num: 900 + name.charCodeAt(0) };
+  }
+
+  // Bus: Zahl + Buchstabe (1A, 2A, 13A, 39A, 48A, 57A, 66A, 74A)
+  var busMatch = name.match(/^(\d+)([A-Z])$/);
+  if (busMatch) {
+    return { cat: 3, num: parseInt(busMatch[1]) || 0 };
+  }
+
+  // Sonstiges
+  return { cat: 5, num: 0 };
+}
+
+function autoSortRowOrderItems() {
+  if (rowOrderItems.length === 0) return;
+
+  rowOrderItems.sort(function(a, b) {
+    var catA = getLineCategory(a.line);
+    var catB = getLineCategory(b.line);
+    if (catA.cat !== catB.cat) return catA.cat - catB.cat;
+    if (catA.num !== catB.num) return catA.num - catB.num;
+    return (a.line || '').localeCompare(b.line || '');
+  });
+
+  console.log('Auto-sort angewendet:', rowOrderItems.map(function(i) { return i.line; }));
+}
+
 // ==================== SEGMENTED CONTROLS ====================
-document.querySelectorAll('.segmented').forEach(seg => {
-  seg.querySelectorAll('.seg-btn, .seg-btn-with-label').forEach(btn => {
-    btn.addEventListener('click', () => {
-      seg.querySelectorAll('.seg-btn, .seg-btn-with-label').forEach(b => b.classList.remove('active'));
+document.querySelectorAll('.segmented').forEach(function(seg) {
+  seg.querySelectorAll('.seg-btn, .seg-btn-with-label').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      seg.querySelectorAll('.seg-btn, .seg-btn-with-label').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
-      updateUI();
+      // Spezialbehandlung fuer sortorder Toggle
+      if (seg.dataset.name === 'sortorder') {
+        updateManualSortState();
+      } else {
+        updateUI();
+      }
     });
   });
 });
 
 // ==================== COLOR DOTS ====================
-document.querySelectorAll('.color-row').forEach(row => {
-  row.querySelectorAll('.color-dot').forEach(dot => {
-    dot.addEventListener('click', () => {
-      row.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+document.querySelectorAll('.color-row').forEach(function(row) {
+  row.querySelectorAll('.color-dot').forEach(function(dot) {
+    dot.addEventListener('click', function() {
+      row.querySelectorAll('.color-dot').forEach(function(d) { d.classList.remove('active'); });
       dot.classList.add('active');
-      updatePreview();
     });
   });
 });
 
 // ==================== TOGGLES ====================
-document.querySelectorAll('.toggle').forEach(toggle => {
-  toggle.addEventListener('click', () => {
+document.querySelectorAll('.toggle').forEach(function(toggle) {
+  toggle.addEventListener('click', function() {
     toggle.classList.toggle('on');
     updateUI();
   });
 });
 
 // ==================== GEHWEG LISTE ====================
-let currentStopIds = [];
-let currentStationDetails = [];
+var currentStopIds = [];
+var currentStationDetails = [];
 
 function updateGehwegList(stopIds, gehwegValues, stationDetails) {
-  const container = document.getElementById('gehwegList');
+  var container = document.getElementById('gehwegList');
   currentStopIds = stopIds || [];
-  
-  // Details übernehmen wenn neue übergeben wurden
+
   if (stationDetails && stationDetails.length > 0) {
     currentStationDetails = stationDetails;
-    console.log('Neue Details übernommen:', currentStationDetails);
-  }
-  // Falls KEINE neuen Details und KEINE bestehenden Details, aus localStorage laden
-  else if (currentStationDetails.length === 0) {
-    const pendingDetails = localStorage.getItem('straba_pending_details');
+  } else if (currentStationDetails.length === 0) {
+    var pendingDetails = localStorage.getItem('straba_pending_details');
     if (pendingDetails) {
-      try {
-        currentStationDetails = JSON.parse(pendingDetails);
-        console.log('Details aus localStorage geladen:', currentStationDetails);
-      } catch (e) {
-        console.error('Fehler beim Parsen der Station Details:', e);
-      }
+      try { currentStationDetails = JSON.parse(pendingDetails); } catch (e) {}
     }
   }
-  // Ansonsten: Behalte bestehende currentStationDetails (nicht überschreiben!)
-  
-  console.log('updateGehwegList - stopIds:', currentStopIds);
-  console.log('updateGehwegList - details:', currentStationDetails);
-  
+
   if (currentStopIds.length === 0 && currentStationDetails.length === 0) {
-    container.innerHTML = `
-      <div class="gehweg-item">
-        <div class="stop-info">
-          <div class="stop-name" style="color:#888">Keine Haltestellen konfiguriert</div>
-          <div class="stop-id" style="color:#666">Bitte zuerst Linien einstellen</div>
-        </div>
-      </div>
-    `;
+    container.innerHTML = '<div class="gehweg-item"><div class="stop-info"><div class="stop-name" style="color:#888">Keine Haltestellen konfiguriert</div><div class="stop-id" style="color:#666">Bitte zuerst Linien einstellen</div></div></div>';
     return;
   }
-  
-  const values = gehwegValues || [];
-  
-  // Wenn wir Details haben, zeige diese an
+
+  var values = gehwegValues || [];
+
   if (currentStationDetails.length > 0) {
-    container.innerHTML = currentStationDetails.map((station, i) => {
-      const val = values[i] !== undefined ? values[i] : 0;
-      
-      // Linien-Anzeige erstellen
-      let linesDisplay = '';
+    container.innerHTML = currentStationDetails.map(function(station, i) {
+      var val = values[i] !== undefined ? values[i] : 0;
+      var linesDisplay = '';
       if (station.lines && station.lines.length > 0) {
-        linesDisplay = station.lines.map(l => 
-          `<span class="line-badge-small">${l.name}</span> → ${l.direction}`
-        ).join('<br>');
+        linesDisplay = station.lines.map(function(l) {
+          return '<span class="line-badge-small">' + l.name + '</span> &rarr; ' + l.direction;
+        }).join('<br>');
       }
-      
-      // Station-Name (mit Fallback)
-      const stationName = station.name || station.stationName || `Haltestelle ${i + 1}`;
-      
-      return `
-        <div class="gehweg-item">
-          <div class="stop-info">
-            <div class="stop-name">${stationName}</div>
-            ${linesDisplay ? `<div class="stop-lines">${linesDisplay}</div>` : `<div class="stop-id">RBL ${station.id || currentStopIds[i] || '?'}</div>`}
-          </div>
-          <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" data-stop-id="${station.id || currentStopIds[i] || ''}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
-          <span class="unit">Min</span>
-        </div>
-      `;
+      var stationName = station.name || station.stationName || 'Haltestelle ' + (i + 1);
+      return '<div class="gehweg-item"><div class="stop-info"><div class="stop-name">' + stationName + '</div>' +
+        (linesDisplay ? '<div class="stop-lines">' + linesDisplay + '</div>' : '<div class="stop-id">RBL ' + (station.id || currentStopIds[i] || '?') + '</div>') +
+        '</div><input type="number" min="0" max="15" step="1" value="' + val + '" data-index="' + i + '" data-stop-id="' + (station.id || currentStopIds[i] || '') + '" onchange="validateGehweg(this)" oninput="validateGehweg(this)"><span class="unit">Min</span></div>';
     }).join('');
   } else {
-    // Fallback: Nur Stop-IDs anzeigen
-    container.innerHTML = currentStopIds.map((id, i) => {
-      const val = values[i] !== undefined ? values[i] : 0;
-      return `
-        <div class="gehweg-item">
-          <div class="stop-info">
-            <div class="stop-name">Haltestelle ${i + 1}</div>
-            <div class="stop-id">RBL ${id}</div>
-          </div>
-          <input type="number" min="0" max="15" step="1" value="${val}" data-index="${i}" data-stop-id="${id}" onchange="validateGehweg(this)" oninput="validateGehweg(this)">
-          <span class="unit">Min</span>
-        </div>
-      `;
+    container.innerHTML = currentStopIds.map(function(id, i) {
+      var val = values[i] !== undefined ? values[i] : 0;
+      return '<div class="gehweg-item"><div class="stop-info"><div class="stop-name">Haltestelle ' + (i + 1) + '</div><div class="stop-id">RBL ' + id + '</div></div><input type="number" min="0" max="15" step="1" value="' + val + '" data-index="' + i + '" data-stop-id="' + id + '" onchange="validateGehweg(this)" oninput="validateGehweg(this)"><span class="unit">Min</span></div>';
     }).join('');
   }
 }
 
 function getCurrentGehwegValues() {
-  const inputs = document.querySelectorAll('#gehwegList input[type="number"]');
-  return Array.from(inputs).map(inp => parseInt(inp.value) || 0);
+  var inputs = document.querySelectorAll('#gehwegList input[type="number"]');
+  return Array.from(inputs).map(function(inp) { return parseInt(inp.value) || 0; });
 }
 
 function validateGehweg(input) {
-  let val = parseFloat(input.value);
-  
-  // Keine Kommazahlen - nur ganze Zahlen
-  if (!Number.isInteger(val)) {
-    val = Math.floor(val);
-  }
-  
-  // Begrenzen auf 0-15
+  var val = parseFloat(input.value);
+  if (!Number.isInteger(val)) val = Math.floor(val);
   if (val < 0) val = 0;
   if (val > 15) val = 15;
-  
-  // Wert setzen
   input.value = val;
 }
 
 function getGehwegString() {
-  // Neues Format: "stopId:gehzeit|stopId:gehzeit"
-  // z.B. "5903:5|5939:0" statt "5|0"
-  const inputs = document.querySelectorAll('#gehwegList input[type="number"]');
+  var inputs = document.querySelectorAll('#gehwegList input[type="number"]');
   if (inputs.length === 0) return '0';
-
-  const entries = [];
-  inputs.forEach(inp => {
-    const stopId = inp.dataset.stopId;
-    const value = parseInt(inp.value) || 0;
-    if (stopId) {
-      entries.push(`${stopId}:${value}`);
-    }
+  var entries = [];
+  inputs.forEach(function(inp) {
+    var stopId = inp.dataset.stopId;
+    var value = parseInt(inp.value) || 0;
+    if (stopId) entries.push(stopId + ':' + value);
   });
-
   if (entries.length === 0) return '0';
   return entries.join('|');
 }
 
 // ==================== ZEILEN-REIHENFOLGE (DRAG & DROP) ====================
-let rowOrderItems = [];  // Array mit {stopId, line, direction} Objekten
-let draggedRowItem = null;
-let draggedRowIndex = -1;
+var rowOrderItems = [];
+var draggedRowItem = null;
+var draggedRowIndex = -1;
 
 function updateRowOrderList() {
-  const container = document.getElementById('rowOrderList');
-  const section = document.getElementById('rowOrderSection');
-  const sortMode = getSegmentValue('sortmode');
+  var container = document.getElementById('rowOrderList');
+  var section = document.getElementById('rowOrderSection');
+  var sortMode = getSegmentValue('sortmode');
 
-  // Nur bei statischer Sortierung anzeigen (sortMode 1 = Statisch)
-  if (sortMode !== '1') {
+  // Nur bei statischer Sortierung UND manueller Sortierung anzeigen
+  if (sortMode !== '1' || !manualSortEnabled) {
     section.classList.remove('show');
     return;
   }
   section.classList.add('show');
 
-  // Wenn rowOrderItems bereits von applyConfig geladen wurden, nur rendern
-  // (erkennbar daran, dass rowOrderItems existiert und itemsKey leer ist)
   if (rowOrderItems.length > 0 && container.dataset.itemsKey === '') {
-    console.log('updateRowOrderList: Verwende bereits geladene rowOrderItems von applyConfig');
     container.dataset.itemsKey = 'loaded-from-config';
     renderRowOrderList();
     return;
   }
 
-  // Erstelle Items aus den Pending/Current Daten
-  const rblString = pendingRbl || currentConfig.rbl_id || '';
-  const filterString = pendingFilter || currentConfig.lines_filter || '';
+  var rblString = pendingRbl || currentConfig.rbl_id || '';
+  var filterString = pendingFilter || currentConfig.lines_filter || '';
 
   if (!rblString || !filterString) {
     container.innerHTML = '<div class="row-order-empty">Keine Linien konfiguriert</div>';
@@ -1375,37 +1420,26 @@ function updateRowOrderList() {
     return;
   }
 
-  // Immer neu aufbauen wenn Daten vorhanden - der Cache führte zu Duplikaten
-  // wenn sich die Details aber nicht die IDs geändert haben
-  const newItemsKey = `${rblString}|${filterString}|${currentStationDetails.length}`;
+  var newItemsKey = rblString + '|' + filterString + '|' + currentStationDetails.length;
   if (container.dataset.itemsKey !== newItemsKey || rowOrderItems.length === 0) {
-    // Items aus RBL und Filter erstellen
-    const stopIds = rblString.split(',').map(s => s.trim());
-    const filters = filterString.split('|').map(s => s.trim());
+    var stopIds = rblString.split(',').map(function(s) { return s.trim(); });
+    var filters = filterString.split('|').map(function(s) { return s.trim(); });
 
-    // Sammle alle Linien mit ihren Stop-IDs und Directions
-    // Key ist "stopId|linie|richtung" — gleiche Linie von verschiedenen Stops = separate Zeilen
-    // (z.B. 39A von Stop 1192 und 39A von Stop 1374 = 2 Einträge)
-    const lineEntries = [];
-
-    stopIds.forEach((stopId, i) => {
-      const linesForStop = filters[i] ? filters[i].split(',').map(l => l.trim()) : [];
-      linesForStop.forEach(line => {
+    var lineEntries = [];
+    stopIds.forEach(function(stopId, i) {
+      var linesForStop = filters[i] ? filters[i].split(',').map(function(l) { return l.trim(); }) : [];
+      linesForStop.forEach(function(line) {
         if (line) {
-          // Direction und Station aus currentStationDetails holen
-          let direction = '';
-          let stationName = '';
+          var direction = '';
+          var stationName = '';
           if (currentStationDetails && currentStationDetails[i]) {
-            const station = currentStationDetails[i];
+            var station = currentStationDetails[i];
             stationName = station.name || station.stationName || '';
             if (station.lines) {
-              const lineInfo = station.lines.find(l => l.name === line);
-              if (lineInfo && lineInfo.direction) {
-                direction = lineInfo.direction;
-              }
+              var lineInfo = station.lines.find(function(l) { return l.name === line; });
+              if (lineInfo && lineInfo.direction) direction = lineInfo.direction;
             }
           }
-
           lineEntries.push({
             line: line,
             direction: direction,
@@ -1417,53 +1451,40 @@ function updateRowOrderList() {
       });
     });
 
-    // Debug: Zeige lineEntries
-    console.log('lineEntries (pro Stop+Linie):', lineEntries);
-
-    // Erstelle rowOrderItems - EINE Zeile pro Stop+Linie!
     rowOrderItems = lineEntries;
-
     container.dataset.itemsKey = newItemsKey;
-    console.log('rowOrderItems erstellt (finale Liste):', rowOrderItems);
   }
 
   renderRowOrderList();
 }
 
 function renderRowOrderList() {
-  const container = document.getElementById('rowOrderList');
-
+  var container = document.getElementById('rowOrderList');
   if (rowOrderItems.length === 0) {
     container.innerHTML = '<div class="row-order-empty">Keine Linien konfiguriert</div>';
     return;
   }
 
-  container.innerHTML = rowOrderItems.map((item, idx) => {
-    const isFirst = idx === 0;
-    const isLast = idx === rowOrderItems.length - 1;
-    const dirText = item.direction || '';
-    const stationText = item.stationName || '';
+  container.innerHTML = rowOrderItems.map(function(item, idx) {
+    var isFirst = idx === 0;
+    var isLast = idx === rowOrderItems.length - 1;
+    var dirText = item.direction || '';
+    var stationText = item.stationName || '';
 
-    return `
-      <div class="row-order-item" draggable="true" data-index="${idx}">
-        <span class="drag-handle">☰</span>
-        <span class="row-number">${idx + 1}</span>
-        <span class="line-badge">${item.line}</span>
-        <span class="direction-info">
-          <span class="direction-text">${dirText}</span>
-          ${stationText ? `<span class="station-text">${stationText}</span>` : ''}
-        </span>
-        <span class="move-buttons">
-          <button class="move-btn" onclick="moveRowOrderItem(${idx}, -1)" ${isFirst ? 'disabled' : ''}>▲</button>
-          <button class="move-btn" onclick="moveRowOrderItem(${idx}, 1)" ${isLast ? 'disabled' : ''}>▼</button>
-        </span>
-      </div>
-    `;
+    return '<div class="row-order-item" draggable="true" data-index="' + idx + '">' +
+      '<span class="drag-handle">&#9776;</span>' +
+      '<span class="row-number">' + (idx + 1) + '</span>' +
+      '<span class="line-badge">' + item.line + '</span>' +
+      '<span class="direction-info"><span class="direction-text">' + dirText + '</span>' +
+      (stationText ? '<span class="station-text">' + stationText + '</span>' : '') +
+      '</span><span class="move-buttons">' +
+      '<button class="move-btn" onclick="moveRowOrderItem(' + idx + ', -1)" ' + (isFirst ? 'disabled' : '') + '>&#9650;</button>' +
+      '<button class="move-btn" onclick="moveRowOrderItem(' + idx + ', 1)" ' + (isLast ? 'disabled' : '') + '>&#9660;</button>' +
+      '</span></div>';
   }).join('');
 
-  // Drag & Drop Events hinzufügen
-  const items = container.querySelectorAll('.row-order-item');
-  items.forEach(item => {
+  var items = container.querySelectorAll('.row-order-item');
+  items.forEach(function(item) {
     item.addEventListener('dragstart', handleRowDragStart);
     item.addEventListener('dragend', handleRowDragEnd);
     item.addEventListener('dragover', handleRowDragOver);
@@ -1481,11 +1502,9 @@ function handleRowDragStart(e) {
   e.dataTransfer.setData('text/plain', draggedRowIndex);
 }
 
-function handleRowDragEnd(e) {
+function handleRowDragEnd() {
   this.classList.remove('dragging');
-  document.querySelectorAll('.row-order-item').forEach(item => {
-    item.classList.remove('drag-over');
-  });
+  document.querySelectorAll('.row-order-item').forEach(function(item) { item.classList.remove('drag-over'); });
   draggedRowItem = null;
   draggedRowIndex = -1;
 }
@@ -1497,129 +1516,89 @@ function handleRowDragOver(e) {
 
 function handleRowDragEnter(e) {
   e.preventDefault();
-  if (this !== draggedRowItem) {
-    this.classList.add('drag-over');
-  }
+  if (this !== draggedRowItem) this.classList.add('drag-over');
 }
 
-function handleRowDragLeave(e) {
+function handleRowDragLeave() {
   this.classList.remove('drag-over');
 }
 
 function handleRowDrop(e) {
   e.preventDefault();
   e.stopPropagation();
-
-  const targetIndex = parseInt(this.dataset.index);
-
+  var targetIndex = parseInt(this.dataset.index);
   if (draggedRowIndex !== -1 && draggedRowIndex !== targetIndex) {
-    // Item verschieben
-    const movedItem = rowOrderItems.splice(draggedRowIndex, 1)[0];
+    var movedItem = rowOrderItems.splice(draggedRowIndex, 1)[0];
     rowOrderItems.splice(targetIndex, 0, movedItem);
-
-    // Liste neu rendern
     renderRowOrderList();
   }
-
   this.classList.remove('drag-over');
 }
 
-// Mobile-freundliche Alternative zu Drag & Drop
 function moveRowOrderItem(index, direction) {
-  const newIndex = index + direction;
-
-  // Prüfe Grenzen
+  var newIndex = index + direction;
   if (newIndex < 0 || newIndex >= rowOrderItems.length) return;
-
-  // Tausche Elemente
-  const temp = rowOrderItems[index];
+  var temp = rowOrderItems[index];
   rowOrderItems[index] = rowOrderItems[newIndex];
   rowOrderItems[newIndex] = temp;
-
-  // Neu rendern
   renderRowOrderList();
 }
 
-// Generiere rowOrder String aus der aktuellen Reihenfolge
-// Format: stopId:line für jede Stop-ID (in der Reihenfolge der Linien)
 function getRowOrderString() {
   if (rowOrderItems.length === 0) return '';
-
-  // Für jede Linie+Richtung alle ihre Stop-IDs ausgeben
-  const parts = [];
-  rowOrderItems.forEach(item => {
+  var parts = [];
+  rowOrderItems.forEach(function(item) {
     if (item.stopIds && item.stopIds.length > 0) {
-      item.stopIds.forEach(stopId => {
-        parts.push(`${stopId}:${item.line}`);
-      });
+      item.stopIds.forEach(function(stopId) { parts.push(stopId + ':' + item.line); });
     } else if (item.stopId) {
-      parts.push(`${item.stopId}:${item.line}`);
+      parts.push(item.stopId + ':' + item.line);
     }
   });
   return parts.join(',');
 }
 
 // ==================== GRUPPIERUNG ====================
-let ftLineGroups = [];        // Array of groups: [{ directions: ['stopId:Linie', ...] }, ...]
-let ftAllDirections = [];     // Alle verfügbaren Richtungen [{key, line, direction, stopIds}, ...]
-let ftGroupingMode = false;   // true wenn gerade eine Gruppe erstellt wird
-let ftSelectedForGroup = [];  // Ausgewählte Richtungen für neue Gruppe
-let ftEventsAttached = false; // Flag ob Events schon angehängt wurden
+var ftLineGroups = [];
+var ftAllDirections = [];
+var ftGroupingMode = false;
+var ftSelectedForGroup = [];
+var ftEventsAttached = false;
 
-// Initialisiert die Gruppierung aus rowOrderItems und bestehender Config
 function initFtGrouping() {
   ftLineGroups = [];
   ftAllDirections = [];
   ftGroupingMode = false;
   ftSelectedForGroup = [];
 
-  // Richtungen aus rowOrderItems extrahieren
-  // Jedes rowOrderItem hat: { line, direction, stopIds }
   loadFtDirectionsFromRowOrder();
 
-  console.log('[initFtGrouping] ftAllDirections:', ftAllDirections.map(d => d.key));
-
-  // Bestehende Gruppierung laden (aus linegroups in Config)
-  const savedLineGroups = currentConfig.linegroups || '';
+  var savedLineGroups = currentConfig.linegroups || '';
   if (savedLineGroups && savedLineGroups.includes('+')) {
-    // Nur parsen wenn echte Gruppen vorhanden (enthält +)
-    console.log('[initFtGrouping] Lade aus linegroups:', savedLineGroups);
     parseFtExistingGroups(savedLineGroups);
   }
 
-  console.log('[initFtGrouping] Nach Parsing - ftLineGroups:', ftLineGroups.map(g => g.directions));
-
-  // Prüfe ob alle Richtungen in ftLineGroups sind, fehlende als 1er-Gruppen hinzufügen
-  const usedKeys = new Set();
-  ftLineGroups.forEach(group => {
-    (group.directions || []).forEach(key => usedKeys.add(key));
+  var usedKeys = new Set();
+  ftLineGroups.forEach(function(group) {
+    (group.directions || []).forEach(function(key) { usedKeys.add(key); });
   });
 
-  const missingDirections = ftAllDirections.filter(d => !usedKeys.has(d.key));
-  if (missingDirections.length > 0) {
-    console.log('[initFtGrouping] Fehlende Richtungen:', missingDirections.map(d => d.key));
-    missingDirections.forEach(dir => {
-      ftLineGroups.push({ directions: [dir.key] });
-    });
-  }
+  var missingDirections = ftAllDirections.filter(function(d) { return !usedKeys.has(d.key); });
+  missingDirections.forEach(function(dir) {
+    ftLineGroups.push({ directions: [dir.key] });
+  });
 
-  // Ungültige Keys entfernen
-  const validKeys = new Set(ftAllDirections.map(d => d.key));
-  ftLineGroups = ftLineGroups.map(group => {
-    const validDirections = (group.directions || []).filter(key => validKeys.has(key));
+  var validKeys = new Set(ftAllDirections.map(function(d) { return d.key; }));
+  ftLineGroups = ftLineGroups.map(function(group) {
+    var validDirections = (group.directions || []).filter(function(key) { return validKeys.has(key); });
     return { directions: validDirections };
-  }).filter(group => group.directions.length > 0);
+  }).filter(function(group) { return group.directions.length > 0; });
 
-  console.log('[initFtGrouping] Finale Gruppen:', ftLineGroups.map(g => g.directions));
-
-  // Wenn keine Gruppen, erstelle für jede Richtung eine 1er-Gruppe
   if (ftLineGroups.length === 0 && ftAllDirections.length > 0) {
-    ftAllDirections.forEach(dir => {
+    ftAllDirections.forEach(function(dir) {
       ftLineGroups.push({ directions: [dir.key] });
     });
   }
 
-  // Event-Listener anhaengen (nur einmal)
   if (!ftEventsAttached) {
     setupFtGroupingEvents();
     ftEventsAttached = true;
@@ -1628,21 +1607,15 @@ function initFtGrouping() {
   renderFtGroupingUI();
 }
 
-// Extrahiert Richtungen aus rowOrderItems
-// Wien-Format: Key = "stopId:Linie" (da mehrere stopIds gleiche Linie+Richtung haben können)
 function loadFtDirectionsFromRowOrder() {
   ftAllDirections = [];
-
   if (!rowOrderItems || rowOrderItems.length === 0) return;
 
-  rowOrderItems.forEach(item => {
-    // Key für Gruppierung: Erste stopId:Linie (eindeutig pro Richtung)
-    const firstStopId = (item.stopIds && item.stopIds.length > 0) ? item.stopIds[0] : '';
+  rowOrderItems.forEach(function(item) {
+    var firstStopId = (item.stopIds && item.stopIds.length > 0) ? item.stopIds[0] : '';
     if (!firstStopId || !item.line) return;
-
-    const key = `${firstStopId}:${item.line}`;
-
-    if (!ftAllDirections.some(d => d.key === key)) {
+    var key = firstStopId + ':' + item.line;
+    if (!ftAllDirections.some(function(d) { return d.key === key; })) {
       ftAllDirections.push({
         key: key,
         line: item.line,
@@ -1653,46 +1626,35 @@ function loadFtDirectionsFromRowOrder() {
     }
   });
 
-  // Nach Linie sortieren
-  ftAllDirections.sort((a, b) => {
-    const aNum = parseInt(a.line) || 999;
-    const bNum = parseInt(b.line) || 999;
+  ftAllDirections.sort(function(a, b) {
+    var aNum = parseInt(a.line) || 999;
+    var bNum = parseInt(b.line) || 999;
     if (aNum !== bNum) return aNum - bNum;
     return a.line.localeCompare(b.line);
   });
 }
 
-// Parse bestehende lineGroups: "272:2+1386:46,4630:U6"
-// Format Wien: stopId:Linie+stopId:Linie,stopId:Linie,...
 function parseFtExistingGroups(lineGroupsStr) {
   if (!lineGroupsStr) return;
-
   ftLineGroups = [];
-  const usedKeys = new Set();
+  var usedKeys = new Set();
+  var groups = lineGroupsStr.split(',');
 
-  const groups = lineGroupsStr.split(',');
+  groups.forEach(function(groupStr) {
+    var rawDirections = groupStr.split('+').map(function(d) { return d.trim(); }).filter(function(d) { return d; });
+    var mappedDirections = [];
 
-  groups.forEach(groupStr => {
-    const rawDirections = groupStr.split('+').map(d => d.trim()).filter(d => d);
-    const mappedDirections = [];
-
-    rawDirections.forEach(rawKey => {
-      // Exakter Match
-      let match = ftAllDirections.find(d => d.key === rawKey);
+    rawDirections.forEach(function(rawKey) {
+      var match = ftAllDirections.find(function(d) { return d.key === rawKey; });
       if (match && !usedKeys.has(match.key)) {
         mappedDirections.push(match.key);
         usedKeys.add(match.key);
         return;
       }
-
-      // Parse stopId:Linie
-      const colonIdx = rawKey.indexOf(':');
+      var colonIdx = rawKey.indexOf(':');
       if (colonIdx > 0) {
-        const stopId = rawKey.substring(0, colonIdx);
-        const line = rawKey.substring(colonIdx + 1);
-
-        // Match per Linie (wenn stopId sich geändert hat)
-        match = ftAllDirections.find(d => d.line === line && !usedKeys.has(d.key));
+        var line = rawKey.substring(colonIdx + 1);
+        match = ftAllDirections.find(function(d) { return d.line === line && !usedKeys.has(d.key); });
         if (match) {
           mappedDirections.push(match.key);
           usedKeys.add(match.key);
@@ -1712,80 +1674,50 @@ function renderFtGroupingUI() {
 }
 
 function renderFtGroups() {
-  const container = document.getElementById('ftGroupsContainer');
+  var container = document.getElementById('ftGroupsContainer');
   if (!container) return;
 
-  let html = '';
-  let groupNumber = 1;
+  var html = '';
+  var groupNumber = 1;
 
-  ftLineGroups.forEach((group, gIdx) => {
-    const directions = group.directions || [];
-
-    // Nur echte Gruppen (2+ Richtungen) als "Gruppen" darstellen
+  ftLineGroups.forEach(function(group, gIdx) {
+    var directions = group.directions || [];
     if (directions.length >= 2) {
-      const directionsHtml = directions.map((key, dIdx) => {
-        const dirInfo = ftAllDirections.find(d => d.key === key);
-        const lineName = dirInfo ? dirInfo.line : key.split(':').pop();
-        const direction = dirInfo ? dirInfo.direction : '';
-
-        return `
-          <div class="ft-direction-chip" data-group-idx="${gIdx}" data-dir-idx="${dIdx}" data-action="remove-from-group">
-            <span class="line-badge">${lineName}</span>
-            ${direction ? `<span class="dir-dest">${direction}</span>` : ''}
-            <span class="chip-remove">x</span>
-          </div>
-        `;
+      var directionsHtml = directions.map(function(key, dIdx) {
+        var dirInfo = ftAllDirections.find(function(d) { return d.key === key; });
+        var lineName = dirInfo ? dirInfo.line : key.split(':').pop();
+        var direction = dirInfo ? dirInfo.direction : '';
+        return '<div class="ft-direction-chip" data-group-idx="' + gIdx + '" data-dir-idx="' + dIdx + '" data-action="remove-from-group">' +
+          '<span class="line-badge">' + lineName + '</span>' +
+          (direction ? '<span class="dir-dest">' + direction + '</span>' : '') +
+          '<span class="chip-remove">x</span></div>';
       }).join('');
 
-      html += `
-        <div class="ft-group-box" data-group-idx="${gIdx}">
-          <div class="ft-group-header">
-            <span>Gruppe ${groupNumber}</span>
-            <button class="ft-group-delete" data-action="delete-group" data-group-idx="${gIdx}">Loeschen</button>
-          </div>
-          <div class="ft-group-content">${directionsHtml}</div>
-        </div>
-      `;
+      html += '<div class="ft-group-box" data-group-idx="' + gIdx + '"><div class="ft-group-header"><span>Gruppe ' + groupNumber + '</span>' +
+        '<button class="ft-group-delete" data-action="delete-group" data-group-idx="' + gIdx + '">Loeschen</button></div>' +
+        '<div class="ft-group-content">' + directionsHtml + '</div></div>';
       groupNumber++;
     }
   });
 
-  // Gruppierungsmodus: aktuelle Auswahl anzeigen
   if (ftGroupingMode) {
-    const selectedHtml = ftSelectedForGroup.map((key, idx) => {
-      const dirInfo = ftAllDirections.find(d => d.key === key);
-      const lineName = dirInfo ? dirInfo.line : key.split(':').pop();
-      const direction = dirInfo ? dirInfo.direction : '';
-
-      return `
-        <div class="ft-direction-chip selected" data-selection-idx="${idx}" data-action="toggle-selection">
-          <span class="line-badge">${lineName}</span>
-          ${direction ? `<span class="dir-dest">${direction}</span>` : ''}
-        </div>
-      `;
+    var selectedHtml = ftSelectedForGroup.map(function(key, idx) {
+      var dirInfo = ftAllDirections.find(function(d) { return d.key === key; });
+      var lineName = dirInfo ? dirInfo.line : key.split(':').pop();
+      var direction = dirInfo ? dirInfo.direction : '';
+      return '<div class="ft-direction-chip selected" data-selection-idx="' + idx + '" data-action="toggle-selection">' +
+        '<span class="line-badge">' + lineName + '</span>' +
+        (direction ? '<span class="dir-dest">' + direction + '</span>' : '') + '</div>';
     }).join('');
 
-    html += `
-      <div class="ft-group-box ft-group-creating">
-        <div class="ft-group-header">
-          <span>Neue Gruppe (${ftSelectedForGroup.length} ausgewaehlt)</span>
-        </div>
-        <div class="ft-group-content">
-          ${selectedHtml || '<span class="hint">Waehle mindestens 2 Richtungen aus dem Pool</span>'}
-        </div>
-        <div class="ft-group-actions">
-          <button class="btn-cancel" data-action="cancel-grouping">Abbrechen</button>
-          <button class="btn-confirm" data-action="confirm-group" ${ftSelectedForGroup.length < 2 ? 'disabled' : ''}>Gruppe erstellen</button>
-        </div>
-      </div>
-    `;
+    html += '<div class="ft-group-box ft-group-creating"><div class="ft-group-header"><span>Neue Gruppe (' + ftSelectedForGroup.length + ' ausgewaehlt)</span></div>' +
+      '<div class="ft-group-content">' + (selectedHtml || '<span class="hint">Waehle mindestens 2 Richtungen aus dem Pool</span>') + '</div>' +
+      '<div class="ft-group-actions"><button class="btn-cancel" data-action="cancel-grouping">Abbrechen</button>' +
+      '<button class="btn-confirm" data-action="confirm-group" ' + (ftSelectedForGroup.length < 2 ? 'disabled' : '') + '>Gruppe erstellen</button></div></div>';
   } else {
-    // Button zum Erstellen einer neuen Gruppe (nur wenn genug 1er-Gruppen)
-    const singleGroups = ftLineGroups.filter(g => (g.directions || []).length === 1);
+    var singleGroups = ftLineGroups.filter(function(g) { return (g.directions || []).length === 1; });
     if (singleGroups.length >= 2) {
-      html += `
-        <button class="ft-create-group-btn" data-action="start-grouping">+ Neue Gruppe erstellen</button>
-      `;
+      html += '<button class="ft-create-group-btn" data-action="start-grouping">+ Neue Gruppe erstellen</button>';
     }
   }
 
@@ -1793,12 +1725,11 @@ function renderFtGroups() {
 }
 
 function renderFtPool() {
-  const container = document.getElementById('ftPoolItems');
+  var container = document.getElementById('ftPoolItems');
   if (!container) return;
 
-  // Pool = 1er-Gruppen (einzelne Linien die nicht in echten Gruppen sind)
-  const singleGroups = ftLineGroups.filter(g => {
-    const dirs = g.directions || [];
+  var singleGroups = ftLineGroups.filter(function(g) {
+    var dirs = g.directions || [];
     return dirs.length === 1 && !ftSelectedForGroup.includes(dirs[0]);
   });
 
@@ -1806,189 +1737,122 @@ function renderFtPool() {
     container.innerHTML = '<div class="pool-empty">Alle Richtungen sind gruppiert</div>';
     return;
   }
-
   if (singleGroups.length === 0 && ftGroupingMode) {
     container.innerHTML = '<div class="pool-empty">Keine weiteren Richtungen verfuegbar</div>';
     return;
   }
 
-  container.innerHTML = singleGroups.map(group => {
-    const key = group.directions[0];
-    const dirInfo = ftAllDirections.find(d => d.key === key);
-    const line = dirInfo ? dirInfo.line : key.split(':').pop();
-    const direction = dirInfo ? dirInfo.direction : '';
-    const poolIdx = ftAllDirections.findIndex(d => d.key === key);
+  container.innerHTML = singleGroups.map(function(group) {
+    var key = group.directions[0];
+    var dirInfo = ftAllDirections.find(function(d) { return d.key === key; });
+    var line = dirInfo ? dirInfo.line : key.split(':').pop();
+    var direction = dirInfo ? dirInfo.direction : '';
+    var poolIdx = ftAllDirections.findIndex(function(d) { return d.key === key; });
 
-    return `
-      <div class="ft-direction-chip clickable" data-pool-idx="${poolIdx}">
-        <span class="line-badge">${line}</span>
-        ${direction ? `<span class="dir-dest">${direction}</span>` : ''}
-      </div>
-    `;
+    return '<div class="ft-direction-chip clickable" data-pool-idx="' + poolIdx + '">' +
+      '<span class="line-badge">' + line + '</span>' +
+      (direction ? '<span class="dir-dest">' + direction + '</span>' : '') + '</div>';
   }).join('');
 }
 
-function startFtGrouping() {
-  ftGroupingMode = true;
-  ftSelectedForGroup = [];
-  renderFtGroupingUI();
-}
-
-function cancelFtGrouping() {
-  ftGroupingMode = false;
-  ftSelectedForGroup = [];
-  renderFtGroupingUI();
-}
+function startFtGrouping() { ftGroupingMode = true; ftSelectedForGroup = []; renderFtGroupingUI(); }
+function cancelFtGrouping() { ftGroupingMode = false; ftSelectedForGroup = []; renderFtGroupingUI(); }
 
 function toggleFtSelection(key) {
-  const idx = ftSelectedForGroup.indexOf(key);
-  if (idx === -1) {
-    ftSelectedForGroup.push(key);
-  } else {
-    ftSelectedForGroup.splice(idx, 1);
-  }
+  var idx = ftSelectedForGroup.indexOf(key);
+  if (idx === -1) ftSelectedForGroup.push(key);
+  else ftSelectedForGroup.splice(idx, 1);
   renderFtGroupingUI();
 }
 
 function confirmFtGroup() {
   if (ftSelectedForGroup.length < 2) return;
-
-  // Entferne die ausgewählten Richtungen aus bestehenden Gruppen
-  ftSelectedForGroup.forEach(key => {
-    for (let i = ftLineGroups.length - 1; i >= 0; i--) {
-      const group = ftLineGroups[i];
-      const keyIdx = (group.directions || []).indexOf(key);
+  ftSelectedForGroup.forEach(function(key) {
+    for (var i = ftLineGroups.length - 1; i >= 0; i--) {
+      var group = ftLineGroups[i];
+      var keyIdx = (group.directions || []).indexOf(key);
       if (keyIdx !== -1) {
         group.directions.splice(keyIdx, 1);
-        if (group.directions.length === 0) {
-          ftLineGroups.splice(i, 1);
-        }
+        if (group.directions.length === 0) ftLineGroups.splice(i, 1);
       }
     }
   });
-
-  // Neue Gruppe erstellen
-  ftLineGroups.push({ directions: [...ftSelectedForGroup] });
-
-  // Reset
+  ftLineGroups.push({ directions: ftSelectedForGroup.slice() });
   ftGroupingMode = false;
   ftSelectedForGroup = [];
   renderFtGroupingUI();
 }
 
 function deleteFtGroup(gIdx) {
-  // Alle Richtungen der Gruppe als eigene 1er-Gruppen wieder einfügen
-  const groupToDelete = ftLineGroups[gIdx];
+  var groupToDelete = ftLineGroups[gIdx];
   if (groupToDelete && groupToDelete.directions) {
-    groupToDelete.directions.forEach(key => {
-      ftLineGroups.push({ directions: [key] });
-    });
+    groupToDelete.directions.forEach(function(key) { ftLineGroups.push({ directions: [key] }); });
   }
-
-  // Gruppe entfernen
   ftLineGroups.splice(gIdx, 1);
   renderFtGroupingUI();
 }
 
 function removeFromGroup(gIdx, key) {
   if (ftLineGroups[gIdx] && ftLineGroups[gIdx].directions) {
-    ftLineGroups[gIdx].directions = ftLineGroups[gIdx].directions.filter(d => d !== key);
-
-    // Entfernte Richtung als eigene 1er-Gruppe hinzufügen
+    ftLineGroups[gIdx].directions = ftLineGroups[gIdx].directions.filter(function(d) { return d !== key; });
     ftLineGroups.push({ directions: [key] });
-
-    // Wenn Gruppe leer, entfernen
-    if (ftLineGroups[gIdx].directions.length === 0) {
-      ftLineGroups.splice(gIdx, 1);
-    }
+    if (ftLineGroups[gIdx].directions.length === 0) ftLineGroups.splice(gIdx, 1);
   }
-
   renderFtGroupingUI();
 }
 
-// Sammelt lineGroups String für den Save-Handler
-// Format: "stopId:Linie+stopId:Linie,stopId:Linie,..."
-// Reihenfolge folgt der Drag&Drop-Liste (rowOrderItems)
 function collectFtLineGroups() {
   if (ftLineGroups.length === 0) return '';
-
-  const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 1);
+  var validGroups = ftLineGroups.filter(function(g) { return g.directions && g.directions.length >= 1; });
   if (validGroups.length === 0) return '';
+  var realGroups = validGroups.filter(function(g) { return g.directions.length >= 2; });
+  if (realGroups.length === 0) return '';
 
-  // Nur echte Gruppen (2+ Richtungen) sammeln
-  const realGroups = validGroups.filter(g => g.directions.length >= 2);
-  if (realGroups.length === 0) return '';  // Keine Gruppierungen = leer (Fallback auf rowOrder)
-
-  // Erstelle ein Mapping: Key -> Gruppen-String (für echte Gruppen)
-  // z.B. "4131:U1" -> "4131:U1+4136:U1"
-  const keyToGroupStr = {};
-  realGroups.forEach(g => {
-    const groupStr = g.directions.join('+');
-    g.directions.forEach(key => {
-      keyToGroupStr[key] = groupStr;
-    });
+  var keyToGroupStr = {};
+  realGroups.forEach(function(g) {
+    var groupStr = g.directions.join('+');
+    g.directions.forEach(function(key) { keyToGroupStr[key] = groupStr; });
   });
 
-  // Durchlaufe rowOrderItems in Drag&Drop-Reihenfolge
-  const result = [];
-  const usedGroups = new Set();
-
-  rowOrderItems.forEach(item => {
-    const firstStopId = (item.stopIds && item.stopIds.length > 0) ? item.stopIds[0] : '';
-    const key = `${firstStopId}:${item.line}`;
-
+  var result = [];
+  var usedGroups = new Set();
+  rowOrderItems.forEach(function(item) {
+    var firstStopId = (item.stopIds && item.stopIds.length > 0) ? item.stopIds[0] : '';
+    var key = firstStopId + ':' + item.line;
     if (keyToGroupStr[key]) {
-      // Dieses Item gehört zu einer echten Gruppe
-      const groupStr = keyToGroupStr[key];
-      if (!usedGroups.has(groupStr)) {
-        result.push(groupStr);
-        usedGroups.add(groupStr);
-      }
+      var groupStr = keyToGroupStr[key];
+      if (!usedGroups.has(groupStr)) { result.push(groupStr); usedGroups.add(groupStr); }
     } else {
-      // Einzelne Linie - alle stopIds ausgeben
       if (item.stopIds && item.stopIds.length > 0) {
-        item.stopIds.forEach(stopId => {
-          result.push(`${stopId}:${item.line}`);
-        });
+        item.stopIds.forEach(function(stopId) { result.push(stopId + ':' + item.line); });
       }
     }
   });
-
   return result.join(',');
 }
 
-// Event Delegation für Gruppierung
 function setupFtGroupingEvents() {
-  const groupsContainer = document.getElementById('ftGroupsContainer');
+  var groupsContainer = document.getElementById('ftGroupsContainer');
   if (groupsContainer) {
     groupsContainer.addEventListener('click', function(e) {
-      const target = e.target.closest('[data-action]');
+      var target = e.target.closest('[data-action]');
       if (!target) return;
-
-      const action = target.dataset.action;
+      var action = target.dataset.action;
       switch(action) {
-        case 'start-grouping':
-          startFtGrouping();
-          break;
-        case 'cancel-grouping':
-          cancelFtGrouping();
-          break;
-        case 'confirm-group':
-          if (!target.disabled) confirmFtGroup();
-          break;
-        case 'delete-group':
-          deleteFtGroup(parseInt(target.dataset.groupIdx));
-          break;
+        case 'start-grouping': startFtGrouping(); break;
+        case 'cancel-grouping': cancelFtGrouping(); break;
+        case 'confirm-group': if (!target.disabled) confirmFtGroup(); break;
+        case 'delete-group': deleteFtGroup(parseInt(target.dataset.groupIdx)); break;
         case 'remove-from-group':
-          const groupIdx = parseInt(target.dataset.groupIdx);
-          const dirIdx = parseInt(target.dataset.dirIdx);
+          var groupIdx = parseInt(target.dataset.groupIdx);
+          var dirIdx = parseInt(target.dataset.dirIdx);
           if (ftLineGroups[groupIdx] && ftLineGroups[groupIdx].directions) {
-            const key = ftLineGroups[groupIdx].directions[dirIdx];
+            var key = ftLineGroups[groupIdx].directions[dirIdx];
             removeFromGroup(groupIdx, key);
           }
           break;
         case 'toggle-selection':
-          const selIdx = parseInt(target.dataset.selectionIdx);
+          var selIdx = parseInt(target.dataset.selectionIdx);
           if (selIdx >= 0 && selIdx < ftSelectedForGroup.length) {
             ftSelectedForGroup.splice(selIdx, 1);
             renderFtGroupingUI();
@@ -1998,22 +1862,15 @@ function setupFtGroupingEvents() {
     });
   }
 
-  const poolContainer = document.getElementById('ftPoolItems');
+  var poolContainer = document.getElementById('ftPoolItems');
   if (poolContainer) {
     poolContainer.addEventListener('click', function(e) {
-      const target = e.target.closest('[data-pool-idx]');
+      var target = e.target.closest('[data-pool-idx]');
       if (!target) return;
-
-      const poolIdx = parseInt(target.dataset.poolIdx);
+      var poolIdx = parseInt(target.dataset.poolIdx);
       if (poolIdx >= 0 && poolIdx < ftAllDirections.length) {
-        const key = ftAllDirections[poolIdx].key;
-
-        // Automatisch Gruppierungsmodus starten
-        if (!ftGroupingMode) {
-          ftGroupingMode = true;
-          ftSelectedForGroup = [];
-        }
-
+        var key = ftAllDirections[poolIdx].key;
+        if (!ftGroupingMode) { ftGroupingMode = true; ftSelectedForGroup = []; }
         toggleFtSelection(key);
       }
     });
@@ -2023,26 +1880,25 @@ function setupFtGroupingEvents() {
 // ==================== UI UPDATES ====================
 function updateUI() {
   // Slideshow Settings
-  const displayMode = getSegmentValue('displaymode');
-  const slideshowSettings = document.getElementById('slideshowSettings');
+  var displayMode = getSegmentValue('displaymode');
+  var slideshowSettings = document.getElementById('slideshowSettings');
   slideshowSettings.classList.toggle('disabled', displayMode !== '2');
 
   // Gehweg Settings
-  const gehwegOn = document.getElementById('gehwegToggle').classList.contains('on');
+  var gehwegOn = document.getElementById('gehwegToggle').classList.contains('on');
   document.getElementById('gehwegSettings').classList.toggle('disabled', !gehwegOn);
 
-  // Zeilen-Reihenfolge aktualisieren (zeigt/versteckt je nach Sortier-Modus)
+  // Zeilen-Reihenfolge (nur bei manueller Sortierung + Statisch)
   updateRowOrderList();
 
-  // Gruppierung anzeigen/verstecken (nur bei Statisch und wenn Richtungen vorhanden)
-  const ftGroupingSection = document.getElementById('ftGroupingSection');
+  // Gruppierung (nur bei manueller Sortierung + Statisch + genug Richtungen)
+  var ftGroupingSection = document.getElementById('ftGroupingSection');
   if (ftGroupingSection) {
-    const sortModeVal = getSegmentValue('sortmode');
-    if (sortModeVal === '1' && rowOrderItems.length >= 2) {
+    var sortModeVal = getSegmentValue('sortmode');
+    if (sortModeVal === '1' && manualSortEnabled && rowOrderItems.length >= 2) {
       ftGroupingSection.classList.add('show');
-      // Gruppierung (neu) initialisieren wenn rowOrderItems sich geändert haben
-      const currentKeys = rowOrderItems.map(i => `${(i.stopIds||[])[0]}:${i.line}`).join(',');
-      const lastKeys = ftGroupingSection.dataset.lastKeys || '';
+      var currentKeys = rowOrderItems.map(function(i) { return ((i.stopIds||[])[0]) + ':' + i.line; }).join(',');
+      var lastKeys = ftGroupingSection.dataset.lastKeys || '';
       if (currentKeys !== lastKeys) {
         ftGroupingSection.dataset.lastKeys = currentKeys;
         initFtGrouping();
@@ -2053,262 +1909,132 @@ function updateUI() {
   }
 
   // Night Settings
-  const nightOn = document.getElementById('nightmodeToggle').classList.contains('on');
+  var nightOn = document.getElementById('nightmodeToggle').classList.contains('on');
   document.getElementById('nightSettings').classList.toggle('disabled', !nightOn);
-  
-  // Sortmode Hint (1=Statisch, 2=Zeit)
-  const sortMode = getSegmentValue('sortmode');
-  const sortHint = document.getElementById('sortmodeHint');
+
+  // Sortmode Hint + Auto-Sort Info Sichtbarkeit
+  var sortMode = getSegmentValue('sortmode');
+  var sortHint = document.getElementById('sortmodeHint');
   if (sortHint) {
     sortHint.textContent = sortMode === '1'
       ? 'Statisch = Feste Reihenfolge der Linien'
-      : 'Nach Zeit = Nächste Abfahrt zuerst';
+      : 'Nach Zeit = Naechste Abfahrt zuerst';
   }
-  
-  updatePreview();
-}
-
-function updatePreview() {
-  const textColorVal = getSegmentValue('textcolor');
-  const colors = {
-    '1': '#ffb340',  // Gelb/Amber
-    '2': '#ffffff',  // Weiß
-    '3': '#ff9500'   // Orange
-  };
-  const textColor = colors[textColorVal] || '#ffb340';
-  
-  // Helligkeit
-  const brightness = getSegmentValue('displaylight');
-  const opacityMap = { '1': 0.4, '2': 0.7, '3': 1.0 };
-  const brightnessOpacity = opacityMap[brightness] || 1.0;
-  
-  const zeilenCount = parseInt(getSegmentValue('anzeige')) || 2;
-  const sortMode = getSegmentValue('sortmode');
-  const hochflurerOn = getSegmentValue('chopper') === '1';
-  const klimaanlageOn = getSegmentValue('silberpfeil') === '1';
-  
-  // Nachtmodus Check
-  const nightOn = document.getElementById('nightmodeToggle').classList.contains('on');
-  const nightStart = parseInt(document.getElementById('nightstart').value) || 22;
-  const nightEnd = parseInt(document.getElementById('nightend').value) || 7;
-  const currentHour = new Date().getHours();
-  
-  const preview = document.getElementById('preview');
-  
-  // Nachtmodus aktiv?
-  let isNightTime = false;
-  if (nightOn) {
-    if (nightStart > nightEnd) {
-      isNightTime = currentHour >= nightStart || currentHour < nightEnd;
-    } else {
-      isNightTime = currentHour >= nightStart && currentHour < nightEnd;
-    }
+  // Automatisch/Manuell Toggle nur bei Statisch anzeigen
+  var autoManualRow = document.getElementById('autoManualRow');
+  var manualContent = document.getElementById('manualSortContent');
+  if (autoManualRow) autoManualRow.style.display = sortMode === '1' ? '' : 'none';
+  if (sortMode !== '1') {
+    if (manualContent) manualContent.classList.remove('open');
+    manualSortEnabled = false;
+    setSegmentValue('sortorder', 'auto');
   }
-  
-  if (isNightTime) {
-    preview.innerHTML = '<div style="text-align:center;color:#444;padding:20px;font-size:13px;">💤 Display ist im Nachtmodus aus</div>';
-    preview.style.opacity = '0.5';
-    return;
-  }
-  
-  preview.style.opacity = brightnessOpacity;
-  
-  // Beispiel-Linien Daten
-  let lines = [
-    { line: 'U6', dest: 'Floridsdorf', time: 4, isHochflurer: false, hasKlima: true },
-    { line: '2', dest: 'Dornbach', time: 6, isHochflurer: true, hasKlima: false },
-    { line: '13A', dest: 'Hauptbahnhof', time: 8, isHochflurer: false, hasKlima: false }
-  ];
-  
-  // Sortierung (1=Statisch, 2=Zeit)
-  if (sortMode === '1') {
-    // Statisch: 13A, U6, 2
-    lines = [lines[2], lines[0], lines[1]];
-  } else {
-    // Zeit: Nach Countdown sortiert
-    lines.sort((a, b) => a.time - b.time);
-  }
-  
-  // Nur gewünschte Anzahl Zeilen
-  lines = lines.slice(0, zeilenCount);
-  
-  // HTML generieren
-  preview.innerHTML = lines.map(l => {
-    let lineDisplay = l.line;
-    let rowColor = textColor;
-    
-    // Klimaanlage: * bei U-Bahnen
-    if (klimaanlageOn && l.hasKlima) {
-      lineDisplay = l.line + '*';
-    }
-    
-    // Hochflurer: Blaue Schrift
-    if (hochflurerOn && l.isHochflurer) {
-      rowColor = '#87ceeb';
-    }
-    
-    return `
-      <div class="preview-row" style="color:${rowColor}">
-        <span class="line-num">${lineDisplay}</span>
-        <span class="destination">${l.dest}</span>
-        <span class="countdown">${l.time}</span>
-      </div>
-    `;
-  }).join('');
 }
 
 function getSegmentValue(name) {
-  const seg = document.querySelector(`[data-name="${name}"]`);
+  var seg = document.querySelector('[data-name="' + name + '"]');
   if (!seg) return '1';
-  const active = seg.querySelector('.active');
-  const value = active ? active.dataset.value : '1';
-  if (name === 'sortmode') {
-    console.log(`getSegmentValue('sortmode') -> active button text: "${active?.textContent.trim()}", data-value: "${value}"`);
-  }
-  return value;
+  var active = seg.querySelector('.active');
+  return active ? active.dataset.value : '1';
 }
 
 function setSegmentValue(name, value) {
-  const seg = document.querySelector(`[data-name="${name}"]`);
+  var seg = document.querySelector('[data-name="' + name + '"]');
   if (!seg) return;
-  console.log(`setSegmentValue('${name}', '${value}')`);
-  seg.querySelectorAll('.seg-btn, .seg-btn-with-label, .color-dot').forEach(btn => {
+  seg.querySelectorAll('.seg-btn, .seg-btn-with-label, .color-dot').forEach(function(btn) {
     btn.classList.remove('active');
-    if (btn.dataset.value === String(value)) {
-      btn.classList.add('active');
-      console.log(`  -> Activated button with data-value="${btn.dataset.value}", text="${btn.textContent.trim()}"`);
-    }
+    if (btn.dataset.value === String(value)) btn.classList.add('active');
   });
 }
 
-// ==================== CONFIG LADEN (vom Parent via postMessage) ====================
+// ==================== CONFIG LADEN ====================
 function applyConfig(config) {
-  if (settingsLoaded) {
-    console.log('Settings bereits geladen - ignoriere erneutes Laden');
-    return;
-  }
+  if (settingsLoaded) return;
   console.log('Config anwenden:', config);
   currentConfig = config;
 
-  // Capabilities aus RBL ableiten (falls nicht bereits gesetzt)
   if (!currentCapabilities && config.rbl_id) {
-    const network = detectNetworkFromRbl(config.rbl_id);
+    var network = detectNetworkFromRbl(config.rbl_id);
     updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
   }
 
-  // Anzeige
   setSegmentValue('anzeige', config.lines_count || '2');
-  // ESP32: sort_mode ODER sortmode (Kompatibilität) 1=Statisch, 2=Zeit
   setSegmentValue('sortmode', config.sort_mode || config.sortmode || '1');
-  
-  // Barrierefreiheit
   setSegmentValue('chopper', config.chopper || '1');
   setSegmentValue('silberpfeil', config.silberpfeil || '1');
-  
-  // Design
-  // text_color ist die Wien-Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
   setSegmentValue('textcolor', config.text_color || '1');
   setSegmentValue('displaylight', config.displaylight || '3');
-  
-  // Nachtmodus
+
   if (config.night_mode_enabled) {
     document.getElementById('nightmodeToggle').classList.add('on');
   }
   document.getElementById('nightstart').value = config.night_mode_start || '22';
   document.getElementById('nightend').value = config.night_mode_end || '7';
-  
-  // Fun-Nachrichten
+
   if (config.show_fun_messages === false || config.show_fun_messages === '0' || config.show_fun_messages === 0) {
     document.getElementById('funMessagesToggle').classList.remove('on');
   } else {
     document.getElementById('funMessagesToggle').classList.add('on');
   }
-  
-  // Erweiterte Einstellungen
+
   setSegmentValue('displaymode', config.display_mode || '1');
   setSegmentValue('stopinterval', config.stop_interval || '10');
-  
-  // Gehweg - neues Format: "stopId:gehzeit|stopId:gehzeit"
-  const stopIds = (config.rbl_id || '').split(',').map(s => s.trim()).filter(s => s);
-  const gehwegString = config.gehweg || '0';
-  
-  // Parse gehweg - unterstützt altes ("|" only) und neues Format ("stopId:value|")
-  let gehwegValues = [];
+
+  // Gehweg
+  var stopIds = (config.rbl_id || '').split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  var gehwegString = config.gehweg || '0';
+  var gehwegValues = [];
   if (gehwegString.indexOf(':') !== -1) {
-    // Neues Format: "5903:5|5939:0"
-    const gehwegMap = {};
-    gehwegString.split('|').forEach(entry => {
-      const colonPos = entry.indexOf(':');
+    var gehwegMap = {};
+    gehwegString.split('|').forEach(function(entry) {
+      var colonPos = entry.indexOf(':');
       if (colonPos !== -1) {
-        const stopId = entry.substring(0, colonPos).trim();
-        const value = parseInt(entry.substring(colonPos + 1)) || 0;
+        var stopId = entry.substring(0, colonPos).trim();
+        var value = parseInt(entry.substring(colonPos + 1)) || 0;
         gehwegMap[stopId] = value;
       }
     });
-    // In Reihenfolge der stopIds umwandeln
-    gehwegValues = stopIds.map(id => gehwegMap[id] || 0);
+    gehwegValues = stopIds.map(function(id) { return gehwegMap[id] || 0; });
   } else {
-    // Altes Format: "5|0" (Abwärtskompatibilität)
-    gehwegValues = gehwegString.split('|').map(v => parseInt(v) || 0);
+    gehwegValues = gehwegString.split('|').map(function(v) { return parseInt(v) || 0; });
   }
-  
+
   updateGehwegList(stopIds, gehwegValues);
 
   if (config.gehweg && config.gehweg !== '0' && config.gehweg !== '') {
-    const hasValue = gehwegValues.some(v => v > 0);
-    if (hasValue) {
+    if (gehwegValues.some(function(v) { return v > 0; })) {
       document.getElementById('gehwegToggle').classList.add('on');
     }
   }
 
-  // Zeilen-Reihenfolge aus bestehender Config laden
-  // Format: "stopId:Linie,stopId:Linie" (z.B. "272:2,692:13A")
-  // Zeilen-Reihenfolge aus bestehender Config laden
-  // NEUE LOGIK: Jede Linie+Richtung = separate Zeile (Richtung = StopId)
-  const savedRowOrder = config.roworder || config.linegroups || '';
-  console.log('applyConfig - savedRowOrder:', savedRowOrder);
+  // Zeilen-Reihenfolge aus Config laden
+  var savedRowOrder = config.roworder || config.linegroups || '';
   if (savedRowOrder) {
-    // Parse savedRowOrder und hole Richtungen aus currentStationDetails
-    const lineDirectionMap = new Map();  // "line|stopId" -> { line, direction, stopIds, firstIndex }
-    let index = 0;
+    var lineDirectionMap = new Map();
+    var index = 0;
+    var stopIdToIndex = {};
+    var stopIdsArr = (config.rbl_id || '').split(',').map(function(s) { return s.trim(); });
+    stopIdsArr.forEach(function(id, i) { stopIdToIndex[id] = i; });
 
-    // Erstelle Lookup für Stop-ID -> Station-Index
-    const stopIdToIndex = {};
-    const stopIds = (config.rbl_id || '').split(',').map(s => s.trim());
-    stopIds.forEach((id, i) => { stopIdToIndex[id] = i; });
-
-    savedRowOrder.split(',').forEach(entry => {
-      const colonPos = entry.indexOf(':');
+    savedRowOrder.split(',').forEach(function(entry) {
+      var colonPos = entry.indexOf(':');
       if (colonPos > 0) {
-        const stopId = entry.substring(0, colonPos).trim();
-        const line = entry.substring(colonPos + 1).trim();
-
+        var stopId = entry.substring(0, colonPos).trim();
+        var line = entry.substring(colonPos + 1).trim();
         if (stopId && line) {
-          // Hole Direction aus currentStationDetails
-          let direction = '';
-          const stationIndex = stopIdToIndex[stopId];
+          var direction = '';
+          var stationIndex = stopIdToIndex[stopId];
           if (currentStationDetails && currentStationDetails[stationIndex]) {
-            const station = currentStationDetails[stationIndex];
+            var station = currentStationDetails[stationIndex];
             if (station.lines) {
-              const lineInfo = station.lines.find(l => l.name === line);
-              if (lineInfo && lineInfo.direction) {
-                direction = lineInfo.direction;
-              }
+              var lineInfo = station.lines.find(function(l) { return l.name === line; });
+              if (lineInfo && lineInfo.direction) direction = lineInfo.direction;
             }
           }
-
-          // Key ist Linie + Richtung (um U1 Oberlaa und U1 Leopoldau zu trennen)
-          const key = direction ? `${line}|${direction}` : `${line}|${stopId}`;
-
+          var key = direction ? (line + '|' + direction) : (line + '|' + stopId);
           if (!lineDirectionMap.has(key)) {
-            lineDirectionMap.set(key, {
-              line: line,
-              direction: direction,
-              stopIds: [stopId],
-              firstIndex: index
-            });
+            lineDirectionMap.set(key, { line: line, direction: direction, stopIds: [stopId], firstIndex: index });
           } else {
-            // Gleiche Linie+Richtung - füge Stop-ID hinzu
             lineDirectionMap.get(key).stopIds.push(stopId);
           }
           index++;
@@ -2316,377 +2042,289 @@ function applyConfig(config) {
       }
     });
 
-    // Konvertiere Map zu Array, sortiert nach firstIndex
     rowOrderItems = Array.from(lineDirectionMap.values())
-      .sort((a, b) => a.firstIndex - b.firstIndex)
-      .map(data => ({
-        line: data.line,
-        direction: data.direction,
-        stopIds: data.stopIds
-      }));
+      .sort(function(a, b) { return a.firstIndex - b.firstIndex; })
+      .map(function(data) { return { line: data.line, direction: data.direction, stopIds: data.stopIds }; });
 
-    console.log('applyConfig - Final rowOrderItems:', JSON.parse(JSON.stringify(rowOrderItems)));
-
-    // Container als "von config geladen" markieren
-    const container = document.getElementById('rowOrderList');
+    var container = document.getElementById('rowOrderList');
     if (container) container.dataset.itemsKey = '';
   }
+
+  // Auto-sort anwenden (Standard: automatisch)
+  autoSortRowOrderItems();
 
   settingsLoaded = true;
   configLoaded = true;
 
-  // Loading-Overlay ausblenden
-  const configLoadingEl = document.getElementById('configLoading');
+  var configLoadingEl = document.getElementById('configLoading');
   if (configLoadingEl) configLoadingEl.classList.remove('show');
 
   updateUI();
 }
 
-// ==================== SPEICHERN (via postMessage an Parent/ESP32) ====================
-document.getElementById('saveBtn').addEventListener('click', () => {
+// ==================== SPEICHERN ====================
+document.getElementById('saveBtn').addEventListener('click', function() {
   document.getElementById('loading').classList.add('show');
 
-  const rblString = pendingRbl || currentConfig.rbl_id || '';
-  const filterString = pendingFilter || currentConfig.lines_filter || '';
+  var rblString = pendingRbl || currentConfig.rbl_id || '';
+  var filterString = pendingFilter || currentConfig.lines_filter || '';
 
-  // Wien rowOrder generieren: Verwende die Drag & Drop Reihenfolge wenn verfügbar
-  // Format: "stopId:Linie,stopId:Linie" (z.B. "272:2,692:13A,1370:44")
-  let rowOrder = '';
-  let lineGroups = '';
+  var rowOrder = '';
+  var lineGroups = '';
 
-  // Bei statischer Sortierung: Verwende die vom User festgelegte Reihenfolge
-  // sortMode 1 = Statisch
-  const sortMode = getSegmentValue('sortmode');
-  if (sortMode === '1' && rowOrderItems.length > 0) {
-    // Wenn Gruppierung vorhanden, verwende lineGroups als rowOrder
-    // (rowOrder mit + Syntax = Firmware erkennt Gruppen im statischen Modus)
-    const ftGroups = collectFtLineGroups();
+  var sortMode = getSegmentValue('sortmode');
+
+  if (!manualSortEnabled) {
+    // Automatische Sortierung: sortmode=1, auto-sorted rowOrder
+    sortMode = '1';
+    if (rowOrderItems.length > 0) {
+      autoSortRowOrderItems();
+      rowOrder = getRowOrderString();
+      lineGroups = rowOrder;
+    } else if (rblString && filterString) {
+      // Fallback
+      var stopIds = rblString.split(',').map(function(s) { return s.trim(); });
+      var filters = filterString.split('|').map(function(s) { return s.trim(); });
+      var parts = [];
+      stopIds.forEach(function(stopId, i) {
+        var linesForStop = filters[i] ? filters[i].split(',').map(function(l) { return l.trim(); }) : [];
+        linesForStop.forEach(function(line) { if (line) parts.push(stopId + ':' + line); });
+      });
+      rowOrder = parts.join(',');
+      lineGroups = rowOrder;
+    }
+  } else if (sortMode === '1' && rowOrderItems.length > 0) {
+    // Manuelle statische Sortierung
+    var ftGroups = collectFtLineGroups();
     if (ftGroups) {
-      // ftGroups enthält die Gruppierung mit + Syntax
-      // z.B. "4407:U4,4131:U1+4136:U1"
       rowOrder = ftGroups;
       lineGroups = ftGroups;
     } else {
-      // Keine Gruppierung → einfache Reihenfolge
       rowOrder = getRowOrderString();
       lineGroups = rowOrder;
     }
+  } else if (sortMode === '2') {
+    // Nach Zeit — kein rowOrder/lineGroups noetig
+    rowOrder = '';
+    lineGroups = '';
   } else if (rblString && filterString) {
-    // Fallback: Standard-Reihenfolge aus RBL/Filter
-    const stopIds = rblString.split(',').map(s => s.trim());
-    const filters = filterString.split('|').map(s => s.trim());
-
-    const rowOrderParts = [];
-    stopIds.forEach((stopId, i) => {
-      const linesForStop = filters[i] ? filters[i].split(',').map(l => l.trim()) : [];
-      linesForStop.forEach(line => {
-        if (line) {
-          rowOrderParts.push(`${stopId}:${line}`);
-        }
-      });
+    var stopIds2 = rblString.split(',').map(function(s) { return s.trim(); });
+    var filters2 = filterString.split('|').map(function(s) { return s.trim(); });
+    var rowParts = [];
+    stopIds2.forEach(function(stopId, i) {
+      var linesForStop = filters2[i] ? filters2[i].split(',').map(function(l) { return l.trim(); }) : [];
+      linesForStop.forEach(function(line) { if (line) rowParts.push(stopId + ':' + line); });
     });
-    rowOrder = rowOrderParts.join(',');
+    rowOrder = rowParts.join(',');
     lineGroups = rowOrder;
   }
 
-  // Config-Daten sammeln
-  const configData = {
+  var configData = {
     type: 'setRBL',
-
-    // Stop-IDs (entweder pending oder bestehende)
     rbl: rblString,
     filter: filterString,
-
-    // Anzeige
     zeilen: getSegmentValue('anzeige'),
-    // 1=Statisch, 2=Zeit
-    sortmode: getSegmentValue('sortmode'),
-
-    // Barrierefreiheit
+    sortmode: sortMode,
     chopper: getSegmentValue('chopper'),
     silberpfeil: getSegmentValue('silberpfeil'),
-
-    // Design
-    colour: '1',  // Immer Wien (1) - index.html ist nur für Wien
-    textcolor: getSegmentValue('textcolor'),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
+    colour: '1',
+    textcolor: getSegmentValue('textcolor'),
     displaylight: getSegmentValue('displaylight'),
-
-    // Nachtmodus
     nightmode: document.getElementById('nightmodeToggle').classList.contains('on') ? '1' : '0',
     nightstart: document.getElementById('nightstart').value,
     nightend: document.getElementById('nightend').value,
-
-    // Fun-Nachrichten
     showfunmessages: document.getElementById('funMessagesToggle').classList.contains('on') ? '1' : '0',
-
-    // Erweiterte
     displaymode: getSegmentValue('displaymode'),
     stopinterval: getSegmentValue('stopinterval'),
-
-    // Gehweg
     gehweg: document.getElementById('gehwegToggle').classList.contains('on') ? getGehwegString() : '0',
-
-    // Wien rowOrder und lineGroups (Format: stopId:Linie) - Reihenfolge vom User
     roworder: rowOrder,
     linegroups: lineGroups
   };
 
   console.log('Sende Config an ESP32:', configData);
 
-  // Sende an Parent (ESP32-Seite)
   if (window.parent && window.parent !== window) {
     window.parent.postMessage(configData, '*');
   } else {
     console.error('Nicht in iframe - kann nicht speichern!');
-    alert('Fehler: Diese Seite muss im Straba-Interface geöffnet werden.');
+    alert('Fehler: Diese Seite muss im Straba-Interface geoeffnet werden.');
     document.getElementById('loading').classList.remove('show');
     return;
   }
 
-  // Status-Updates
-  setTimeout(() => {
-    document.querySelector('.loading-text').textContent = 'Neustart läuft...';
+  setTimeout(function() {
+    document.querySelector('.loading-text').textContent = 'Neustart laeuft...';
   }, 2000);
 
-  setTimeout(() => {
+  setTimeout(function() {
     document.querySelector('.loading-text').textContent = 'Fertig! Seite wird neu geladen...';
   }, 5000);
 });
 
-// ==================== KOMMUNIKATION MIT ESP32 (PARENT) ====================
+// ==================== KOMMUNIKATION MIT ESP32 ====================
 window.addEventListener('message', function(event) {
-  console.log('Nachricht empfangen:', event.data);
-  
-  // ESP32 sendet bestehende Konfiguration (nur Stations-Daten)
   if (event.data && event.data.type === 'loadExistingConfig') {
-    if (settingsLoaded) return;  // Nur blockieren wenn Settings bereits geladen
-    console.log('Bestehende Config vom ESP32 erhalten');
-
-    // Speichere RBL/Filter für später (nur wenn keine pending Stations aus localStorage)
+    if (settingsLoaded) return;
     if (event.data.rbl && !pendingRbl) {
       currentConfig.rbl_id = event.data.rbl;
       currentConfig.lines_filter = event.data.filter || '';
-
-      // Gehweg-Liste aktualisieren
-      const stopIds = event.data.rbl.split(',').map(s => s.trim()).filter(s => s);
+      var stopIds = event.data.rbl.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
       updateGehwegList(stopIds, []);
     }
   }
 
-  // Empfange volle Config (JSON) vom ESP32 — hier kommen die Settings!
   if (event.data && event.data.type === 'loadFullConfig') {
-    if (settingsLoaded) return;  // Settings nur 1x laden
+    if (settingsLoaded) return;
     applyConfig(event.data.config);
   }
-  
-  // Pending Stations von localmainpage
+
   if (event.data && event.data.type === 'pendingStations') {
     pendingRbl = event.data.rbl || '';
     pendingFilter = event.data.filter || '';
-    
     if (pendingRbl) {
-      const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
-      
-      // Zeige Banner
+      var stopIds = pendingRbl.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
       document.getElementById('pendingBanner').style.display = 'block';
-      document.getElementById('pendingText').textContent = 
-        `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
-      
-      // Aktualisiere Gehweg-Liste
+      document.getElementById('pendingText').textContent =
+        stopIds.length + ' Station' + (stopIds.length > 1 ? 'en' : '') + ' ausgewaehlt. Wird beim Speichern uebernommen.';
       updateGehwegList(stopIds, [], event.data.details || []);
     }
   }
 });
 
-// ==================== FEATURE VISIBILITY BASIEREND AUF CAPABILITIES ====================
+// ==================== FEATURE VISIBILITY ====================
 function updateFeatureVisibility(capabilities) {
   currentCapabilities = capabilities;
 
-  // Hochflurer-Option
-  const rowChopper = document.getElementById('rowChopper');
+  var rowChopper = document.getElementById('rowChopper');
   if (rowChopper) {
-    if (capabilities && capabilities.showHighFloor) {
-      rowChopper.classList.remove('feature-hidden', 'feature-disabled');
-    } else {
-      rowChopper.classList.add('feature-hidden');
-    }
+    if (capabilities && capabilities.showHighFloor) rowChopper.classList.remove('feature-hidden', 'feature-disabled');
+    else rowChopper.classList.add('feature-hidden');
   }
 
-  // Klimaanlage-Option (Silberpfeil)
-  const rowSilberpfeil = document.getElementById('rowSilberpfeil');
+  var rowSilberpfeil = document.getElementById('rowSilberpfeil');
   if (rowSilberpfeil) {
-    if (capabilities && capabilities.showAirCondition) {
-      rowSilberpfeil.classList.remove('feature-hidden', 'feature-disabled');
-    } else {
-      rowSilberpfeil.classList.add('feature-hidden');
-    }
+    if (capabilities && capabilities.showAirCondition) rowSilberpfeil.classList.remove('feature-hidden', 'feature-disabled');
+    else rowSilberpfeil.classList.add('feature-hidden');
   }
 
-  // Textfarbe-Option
-  const rowTextfarbe = document.getElementById('rowTextfarbe');
+  var rowTextfarbe = document.getElementById('rowTextfarbe');
   if (rowTextfarbe) {
-    if (capabilities && capabilities.textColorChangeable) {
-      rowTextfarbe.classList.remove('feature-hidden', 'feature-disabled');
-    } else {
-      rowTextfarbe.classList.add('feature-hidden');
-    }
+    if (capabilities && capabilities.textColorChangeable) rowTextfarbe.classList.remove('feature-hidden', 'feature-disabled');
+    else rowTextfarbe.classList.add('feature-hidden');
   }
 
-  // Wien-Badge anzeigen wenn Wien-Features aktiv
-  const wienBadge1 = document.getElementById('wienOnlyBadge1');
+  var wienBadge1 = document.getElementById('wienOnlyBadge1');
   if (wienBadge1) {
-    const isWien = capabilities && (capabilities.showHighFloor || capabilities.showAirCondition);
+    var isWien = capabilities && (capabilities.showHighFloor || capabilities.showAirCondition);
     wienBadge1.style.display = isWien ? 'inline' : 'none';
   }
 
-  // Barrierefreiheit-Karte komplett verstecken wenn keine Features
-  const cardBarrierefreiheit = document.getElementById('cardBarrierefreiheit');
+  var cardBarrierefreiheit = document.getElementById('cardBarrierefreiheit');
   if (cardBarrierefreiheit) {
-    const hasAnyFeature = capabilities && (capabilities.showHighFloor || capabilities.showAirCondition);
-    if (!hasAnyFeature) {
-      cardBarrierefreiheit.classList.add('feature-hidden');
-    } else {
-      cardBarrierefreiheit.classList.remove('feature-hidden');
-    }
+    var hasAnyFeature = capabilities && (capabilities.showHighFloor || capabilities.showAirCondition);
+    if (!hasAnyFeature) cardBarrierefreiheit.style.display = 'none';
+    else cardBarrierefreiheit.style.display = '';
   }
-
-  console.log('Feature visibility updated:', capabilities);
 }
 
-// Erkennt das Netzwerk aus der RBL-ID
 function detectNetworkFromRbl(rbl) {
-  if (!rbl) return 'WL';  // Default
-  const firstId = rbl.split(',')[0].trim();
-  if (firstId.includes(':')) {
-    const network = firstId.split(':')[0].toUpperCase();
-    return network;
-  }
-  // Nur Zahlen = Wiener Linien
+  if (!rbl) return 'WL';
+  var firstId = rbl.split(',')[0].trim();
+  if (firstId.includes(':')) return firstId.split(':')[0].toUpperCase();
   return 'WL';
 }
 
-// ==================== PRECONFIG VON CITIES.HTML ÜBERNEHMEN ====================
+// ==================== PRECONFIG VON CITIES.HTML ====================
 function applyPreConfig(preConfig) {
-  console.log('Übernehme PreConfig von cities:', preConfig);
-
-  // Capabilities übernehmen
-  if (preConfig.capabilities) {
-    updateFeatureVisibility(preConfig.capabilities);
-  } else {
-    // Capabilities aus Netzwerk ableiten
-    const network = detectNetworkFromRbl(preConfig.rbl);
+  if (preConfig.capabilities) updateFeatureVisibility(preConfig.capabilities);
+  else {
+    var network = detectNetworkFromRbl(preConfig.rbl);
     updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
   }
 
-  // Display-Einstellungen
   if (preConfig.colour) setSegmentValue('colour', preConfig.colour);
   if (preConfig.rows) setSegmentValue('anzeige', preConfig.rows);
   if (preConfig.sortMode) setSegmentValue('sortmode', preConfig.sortMode);
   if (preConfig.displayLight) setSegmentValue('displaylight', preConfig.displayLight);
-
-  // Barrierefreiheit
   if (preConfig.chopper !== undefined) setSegmentValue('chopper', preConfig.chopper);
   if (preConfig.silberpfeil !== undefined) setSegmentValue('silberpfeil', preConfig.silberpfeil);
 
-  // Nachtmodus
-  if (preConfig.nightMode) {
-    document.getElementById('nightmodeToggle').classList.add('on');
-  }
+  if (preConfig.nightMode) document.getElementById('nightmodeToggle').classList.add('on');
   if (preConfig.nightStart) document.getElementById('nightstart').value = preConfig.nightStart;
   if (preConfig.nightEnd) document.getElementById('nightend').value = preConfig.nightEnd;
 
-  // Erweiterte Einstellungen
   if (preConfig.displayMode) setSegmentValue('displaymode', preConfig.displayMode);
   if (preConfig.stopInterval) setSegmentValue('stopinterval', preConfig.stopInterval);
 
-  // Fun-Nachrichten
-  if (preConfig.showFunMessages === false) {
-    document.getElementById('funMessagesToggle').classList.remove('on');
-  }
+  if (preConfig.showFunMessages === false) document.getElementById('funMessagesToggle').classList.remove('on');
 
-  // Gehweg-Werte
   if (preConfig.gehweg && Array.isArray(preConfig.gehweg)) {
-    const stopIds = preConfig.rbl ? preConfig.rbl.split(',').map(s => s.trim()).filter(s => s) : [];
+    var stopIds = preConfig.rbl ? preConfig.rbl.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : [];
     updateGehwegList(stopIds, preConfig.gehweg, preConfig.details || []);
-
-    // Gehweg-Toggle aktivieren wenn Werte > 0
-    const hasValues = preConfig.gehweg.some(v => v > 0);
-    if (hasValues) {
+    if (preConfig.gehweg.some(function(v) { return v > 0; })) {
       document.getElementById('gehwegToggle').classList.add('on');
     }
   }
 
-  // lineGroups von cities.html übernehmen (für Gruppierungs-UI)
   if (preConfig.lineGroups) {
     currentConfig.linegroups = preConfig.lineGroups;
-    console.log('lineGroups von cities übernommen:', preConfig.lineGroups);
   }
 
   updateUI();
 }
 
 // ==================== INIT ====================
-document.addEventListener('DOMContentLoaded', () => {
-  updatePreview();
+document.addEventListener('DOMContentLoaded', function() {
   updateUI();
 
-  // Prüfe localStorage für Stations-Daten (von localmainpage oder cities.html)
-  const pendingConfigStr = localStorage.getItem('straba_pending_config');
+  var pendingConfigStr = localStorage.getItem('straba_pending_config');
   if (pendingConfigStr) {
-    // PreConfig von cities.html (enthält ALLE Settings)
     try {
-      const preConfig = JSON.parse(pendingConfigStr);
+      var preConfig = JSON.parse(pendingConfigStr);
       applyPreConfig(preConfig);
 
       pendingRbl = preConfig.rbl || '';
       pendingFilter = preConfig.filter || '';
 
-      const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
+      var stopIds = pendingRbl.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
 
       document.getElementById('pendingBanner').style.display = 'block';
       document.getElementById('pendingText').textContent =
-        `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
+        stopIds.length + ' Station' + (stopIds.length > 1 ? 'en' : '') + ' ausgewaehlt. Wird beim Speichern uebernommen.';
 
       localStorage.removeItem('straba_pending_config');
       localStorage.removeItem('straba_pending_rbl');
       localStorage.removeItem('straba_pending_filter');
       localStorage.removeItem('straba_pending_details');
 
-      // cities.html PreConfig hat Settings dabei → fertig
       configLoaded = true;
       settingsLoaded = true;
-      const cle = document.getElementById('configLoading');
+      var cle = document.getElementById('configLoading');
       if (cle) cle.classList.remove('show');
 
     } catch (e) {
       console.error('Fehler beim Parsen der PreConfig:', e);
     }
   } else {
-    // Alte Methode: Nur Stations-Daten aus localStorage (von localmainpage)
-    // Settings kommen SEPARAT vom ESP32 via postMessage!
-    const localPendingRbl = localStorage.getItem('straba_pending_rbl');
+    var localPendingRbl = localStorage.getItem('straba_pending_rbl');
     if (localPendingRbl) {
       pendingRbl = localPendingRbl;
       pendingFilter = localStorage.getItem('straba_pending_filter') || '';
 
-      const stopIds = pendingRbl.split(',').map(s => s.trim()).filter(s => s);
-      let details = [];
+      var stopIds = pendingRbl.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+      var details = [];
 
-      const pendingDetails = localStorage.getItem('straba_pending_details');
+      var pendingDetails = localStorage.getItem('straba_pending_details');
       if (pendingDetails) {
-        try {
-          details = JSON.parse(pendingDetails);
-        } catch (e) {
-          console.error('Fehler beim Parsen der Station Details:', e);
-        }
+        try { details = JSON.parse(pendingDetails); } catch (e) {}
       }
 
-      const network = detectNetworkFromRbl(pendingRbl);
+      var network = detectNetworkFromRbl(pendingRbl);
       updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
 
       document.getElementById('pendingBanner').style.display = 'block';
       document.getElementById('pendingText').textContent =
-        `${stopIds.length} Station${stopIds.length > 1 ? 'en' : ''} ausgewählt. Wird beim Speichern übernommen.`;
+        stopIds.length + ' Station' + (stopIds.length > 1 ? 'en' : '') + ' ausgewaehlt. Wird beim Speichern uebernommen.';
 
       updateGehwegList(stopIds, [], details);
 
@@ -2696,54 +2334,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
       updateRowOrderList();
 
-      // NUR Stations-Daten geladen — Settings NOCH NICHT!
-      // settingsLoaded bleibt false → loadFullConfig vom ESP32 wird akzeptiert
       configLoaded = true;
     } else {
-      // Keine pending Config - Default zu Wien (alle Features)
       updateFeatureVisibility(CITY_CAPABILITIES.WL);
     }
   }
 
-  // Config vom ESP32-Parent anfordern (1x, mit 2 Retries)
-  let configRetries = 0;
-  const MAX_CONFIG_RETRIES = 2;
+  // Config vom ESP32-Parent anfordern
+  var configRetries = 0;
+  var MAX_CONFIG_RETRIES = 2;
 
   function requestConfigFromParent() {
-    if (settingsLoaded) return;  // Bereits erhalten
+    if (settingsLoaded) return;
     if (window.parent && window.parent !== window) {
       configRetries++;
-      console.log('Frage Parent nach Config (Versuch ' + configRetries + ')...');
       window.parent.postMessage({ type: 'requestFullConfig' }, '*');
       window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
 
       if (configRetries <= MAX_CONFIG_RETRIES) {
-        // Retry nach 1.5s wenn keine Antwort
-        setTimeout(() => {
-          if (!settingsLoaded) {
-            console.log('Keine Antwort - retry...');
-            requestConfigFromParent();
-          }
+        setTimeout(function() {
+          if (!settingsLoaded) requestConfigFromParent();
         }, 1500);
       } else {
-        // Alle Versuche fehlgeschlagen → mit Defaults weitermachen
-        console.log('Keine Config vom ESP32 erhalten - verwende Standardwerte');
-        const cle = document.getElementById('configLoading');
+        var cle = document.getElementById('configLoading');
         if (cle) cle.classList.remove('show');
       }
     } else {
-      // Nicht in iframe → Loading ausblenden
-      const cle = document.getElementById('configLoading');
+      var cle = document.getElementById('configLoading');
       if (cle) cle.classList.remove('show');
     }
   }
 
-  // Starte Config-Anfrage (mit kleinem Delay damit iframe stabil ist)
   if (!settingsLoaded) {
     setTimeout(requestConfigFromParent, 100);
   }
 
-  // Finale Aktualisierung der Row Order Liste
   updateRowOrderList();
 });
 </script>
