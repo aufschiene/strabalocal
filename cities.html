@@ -352,6 +352,23 @@
     .direction-option.selected {
       background: #e8f0f8;
     }
+    .bis-dropdown-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 14px 10px;
+      background: #e8f0f8;
+    }
+    .bis-select {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+      background: #fff;
+      cursor: pointer;
+      flex: 1;
+      max-width: 220px;
+    }
     .direction-option .checkbox {
       width: 22px;
       height: 22px;
@@ -2723,7 +2740,10 @@ const REGIONS = {
         name: 'Zugverkehr',
         icon: '\uD83D\uDE86',
         desc: 'ÖBB, Westbahn',
-        networks: ['OEBB_FERN', 'OEBB', 'WESTBAHN']
+        subCategories: {
+          nah: { name: 'Nahverkehr', icon: '🚈', desc: 'S-Bahn, REX, Regionalzug, IR', networks: ['OEBB_REGIONAL'] },
+          fern: { name: 'Fernverkehr', icon: '🚄', desc: 'Railjet, IC, EC, Nightjet, Westbahn', networks: ['OEBB_FERN', 'WESTBAHN'] }
+        }
       }
     },
     // Legacy subRegions für Kompatibilität (wird von verkehrsarten ersetzt)
@@ -3231,8 +3251,11 @@ const WIEN_DATA_URL = 'https://straba-983965425140.europe-west3.run.app/search/'
 // Netzwerk-Alias für API-Calls (lokale Varianten → existierender Server-Endpoint)
 const API_NETWORK_MAP = {
   'OEBB_STAMM_SBAHN': 'OEBB_SBAHN',
-  'OEBB_REGIONAL': 'OEBB_SBAHN',
-  'OEBB_FERN': 'OEBB',
+  'OEBB_REGIONAL': 'OEBBREG',
+  'OEBB_SBAHN': 'OEBBREG',
+  'OEBB_REG_NOE': 'OEBBREG',
+  'OEBB_REG_OOE': 'OEBBREG',
+  'OEBB_FERN': 'OEBBFERN',
 };
 function mapNetworkForApi(network) {
   return API_NETWORK_MAP[network] || network;
@@ -3264,6 +3287,7 @@ let selectedSubRegion = null;
 
 // Verkehrsart (nur AT: 'stadt' oder 'zug')
 let selectedVerkehrsart = null;
+let selectedZugKategorie = null; // 'nah' oder 'fern'
 
 // Journey-Modus (für DB)
 let journeyFromStop = null;
@@ -3392,6 +3416,7 @@ function goBack(step) {
     selectedNetwork = null;
     selectedStop = null;
     selectedVerkehrsart = null;
+    selectedZugKategorie = null;
     selectedSubRegion = null;
     journeyFromStop = null;
     journeyToStop = null;
@@ -3511,11 +3536,37 @@ function renderNetworkGrid() {
     return;
   }
 
-  // === AT Zugverkehr: ÖBB / Westbahn direkt ===
+  // === AT Zugverkehr: Nah/Fern Auswahl ===
   if (region.verkehrsarten && selectedVerkehrsart === 'zug') {
-    if (titleEl) titleEl.textContent = 'Zuganbieter wählen';
-    if (backBtn) backBtn.setAttribute('onclick', "goBackToVerkehrsart()");
-    const networks = region.verkehrsarten.zug.networks;
+    const zugKat = region.verkehrsarten.zug;
+
+    // Wenn subCategories: erst Nah/Fern wählen
+    if (zugKat.subCategories && !selectedZugKategorie) {
+      if (titleEl) titleEl.textContent = 'Nah- oder Fernverkehr?';
+      if (backBtn) backBtn.setAttribute('onclick', "goBackToVerkehrsart()");
+      networkGrid.innerHTML = Object.entries(zugKat.subCategories).map(([key, cat]) => `
+        <button class="selection-btn" onclick="selectZugKategorie('${key}')">
+          <div class="network-badge" style="font-size:24px;">${cat.icon}</div>
+          <div class="name">${cat.name}</div>
+          <div class="desc">${cat.desc}</div>
+        </button>
+      `).join('');
+      return;
+    }
+
+    // Nah/Fern gewählt → Netzwerke anzeigen
+    const subCat = zugKat.subCategories?.[selectedZugKategorie];
+    const networks = subCat?.networks || zugKat.networks || [];
+
+    if (networks.length === 1) {
+      // Nur ein Netzwerk → direkt auswählen
+      selectNetwork(networks[0]);
+      return;
+    }
+
+    const katName = subCat?.name || 'Zugverkehr';
+    if (titleEl) titleEl.textContent = katName + ' — Anbieter wählen';
+    if (backBtn) backBtn.setAttribute('onclick', "selectedZugKategorie = null; renderNetworkGrid()");
     networkGrid.innerHTML = networks.map(id => {
       const net = NETWORKS[id];
       const badgeClass = id.toLowerCase();
@@ -3589,10 +3640,21 @@ function renderNetworkGrid() {
 
 function selectVerkehrsart(art) {
   selectedVerkehrsart = art;
+  selectedZugKategorie = null;
+  renderNetworkGrid();
+}
+
+function selectZugKategorie(kat) {
+  selectedZugKategorie = kat;
   renderNetworkGrid();
 }
 
 function goBackToVerkehrsart() {
+  if (selectedZugKategorie) {
+    selectedZugKategorie = null;
+    renderNetworkGrid();
+    return;
+  }
   selectedVerkehrsart = null;
   selectedSubRegion = null;
   selectedNetwork = null;
@@ -4521,8 +4583,8 @@ function extractLines(data) {
 
           // Bei OEBB Regional (alle): S-Bahn + REX + R + CJX, kein Fernverkehr
           if (selectedNetwork === 'OEBB_REGIONAL' || selectedNetwork === 'OEBB_REG_NOE' || selectedNetwork === 'OEBB_REG_OOE') {
-            // Nur S-Bahn (S1, S2...), REX, R-Züge (R1, R12...) und CJX
-            if (!/^(S\d|REX|R\d|CJX)/.test(name)) {
+            // Nur S-Bahn, REX, R-Züge, IR und CJX (kein Fernverkehr, keine Busse)
+            if (!/^(S\d|REX|R\d|R$|IR|CJX)/.test(name)) {
               return;
             }
           }
@@ -4559,13 +4621,48 @@ function extractLines(data) {
   }
 
   availableLines = Array.from(linesMap.values());
-  
+
   availableLines.sort((a, b) => {
     const aNum = parseInt(a.name) || 999;
     const bNum = parseInt(b.name) || 999;
     if (aNum !== bNum) return aNum - bNum;
     return a.name.localeCompare(b.name);
   });
+
+  // ÖBB Regional: Direction-Buchstaben zuweisen (A, B, C, ...)
+  // Basierend auf Richtungsgruppierung (gleiche erste Stopovers = gleiche Richtung)
+  if (isRegionalOebbNetwork()) {
+    const lineNames = [...new Set(availableLines.map(l => l.name))];
+    for (const lineName of lineNames) {
+      const lineDirs = availableLines.filter(l => l.name === lineName);
+      // Gruppiere nach Richtung
+      const ridGroups = new Map();
+      lineDirs.forEach(l => {
+        const key = getRegionalDirKey(l);
+        if (!ridGroups.has(key)) ridGroups.set(key, []);
+        ridGroups.get(key).push(l);
+      });
+      // Buchstaben zuweisen: A, B, C, ...
+      let letterIdx = 0;
+      for (const [key, dirs] of ridGroups) {
+        const letter = String.fromCharCode(65 + letterIdx); // A, B, C, ...
+        dirs.forEach(d => { d.directionLetter = letter; });
+        letterIdx++;
+      }
+    }
+  }
+}
+
+// Prüft ob ein Netzwerk ein ÖBB Regional-Netzwerk ist (für beliebiges network)
+function isRegOebb(network) {
+  return ['OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
+          'OEBB_REG_NOE', 'OEBB_REG_OOE'].includes(network);
+}
+
+// Prüft ob das aktuelle Netzwerk ein ÖBB Regional-Netzwerk ist
+function isRegionalOebbNetwork() {
+  return ['OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
+          'OEBB_REG_NOE', 'OEBB_REG_OOE'].includes(selectedNetwork);
 }
 
 function renderLines() {
@@ -4573,7 +4670,9 @@ function renderLines() {
     linesList.innerHTML = '<div class="no-results">Keine Abfahrten gefunden</div>';
     return;
   }
-  
+
+  const isRegional = isRegionalOebbNetwork();
+
   // Group by line name
   const groups = new Map();
   availableLines.forEach((line, idx) => {
@@ -4582,62 +4681,205 @@ function renderLines() {
     }
     groups.get(line.name).push({ ...line, idx });
   });
-  
+
+  // Für Regional-ÖBB: nur S-Bahn und REX anzeigen (keine Busse, Metro, Fernverkehr)
+  if (isRegional) {
+    const fernverkehr = new Set(['IC', 'ICE', 'EC', 'EN', 'NJ', 'RJ', 'RJX', 'IR', 'D', 'WB']);
+    for (const [name, dirs] of groups) {
+      const type = (dirs[0]?.type || '').toLowerCase();
+      if (type.includes('bus') || type.includes('metro') || type.includes('tram') || fernverkehr.has(name)) {
+        groups.delete(name);
+      }
+    }
+  }
+
+  // Sortiere Linien: S-Bahn zuerst, dann REX/CJX, dann R/IR
+  const sortedGroups = [...groups.entries()].sort((a, b) => {
+    const typeOrder = (name) => {
+      if (/^S\d/.test(name)) return 0;  // S-Bahn
+      if (/^CJX/.test(name)) return 1;  // CJX (wie S-Bahn)
+      if (/^REX/.test(name)) return 2;  // REX
+      if (/^R\d|^R$/.test(name)) return 3;  // R-Züge
+      if (/^IR/.test(name)) return 4;   // IR
+      return 5;
+    };
+    const orderDiff = typeOrder(a[0]) - typeOrder(b[0]);
+    if (orderDiff !== 0) return orderDiff;
+    // Gleicher Typ: nach Nummer sortieren (S1 < S2 < S45)
+    const numA = parseInt(a[0].replace(/\D/g, '')) || 999;
+    const numB = parseInt(b[0].replace(/\D/g, '')) || 999;
+    return numA - numB;
+  });
+
   let html = '';
-  groups.forEach((directions, lineName) => {
-    const allSelected = directions.every(d => selectedLines.has(d.idx));
-    const someSelected = directions.some(d => selectedLines.has(d.idx));
+  sortedGroups.forEach(([lineName, directions]) => {
     const lineType = directions[0]?.type || '';
     const badgeClass = getLineTypeClass(lineType, lineName);
-    
-    html += `
-      <div class="line-group">
+
+    if (isRegional) {
+      // === REGIONAL-MODUS: 2 Richtungen pro Linie ===
+      // Gruppiere nach Strecke (gleiche erste 2 Stopovers = gleiche Richtung)
+      const ridGroups = new Map();
+      directions.forEach(dir => {
+        const stops = dir.stopovers || [];
+        let dirKey;
+        if (stops.length >= 2) {
+          dirKey = stops.slice(0, 2).join('|');
+        } else if (stops.length === 1) {
+          dirKey = stops[0];
+        } else {
+          // Keine Stopovers → jedes Ziel separat (nicht ideal, aber korrekt)
+          dirKey = dir.towards || 'unknown';
+        }
+        if (!ridGroups.has(dirKey)) ridGroups.set(dirKey, []);
+        ridGroups.get(dirKey).push(dir);
+      });
+
+      html += `<div class="line-group">
         <div class="line-group-header">
           <div class="line-badge ${badgeClass}">${lineName}</div>
-          <div class="line-name">Linie ${lineName}</div>
-          <button class="line-toggle" onclick="toggleLineGroup('${lineName}')">${allSelected ? 'Abwählen' : 'Alle'}</button>
+          <div class="line-name">${lineName}</div>
         </div>
-        <div class="line-directions">
-    `;
-    
-    directions.forEach(dir => {
-      const selected = selectedLines.has(dir.idx);
-      const hasVia = selected && dir.stopovers && dir.stopovers.length > 0 && (selectedNetwork === 'OEBB' || selectedNetwork === 'DB');
-      const currentVia = selectedVias.get(dir.idx) || null;
+        <div class="line-directions">`;
+
+      // Hinweis wenn >2 Richtungen (fehlende GTFS-Daten)
+      if (ridGroups.size > 2) {
+        html += `<div style="margin:4px 0 8px;padding:8px 12px;background:#fff8e6;border-radius:8px;font-size:11px;color:#886600;line-height:1.4;">
+          Manche Datengrundlagen filtern nicht alle Richtungen perfekt. Am besten alle Ziele anhaken die deine Richtung betreffen und dann im Feintuning diese Linien gruppieren.
+        </div>`;
+      }
+
+      ridGroups.forEach((ridDirs, dirKey) => {
+        // Sortiere: meiste Stopovers = weiteste Route → als Richtungsname verwenden
+        ridDirs.sort((a, b) => (a.stopovers?.length || 0) - (b.stopovers?.length || 0));
+
+        // Weitester Endbahnhof (letzter in der sortierten Liste) = Richtungsname
+        const furthestDest = ridDirs[ridDirs.length - 1]?.towards || 'Unbekannt';
+        const dirLabel = `Richtung ${shortenStopName(furthestDest)}`;
+
+        const anySelected = ridDirs.some(d => selectedLines.has(d.idx));
+        // Welcher Endhalt ist gerade ausgewählt?
+        const selectedEndIdx = ridDirs.reduce((best, d) => {
+          if (selectedLines.has(d.idx)) return d.idx;
+          return best;
+        }, -1);
+
+        const escapedKey = dirKey.replace(/'/g, "\\'").replace(/\|/g, "\\|");
+
+        // Klick wählt ALLE Züge dieser Richtung (den weitesten Endhalt = alle inklusive)
+        const furthestIdx = ridDirs[ridDirs.length - 1].idx;
+
+        html += `
+          <div class="direction-option ${anySelected ? 'selected' : ''}" onclick="selectRegionalDirection('${lineName}', '${escapedKey}', ${furthestIdx})">
+            <div class="checkbox">${anySelected ? '✓' : ''}</div>
+            <div class="direction-text">${dirLabel}</div>
+          </div>`;
+
+        // BETA: "Nur Züge bis..." Filter (nur wenn Richtung ausgewählt und >1 Endhalt)
+        if (anySelected && ridDirs.length > 1) {
+          const endStops = ridDirs.map(d => ({idx: d.idx, name: shortenStopName(d.towards)}));
+          html += `<div style="margin-left:32px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+            <span style="font-size:11px;color:#999;background:#f0f0f0;padding:2px 6px;border-radius:4px;">BETA</span>
+            <span style="font-size:12px;color:#888;">Mindestens bis:</span>
+            <select style="padding:5px 10px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:#fafafa;" onchange="changeBisStop('${lineName}', '${escapedKey}', this.value)">
+              <option value="${furthestIdx}" ${selectedEndIdx === furthestIdx || selectedEndIdx === -1 ? 'selected' : ''}>Alle</option>`;
+          // Endhalte in Streckenreihenfolge (kürzeste → längste)
+          endStops.forEach(es => {
+            if (es.idx !== furthestIdx) {
+              html += `<option value="${es.idx}" ${es.idx === selectedEndIdx ? 'selected' : ''}>${es.name}</option>`;
+            }
+          });
+          html += `</select></div>`;
+          // Info-Text unter dem Dropdown
+          const firstStop = endStops[0]?.name || '?';
+          html += `<div style="margin-left:32px;margin-bottom:6px;font-size:11px;color:#aaa;line-height:1.4;">
+            Zeige nur ${lineName}-Züge an, die mindestens einen bestimmten Zwischenstopp erreichen. <span style="color:#cc8800;">Beta — kann Fehler enthalten.</span>
+          </div>`;
+        }
+      });
+
+      html += `</div></div>`;
+
+    } else {
+      // === STANDARD-MODUS (Wien, Linz, STV, etc.): Bisheriges Layout ===
+      const allSelected = directions.every(d => selectedLines.has(d.idx));
 
       html += `
-        <div class="direction-option ${selected ? 'selected' : ''}" onclick="toggleLine(${dir.idx})">
-          <div class="checkbox">${selected ? '✓' : ''}</div>
-          <div class="direction-text">
-            → ${dir.towards || 'Alle Richtungen'}
-            ${currentVia ? `<span class="via-active">via ${currentVia}</span>` : ''}
+        <div class="line-group">
+          <div class="line-group-header">
+            <div class="line-badge ${badgeClass}">${lineName}</div>
+            <div class="line-name">Linie ${lineName}</div>
+            <button class="line-toggle" onclick="toggleLineGroup('${lineName}')">${allSelected ? 'Abwählen' : 'Alle'}</button>
           </div>
-        </div>
+          <div class="line-directions">
       `;
 
-      // Stopovers als "via" Auswahl anzeigen (nur wenn Richtung ausgewählt)
-      if (hasVia) {
-        html += `<div class="stopovers-row" onclick="event.stopPropagation()">`;
-        html += `<span class="stopovers-label">Via:</span>`;
-        dir.stopovers.forEach(stop => {
-          // Stopname kürzen: "Linz/Donau Hauptbahnhof 1" → "Linz"
-          const shortName = shortenStopName(stop);
-          const isActive = currentVia === stop;
-          html += `<span class="stopover-chip ${isActive ? 'active' : ''}" onclick="event.stopPropagation(); toggleVia(${dir.idx}, '${stop.replace(/'/g, "\\'")}')">${shortName}</span>`;
-        });
-        html += `</div>`;
-      }
-    });
-    
-    html += `
-        </div>
-      </div>
-    `;
+      directions.forEach(dir => {
+        const selected = selectedLines.has(dir.idx);
+        html += `
+          <div class="direction-option ${selected ? 'selected' : ''}" onclick="toggleLine(${dir.idx})">
+            <div class="checkbox">${selected ? '✓' : ''}</div>
+            <div class="direction-text">→ ${dir.towards || 'Alle Richtungen'}</div>
+          </div>
+        `;
+      });
+
+      html += `</div></div>`;
+    }
   });
-  
+
   linesList.innerHTML = html;
   updateAddButton();
   updateSelectAllButton();
+}
+
+// Gruppierungskey für Regional-Richtungen (gleiche erste 2 Stopovers)
+function getRegionalDirKey(line) {
+  const stops = line.stopovers || [];
+  if (stops.length >= 2) return stops.slice(0, 2).join('|');
+  if (stops.length === 1) return stops[0];
+  return line.towards || 'unknown';
+}
+
+// Regional-Richtung auswählen/abwählen
+function selectRegionalDirection(lineName, rid, furthestIdx) {
+  // Unescape | from onclick
+  rid = rid.replace(/\\\|/g, '|');
+  const ridDirs = availableLines
+    .map((l, idx) => ({...l, idx}))
+    .filter(l => l.name === lineName && getRegionalDirKey(l) === rid);
+
+  const anySelected = ridDirs.some(d => selectedLines.has(d.idx));
+
+  if (anySelected) {
+    ridDirs.forEach(d => { selectedLines.delete(d.idx); selectedVias.delete(d.idx); });
+  } else {
+    // Auswählen: den ausgewählten Endhalt
+    selectedLines.add(furthestIdx);
+  }
+  renderLines();
+}
+
+// "Bis wohin" Dropdown geändert
+function changeBisStop(lineName, rid, selectedIdx) {
+  rid = rid.replace(/\\\|/g, '|');
+  selectedIdx = parseInt(selectedIdx);
+  const ridDirs = availableLines
+    .map((l, idx) => ({...l, idx}))
+    .filter(l => l.name === lineName && getRegionalDirKey(l) === rid);
+
+  // Sortiere nach Stopovers (kürzeste → längste)
+  ridDirs.sort((a, b) => (a.stopovers?.length || 0) - (b.stopovers?.length || 0));
+
+  // Finde Position des gewählten Endhalts
+  const bisPos = ridDirs.findIndex(d => d.idx === selectedIdx);
+
+  // Deselect alle, dann select alle BIS zum gewählten
+  ridDirs.forEach(d => { selectedLines.delete(d.idx); selectedVias.delete(d.idx); });
+  // Nur den gewählten Endhalt auswählen (richtungsId matcht eh alle dazwischen)
+  selectedLines.add(selectedIdx);
+
+  renderLines();
 }
 
 function getLineTypeClass(type, lineName) {
@@ -5344,16 +5586,41 @@ function addStation() {
   const uniqueLineNames = [...new Set(selectedLineNames)];
   const filter = uniqueLineNames.join(',');
 
-  const fullId = `${selectedNetwork}:${selectedStop.id}`;
+  // Netzwerk-Mapping: OEBB_SBAHN → OEBBREG, OEBB_FERN → OEBBFERN etc.
+  // Server filtert automatisch nach Produkt basierend auf dem Netzwerk-Prefix
+  const apiNetwork = mapNetworkForApi(selectedNetwork);
+  let fullId = `${apiNetwork}:${selectedStop.id}`;
 
   // Ausgewaehlte Richtungen speichern (Linie + towards + optionaler via-Filter + richtungsId)
-  const selectedDirections = Array.from(selectedLines).map(idx => ({
-    line: availableLines[idx].name,
-    towards: availableLines[idx].towards || '',
-    type: availableLines[idx].type || '',
-    richtungsId: availableLines[idx].richtungsId || '',
-    ...(selectedVias.has(idx) ? { via: selectedVias.get(idx) } : {})
-  }));
+  const selectedDirections = Array.from(selectedLines).map(idx => {
+    const line = availableLines[idx];
+    const dir = {
+      line: line.name,
+      towards: line.towards || '',
+      type: line.type || '',
+      richtungsId: line.richtungsId || '',
+      ...(selectedVias.has(idx) ? { via: selectedVias.get(idx) } : {})
+    };
+    // ÖBB Regional: Direction-Buchstabe und "Mindestens bis" Targets
+    if (isRegionalOebbNetwork() && line.directionLetter) {
+      dir.directionLetter = line.directionLetter;
+      // Finde alle Endhalte dieser Richtung die mindestens so weit fahren
+      const ridKey = getRegionalDirKey(line);
+      const ridDirs = availableLines
+        .filter(l => l.name === line.name && getRegionalDirKey(l) === ridKey);
+      // Sortiere nach Stopovers-Länge (kürzeste → längste)
+      ridDirs.sort((a, b) => (a.stopovers?.length || 0) - (b.stopovers?.length || 0));
+      const myPos = ridDirs.findIndex(d => d.towards === line.towards);
+      // Alle Endhalte AB dem gewählten (= mindestens so weit)
+      const targets = ridDirs.slice(myPos >= 0 ? myPos : 0).map(d => d.towards);
+      const isFurthest = ridDirs.length > 0 && ridDirs[ridDirs.length - 1].towards === line.towards;
+      // Nur setzen wenn NICHT "Alle" (= weitester Endhalt) gewählt
+      if (!isFurthest && targets.length > 0) {
+        dir.bisTargets = targets;
+      }
+    }
+    return dir;
+  });
 
   if (editingStationIndex !== null) {
     // Bearbeiten-Modus: Bestehende Station aktualisieren
@@ -5923,15 +6190,27 @@ function calculateRecommendedConfig() {
     rowOrder: (function() {
       const items = [];
       stations.forEach(s => {
-        if (s.network !== 'WL') return;  // Nur Wien
         if (s.allDepartures) return;
-        if (s.directions && s.directions.length > 0) {
-          s.directions.forEach(d => {
-            // Wien: stopId:Linie (z.B. "250:5", "4621:U6")
-            const rbl = s.stopId || '';
-            const item = `${rbl}:${d.line}`;
-            if (!items.includes(item)) items.push(item);
-          });
+        if (s.network === 'WL') {
+          // Wien: stopId:Linie (z.B. "250:5", "4621:U6")
+          if (s.directions && s.directions.length > 0) {
+            s.directions.forEach(d => {
+              const rbl = s.stopId || '';
+              const item = `${rbl}:${d.line}`;
+              if (!items.includes(item)) items.push(item);
+            });
+          }
+        } else if (isRegOebb(s.network)) {
+          // ÖBB Regional: Linie:Zieltext (z.B. "S3:Pregarten Bahnhof")
+          // Wird als Via-Referenz verwendet (Firmware zeigt "via Pregarten" wenn Zug weiter fährt)
+          if (s.directions && s.directions.length > 0) {
+            s.directions.forEach(d => {
+              if (d.towards) {
+                const item = `${d.line}:${d.towards}`;
+                if (!items.includes(item)) items.push(item);
+              }
+            });
+          }
         }
       });
       return items.join(',');
@@ -6002,8 +6281,10 @@ function calculateRecommendedConfig() {
  * aber trotzdem angezeigt werden sollen.
  */
 // ÖBB HAFAS richtungsIds sind instabil (ändern sich täglich).
-// Nur diese Netzwerke haben stabile richtungsIds:
+// Netzwerke mit stabilen richtungsIds (Server normalisiert ÖBB richtungsIds pro Strecke):
 function hasStableRichtungsId(network) {
+  // Nur Netzwerke mit stabilen richtungsIds (H/R, 1/2, etc.)
+  // ÖBB HAFAS IDs sind NICHT stabil (ändern sich täglich) → Zieltext verwenden
   return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN'].includes(network);
 }
 
@@ -6011,6 +6292,29 @@ function hasStableRichtungsId(network) {
 function getDirectionKey(dir, network) {
   if (dir.richtungsId && hasStableRichtungsId(network)) {
     return `${dir.line}:${dir.richtungsId}`;
+  }
+  // ÖBB Regional: Direction-Buchstabe wenn vorhanden (z.B. S3A, S3B)
+  // Der "Mindestens bis" Filter wird separat über bisTargets gelöst
+  if (dir.directionLetter) {
+    return `${dir.line}:${dir.line}${dir.directionLetter}`;
+  }
+  return dir.towards ? `${dir.line}:${dir.towards}` : dir.line;
+}
+
+// Baut den Zieltext-Filter für "Mindestens bis" Feature
+// Wenn bisTargets gesetzt: alle Endhalte ab dem gewählten Halt
+// Wenn nicht: nur die directionId (alle Züge dieser Richtung)
+function getDirectionFilterKey(dir, network) {
+  if (dir.richtungsId && hasStableRichtungsId(network)) {
+    return `${dir.line}:${dir.richtungsId}`;
+  }
+  // "Mindestens bis" aktiv: Liste aller Endhalte die mindestens so weit fahren
+  if (dir.bisTargets && dir.bisTargets.length > 0) {
+    return `${dir.line}:${dir.bisTargets.join('|')}`;
+  }
+  // Standard: Direction-Buchstabe (alle Züge dieser Richtung)
+  if (dir.directionLetter) {
+    return `${dir.line}:${dir.line}${dir.directionLetter}`;
   }
   return dir.towards ? `${dir.line}:${dir.towards}` : dir.line;
 }
@@ -6029,6 +6333,23 @@ function buildLineFilterDestination(stationsList) {
       if (!dir.line) return;
       const line = dir.line;
 
+      // ÖBB Regional mit "Mindestens bis": bisTargets als Filter
+      if (dir.bisTargets && dir.bisTargets.length > 0) {
+        if (!lineToDestinations[line]) lineToDestinations[line] = [];
+        dir.bisTargets.forEach(t => {
+          if (!lineToDestinations[line].includes(t)) lineToDestinations[line].push(t);
+        });
+        return;
+      }
+
+      // ÖBB Regional mit Direction-Buchstabe: Direction-ID als Filter (alle Züge)
+      if (dir.directionLetter) {
+        if (!lineToDestinations[line]) lineToDestinations[line] = [];
+        const dirId = `${line}${dir.directionLetter}`;
+        if (!lineToDestinations[line].includes(dirId)) lineToDestinations[line].push(dirId);
+        return;
+      }
+
       // Für Netzwerke mit stabilen richtungsIds: richtungsId verwenden
       if (dir.richtungsId && hasStableRichtungsId(station.network)) {
         if (!lineToDestinations[line]) lineToDestinations[line] = [];
@@ -6036,7 +6357,7 @@ function buildLineFilterDestination(stationsList) {
           lineToDestinations[line].push(dir.richtungsId);
         }
       } else if (dir.towards) {
-        // ÖBB und andere: Zieltext verwenden
+        // Andere: Zieltext verwenden
         if (!lineToDestinations[line]) lineToDestinations[line] = [];
         if (!lineToDestinations[line].includes(dir.towards)) {
           lineToDestinations[line].push(dir.towards);
