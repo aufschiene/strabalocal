@@ -2019,9 +2019,9 @@ function applyConfig(config) {
     }
   }
 
-  // Zeilen-Reihenfolge aus Config laden
+  // Zeilen-Reihenfolge aus Config laden — NUR wenn keine neuen Stops pending sind
   var savedRowOrder = config.roworder || config.linegroups || '';
-  if (savedRowOrder) {
+  if (savedRowOrder && !pendingRbl) {
     var lineDirectionMap = new Map();
     var index = 0;
     var stopIdToIndex = {};
@@ -2409,6 +2409,10 @@ document.addEventListener('DOMContentLoaded', function() {
       updateRowOrderList();
 
       configLoaded = true;
+      settingsLoaded = true;
+      var cle2 = document.getElementById('configLoading');
+      if (cle2) cle2.classList.remove('show');
+      updateUI();
     } else {
       updateFeatureVisibility(CITY_CAPABILITIES.WL);
     }
