@@ -1405,24 +1405,10 @@ function updateRowOrderList() {
   }
   section.classList.add('show');
 
-  // Wenn neue Stops (pendingRbl) → alte rowOrderItems verwerfen
-  if (pendingRbl && rowOrderItems.length > 0) {
-    var currentStops = pendingRbl.split(',').map(function(s) { return s.trim(); });
-    var anyMatch = rowOrderItems.some(function(item) {
-      return item.stopIds && item.stopIds.some(function(sid) {
-        return currentStops.indexOf(sid) >= 0;
-      });
-    });
-    if (!anyMatch) {
-      rowOrderItems = [];
-      container.dataset.itemsKey = '';
-    }
-  }
-
-  if (rowOrderItems.length > 0 && container.dataset.itemsKey === '') {
-    container.dataset.itemsKey = 'loaded-from-config';
-    renderRowOrderList();
-    return;
+  // Wenn neue Stops (pendingRbl) → IMMER neu aufbauen
+  if (pendingRbl) {
+    rowOrderItems = [];
+    container.dataset.itemsKey = '';
   }
 
   var rblString = pendingRbl || currentConfig.rbl_id || '';
@@ -1434,36 +1420,31 @@ function updateRowOrderList() {
     return;
   }
 
-  var newItemsKey = rblString + '|' + filterString + '|' + currentStationDetails.length;
+  var newItemsKey = rblString + '|' + filterString;
   if (container.dataset.itemsKey !== newItemsKey || rowOrderItems.length === 0) {
-    // Logische Gruppen per gehweg (|) erkennen, nicht per Komma
-    // gehweg: "4131,4136:0|4271:0" → Gruppen: ["4131,4136", "4271"]
-    var gehwegStr = currentConfig.gehweg || '';
-    var logicalGroups = [];
-    if (gehwegStr && gehwegStr.indexOf('|') >= 0) {
-      gehwegStr.split('|').forEach(function(seg) {
-        var colonPos = seg.indexOf(':');
-        logicalGroups.push(colonPos > 0 ? seg.substring(0, colonPos) : seg);
-      });
-    }
-    // Fallback: wenn keine gehweg-Gruppen, split per Komma (alte Logik)
-    var stopGroups = logicalGroups.length > 0 ? logicalGroups : rblString.split(',').map(function(s) { return s.trim(); });
+    // Einfache Zuordnung: Filter per | splitten = logische Gruppen
+    // Stops per Komma verteilen auf Gruppen (Wien: mehrere numerische Stops pro Gruppe)
     var filters = filterString.split('|').map(function(s) { return s.trim(); });
+    var allStops = rblString.split(',').map(function(s) { return s.trim(); });
 
     var lineEntries = [];
-    stopGroups.forEach(function(stopGroup, i) {
-      // Jede Gruppe kann mehrere Stop-IDs haben (Wien: "4131,4136")
-      var individualStops = stopGroup.split(',').map(function(s) { return s.trim(); });
-      var linesForStop = filters[i] ? filters[i].split(',').map(function(l) { return l.trim(); }) : [];
-
-      // Pro individuellem Bahnsteig + Linie einen Eintrag
-      individualStops.forEach(function(stopId) {
-        linesForStop.forEach(function(line) {
+    var rblIdx = 0;
+    for (var fi = 0; fi < filters.length && rblIdx < allStops.length; fi++) {
+      var linesForGroup = filters[fi].split(',').map(function(l) { return l.trim(); });
+      var groupStops = [allStops[rblIdx]]; rblIdx++;
+      // Wien: weitere numerische Stops in gleicher Gruppe (bis zum nächsten nicht-numerischen oder Gruppenende)
+      while (rblIdx < allStops.length && rblIdx < allStops.length - (filters.length - fi - 1)) {
+        if (!/^\d+$/.test(allStops[rblIdx])) break;
+        groupStops.push(allStops[rblIdx]); rblIdx++;
+      }
+      // Pro Stop + Linie einen Eintrag
+      groupStops.forEach(function(stopId) {
+        linesForGroup.forEach(function(line) {
           if (line) {
             var direction = '';
             var stationName = '';
-            if (currentStationDetails && currentStationDetails[i]) {
-              var station = currentStationDetails[i];
+            if (currentStationDetails && currentStationDetails[fi]) {
+              var station = currentStationDetails[fi];
               stationName = station.name || station.stationName || '';
               if (station.lines) {
                 var lineInfo = station.lines.find(function(l) { return l.name === line; });
@@ -1475,7 +1456,7 @@ function updateRowOrderList() {
               direction: direction,
               stationName: stationName,
               stopIds: [stopId],
-              firstIndex: i
+              firstIndex: fi
             });
           }
         });
