@@ -2150,26 +2150,27 @@ document.getElementById('saveBtn').addEventListener('click', function() {
     if (rblString && filterString) {
       rowOrder = buildRowOrderFromStops(rblString, filterString);
       lineGroups = rowOrder;
-      }
-      var parts = [];
-      groups.forEach(function(group, gi) {
-        var individualStops = group.split(',').map(function(s) { return s.trim(); });
-        var linesForGroup = filters[gi] ? filters[gi].split(',').map(function(l) { return l.trim(); }) : [];
-        individualStops.forEach(function(stopId) {
-          linesForGroup.forEach(function(line) { if (line) parts.push(stopId + ':' + line); });
-        });
-      });
-      rowOrder = parts.join(',');
-      lineGroups = rowOrder;
     }
   } else if (sortMode === '1' && rowOrderItems.length > 0) {
-    // Manuelle statische Sortierung
-    var ftGroups = collectFtLineGroups();
-    if (ftGroups) {
-      rowOrder = ftGroups;
-      lineGroups = ftGroups;
+    // Manuelle statische Sortierung — prüfe ob Items noch zu aktuellen Stops passen
+    var currentStops = rblString.split(',').map(function(s) { return s.trim(); });
+    var itemsValid = rowOrderItems.some(function(item) {
+      return item.stopIds && item.stopIds.some(function(sid) {
+        return currentStops.indexOf(sid) >= 0;
+      });
+    });
+    if (itemsValid) {
+      var ftGroups = collectFtLineGroups();
+      if (ftGroups) {
+        rowOrder = ftGroups;
+        lineGroups = ftGroups;
+      } else {
+        rowOrder = getRowOrderString();
+        lineGroups = rowOrder;
+      }
     } else {
-      rowOrder = getRowOrderString();
+      // Alte Items ungültig — frisch generieren
+      rowOrder = buildRowOrderFromStops(rblString, filterString);
       lineGroups = rowOrder;
     }
   } else if (sortMode === '2') {
@@ -2177,14 +2178,8 @@ document.getElementById('saveBtn').addEventListener('click', function() {
     rowOrder = '';
     lineGroups = '';
   } else if (rblString && filterString) {
-    var stopIds2 = rblString.split(',').map(function(s) { return s.trim(); });
-    var filters2 = filterString.split('|').map(function(s) { return s.trim(); });
-    var rowParts = [];
-    stopIds2.forEach(function(stopId, i) {
-      var linesForStop = filters2[i] ? filters2[i].split(',').map(function(l) { return l.trim(); }) : [];
-      linesForStop.forEach(function(line) { if (line) rowParts.push(stopId + ':' + line); });
-    });
-    rowOrder = rowParts.join(',');
+    // Fallback: frisch generieren
+    rowOrder = buildRowOrderFromStops(rblString, filterString);
     lineGroups = rowOrder;
   }
 
