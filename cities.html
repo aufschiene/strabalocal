@@ -2422,18 +2422,22 @@
     </div>
 
     <div class="lines-container hidden" id="linesContainer">
-      <button class="btn" id="allDeparturesBtn" onclick="addStationAllDepartures()" style="width:100%;margin-bottom:12px;padding:14px;background:#0055a4;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;">
-        Alle Abfahrten anzeigen
-      </button>
-      <div class="lines-header">
-        <h3>Oder Linien auswählen:</h3>
+      <!-- Toggle: Alle Abfahrten vs Linien auswählen -->
+      <div style="display:flex;background:#f0f0f0;border-radius:10px;padding:4px;margin-bottom:12px;" id="departureModeToggle">
+        <button class="toggle-btn" id="btnAllDepartures" onclick="setDepartureMode('all')" style="flex:1;">Alle Abfahrten</button>
+        <button class="toggle-btn active" id="btnSelectLines" onclick="setDepartureMode('lines')" style="flex:1;">Linien wählen</button>
+      </div>
+      <div class="lines-header" id="linesHeader">
+        <h3>Linien auswählen:</h3>
         <button class="select-all-btn" id="selectAllBtn" onclick="toggleSelectAll()">Alle auswählen</button>
       </div>
       <div id="linesList"></div>
+      <!-- Hidden button für Kompatibilität -->
+      <button class="btn hidden" id="allDeparturesBtn"></button>
     </div>
 
-    <button class="btn btn-primary" id="addStationBtn" onclick="showGroupingStep()" disabled>
-      Weiter
+    <button class="btn btn-primary hidden" id="addStationBtn" onclick="showGroupingStep()" disabled>
+      Station hinzufügen
     </button>
   </div>
 
@@ -3350,6 +3354,31 @@ function showStep(step) {
   if (stepWienLine) stepWienLine.classList.toggle('hidden', step !== 'wienLine');
   if (stepWienStation) stepWienStation.classList.toggle('hidden', step !== 'wienStation');
   if (stepWienDirection) stepWienDirection.classList.toggle('hidden', step !== 'wienDirection');
+
+  // Ein Button für alles — der fixierte saveBtn in der bottom-bar
+  const isEditingLines = (step === 'lines' || step === 'search' || step === 'wienLine' || step === 'wienStation' || step === 'wienDirection');
+  const bottomBar = document.querySelector('.bottom-bar');
+  const openFinetuningBtn = document.getElementById('openFinetuningBtn');
+
+  // openFinetuningBtn im stationsCard immer verstecken — alles über bottom-bar
+  if (openFinetuningBtn) openFinetuningBtn.classList.add('hidden');
+
+  if (isEditingLines) {
+    // Im Linien-Step: saveBtn → "Station hinzufügen"/"Aktualisieren"
+    if (bottomBar) bottomBar.style.display = '';
+    saveBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
+    saveBtn.onclick = function() { showGroupingStep(); };
+    saveBtn.disabled = true;  // Wird von updateAddButton enabled
+  } else if (stations.length > 0) {
+    // Stationen vorhanden: "Weiter"
+    if (bottomBar) bottomBar.style.display = '';
+    saveBtn.textContent = 'Weiter';
+    saveBtn.onclick = function() { handleStationsNextStep(); };
+    saveBtn.disabled = false;
+  } else {
+    // Keine Stationen, kein Lines-Step: bottom-bar verstecken
+    if (bottomBar) bottomBar.style.display = 'none';
+  }
 
   updateBreadcrumb();
 }
@@ -4507,8 +4536,8 @@ async function selectStop(id, name) {
   linesLoading.classList.remove('hidden');
   linesContainer.classList.add('hidden');
   addStationBtn.disabled = true;
-  addStationBtn.style.display = '';
-  addStationBtn.textContent = 'Weiter';
+  addStationBtn.style.display = 'none';  // Versteckt — alles über fixierten saveBtn
+  addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
   document.getElementById('selectAllBtn').style.display = '';
 
   try {
@@ -5026,9 +5055,9 @@ function renderOebbDestSearch() {
   // Header anpassen
   document.querySelector('#linesContainer .lines-header h3').textContent = 'Züge nach...';
   document.getElementById('selectAllBtn').style.display = 'none';
-  addStationBtn.style.display = '';
+  addStationBtn.style.display = 'none';  // Versteckt — alles über fixierten saveBtn
   addStationBtn.disabled = !oebb_toStop;
-  addStationBtn.textContent = 'Weiter';
+  addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
 
   let html = '';
 
@@ -5158,9 +5187,9 @@ function renderStammstreckeConfig() {
   // Header anpassen
   document.querySelector('#linesContainer .lines-header h3').textContent = 'Stammstrecke konfigurieren';
   document.getElementById('selectAllBtn').style.display = 'none';
-  addStationBtn.style.display = '';
+  addStationBtn.style.display = 'none';  // Versteckt — alles über fixierten saveBtn
   addStationBtn.disabled = stamm_selectedRichtungen.size === 0;
-  addStationBtn.textContent = 'Weiter';
+  addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
 
   let html = '';
 
@@ -5313,9 +5342,9 @@ function renderPointToPointConfig() {
   document.querySelector('#linesContainer .lines-header h3').textContent = 'Fernverkehr konfigurieren';
   document.getElementById('selectAllBtn').style.display = 'none';
   document.getElementById('allDeparturesBtn').style.display = 'none';
-  addStationBtn.style.display = '';
+  addStationBtn.style.display = 'none';  // Versteckt — alles über fixierten saveBtn
   addStationBtn.disabled = !oebb_toStop;
-  addStationBtn.textContent = 'Weiter';
+  addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
   addStationBtn.onclick = function() { addStationFromOebb(); };
 
   const gattungen = NETWORKS[selectedNetwork]?.defaultGattungen || OEBB_GATTUNGEN;
@@ -5520,13 +5549,49 @@ function updateSelectAllButton() {
 }
 
 function updateAddButton() {
-  addStationBtn.disabled = selectedLines.size === 0;
+  const enabled = selectedLines.size > 0;
+  addStationBtn.disabled = !enabled;
+  // Auch den fixierten bottom-bar Button updaten wenn im Lines-Step
+  if (['lines', 'search'].includes(currentStep)) {
+    saveBtn.disabled = !enabled;
+  }
 }
 
 // Gruppierung jetzt nur im Feintuning - alte Funktionen entfernt
 function showGroupingStep() {
-  // Direkt Station hinzufuegen - Gruppierung im Feintuning
-  addStation();
+  // Je nach Toggle: Alle Abfahrten oder bestimmte Linien
+  if (departureMode === 'all') {
+    addStationAllDepartures();
+  } else {
+    addStation();
+  }
+}
+
+// ==================== DEPARTURE MODE TOGGLE ====================
+let departureMode = 'lines';  // 'all' oder 'lines' — Standard: Linien wählen
+
+function setDepartureMode(mode) {
+  departureMode = mode;
+  const btnAll = document.getElementById('btnAllDepartures');
+  const btnLines = document.getElementById('btnSelectLines');
+  const linesList = document.getElementById('linesList');
+  const linesHeader = document.getElementById('linesHeader');
+
+  if (mode === 'all') {
+    btnAll.classList.add('active');
+    btnLines.classList.remove('active');
+    if (linesList) linesList.style.display = 'none';
+    if (linesHeader) linesHeader.style.display = 'none';
+    // saveBtn enablen — "Alle Abfahrten" ist immer gültig
+    saveBtn.disabled = false;
+  } else {
+    btnAll.classList.remove('active');
+    btnLines.classList.add('active');
+    if (linesList) linesList.style.display = '';
+    if (linesHeader) linesHeader.style.display = '';
+    // saveBtn disabled bis Linien gewählt
+    saveBtn.disabled = selectedLines.size === 0;
+  }
 }
 
 // ==================== ADD STATION ====================
@@ -5627,6 +5692,8 @@ function addStation() {
     const existingStation = stations[editingStationIndex];
     existingStation.filter = filter;
     existingStation.directions = selectedDirections;
+    existingStation.allDepartures = false;  // Von "Alle" auf bestimmte Linien gewechselt
+    existingStation.fullId = fullId;  // fullId aktualisieren (Netzwerk-Mapping)
 
     // WICHTIG: Entferne andere Stationen mit derselben fullId (Duplikate)
     // Das passiert wenn eine "existing" Station bearbeitet wird
@@ -5858,6 +5925,11 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
 
   document.getElementById('selectedStationName').textContent = name;
   document.getElementById('selectedStationInfo').textContent = `${NETWORKS[selectedNetwork].name} · ID: ${id}`;
+
+  // Toggle-Modus setzen: "Alle Abfahrten" wenn Station allDepartures hat, sonst "Linien wählen"
+  const editingStation = editingStationIndex !== null ? stations[editingStationIndex] : null;
+  const isAllDeps = editingStation && editingStation.allDepartures;
+  setDepartureMode(isAllDeps ? 'all' : 'lines');
 
   searchResults.classList.remove('show');
   showStep('lines');
