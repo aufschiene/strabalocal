@@ -4317,20 +4317,22 @@ function addWienStation() {
     return;
   }
 
-  // Ausgewaehlte Richtungen speichern (Linie + towards)
+  // Ausgewaehlte Richtungen speichern (Linie + towards + stopId pro Bahnsteig)
   const selectedDirections = [];
   wienSelectedDirections.forEach(d => {
     selectedDirections.push({
       line: wienSelectedLine.lineName,
       towards: d.towards || '',
-      type: 'metro'
+      type: 'metro',
+      stopId: String(d.stopId || '')  // Einzelner Bahnsteig (z.B. "4131")
     });
   });
   wienOtherLines.forEach(ol => {
     selectedDirections.push({
       line: ol.lineName,
       towards: ol.towards || '',
-      type: ol.lineName.startsWith('U') ? 'metro' : 'tram'
+      type: ol.lineName.startsWith('U') ? 'metro' : 'tram',
+      stopId: String(ol.stopId || '')  // Einzelner Bahnsteig
     });
   });
 
@@ -6349,10 +6351,11 @@ function calculateRecommendedConfig() {
       stations.forEach(s => {
         if (s.allDepartures) return;
         if (s.network === 'WL') {
-          // Wien: stopId:Linie (z.B. "250:5", "4621:U6")
+          // Wien: stopId:Linie pro Bahnsteig (z.B. "4131:U1", "4136:U1", "4272:U2")
           if (s.directions && s.directions.length > 0) {
             s.directions.forEach(d => {
-              const rbl = s.stopId || '';
+              // Pro Bahnsteig einzeln (d.stopId) statt zusammengefasst (s.stopId)
+              const rbl = d.stopId || s.stopId || '';
               const item = `${rbl}:${d.line}`;
               if (!items.includes(item)) items.push(item);
             });
@@ -6386,9 +6389,11 @@ function calculateRecommendedConfig() {
         if (s.lineGroups) {
           allGroups.push(s.lineGroups);
         } else if (s.network === 'WL' && s.directions && s.directions.length > 0) {
-          // Wien: stopId:Linie Format
-          const rbl = s.stopId || '';
-          const dirGroups = s.directions.map(d => `${rbl}:${d.line}`);
+          // Wien: stopId:Linie pro Bahnsteig (z.B. "4131:U1,4136:U1,4272:U2")
+          const dirGroups = s.directions.map(d => {
+            const rbl = d.stopId || s.stopId || '';
+            return `${rbl}:${d.line}`;
+          });
           allGroups.push(dirGroups.join(','));
         } else if (s.directions && s.directions.length > 0) {
           const dirGroups = s.directions.map(d => getDirectionKey(d, s.network));
