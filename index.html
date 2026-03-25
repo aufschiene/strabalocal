@@ -2320,6 +2320,11 @@ function applyPreConfig(preConfig) {
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('[INIT] DOMContentLoaded fired');
+  console.log('[INIT] straba_pending_config:', localStorage.getItem('straba_pending_config'));
+  console.log('[INIT] straba_pending_rbl:', localStorage.getItem('straba_pending_rbl'));
+  console.log('[INIT] straba_pending_fresh:', localStorage.getItem('straba_pending_fresh'));
+  console.log('[INIT] window.parent === window:', window.parent === window);
   updateUI();
 
   var pendingConfigStr = localStorage.getItem('straba_pending_config');
@@ -2352,7 +2357,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   } else {
     var localPendingRbl = localStorage.getItem('straba_pending_rbl');
+    console.log('[INIT] pendingRbl from localStorage:', localPendingRbl);
+    console.log('[INIT] all localStorage keys:', Object.keys(localStorage));
     if (localPendingRbl) {
+      console.log('[INIT] Pending-Pfad aktiv!');
       pendingRbl = localPendingRbl;
       pendingFilter = localStorage.getItem('straba_pending_filter') || '';
 
@@ -2410,10 +2418,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
       configLoaded = true;
       settingsLoaded = true;
+      console.log('[INIT] settingsLoaded=true, removing loading overlay');
       var cle2 = document.getElementById('configLoading');
-      if (cle2) cle2.classList.remove('show');
+      if (cle2) { cle2.classList.remove('show'); console.log('[INIT] Loading overlay removed'); }
+      else console.error('[INIT] configLoading element NOT FOUND!');
       updateUI();
     } else {
+      console.log('[INIT] Kein pendingRbl, kein pendingConfig → warte auf ESP Parent');
       updateFeatureVisibility(CITY_CAPABILITIES.WL);
     }
   }
@@ -2444,10 +2455,14 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   if (!settingsLoaded) {
+    console.log('[INIT] settingsLoaded=false → requesting config from parent in 100ms');
     setTimeout(requestConfigFromParent, 100);
+  } else {
+    console.log('[INIT] settingsLoaded=true → skipping parent request');
   }
 
   updateRowOrderList();
+  console.log('[INIT] DOMContentLoaded handler complete. settingsLoaded=' + settingsLoaded + ' configLoaded=' + configLoaded);
 });
 </script>
 </body>
