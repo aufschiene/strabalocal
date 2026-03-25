@@ -2105,52 +2105,51 @@ document.getElementById('saveBtn').addEventListener('click', function() {
 
   var sortMode = getSegmentValue('sortmode');
 
-  if (!manualSortEnabled) {
-    // Automatische Sortierung: sortmode=1, auto-sorted rowOrder
-    sortMode = '1';
-    // Prüfe ob rowOrderItems zur aktuellen rbl_id passen
-    var rowOrderValid = rowOrderItems.length > 0;
-    if (rowOrderValid) {
-      // Prüfe ob mindestens ein stopId aus rowOrder in der rblString vorkommt
-      var currentStops = rblString.split(',').map(function(s) { return s.trim(); });
-      var anyMatch = rowOrderItems.some(function(item) {
-        return item.stopIds && item.stopIds.some(function(sid) {
-          return currentStops.indexOf(sid) >= 0;
-        });
-      });
-      if (!anyMatch) rowOrderValid = false;  // Alte IDs → neu generieren
-    }
-    if (rowOrderValid) {
-      autoSortRowOrderItems();
-      rowOrder = getRowOrderString();
-      lineGroups = rowOrder;
-    } else if (rblString && filterString) {
-      // Fallback: rowOrder aus aktuellen Stops+Filtern generieren
-      var filters = filterString.split('|').map(function(s) { return s.trim(); });
-      // Logische Gruppen aus gehweg oder Filter-Anzahl ableiten
-      var gehwegStr = currentConfig.gehweg || '';
-      var groups = [];
-      if (gehwegStr && gehwegStr.indexOf('|') >= 0) {
-        gehwegStr.split('|').forEach(function(seg) {
-          var cp = seg.indexOf(':');
-          groups.push(cp > 0 ? seg.substring(0, cp) : seg);
+  // rowOrder und lineGroups generieren
+  function buildRowOrderFromStops(rbl, filter) {
+    var filters = filter.split('|').map(function(s) { return s.trim(); });
+    var allStops = rbl.split(',').map(function(s) { return s.trim(); });
+    var parts = [];
+    // Zuordnung: Filter-Segmente (|) = logische Gruppen
+    // Stops per Komma verteilen auf Gruppen
+    if (filters.length > 0 && filters.length <= allStops.length) {
+      var rblIdx = 0;
+      for (var fi = 0; fi < filters.length && rblIdx < allStops.length; fi++) {
+        var linesForGroup = filters[fi].split(',').map(function(l) { return l.trim(); });
+        // Erster Stop dieser Gruppe
+        var stopId = allStops[rblIdx]; rblIdx++;
+        // Wien: weitere numerische Stops in gleicher Gruppe
+        var groupStops = [stopId];
+        while (rblIdx < allStops.length && rblIdx < allStops.length - (filters.length - fi - 1)) {
+          var next = allStops[rblIdx].trim();
+          var numeric = /^\d+$/.test(next);
+          if (!numeric) break;
+          groupStops.push(next);
+          rblIdx++;
+        }
+        // Pro Stop + Linie einen Eintrag
+        groupStops.forEach(function(sid) {
+          linesForGroup.forEach(function(line) {
+            if (line) parts.push(sid + ':' + line);
+          });
         });
       }
-      if (groups.length === 0) {
-        // Keine gehweg-Gruppen: Stops per Komma splitten und per Filter-Anzahl zuordnen
-        var allStops = rblString.split(',').map(function(s) { return s.trim(); });
-        if (filters.length > 0 && filters.length < allStops.length) {
-          // Mehr Stops als Filter → Wien-Format: Stops gleichmäßig auf Filter verteilen
-          var stopsPerFilter = Math.ceil(allStops.length / filters.length);
-          for (var fi = 0; fi < filters.length; fi++) {
-            var start = fi * stopsPerFilter;
-            var end = Math.min(start + stopsPerFilter, allStops.length);
-            groups.push(allStops.slice(start, end).join(','));
-          }
-        } else {
-          // 1:1 Zuordnung
-          groups = allStops;
-        }
+    } else {
+      // 1:1 Fallback
+      allStops.forEach(function(sid, i) {
+        var f = filters[i] || '';
+        f.split(',').forEach(function(l) { if (l.trim()) parts.push(sid + ':' + l.trim()); });
+      });
+    }
+    return parts.join(',');
+  }
+
+  if (!manualSortEnabled) {
+    sortMode = '1';
+    // IMMER frisch aus aktuellen Stops generieren
+    if (rblString && filterString) {
+      rowOrder = buildRowOrderFromStops(rblString, filterString);
+      lineGroups = rowOrder;
       }
       var parts = [];
       groups.forEach(function(group, gi) {
@@ -2381,19 +2380,32 @@ document.addEventListener('DOMContentLoaded', function() {
       pendingRbl = localPendingRbl;
       pendingFilter = localStorage.getItem('straba_pending_filter') || '';
 
-      // Wenn frische Config von localmainpage → rowOrder/lineGroups aktualisieren
-      // Bestehende Gruppierungen beibehalten, nur nicht-mehr-vorhandene Stops entfernen
+      // Wenn frische Config von localmainpage → ALLES komplett neu aufbauen
+      // Alte rowOrderItems, lineGroups verwerfen → werden aus pendingRbl+pendingFilter generiert
       if (localStorage.getItem('straba_pending_fresh') === '1') {
+        rowOrderItems = [];  // Komplett neu
+        // Bestehende Gruppierungen aus ESP Config laden und filtern
+        var existingLG = currentConfig.linegroups || '';
         var newStops = pendingRbl.split(',').map(function(s) { return s.trim(); });
-        // Filtere rowOrderItems: behalte nur Items deren Stops noch existieren
-        if (rowOrderItems.length > 0) {
-          rowOrderItems = rowOrderItems.filter(function(item) {
-            return item.stopIds && item.stopIds.some(function(sid) {
-              return newStops.indexOf(sid) >= 0;
-            });
+        if (existingLG && existingLG.indexOf('+') >= 0) {
+          // Gruppierungen filtern: nur behalten wenn ALLE Stops der Gruppe noch existieren
+          var filteredGroups = [];
+          existingLG.split(',').forEach(function(entry) {
+            if (entry.indexOf('+') >= 0) {
+              // Gruppen-Eintrag: "4131:U1+4136:U1" → prüfe ob alle stopIds noch da
+              var allExist = entry.split('+').every(function(part) {
+                var col = part.indexOf(':');
+                var sid = col > 0 ? part.substring(0, col).trim() : part.trim();
+                return newStops.indexOf(sid) >= 0;
+              });
+              if (allExist) filteredGroups.push(entry);
+            }
+            // Einzelne Einträge ohne + werden neu generiert
           });
+          if (filteredGroups.length > 0) {
+            localStorage.setItem('straba_preserved_groups', filteredGroups.join(','));
+          }
         }
-        // Signal dass neue Stops hinzugefügt werden müssen (in updateRowOrderList)
         localStorage.removeItem('straba_pending_fresh');
       }
 
