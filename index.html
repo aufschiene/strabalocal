@@ -2094,18 +2094,57 @@ document.getElementById('saveBtn').addEventListener('click', function() {
   if (!manualSortEnabled) {
     // Automatische Sortierung: sortmode=1, auto-sorted rowOrder
     sortMode = '1';
-    if (rowOrderItems.length > 0) {
+    // Prüfe ob rowOrderItems zur aktuellen rbl_id passen
+    var rowOrderValid = rowOrderItems.length > 0;
+    if (rowOrderValid) {
+      // Prüfe ob mindestens ein stopId aus rowOrder in der rblString vorkommt
+      var currentStops = rblString.split(',').map(function(s) { return s.trim(); });
+      var anyMatch = rowOrderItems.some(function(item) {
+        return item.stopIds && item.stopIds.some(function(sid) {
+          return currentStops.indexOf(sid) >= 0;
+        });
+      });
+      if (!anyMatch) rowOrderValid = false;  // Alte IDs → neu generieren
+    }
+    if (rowOrderValid) {
       autoSortRowOrderItems();
       rowOrder = getRowOrderString();
       lineGroups = rowOrder;
     } else if (rblString && filterString) {
-      // Fallback
-      var stopIds = rblString.split(',').map(function(s) { return s.trim(); });
+      // Fallback: rowOrder aus aktuellen Stops+Filtern generieren
       var filters = filterString.split('|').map(function(s) { return s.trim(); });
+      // Logische Gruppen aus gehweg oder Filter-Anzahl ableiten
+      var gehwegStr = currentConfig.gehweg || '';
+      var groups = [];
+      if (gehwegStr && gehwegStr.indexOf('|') >= 0) {
+        gehwegStr.split('|').forEach(function(seg) {
+          var cp = seg.indexOf(':');
+          groups.push(cp > 0 ? seg.substring(0, cp) : seg);
+        });
+      }
+      if (groups.length === 0) {
+        // Keine gehweg-Gruppen: Stops per Komma splitten und per Filter-Anzahl zuordnen
+        var allStops = rblString.split(',').map(function(s) { return s.trim(); });
+        if (filters.length > 0 && filters.length < allStops.length) {
+          // Mehr Stops als Filter → Wien-Format: Stops gleichmäßig auf Filter verteilen
+          var stopsPerFilter = Math.ceil(allStops.length / filters.length);
+          for (var fi = 0; fi < filters.length; fi++) {
+            var start = fi * stopsPerFilter;
+            var end = Math.min(start + stopsPerFilter, allStops.length);
+            groups.push(allStops.slice(start, end).join(','));
+          }
+        } else {
+          // 1:1 Zuordnung
+          groups = allStops;
+        }
+      }
       var parts = [];
-      stopIds.forEach(function(stopId, i) {
-        var linesForStop = filters[i] ? filters[i].split(',').map(function(l) { return l.trim(); }) : [];
-        linesForStop.forEach(function(line) { if (line) parts.push(stopId + ':' + line); });
+      groups.forEach(function(group, gi) {
+        var individualStops = group.split(',').map(function(s) { return s.trim(); });
+        var linesForGroup = filters[gi] ? filters[gi].split(',').map(function(l) { return l.trim(); }) : [];
+        individualStops.forEach(function(stopId) {
+          linesForGroup.forEach(function(line) { if (line) parts.push(stopId + ':' + line); });
+        });
       });
       rowOrder = parts.join(',');
       lineGroups = rowOrder;
