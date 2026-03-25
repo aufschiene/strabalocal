@@ -728,28 +728,55 @@ function loadExistingConfig(rbl, filter) {
   
   console.log('Lade bestehende Config:', rbl, filter);
   
-  const rblIds = rbl.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
-  
-  if (rblIds.length === 0) {
+  // Logische Gruppen erkennen: gehweg hat das richtige Format ("4131,4136:0|4271:0")
+  // Fallback: rbl per Komma splitten (alte Logik)
+  let logicalGroups = [];
+  const gehwegStr = document.getElementById('gehweg')?.value || '';
+  if (gehwegStr && gehwegStr.includes('|')) {
+    gehwegStr.split('|').forEach(seg => {
+      const colonPos = seg.indexOf(':');
+      const ids = (colonPos > 0 ? seg.substring(0, colonPos) : seg).trim();
+      logicalGroups.push(ids);
+    });
+  }
+  // Wenn keine gehweg-Gruppen: alle RBL-IDs per Komma (alte Logik)
+  if (logicalGroups.length === 0) {
+    logicalGroups = rbl.split(',').map(s => s.trim());
+  }
+
+  // Alle individuellen Stop-IDs sammeln (für die Suche in stationData)
+  const allRblIds = [];
+  logicalGroups.forEach(group => {
+    group.split(',').forEach(id => {
+      const parsed = parseInt(id.trim());
+      if (!isNaN(parsed)) allRblIds.push(parsed);
+    });
+  });
+
+  if (allRblIds.length === 0) {
     console.log('Keine gültigen RBL-IDs gefunden');
     return;
   }
-  
+
   let filters = [];
   if (filter && filter.includes('|')) {
     filters = filter.split('|');
   } else if (filter) {
-    filters = rblIds.map(() => filter);
+    filters = logicalGroups.map(() => filter);
   }
-  
-  console.log('Parsed RBL IDs:', rblIds);
+
+  console.log('Parsed Gruppen:', logicalGroups);
   console.log('Parsed Filters:', filters);
-  
+
   let addedCount = 0;
-  
-  rblIds.forEach((stationId, idx) => {
-    const stationFilter = filters[idx] || '';
+
+  // Pro logischer Gruppe: alle Stop-IDs dieser Gruppe verarbeiten
+  logicalGroups.forEach((group, groupIdx) => {
+    const groupStopIds = group.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+    const stationFilter = filters[groupIdx] || '';
     const linesToAdd = stationFilter ? stationFilter.split(',').map(l => l.trim()).filter(l => l) : [];
+
+    groupStopIds.forEach(stationId => {
     
     console.log(`Station ${stationId}: Filter = ${linesToAdd.join(', ') || 'alle'}`);
     
@@ -790,8 +817,9 @@ function loadExistingConfig(rbl, filter) {
         });
       }
     });
-  });
-  
+    });  // Ende groupStopIds.forEach
+  });  // Ende logicalGroups.forEach
+
   if (addedCount > 0) {
     configLoaded = true;
     existingConfigLoaded = true;

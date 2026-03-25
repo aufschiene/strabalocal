@@ -1422,32 +1422,49 @@ function updateRowOrderList() {
 
   var newItemsKey = rblString + '|' + filterString + '|' + currentStationDetails.length;
   if (container.dataset.itemsKey !== newItemsKey || rowOrderItems.length === 0) {
-    var stopIds = rblString.split(',').map(function(s) { return s.trim(); });
+    // Logische Gruppen per gehweg (|) erkennen, nicht per Komma
+    // gehweg: "4131,4136:0|4271:0" → Gruppen: ["4131,4136", "4271"]
+    var gehwegStr = currentConfig.gehweg || '';
+    var logicalGroups = [];
+    if (gehwegStr && gehwegStr.indexOf('|') >= 0) {
+      gehwegStr.split('|').forEach(function(seg) {
+        var colonPos = seg.indexOf(':');
+        logicalGroups.push(colonPos > 0 ? seg.substring(0, colonPos) : seg);
+      });
+    }
+    // Fallback: wenn keine gehweg-Gruppen, split per Komma (alte Logik)
+    var stopGroups = logicalGroups.length > 0 ? logicalGroups : rblString.split(',').map(function(s) { return s.trim(); });
     var filters = filterString.split('|').map(function(s) { return s.trim(); });
 
     var lineEntries = [];
-    stopIds.forEach(function(stopId, i) {
+    stopGroups.forEach(function(stopGroup, i) {
+      // Jede Gruppe kann mehrere Stop-IDs haben (Wien: "4131,4136")
+      var individualStops = stopGroup.split(',').map(function(s) { return s.trim(); });
       var linesForStop = filters[i] ? filters[i].split(',').map(function(l) { return l.trim(); }) : [];
-      linesForStop.forEach(function(line) {
-        if (line) {
-          var direction = '';
-          var stationName = '';
-          if (currentStationDetails && currentStationDetails[i]) {
-            var station = currentStationDetails[i];
-            stationName = station.name || station.stationName || '';
-            if (station.lines) {
-              var lineInfo = station.lines.find(function(l) { return l.name === line; });
-              if (lineInfo && lineInfo.direction) direction = lineInfo.direction;
+
+      // Pro individuellem Bahnsteig + Linie einen Eintrag
+      individualStops.forEach(function(stopId) {
+        linesForStop.forEach(function(line) {
+          if (line) {
+            var direction = '';
+            var stationName = '';
+            if (currentStationDetails && currentStationDetails[i]) {
+              var station = currentStationDetails[i];
+              stationName = station.name || station.stationName || '';
+              if (station.lines) {
+                var lineInfo = station.lines.find(function(l) { return l.name === line; });
+                if (lineInfo && lineInfo.direction) direction = lineInfo.direction;
+              }
             }
+            lineEntries.push({
+              line: line,
+              direction: direction,
+              stationName: stationName,
+              stopIds: [stopId],
+              firstIndex: i
+            });
           }
-          lineEntries.push({
-            line: line,
-            direction: direction,
-            stationName: stationName,
-            stopIds: [stopId],
-            firstIndex: i
-          });
-        }
+        });
       });
     });
 
