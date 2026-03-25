@@ -1405,6 +1405,20 @@ function updateRowOrderList() {
   }
   section.classList.add('show');
 
+  // Wenn neue Stops (pendingRbl) → alte rowOrderItems verwerfen
+  if (pendingRbl && rowOrderItems.length > 0) {
+    var currentStops = pendingRbl.split(',').map(function(s) { return s.trim(); });
+    var anyMatch = rowOrderItems.some(function(item) {
+      return item.stopIds && item.stopIds.some(function(sid) {
+        return currentStops.indexOf(sid) >= 0;
+      });
+    });
+    if (!anyMatch) {
+      rowOrderItems = [];
+      container.dataset.itemsKey = '';
+    }
+  }
+
   if (rowOrderItems.length > 0 && container.dataset.itemsKey === '') {
     container.dataset.itemsKey = 'loaded-from-config';
     renderRowOrderList();
@@ -2366,6 +2380,22 @@ document.addEventListener('DOMContentLoaded', function() {
     if (localPendingRbl) {
       pendingRbl = localPendingRbl;
       pendingFilter = localStorage.getItem('straba_pending_filter') || '';
+
+      // Wenn frische Config von localmainpage → rowOrder/lineGroups aktualisieren
+      // Bestehende Gruppierungen beibehalten, nur nicht-mehr-vorhandene Stops entfernen
+      if (localStorage.getItem('straba_pending_fresh') === '1') {
+        var newStops = pendingRbl.split(',').map(function(s) { return s.trim(); });
+        // Filtere rowOrderItems: behalte nur Items deren Stops noch existieren
+        if (rowOrderItems.length > 0) {
+          rowOrderItems = rowOrderItems.filter(function(item) {
+            return item.stopIds && item.stopIds.some(function(sid) {
+              return newStops.indexOf(sid) >= 0;
+            });
+          });
+        }
+        // Signal dass neue Stops hinzugefügt werden müssen (in updateRowOrderList)
+        localStorage.removeItem('straba_pending_fresh');
+      }
 
       var stopIds = pendingRbl.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
       var details = [];

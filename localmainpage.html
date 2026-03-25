@@ -1466,6 +1466,10 @@ function continueSetup() {
   localStorage.setItem('straba_pending_rbl', stopIdString);
   localStorage.setItem('straba_pending_filter', filterString);
   localStorage.setItem('straba_pending_details', JSON.stringify(stationDetails));
+  // WICHTIG: Alte lineGroups/rowOrder löschen damit index.html frisch generiert
+  localStorage.setItem('straba_pending_linegroups', '');
+  localStorage.setItem('straba_pending_roworder', '');
+  localStorage.setItem('straba_pending_fresh', '1');  // Signal: alles neu generieren
   
   // Navigiere zu index.html (erweiterte Einstellungen)
   // Beide Seiten sind auf GitHub Pages, also funktioniert die Navigation direkt
