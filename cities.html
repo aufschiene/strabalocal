@@ -601,14 +601,95 @@
       padding: 30px;
       color: #888;
     }
-    .lines-loading .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid #e0e0e0;
-      border-top-color: #0055a4;
+    .train-loading {
+      position: relative;
+      width: 200px;
+      height: 40px;
+      margin: 0 auto 16px;
+      overflow: hidden;
+    }
+    .train-track {
+      position: absolute;
+      bottom: 4px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #ddd;
+    }
+    .train-track::before, .train-track::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      width: 4px;
+      height: 8px;
+      background: #ccc;
+      border-radius: 2px 2px 0 0;
+    }
+    .train-track::before { left: 30px; }
+    .train-track::after { right: 30px; }
+    .train-body {
+      position: absolute;
+      bottom: 6px;
+      width: 48px;
+      height: 22px;
+      background: #0055a4;
+      border-radius: 4px 8px 2px 2px;
+      animation: trainMove 3s ease-in-out infinite;
+    }
+    .train-body::before {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 6px;
+      width: 8px;
+      height: 8px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 2px;
+    }
+    .train-body::after {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 18px;
+      width: 8px;
+      height: 8px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 2px;
+    }
+    .train-wheel {
+      position: absolute;
+      bottom: -3px;
+      width: 6px;
+      height: 6px;
+      background: #333;
       border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 12px;
+    }
+    .train-wheel.w1 { left: 6px; }
+    .train-wheel.w2 { right: 6px; }
+    .train-door {
+      position: absolute;
+      top: 3px;
+      left: 32px;
+      width: 6px;
+      height: 14px;
+      background: rgba(255,255,255,0.4);
+      border-radius: 1px;
+      animation: doorOpen 3s ease-in-out infinite;
+    }
+    @keyframes trainMove {
+      0% { left: 10px; }
+      35% { left: 76px; }
+      40% { left: 76px; }  /* Halt — Türen auf */
+      45% { left: 76px; }
+      100% { left: 142px; }
+    }
+    @keyframes doorOpen {
+      0% { width: 6px; left: 32px; opacity: 0.4; }
+      35% { width: 6px; left: 32px; opacity: 0.4; }
+      38% { width: 10px; left: 30px; opacity: 0.8; }  /* Türen öffnen */
+      42% { width: 10px; left: 30px; opacity: 0.8; }  /* Türen offen */
+      45% { width: 6px; left: 32px; opacity: 0.4; }   /* Türen schließen */
+      100% { width: 6px; left: 32px; opacity: 0.4; }
     }
     
     /* Station Chips */
@@ -2417,7 +2498,14 @@
     <p style="color:#666;font-size:13px;margin-bottom:16px;" id="selectedStationInfo"></p>
 
     <div class="lines-loading" id="linesLoading">
-      <div class="spinner"></div>
+      <div class="train-loading">
+        <div class="train-track"></div>
+        <div class="train-body">
+          <div class="train-wheel w1"></div>
+          <div class="train-wheel w2"></div>
+          <div class="train-door"></div>
+        </div>
+      </div>
       <div>Lade Abfahrten...</div>
     </div>
 
@@ -5815,11 +5903,8 @@ function updateStationsList() {
   } else {
     emptyState.style.display = 'none';
     saveBtn.disabled = false;
-    if (openFinetuningBtn) {
-      openFinetuningBtn.classList.remove('hidden');
-      // Button-Text je nach Config-Status
-      openFinetuningBtn.textContent = hasExistingConfig ? 'Feintuning öffnen' : 'Weiter';
-    }
+    // openFinetuningBtn nicht mehr verwenden — alles über saveBtn in bottom-bar
+    if (openFinetuningBtn) openFinetuningBtn.classList.add('hidden');
   }
 
   const chips = Array.from(groupedStations.values()).map((group) => {
