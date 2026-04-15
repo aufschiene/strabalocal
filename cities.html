@@ -128,6 +128,7 @@
     .region-badge.ch { background: #D52B1E; color: #fff; }
     .region-badge.dk { background: #C8102E; color: #fff; }
     .region-badge.fr { background: linear-gradient(90deg, #002395 33%, #fff 33%, #fff 66%, #ED2939 66%); }
+    .region-badge.nl { background: linear-gradient(180deg, #AE1C28 33%, #fff 33%, #fff 66%, #21468B 66%); }
 
     /* Bundesland-Wappen (stilisierte Schild-Form) */
     .wappen-badge {
@@ -2375,6 +2376,11 @@
         <div class="name">Frankreich</div>
         <div class="desc">Paris (RATP)</div>
       </button>
+      <button class="selection-btn" onclick="selectRegion('NL')">
+        <div class="region-badge nl">NL</div>
+        <div class="name">Niederlande</div>
+        <div class="desc">Amsterdam, Rotterdam</div>
+      </button>
       <button class="selection-btn disabled" onclick="selectRegion('CH')">
         <div class="region-badge ch">CH</div>
         <div class="name">Schweiz</div>
@@ -2853,6 +2859,14 @@ const REGIONS = {
     name: 'Frankreich',
     networks: ['PARIS']
   },
+  NL: {
+    name: 'Niederlande',
+    networks: ['GVB', 'RET'],
+    subRegions: {
+      NL_AMS: { name: 'Amsterdam', desc: 'Metro, Tram, Bus, Fähre (GVB)', networks: ['GVB'] },
+      NL_RTD: { name: 'Rotterdam', desc: 'Tram, Bus (RET)', networks: ['RET'] }
+    }
+  },
   DK: {
     name: 'Dänemark',
     networks: []
@@ -2932,6 +2946,24 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 9,             // RATP Paris
+    defaultBrightness: 3
+  },
+  GVB: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 1,             // Wien-Style (gelb auf schwarz)
+    defaultBrightness: 3
+  },
+  RET: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 1,             // Wien-Style (gelb auf schwarz)
     defaultBrightness: 3
   },
   OEBB: {
@@ -3333,6 +3365,56 @@ const NETWORKS = {
     searchType: 'server_proxy',
     placeholder: 'z.B. Châtelet, Gare du Nord...',
     isJourneyBased: false
+  },
+  GVB: {
+    name: 'GVB Amsterdam',
+    shortName: 'GVB',
+    region: 'NL',
+    desc: 'Metro, Tram, Bus, Fähre',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Centraal, Dam, Leidseplein...',
+    isJourneyBased: false,
+    fallbackStations: [
+      { id: '30000020', name: 'Amsterdam Centraal', info: 'Metro, Tram, Bus' },
+      { id: '30003981', name: 'Dam', info: 'Tram' },
+      { id: '30003982', name: 'Leidseplein', info: 'Tram' },
+      { id: '30003983', name: 'Museumplein', info: 'Tram' },
+      { id: '30003984', name: 'Waterlooplein', info: 'Metro, Tram' },
+      { id: '30003985', name: 'Nieuwmarkt', info: 'Metro' },
+      { id: '30003988', name: 'Rokin', info: 'Metro' },
+      { id: '30003989', name: 'Vijzelgracht', info: 'Metro' },
+      { id: '30003990', name: 'De Pijp', info: 'Metro' },
+      { id: '30003991', name: 'Europaplein', info: 'Metro' },
+      { id: '30003992', name: 'Station Zuid', info: 'Metro' },
+      { id: '30003993', name: 'RAI', info: 'Metro' },
+      { id: '30003998', name: 'Bijlmer ArenA', info: 'Metro' },
+      { id: '30004010', name: 'Reigersbos', info: 'Metro' },
+      { id: '30004020', name: 'Gein', info: 'Metro' },
+      { id: '30004030', name: 'Gaasperplas', info: 'Metro' },
+      { id: '30000200', name: 'Amstel Station', info: 'Metro, Bus' },
+      { id: '30000300', name: 'Sloterdijk', info: 'Metro, Bus' },
+      { id: '30004080', name: 'Isolatorweg', info: 'Metro' },
+      { id: '30003986', name: 'Wibautstraat', info: 'Metro' },
+      { id: '30003987', name: 'Weesperplein', info: 'Metro' },
+      { id: '30003994', name: 'Overamstel', info: 'Metro' },
+      { id: '30003995', name: 'Van der Madeweg', info: 'Metro' },
+      { id: '30003996', name: 'Duivendrecht', info: 'Metro' },
+      { id: '30003997', name: 'Strandvliet', info: 'Metro' },
+      { id: '30003999', name: 'Bullewijk', info: 'Metro' },
+      { id: '30004000', name: 'Holendrecht', info: 'Metro' },
+      { id: '30004040', name: 'Kraaiennest', info: 'Metro' },
+      { id: '30004050', name: 'Ganzenhoef', info: 'Metro' },
+      { id: '30004060', name: 'Diemen-Zuid', info: 'Metro' }
+    ]
+  },
+  RET: {
+    name: 'RET Rotterdam',
+    shortName: 'RET',
+    region: 'NL',
+    desc: 'Metro, Tram, Bus',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Centraal, Beurs, Jericholaan...',
+    isJourneyBased: false
   }
 };
 
@@ -3348,6 +3430,8 @@ const API_NETWORK_MAP = {
   'OEBB_REG_NOE': 'OEBBREG',
   'OEBB_REG_OOE': 'OEBBREG',
   'OEBB_FERN': 'OEBBFERN',
+  'GVB': 'OVAPI',
+  'RET': 'OVAPI',
 };
 function mapNetworkForApi(network) {
   return API_NETWORK_MAP[network] || network;
@@ -3456,7 +3540,9 @@ function showStep(step) {
     if (bottomBar) bottomBar.style.display = '';
     saveBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
     saveBtn.onclick = function() { showGroupingStep(); };
-    saveBtn.disabled = true;  // Wird von updateAddButton enabled
+    // P2P: oebb_toStop prüfen, sonst selectedLines
+    const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
+    saveBtn.disabled = isP2P ? !oebb_toStop : selectedLines.size === 0;
   } else if (stations.length > 0) {
     // Stationen vorhanden: "Weiter"
     if (bottomBar) bottomBar.style.display = '';
@@ -4521,6 +4607,24 @@ function displaySearchResults(results) {
     filtered = results.filter(r => (r.info || '').includes('Fernverkehr'));
   }
 
+  // NL-Netzwerke: Gleicher Name = eine Station mit mehreren Perrons (wie Wien Bahnsteige)
+  if (['GVB', 'RET', 'OVAPI'].includes(selectedNetwork)) {
+    const grouped = new Map();
+    filtered.forEach(r => {
+      const key = r.name;
+      if (!grouped.has(key)) {
+        grouped.set(key, { ids: [r.id], name: r.name, info: r.info });
+      } else {
+        grouped.get(key).ids.push(r.id);
+      }
+    });
+    filtered = Array.from(grouped.values()).map(g => ({
+      id: g.ids.join(','),
+      name: g.name,
+      info: g.info + (g.ids.length > 1 ? ` (${g.ids.length} Perrons)` : '')
+    }));
+  }
+
   if (filtered.length === 0) {
     searchResults.innerHTML = '<div class="no-results">Keine Stationen gefunden</div>';
   } else {
@@ -4633,11 +4737,26 @@ async function selectStop(id, name) {
   try {
     // Netzwerk-Alias für API (Production-kompatibel)
     const apiNetwork = mapNetworkForApi(selectedNetwork);
-    const apiFullId = `${apiNetwork}:${selectedStop.id}`;
-    const response = await fetch(`${DEPARTURES_API}?stopId=${apiFullId}`);
-    const data = await response.json();
+    const stopIds = selectedStop.id.split(',');
 
-    extractLines(data);
+    // NL/Wien: Mehrere Perrons → einzeln abfragen und mergen
+    let mergedData = null;
+    for (const sid of stopIds) {
+      const apiFullId = `${apiNetwork}:${sid.trim()}`;
+      const response = await fetch(`${DEPARTURES_API}?stopId=${apiFullId}`);
+      const data = await response.json();
+      if (!mergedData) {
+        mergedData = data;
+      } else {
+        // Merge: Monitore zusammenführen
+        const newMonitors = data?.data?.monitors || [];
+        if (mergedData?.data?.monitors) {
+          mergedData.data.monitors.push(...newMonitors);
+        }
+      }
+    }
+
+    extractLines(mergedData || {});
     renderLines();
 
     linesLoading.classList.add('hidden');
@@ -5542,13 +5661,13 @@ function selectP2PDestByName(name) {
 
 function selectP2PDest(id, name) {
   oebb_toStop = { id, name };
-  addStationBtn.disabled = false;
+  updateAddButton();
   renderPointToPointConfig();
 }
 
 function clearOebbDest() {
   oebb_toStop = null;
-  addStationBtn.disabled = true;
+  updateAddButton();
   renderPointToPointConfig();
 }
 
@@ -5639,7 +5758,9 @@ function updateSelectAllButton() {
 }
 
 function updateAddButton() {
-  const enabled = selectedLines.size > 0;
+  // P2P (Fernverkehr): oebb_toStop prüfen statt selectedLines
+  const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
+  const enabled = isP2P ? !!oebb_toStop : selectedLines.size > 0;
   addStationBtn.disabled = !enabled;
   // Auch den fixierten bottom-bar Button updaten wenn im Lines-Step
   if (['lines', 'search'].includes(currentStep)) {
@@ -5689,7 +5810,11 @@ function addStationAllDepartures() {
   // Alle Abfahrten ohne Filter — zeigt die nächsten N Züge chronologisch
   if (!selectedNetwork || !selectedStop) return;
 
-  const fullId = `${selectedNetwork}:${selectedStop.id}`;
+  // NL: Mehrere Perrons (31001073,31001084) → jede ID einzeln prefixen
+  const apiNetwork = mapNetworkForApi(selectedNetwork);
+  const fullId = selectedStop.id.includes(',')
+    ? selectedStop.id.split(',').map(s => `${apiNetwork}:${s.trim()}`).join(',')
+    : `${apiNetwork}:${selectedStop.id}`;
 
   if (editingStationIndex !== null) {
     const existingStation = stations[editingStationIndex];
@@ -5725,8 +5850,8 @@ function addStationAllDepartures() {
 }
 
 function addStation() {
-  // OEBB Von-Nach Modus
-  if (selectedNetwork === 'OEBB' && oebb_toStop) {
+  // OEBB Von-Nach Modus (OEBB_FERN oder OEBB mit Ziel)
+  if ((NETWORKS[selectedNetwork]?.isPointToPoint || selectedNetwork === 'OEBB') && oebb_toStop) {
     return addStationFromOebb();
   }
 
@@ -5744,7 +5869,10 @@ function addStation() {
   // Netzwerk-Mapping: OEBB_SBAHN → OEBBREG, OEBB_FERN → OEBBFERN etc.
   // Server filtert automatisch nach Produkt basierend auf dem Netzwerk-Prefix
   const apiNetwork = mapNetworkForApi(selectedNetwork);
-  let fullId = `${apiNetwork}:${selectedStop.id}`;
+  // NL: Mehrere Perrons → jede ID einzeln prefixen
+  let fullId = selectedStop.id.includes(',')
+    ? selectedStop.id.split(',').map(s => `${apiNetwork}:${s.trim()}`).join(',')
+    : `${apiNetwork}:${selectedStop.id}`;
 
   // Ausgewaehlte Richtungen speichern (Linie + towards + optionaler via-Filter + richtungsId)
   const selectedDirections = Array.from(selectedLines).map(idx => {
@@ -6143,7 +6271,9 @@ const NETWORK_COLORS = {
   OEBB_STAMM_SBAHN: { id: 12, name: 'ÖBB Stammstrecke', color: '#003366' },
   OEBB_REG_NOE: { id: 12, name: 'ÖBB Regional NÖ', color: '#0055A4' },
   OEBB_REG_OOE: { id: 12, name: 'ÖBB Regional OÖ', color: '#0055A4' },
-  WESTBAHN: { id: 14, name: 'Westbahn', color: '#0055A4' }
+  WESTBAHN: { id: 14, name: 'Westbahn', color: '#0055A4' },
+  GVB: { id: 1, name: 'GVB Amsterdam', color: '#004B93' },
+  RET: { id: 1, name: 'RET Rotterdam', color: '#E4002B' }
 };
 
 let suggestedColor = 1;
@@ -6252,35 +6382,69 @@ function calculateRecommendedConfig() {
     }
   }
 
-  // Zeilenanzahl bestimmen: Anzahl der verschiedenen Linien/Richtungen
-  let totalDirections = 0;
-  stations.forEach(s => {
-    if (s.lineGroups && s.lineGroups.length > 0) {
-      // lineGroups vorhanden (z.B. Stammstrecke "1,2") → Gruppen zählen
-      totalDirections += s.lineGroups.split(',').length;
-    } else if (s.directions && s.directions.length > 0) {
-      // Neue Struktur: directions Array zaehlen
-      totalDirections += s.directions.length;
-    } else if (s.filter) {
-      // Fallback: Filter-Linien zaehlen (alte Struktur)
-      totalDirections += s.filter.split(',').length;
-    } else {
-      totalDirections += 1;
+  // Zeilenanzahl bestimmen: Pro Display-Typ Richtungen zählen und rows berechnen
+  // Bei Multi-Display: Maximum aller Display-Typen
+  function countDirections(station) {
+    if (station.lineGroups && station.lineGroups.length > 0) {
+      return station.lineGroups.split(',').length;
+    } else if (station.directions && station.directions.length > 0) {
+      return station.directions.length;
+    } else if (station.filter) {
+      return station.filter.split(',').length;
     }
-  });
-  // Zeilen = Anzahl Richtungen, max abhängig vom Display-Typ
-  const maxRows = (displayType === 2 || displayType === 13) ? 4 : 3;  // Linz + Graz: 4 Zeilen, sonst 3
-  let rows;
-  if (totalDirections > maxRows) {
-    rows = maxRows;
-  } else if (totalDirections < 1) {
-    rows = 1;
-  } else {
-    rows = totalDirections;
+    return 1;
   }
-  // ÖBB S-Bahn (colour 12): IMMER mindestens 2 Zeilen (Hauptzeile + Kompaktzeile)
-  if (displayType === 12) {
-    rows = Math.max(rows, 2);
+
+  function getRowsForDisplayType(colour, dirCount) {
+    if (colour === 12 || colour === 14) {
+      // ÖBB/Westbahn: Fixes Layout, mindestens 2 (1 Haupt + 1 Kompakt), max 3
+      return Math.max(Math.min(dirCount, 3), 2);
+    }
+    if (colour === 2 || colour === 13) {
+      // Linz/Graz: 1-4 Zeilen
+      return Math.min(Math.max(dirCount, 1), 4);
+    }
+    // Wien (colour 1) und andere:
+    // 1 Richtung → 3 Zeilen (Single-Mode)
+    // 2 Richtungen → 2 Zeilen
+    // 3 Richtungen → 3 Zeilen
+    // 4 Richtungen → 2 Zeilen (Paging)
+    // 5+ Richtungen → 3 Zeilen (Paging)
+    if (dirCount === 1) return 3;
+    if (dirCount === 2) return 2;
+    if (dirCount === 3) return 3;
+    if (dirCount === 4) return 2;
+    return 3; // 5+
+  }
+
+  // Rows pro Gruppe berechnen
+  const stationsByColour = new Map();
+  // Reihenfolge beibehalten: uniqueColours in Stations-Reihenfolge
+  const colourOrder = [];
+  stations.forEach(s => {
+    const c = NETWORK_COLORS[s.network]?.id || displayType;
+    if (!stationsByColour.has(c)) {
+      stationsByColour.set(c, []);
+      colourOrder.push(c);
+    }
+    stationsByColour.get(c).push(s);
+  });
+  const isMulti = stationsByColour.size > 1;
+  let rows;  // Kann String ("4,2,3") oder Number (2) sein
+  if (isMulti) {
+    // Multi-Display: Pro Gruppe komma-separiert
+    const perGroupRows = colourOrder.map(colourVal => {
+      const groupStations = stationsByColour.get(colourVal);
+      let dirCount = 0;
+      groupStations.forEach(s => { dirCount += countDirections(s); });
+      return getRowsForDisplayType(colourVal, dirCount);
+    });
+    rows = perGroupRows.join(',');  // z.B. "4,2,3"
+  } else {
+    // Single-Display: eine Zahl
+    let totalDirections = 0;
+    stations.forEach(s => { totalDirections += countDirections(s); });
+    rows = getRowsForDisplayType(displayType, totalDirections);
   }
 
   // Einzigartige Stationen für stationDetails (gruppiert nach Name+Netzwerk)
@@ -6396,8 +6560,25 @@ function calculateRecommendedConfig() {
           });
           allGroups.push(dirGroups.join(','));
         } else if (s.directions && s.directions.length > 0) {
-          const dirGroups = s.directions.map(d => getDirectionKey(d, s.network));
-          allGroups.push(dirGroups.join(','));
+          // NL (GVB, RET): Gruppiere nach richtungsId (gleiche Richtung = eine Zeile)
+          // z.B. A:2+B:2,A:1+B:1 (alle Richtung 2 zusammen, alle Richtung 1 zusammen)
+          const isNL = ['GVB', 'RET'].includes(s.network);
+          if (isNL) {
+            const byDir = {};
+            s.directions.forEach(d => {
+              const rid = d.richtungsId || '';
+              const key = getDirectionKey(d, s.network);
+              if (!byDir[rid]) byDir[rid] = [];
+              byDir[rid].push(key);
+            });
+            // Pro Richtung eine Gruppe mit + verbunden
+            Object.values(byDir).forEach(entries => {
+              allGroups.push(entries.join('+'));
+            });
+          } else {
+            const dirGroups = s.directions.map(d => getDirectionKey(d, s.network));
+            allGroups.push(dirGroups.join(','));
+          }
         }
       });
       return allGroups.filter(g => g).join(',');
@@ -6614,6 +6795,24 @@ function goToDisplayConfig() {
   var speedRow = document.getElementById('quickSpeedRow');
   if (speedRow) {
     speedRow.style.display = recommendedConfig.multiDisplay ? '' : 'none';
+  }
+
+  // Nachtmodus Toggle mit bestehender Einstellung initialisieren
+  var nightToggle = document.getElementById('quickNightMode');
+  if (nightToggle) {
+    if (recommendedConfig.nightMode) {
+      nightToggle.classList.add('active');
+    } else {
+      nightToggle.classList.remove('active');
+    }
+  }
+
+  // Wechselgeschwindigkeit aus bestehender Config initialisieren
+  if (recommendedConfig.stopInterval) {
+    var speedVal = recommendedConfig.stopInterval;
+    if (speedVal <= 5) setFtToggleVal('quickSpeed', 5);
+    else if (speedVal >= 20) setFtToggleVal('quickSpeed', 20);
+    else setFtToggleVal('quickSpeed', 10);
   }
 
   // Show config step, hide others (inkl. Regions-Card)
