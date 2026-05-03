@@ -607,23 +607,6 @@
       box-shadow: none;
     }
 
-    /* Update-Only Button: dezenter blau-ton, klar von "Weiter" abgegrenzt */
-    .btn-update-only {
-      background: rgba(66, 133, 244, 0.15);
-      border: 1px solid rgba(66, 133, 244, 0.5);
-      color: #6ea4ff;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .btn-update-only small {
-      font-size: 11px;
-      font-weight: 400;
-      opacity: 0.8;
-    }
-    .btn-update-only:hover {
-      background: rgba(66, 133, 244, 0.25);
-      transform: translateY(-1px);
-    }
     
     /* ==================== BAUSTELLE-WIZARD MODAL ==================== */
     .construction-modal {
@@ -918,11 +901,6 @@
       <button class="btn btn-add" onclick="showAddView()">
         + Weitere Station hinzufügen
       </button>
-      <!-- Nur sichtbar wenn bestehende Config geladen wurde UND neue Stationen dazugekommen sind -->
-      <button class="btn btn-update-only" id="updateLinesOnlyBtn" onclick="updateLinesOnly()" style="display:none;margin-top:12px;">
-        Nur Linien aktualisieren
-        <small>Bestehende Einstellungen behalten</small>
-      </button>
       <button class="btn btn-primary" id="continueBtn" disabled onclick="continueSetup()" style="margin-top:12px;">
         Weiter zu den Einstellungen
       </button>
@@ -1038,7 +1016,6 @@ let existingConfigLoaded = false;
 let configLoaded = false;
 let pendingConfig = null;
 let currentView = 'add';  // 'add' oder 'list'
-let currentDeviceConfig = null;  // Volle Config vom Device (für "Nur Linien aktualisieren")
 
 // HTML-Escape Helper für Stationsnamen im Header
 function _escHtml(s) {
@@ -1679,19 +1656,11 @@ window.addEventListener('message', function(event) {
     if (configLoaded) return;
     loadExistingConfig(event.data.rbl, event.data.filter);
   }
-  // Volle Device-Config (für "Nur Linien aktualisieren")
-  if (event.data && event.data.type === 'loadFullConfig' && event.data.config) {
-    currentDeviceConfig = event.data.config;
-    console.log('Device-Config geladen für Quick-Update:', currentDeviceConfig);
-    if (typeof updateUpdateOnlyButtonVisibility === 'function') updateUpdateOnlyButtonVisibility();
-  }
 });
 
 function requestExistingConfig() {
   console.log('Frage Parent nach bestehender Config...');
   window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
-  // Auch volle Config holen — für den Quick-Update-Button
-  window.parent.postMessage({ type: 'requestFullConfig' }, '*');
 }
 
 window.onload = async function() {
@@ -2287,9 +2256,6 @@ function updateStationsList() {
   const existingItems = stationsList.querySelectorAll('.station-item');
   existingItems.forEach(item => item.remove());
   emptyState.insertAdjacentHTML('beforebegin', items);
-
-  // Sichtbarkeit "Nur Linien aktualisieren" Button updaten
-  if (typeof updateUpdateOnlyButtonVisibility === 'function') updateUpdateOnlyButtonVisibility();
 }
 
 function removeStation(stationId) {
@@ -2309,127 +2275,6 @@ function removeStationLine(stationId, lineName) {
   updateStationsList();
   if (addedStations.length === 0) {
     showAddView();
-  }
-}
-
-// Sichtbarkeit des "Nur Linien aktualisieren"-Buttons aktualisieren.
-// Sichtbar wenn:
-//   - Eine bestehende Config geladen wurde (existingConfigLoaded)
-//   - UND Device-Config-Werte verfügbar sind (currentDeviceConfig vom Parent)
-//   - UND mindestens eine Station vorhanden ist
-function updateUpdateOnlyButtonVisibility() {
-  var btn = document.getElementById('updateLinesOnlyBtn');
-  if (!btn) return;
-  var visible = (existingConfigLoaded && currentDeviceConfig && addedStations.length > 0);
-  btn.style.display = visible ? '' : 'none';
-}
-
-// Hilfs-Funktion: aus addedStations rbl + filter + gehweg bauen
-function _buildStationsConfig() {
-  const stationGroups = {};
-  addedStations.forEach(s => {
-    if (!stationGroups[s.stationId]) {
-      stationGroups[s.stationId] = { stationId: s.stationId, stationName: s.stationName, lines: [] };
-    }
-    const exists = stationGroups[s.stationId].lines.some(l =>
-      l.name === s.lineName && l.direction === s.direction
-    );
-    if (!exists) {
-      stationGroups[s.stationId].lines.push({ name: s.lineName, direction: s.direction });
-    }
-  });
-  const stopIds = [];
-  const filters = [];
-  const stationDetails = [];
-  Object.values(stationGroups).forEach(group => {
-    stopIds.push(group.stationId);
-    filters.push(group.lines.map(l => l.name).join(','));
-    stationDetails.push({ id: group.stationId, name: group.stationName, lines: group.lines });
-  });
-  return {
-    rbl: stopIds.join(','),
-    filter: filters.join('|'),
-    details: stationDetails,
-    stopIds: stopIds
-  };
-}
-
-// Nur Linien aktualisieren: behält alle existierenden Settings vom Device,
-// schickt aber neue rbl/filter. Neue Stops bekommen gehweg=0.
-function updateLinesOnly() {
-  if (addedStations.length === 0) {
-    alert('Bitte füge mindestens eine Station hinzu.');
-    return;
-  }
-  if (!currentDeviceConfig) {
-    alert('Device-Konfiguration noch nicht geladen — bitte kurz warten und nochmal probieren.');
-    return;
-  }
-
-  const cfg = _buildStationsConfig();
-
-  // Gehweg: bestehenden Wert pro Stop übernehmen falls vorhanden, sonst 0 für neue Stops
-  let gehwegStr = '0';
-  if (currentDeviceConfig.gehweg && typeof currentDeviceConfig.gehweg === 'string' && currentDeviceConfig.gehweg.indexOf(':') >= 0) {
-    // Map alte Stop-IDs → Werte parsen
-    const gehwegMap = {};
-    currentDeviceConfig.gehweg.split('|').forEach(entry => {
-      const colonPos = entry.indexOf(':');
-      if (colonPos > 0) {
-        const sid = entry.substring(0, colonPos).trim();
-        const val = parseInt(entry.substring(colonPos + 1)) || 0;
-        gehwegMap[sid] = val;
-      }
-    });
-    gehwegStr = cfg.stopIds.map(sid => sid + ':' + (gehwegMap[String(sid)] || 0)).join('|');
-  } else if (cfg.stopIds.length > 0) {
-    // Default: alle 0
-    gehwegStr = cfg.stopIds.map(sid => sid + ':0').join('|');
-  }
-
-  // Bestehende Settings vom Device + neue rbl/filter
-  const configData = {
-    type: 'setRBL',
-    rbl: cfg.rbl,
-    filter: cfg.filter,
-    zeilen: String(currentDeviceConfig.lines_count || '2'),
-    sortmode: String(currentDeviceConfig.sortmode || currentDeviceConfig.sort_mode || '1'),
-    chopper: String(currentDeviceConfig.chopper || '0'),
-    silberpfeil: String(currentDeviceConfig.silberpfeil || '0'),
-    wienbadges: String(currentDeviceConfig.wien_badges || '0'),
-    colour: String(currentDeviceConfig.colour || '1'),
-    textcolor: String(currentDeviceConfig.text_color || '1'),
-    displaylight: String(currentDeviceConfig.displaylight || '3'),
-    nightmode: currentDeviceConfig.night_mode_enabled ? '1' : '0',
-    nightstart: String(currentDeviceConfig.night_mode_start || '22'),
-    nightend: String(currentDeviceConfig.night_mode_end || '7'),
-    showfunmessages: (currentDeviceConfig.show_fun_messages === false || currentDeviceConfig.show_fun_messages === '0' || currentDeviceConfig.show_fun_messages === 0) ? '0' : '1',
-    displaymode: String(currentDeviceConfig.display_mode || '1'),
-    stopinterval: String(currentDeviceConfig.stop_interval || '10'),
-    gehweg: gehwegStr,
-    // lineGroups/rowOrder neu generieren statt alte zu behalten (sonst inkonsistent mit neuer Linien-Auswahl)
-    linegroups: '',
-    linefilter: '',
-    linefilterdestination: '',
-    roworder: '',
-    roworderdestination: ''
-  };
-
-  console.log('[Update-Only] Sende Config:', configData);
-
-  // localStorage clearen damit index.html nicht versucht den alten state wiederherzustellen
-  localStorage.removeItem('straba_pending_rbl');
-  localStorage.removeItem('straba_pending_filter');
-  localStorage.removeItem('straba_pending_details');
-  localStorage.removeItem('straba_pending_fresh');
-  localStorage.removeItem('straba_back_active');
-  localStorage.removeItem('straba_back_rbl');
-  localStorage.removeItem('straba_back_filter');
-
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage(configData, '*');
-  } else {
-    alert('Fehler: Diese Seite muss im Straba-Interface geöffnet werden.');
   }
 }
 

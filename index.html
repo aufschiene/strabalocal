@@ -254,7 +254,7 @@
       margin-top:14px;
       transition:opacity 0.3s, transform 0.3s;
     }
-    .sub-section.disabled{opacity:0.4;pointer-events:none;transform:scale(0.98)}
+    .sub-section.disabled{display:none}
     .sub-section h4{font-size:12px;color:#aaa;margin-bottom:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.3px}
 
     /* Gehweg Liste */
@@ -384,6 +384,25 @@
     .wizard-finetune-row{
       text-align:center;
       margin-top:14px;
+    }
+    /* Beschreibungstext nur im Wizard sichtbar — gibt zusätzlichen Kontext zum aktuellen Schritt */
+    .wizard-description{
+      display:none;
+    }
+    body.wizard-active .wizard-description{
+      display:block;
+      background:rgba(255,215,0,0.04);
+      border-left:3px solid rgba(255,215,0,0.4);
+      padding:10px 14px;
+      margin:8px 0 16px;
+      border-radius:4px;
+      color:#ccc;
+      font-size:13px;
+      line-height:1.5;
+    }
+    body.wizard-active .wizard-description b{
+      color:#ffd700;
+      font-weight:600;
     }
     .wizard-finetune-link{
       color:#888;
@@ -1043,6 +1062,14 @@
   <!-- Standardmäßig versteckt — wird nur sichtbar wenn updateFeatureVisibility() es freigibt -->
   <div class="card feature-hidden" id="cardBarrierefreiheit">
     <h2>Features <span id="wienOnlyBadge1" class="wien-only-badge" style="display:none;">Wien</span></h2>
+    <div class="wizard-description">
+      <b>Wien-spezifische Anzeige-Optionen.</b><br>
+      <b>Hochflurer markieren</b> kennzeichnet nicht-barrierefreie Fahrzeuge in hellblauer Schrift —
+      praktisch wenn du auf einen Niederflur-Wagen warten möchtest.<br>
+      <b>U-Bahnen mit Klimaanlage</b> ergänzt einen Stern (★) bei klimatisierten Zügen (z.B. U2*).<br>
+      <b>U-Bahn Badges</b> hinterlegen die Liniennummer in der Originalfarbe der Wiener Linien
+      (U1 rot, U2 lila, U3 orange, U4 grün, U6 braun).
+    </div>
 
     <div class="control-row feature-hidden" id="rowChopper">
       <div class="control-label">
@@ -1171,6 +1198,11 @@
   <!-- ==================== 3. NACHTMODUS ==================== -->
   <div class="card" id="cardNachtmodus">
     <h2>Nachtmodus</h2>
+    <div class="wizard-description">
+      <b>Strom sparen wenn du schläfst.</b><br>
+      Aktiviere den Nachtmodus und das Display schaltet sich in dem von dir gewählten
+      Zeitraum komplett aus. Standardmäßig <b>aus</b> — kannst du jederzeit aktivieren.
+    </div>
 
     <div class="control-row">
       <div class="control-label">
@@ -1201,6 +1233,12 @@
   <!-- ==================== 4. GEHWEG ==================== -->
   <div class="card" id="cardGehweg">
     <h2>Gehweg zur Haltestelle</h2>
+    <div class="wizard-description">
+      <b>Zeige nur Abfahrten, die du noch erreichen kannst.</b><br>
+      Trag pro Haltestelle ein, wie viele Minuten du im schlimmsten Fall zu Fuß brauchst.
+      Beispiel: <b>5&nbsp;min Gehweg</b> → Abfahrten die in 0-4&nbsp;Minuten kommen werden ausgeblendet,
+      damit du nicht hinhetzt für etwas das du eh nicht mehr schaffst. Maximal 15&nbsp;Minuten.
+    </div>
 
     <div class="control-row">
       <div class="control-label">
