@@ -874,6 +874,17 @@
         <div class="seg-btn" data-value="1">An</div>
       </div>
     </div>
+
+    <div class="control-row" id="rowWienBadges">
+      <div class="control-label">
+        <span>Wien U-Bahn Badges</span>
+        <small>Linien mit den Original-Farben hinterlegen (U1 rot, U2 lila, …)</small>
+      </div>
+      <div class="segmented" data-name="wienbadges">
+        <div class="seg-btn active" data-value="0">Aus</div>
+        <div class="seg-btn" data-value="1">An</div>
+      </div>
+    </div>
   </div>
 
   <!-- ==================== 2. ZEILEN ==================== -->
@@ -1976,6 +1987,7 @@ function applyConfig(config) {
   setSegmentValue('sortmode', config.sort_mode || config.sortmode || '1');
   setSegmentValue('chopper', (config.chopper !== undefined && config.chopper !== '') ? config.chopper : '0');
   setSegmentValue('silberpfeil', (config.silberpfeil !== undefined && config.silberpfeil !== '') ? config.silberpfeil : '0');
+  setSegmentValue('wienbadges', (config.wien_badges !== undefined && config.wien_badges !== '') ? config.wien_badges : '0');
   setSegmentValue('textcolor', config.text_color || '1');
   setSegmentValue('displaylight', config.displaylight || '3');
 
@@ -2199,6 +2211,7 @@ document.getElementById('saveBtn').addEventListener('click', function() {
     sortmode: sortMode,
     chopper: getSegmentValue('chopper'),
     silberpfeil: getSegmentValue('silberpfeil'),
+    wienbadges: getSegmentValue('wienbadges'),
     colour: '1',
     textcolor: getSegmentValue('textcolor'),
     displaylight: getSegmentValue('displaylight'),
