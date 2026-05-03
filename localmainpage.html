@@ -1019,25 +1019,16 @@ function closeConstructionWizard() {
   document.getElementById('constructionModal').classList.remove('show');
 }
 
-// Hole live Abfahrten von der Wiener Linien API, gruppiere nach line+richtungsId
+// Hole live Abfahrten von der Straba-Backend-API, gruppiere nach line+richtungsId
 async function fetchConstructionLines(stationId) {
-  // Straba-Backend-Proxy für Wiener Linien (umgeht CORS, hat WL-Real-Time-Format)
   const apiUrl = 'https://api.straba.at/api/v1/wl/departures?stopId=' + stationId;
-  const fallbackUrl = 'https://www.wienerlinien.at/ogd_realtime/monitor?stopID=' + stationId;
 
   // Timeout 35s
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 35000);
 
   try {
-    let response;
-    try {
-      response = await fetch(apiUrl, { signal: controller.signal });
-      if (!response.ok) throw new Error('Backend HTTP ' + response.status);
-    } catch (e) {
-      console.log('[Baustelle] Backend-Aufruf fehlgeschlagen, versuche direkten WL-API:', e);
-      response = await fetch(fallbackUrl, { signal: controller.signal });
-    }
+    const response = await fetch(apiUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -1045,41 +1036,63 @@ async function fetchConstructionLines(stationId) {
 
     // Linien gruppieren: line + richtungsId → ein Eintrag
     const grouped = {};
-    if (data.data && Array.isArray(data.data.monitors)) {
-      data.data.monitors.forEach(m => {
-        if (!m.lines || !Array.isArray(m.lines)) return;
-        m.lines.forEach(line => {
-          const lineName = line.name || '';
-          const towards = line.towards || m.towards || '';
-          const richtungsId = line.richtungsId || '';
-          const lineId = (line.lineID !== undefined) ? line.lineID : '';
-          const patternId = (line.patternId !== undefined) ? line.patternId : '';
-          const key = lineName + '|' + (richtungsId || towards);
-          if (!grouped[key]) {
-            grouped[key] = {
-              lineName: lineName,
-              towards: towards,
-              richtungsId: richtungsId,
-              lineId: lineId,
-              patternId: patternId,
-              countdowns: [],
-              type: line.type || ''
-            };
-          }
-          // Countdowns sammeln (für die "live"-Info)
-          if (line.departures && line.departures.departure) {
-            line.departures.departure.forEach(d => {
-              const cd = (d.departureTime && d.departureTime.countdown !== undefined) ? d.departureTime.countdown : null;
-              if (cd !== null) grouped[key].countdowns.push(cd);
-            });
-          }
-        });
+    // API-Format: entweder data.data.monitors (WL Realtime) oder data.monitors (Backend)
+    const monitors = (data && data.data && Array.isArray(data.data.monitors))
+                     ? data.data.monitors
+                     : (data && Array.isArray(data.monitors)) ? data.monitors : [];
+
+    monitors.forEach(m => {
+      if (!m || typeof m !== 'object') return;
+      if (!Array.isArray(m.lines)) return;
+      m.lines.forEach(line => {
+        if (!line || typeof line !== 'object') return;
+        const lineName = line.name || '';
+        const towards = line.towards || m.towards || '';
+        const richtungsId = line.richtungsId || '';
+        const lineId = (line.lineID !== undefined) ? line.lineID : '';
+        const patternId = (line.patternId !== undefined) ? line.patternId : '';
+        if (!lineName) return;  // Linien ohne Namen überspringen
+        const key = lineName + '|' + (richtungsId || towards);
+        if (!grouped[key]) {
+          grouped[key] = {
+            lineName: lineName,
+            towards: towards,
+            richtungsId: richtungsId,
+            lineId: lineId,
+            patternId: patternId,
+            countdowns: [],
+            type: line.type || ''
+          };
+        }
+        // Countdowns sammeln (für die "live"-Info)
+        if (line.departures && Array.isArray(line.departures.departure)) {
+          line.departures.departure.forEach(d => {
+            if (!d) return;
+            const cd = (d.departureTime && d.departureTime.countdown !== undefined) ? d.departureTime.countdown : null;
+            if (cd !== null) grouped[key].countdowns.push(cd);
+          });
+        }
+      });
+    });
+
+    // Set aller bekannten Linien aus unserer Datenbank — diese filtern wir raus,
+    // weil sie ja regulär verfügbar sind. Nur "fremde" Linien sind echte Baustellen-Linien.
+    const knownLineNames = new Set();
+    if (Array.isArray(stationData)) {
+      stationData.forEach(l => {
+        if (l && l.lineName) knownLineNames.add(String(l.lineName).trim().toUpperCase());
       });
     }
 
-    constructionLines = Object.values(grouped);
+    const allLines = Object.values(grouped);
+    constructionLines = allLines.filter(l => {
+      const name = String(l.lineName || '').trim().toUpperCase();
+      return name && !knownLineNames.has(name);
+    });
+
     if (constructionLines.length === 0) {
-      showConstructionError('Keine aktiven Linien an dieser Station gefunden.');
+      // Keine "fremden" Linien gefunden — alles läuft nach Plan
+      showConstructionAllGood();
       return;
     }
     renderConstructionResult();
@@ -1098,7 +1111,15 @@ function showConstructionError(msg) {
   document.getElementById('constructionLoading').style.display = 'none';
   document.getElementById('constructionResult').style.display = 'none';
   document.getElementById('constructionError').style.display = '';
-  document.getElementById('constructionErrorText').textContent = msg;
+  document.getElementById('constructionErrorText').innerHTML = msg;
+}
+
+function showConstructionAllGood() {
+  showConstructionError(
+    'Hmm, scheint alles nach Plan zu laufen — keine ungewöhnlichen Linien an dieser Station gefunden.<br><br>' +
+    'Falls du der Meinung bist es fährt eine Linie die nicht in unserer Datenbank steht, kontaktiere bitte ' +
+    '<a href="mailto:support@straba.at" style="color:#ffd700;">support@straba.at</a>.'
+  );
 }
 
 function renderConstructionResult() {
