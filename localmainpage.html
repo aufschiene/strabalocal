@@ -1075,23 +1075,24 @@ async function fetchConstructionLines(stationId) {
       });
     });
 
-    // Set aller bekannten Linien aus unserer Datenbank — diese filtern wir raus,
-    // weil sie ja regulär verfügbar sind. Nur "fremde" Linien sind echte Baustellen-Linien.
-    const knownLineNames = new Set();
-    if (Array.isArray(stationData)) {
-      stationData.forEach(l => {
-        if (l && l.lineName) knownLineNames.add(String(l.lineName).trim().toUpperCase());
-      });
-    }
+    // Set aller Linien die der User für DIESE Station bereits konfiguriert hat.
+    // Diese filtern wir raus — Baustellen-Wizard zeigt nur Linien, die NEU dazukommen würden.
+    const configuredLineNames = new Set();
+    addedStations.forEach(s => {
+      if (s.stationId === constructionStationId && s.lineName) {
+        configuredLineNames.add(String(s.lineName).trim().toUpperCase());
+      }
+    });
 
     const allLines = Object.values(grouped);
     constructionLines = allLines.filter(l => {
       const name = String(l.lineName || '').trim().toUpperCase();
-      return name && !knownLineNames.has(name);
+      return name && !configuredLineNames.has(name);
     });
 
     if (constructionLines.length === 0) {
-      // Keine "fremden" Linien gefunden — alles läuft nach Plan
+      // Keine zusätzlichen Linien gefunden — entweder ist alles schon konfiguriert
+      // oder hier fährt wirklich nichts ungewöhnliches.
       showConstructionAllGood();
       return;
     }
@@ -1943,9 +1944,11 @@ function updateStationsList() {
     continueBtn.disabled = false;
   }
   
+  // Pro Linie ein Eintrag (Schlüssel: stationId + lineName).
+  // So bekommt 43 und 43A an derselben Station je eine eigene Zeile.
   const grouped = {};
   addedStations.forEach((station, idx) => {
-    const key = `${station.stationId}`;
+    const key = `${station.stationId}|${station.lineName}`;
     if (!grouped[key]) {
       grouped[key] = {
         ...station,
@@ -1955,19 +1958,13 @@ function updateStationsList() {
         hasExisting: station.isExisting
       };
     } else {
+      // Gleiche Linie an gleicher Station: nur Richtungen zusammenfassen
       grouped[key].indices.push(idx);
-      const lineExists = grouped[key].lines.some(l => 
-        l.lineName === station.lineName && l.direction === station.direction
-      );
-      if (!lineExists) {
-        grouped[key].lines.push({lineName: station.lineName, direction: station.direction});
-      }
       if (!grouped[key].allDirections.includes(station.direction)) {
         grouped[key].allDirections.push(station.direction);
+        grouped[key].lines.push({lineName: station.lineName, direction: station.direction});
       }
-      if (station.isExisting) {
-        grouped[key].hasExisting = true;
-      }
+      if (station.isExisting) grouped[key].hasExisting = true;
     }
   });
   
@@ -2010,7 +2007,7 @@ function updateStationsList() {
             </button>
           </div>
         </div>
-        <button class="delete-btn" onclick="removeStation(${station.stationId})" title="Entfernen">✕</button>
+        <button class="delete-btn" onclick="removeStationLine(${station.stationId}, '${String(firstLineName).replace(/'/g, "&#39;")}')" title="Entfernen">✕</button>
       </div>
     `;
   }).join('');
@@ -2024,6 +2021,17 @@ function removeStation(stationId) {
   addedStations = addedStations.filter(s => s.stationId !== stationId);
   updateStationsList();
   // Wenn keine Stationen mehr → zurück zur Add-Ansicht
+  if (addedStations.length === 0) {
+    showAddView();
+  }
+}
+
+// Entfernt nur eine spezifische Linie an einer Station (für die Pro-Linie-Zeilen-Ansicht)
+function removeStationLine(stationId, lineName) {
+  addedStations = addedStations.filter(s =>
+    !(s.stationId === stationId && String(s.lineName) === String(lineName))
+  );
+  updateStationsList();
   if (addedStations.length === 0) {
     showAddView();
   }
