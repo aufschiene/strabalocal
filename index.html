@@ -358,6 +358,26 @@
       transition:width 0.3s ease;
       width:0%;
     }
+    .wizard-back-link-row{
+      margin-bottom:12px;
+    }
+    .wizard-back-link{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:8px 14px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.08);
+      color:#aaa;
+      text-decoration:none;
+      font-size:13px;
+      border-radius:8px;
+      transition:all 0.15s;
+    }
+    .wizard-back-link:hover{
+      background:rgba(255,255,255,0.1);
+      color:#fff;
+    }
     .wizard-finetune-row{
       text-align:center;
       margin-top:14px;
@@ -997,6 +1017,13 @@
   <div class="pending-banner" id="pendingBanner" style="display:none;">
     <div class="pending-title">&#10003; Neue Stationen bereit</div>
     <div class="pending-text" id="pendingText">Deine ausgewaehlten Stationen werden beim Speichern uebernommen.</div>
+  </div>
+
+  <!-- ==================== WIZARD: ZURÜCK-LINK ==================== -->
+  <div id="wizardBackLinkRow" class="wizard-back-link-row" style="display:none;">
+    <a href="#" onclick="goBackToLines();return false;" class="wizard-back-link">
+      &larr; Zur&uuml;ck zu Linien einstellen
+    </a>
   </div>
 
   <!-- ==================== WIZARD NAV (TOP) ==================== -->
@@ -2275,6 +2302,8 @@ function applyWizardView() {
   var expandCard = document.getElementById('cardExpand');
   var zeilenCard = document.getElementById('cardZeilenSortierung');
   var backToWizard = document.getElementById('backToWizardLink');
+  var pendingBanner = document.getElementById('pendingBanner');
+  var wizardBackLinkRow = document.getElementById('wizardBackLinkRow');
 
   if (wizardViewMode === 'full') {
     document.body.classList.remove('wizard-active');
@@ -2282,11 +2311,14 @@ function applyWizardView() {
     if (navTop) navTop.style.display = 'none';
     if (navBottom) navBottom.style.display = 'none';
     if (finetuneRow) finetuneRow.style.display = 'none';
+    if (wizardBackLinkRow) wizardBackLinkRow.style.display = 'none';
     if (saveBtn) saveBtn.style.display = '';
     if (introBox) introBox.classList.remove('wizard-hidden');
     if (expandCard) expandCard.classList.remove('wizard-hidden');
     if (zeilenCard) zeilenCard.classList.remove('wizard-hidden');
     if (backToWizard) backToWizard.style.display = '';
+    // Pending-Banner darf im Full-Modus wieder angezeigt werden (von der ursprünglichen Logik)
+    // → Wir setzen ihn nicht aktiv, lassen aber die andere Logik ihn zeigen falls nötig
     // Alle Wizard-Karten zeigen (außer feature-hidden die durch andere Logik versteckt sind)
     wizardSteps.forEach(function(s) {
       var el = document.getElementById(s.id);
@@ -2304,6 +2336,9 @@ function applyWizardView() {
   if (expandCard) expandCard.classList.add('wizard-hidden');
   if (zeilenCard) zeilenCard.classList.add('wizard-hidden');  // Zeilen+Sortierung im Wizard verstecken
   if (backToWizard) backToWizard.style.display = 'none';
+  // Pending-Banner im Wizard verstecken — stattdessen Back-Link zeigen
+  if (pendingBanner) pendingBanner.style.display = 'none';
+  if (wizardBackLinkRow) wizardBackLinkRow.style.display = '';
 
   var activeSteps = getActiveWizardSteps();
   if (activeSteps.length === 0) {

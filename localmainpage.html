@@ -488,27 +488,30 @@
       margin-top: 6px;
     }
 
-    /* Baustelle-Button */
-    .station-item .construction-btn {
-      background: rgba(255, 165, 0, 0.08);
-      border: 1px dashed rgba(255, 165, 0, 0.35);
+    /* Baustelle-Inline-Button im Add-Flow (unter "Weitere Linien an dieser Station") */
+    .construction-btn-inline {
+      width: 100%;
+      margin-top: 12px;
+      background: rgba(255, 165, 0, 0.10);
+      border: 1px dashed rgba(255, 165, 0, 0.40);
       color: #ffb84d;
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 11px;
+      padding: 11px 14px;
+      border-radius: 8px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 5px;
+      justify-content: center;
+      gap: 8px;
       transition: all 0.15s;
     }
-    .station-item .construction-btn:hover {
-      background: rgba(255, 165, 0, 0.16);
+    .construction-btn-inline:hover {
+      background: rgba(255, 165, 0, 0.18);
       border-style: solid;
     }
-    .station-item .construction-btn .construction-icon {
-      font-size: 13px;
+    .construction-btn-inline .construction-icon {
+      font-size: 15px;
     }
     
     .station-item .delete-btn {
@@ -934,6 +937,12 @@
           <h3>Weitere Linien an dieser Station:</h3>
           <div class="other-lines-hint">Optional: Auch diese Linien anzeigen?</div>
           <div class="other-lines-options" id="otherLinesOptions"></div>
+
+          <!-- Baustelle-Button: Live-API abfragen falls hier eine andere Linie wegen Baustelle fährt -->
+          <button class="construction-btn-inline" id="constructionBtnInline" type="button" onclick="openConstructionFromAddFlow()">
+            <span class="construction-icon">🚧</span>
+            Hier f&auml;hrt eine andere Linie wegen Baustelle?
+          </button>
         </div>
 
         <button class="btn btn-add" id="addStationBtn" disabled onclick="addStation()">
@@ -998,6 +1007,27 @@ let constructionStationId = null;
 let constructionStationName = '';
 let constructionLines = [];          // Geladene Linien (gruppiert nach line+richtungsId)
 let constructionSelected = new Set();  // Ausgewählte Indizes
+
+// Aufruf aus dem Add-Flow: nutzt die gerade in Step 2 ausgewählte Station
+function openConstructionFromAddFlow() {
+  if (!selectedStation) {
+    alert('Bitte zuerst eine Station auswählen.');
+    return;
+  }
+  // Erste verfügbare Direction-stopId nehmen — alle Directions an einer Station
+  // teilen sich praktisch denselben physischen Stop (verschiedene Plattformen aggregiert)
+  let stopId = null;
+  if (Array.isArray(selectedStation.directions) && selectedStation.directions.length > 0) {
+    stopId = selectedStation.directions[0].stopId;
+  } else if (selectedStation.stationID !== undefined) {
+    stopId = selectedStation.stationID;
+  }
+  if (!stopId) {
+    alert('Konnte Stop-ID nicht ermitteln.');
+    return;
+  }
+  openConstructionWizard(stopId, selectedStation.name || '');
+}
 
 function openConstructionWizard(stationId, stationName) {
   constructionStationId = stationId;
@@ -1075,8 +1105,10 @@ async function fetchConstructionLines(stationId) {
       });
     });
 
-    // Set aller Linien die der User für DIESE Station bereits konfiguriert hat.
-    // Diese filtern wir raus — Baustellen-Wizard zeigt nur Linien, die NEU dazukommen würden.
+    // Linien die der User für DIESE Station bereits konfiguriert hat — die filtern wir raus
+    // (sonst wäre die Linie ja schon doppelt). Live-Linien die der User noch nicht hat,
+    // werden angezeigt — egal ob sie in der statischen DB stehen oder nicht.
+    // (DB-Check entfernt, da unsere DB nicht 100% aktuell ist und legitime Linien fälschlich filterte.)
     const configuredLineNames = new Set();
     addedStations.forEach(s => {
       if (s.stationId === constructionStationId && s.lineName) {
@@ -1087,12 +1119,12 @@ async function fetchConstructionLines(stationId) {
     const allLines = Object.values(grouped);
     constructionLines = allLines.filter(l => {
       const name = String(l.lineName || '').trim().toUpperCase();
-      return name && !configuredLineNames.has(name);
+      if (!name) return false;
+      // Schon konfiguriert? → raus, sonst zeigen
+      return !configuredLineNames.has(name);
     });
 
     if (constructionLines.length === 0) {
-      // Keine zusätzlichen Linien gefunden — entweder ist alles schon konfiguriert
-      // oder hier fährt wirklich nichts ungewöhnliches.
       showConstructionAllGood();
       return;
     }
@@ -1999,12 +2031,6 @@ function updateStationsList() {
           <div class="station-name-row">
             <span class="station-name">${station.stationName}</span>
             ${directionDisplay ? `<span class="station-direction">${directionDisplay}</span>` : ''}
-          </div>
-          <div class="station-details">
-            <button class="construction-btn" onclick="openConstructionWizard(${station.stationId}, '${(station.stationName || '').replace(/'/g, "&#39;")}')">
-              <span class="construction-icon">🚧</span>
-              Baustelle? Andere Linie f&auml;hrt hier
-            </button>
           </div>
         </div>
         <button class="delete-btn" onclick="removeStationLine(${station.stationId}, '${String(firstLineName).replace(/'/g, "&#39;")}')" title="Entfernen">✕</button>
