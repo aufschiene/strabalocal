@@ -564,6 +564,31 @@
       box-shadow: none;
     }
     
+    /* Add-View Header (zeigt Anzahl ausgewählter Stationen + Zurück-Link) */
+    .add-view-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(255, 215, 0, 0.08);
+      border: 1px solid rgba(255, 215, 0, 0.25);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #ffd700;
+    }
+    .add-view-header .back-to-list {
+      color: #ffd700;
+      text-decoration: none;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255, 215, 0, 0.15);
+    }
+    .add-view-header .back-to-list:hover {
+      background: rgba(255, 215, 0, 0.25);
+    }
+
     /* Bottom Bar */
     .bottom-bar {
       position: fixed;
@@ -609,71 +634,83 @@
     <div class="banner-title">✓ Bestehende Konfiguration geladen</div>
     <div class="banner-text">Du kannst weitere Stationen hinzufügen oder bestehende entfernen.</div>
   </div>
-  
-  <!-- Step 1: Select Line -->
-  <div class="card">
-    <h2><span class="step">1</span> Linie wählen</h2>
-    <div class="input-group">
-      <label>Liniennummer eingeben</label>
-      <div class="input-wrapper">
-        <input type="text" id="lineInput" placeholder="z.B. 2, 46A, U6..." autocomplete="off">
-        <div class="dropdown" id="lineDropdown">
-          <div id="lineList"></div>
+
+  <!-- ============================================================ -->
+  <!-- VIEW: STATIONEN-LISTE (sichtbar wenn Stationen vorhanden)     -->
+  <!-- ============================================================ -->
+  <div id="listView" style="display:none;">
+    <div class="card">
+      <h2>Deine Stationen</h2>
+      <div class="stations-list" id="stationsList">
+        <div class="empty-state" id="emptyState">
+          <div class="icon">🚏</div>
+          <p>Noch keine Stationen hinzugefügt</p>
         </div>
       </div>
-    </div>
-  </div>
-  
-  <!-- Step 2: Select Station -->
-  <div class="card" id="stationCard" style="opacity: 0.5; pointer-events: none;">
-    <h2><span class="step">2</span> Station wählen</h2>
-    <div class="input-group">
-      <label>Stationsname eingeben</label>
-      <div class="input-wrapper">
-        <input type="text" id="stationInput" placeholder="z.B. Westbahnhof, Karlsplatz..." disabled autocomplete="off">
-        <div class="dropdown" id="stationDropdown">
-          <div id="stationList"></div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Direction Selection -->
-    <div class="direction-selection" id="directionSelection">
-      <h3>Richtung(en) wählen:</h3>
-      <div class="direction-options" id="directionOptions"></div>
-      
-      <!-- Other lines at same stop -->
-      <div class="other-lines-section" id="otherLinesSection" style="display: none;">
-        <div class="other-lines-divider"></div>
-        <h3>Weitere Linien an dieser Station:</h3>
-        <div class="other-lines-hint">Optional: Auch diese Linien anzeigen?</div>
-        <div class="other-lines-options" id="otherLinesOptions"></div>
-      </div>
-      
-      <button class="btn btn-add" id="addStationBtn" disabled onclick="addStation()">
-        Station hinzufügen
+      <button class="btn btn-add" onclick="showAddView()">
+        + Weitere Station hinzufügen
+      </button>
+      <button class="btn btn-primary" id="continueBtn" disabled onclick="continueSetup()" style="margin-top:12px;">
+        Weiter zu den Einstellungen
       </button>
     </div>
   </div>
-  
-  <!-- Step 3: Added Stations -->
-  <div class="card">
-    <h2><span class="step">3</span> Deine Stationen</h2>
-    <div class="stations-list" id="stationsList">
-      <div class="empty-state" id="emptyState">
-        <div class="icon">🚏</div>
-        <p>Noch keine Stationen hinzugefügt</p>
+
+  <!-- ============================================================ -->
+  <!-- VIEW: STATION HINZUFÜGEN (Wizard mit Step 1 + Step 2)         -->
+  <!-- ============================================================ -->
+  <div id="addView">
+    <!-- Mini-Banner: zeigt aktuelle Anzahl Stationen + "zurück" Link -->
+    <div id="addViewHeader" class="add-view-header" style="display:none;">
+      <span id="addViewHeaderCount">0 Stationen ausgewählt</span>
+      <a href="#" onclick="showListView();return false;" class="back-to-list">Zurück zur Liste</a>
+    </div>
+
+    <!-- Step 1: Select Line -->
+    <div class="card">
+      <h2><span class="step">1</span> Linie wählen</h2>
+      <div class="input-group">
+        <label>Liniennummer eingeben</label>
+        <div class="input-wrapper">
+          <input type="text" id="lineInput" placeholder="z.B. 2, 46A, U6..." autocomplete="off">
+          <div class="dropdown" id="lineDropdown">
+            <div id="lineList"></div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- Bottom Bar -->
-<div class="bottom-bar">
-  <div class="container">
-    <button class="btn btn-primary" id="continueBtn" disabled onclick="continueSetup()">
-      Weiter zu den Einstellungen
-    </button>
+    <!-- Step 2: Select Station -->
+    <div class="card" id="stationCard" style="opacity: 0.5; pointer-events: none;">
+      <h2><span class="step">2</span> Station wählen</h2>
+      <div class="input-group">
+        <label>Stationsname eingeben</label>
+        <div class="input-wrapper">
+          <input type="text" id="stationInput" placeholder="z.B. Westbahnhof, Karlsplatz..." disabled autocomplete="off">
+          <div class="dropdown" id="stationDropdown">
+            <div id="stationList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Direction Selection -->
+      <div class="direction-selection" id="directionSelection">
+        <h3>Richtung(en) wählen:</h3>
+        <div class="direction-options" id="directionOptions"></div>
+
+        <!-- Other lines at same stop -->
+        <div class="other-lines-section" id="otherLinesSection" style="display: none;">
+          <div class="other-lines-divider"></div>
+          <h3>Weitere Linien an dieser Station:</h3>
+          <div class="other-lines-hint">Optional: Auch diese Linien anzeigen?</div>
+          <div class="other-lines-options" id="otherLinesOptions"></div>
+        </div>
+
+        <button class="btn btn-add" id="addStationBtn" disabled onclick="addStation()">
+          Station hinzufügen
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -688,6 +725,45 @@ let addedStations = [];
 let existingConfigLoaded = false;
 let configLoaded = false;
 let pendingConfig = null;
+let currentView = 'add';  // 'add' oder 'list'
+
+// View-Switching: 'add' = Wizard zum Hinzufügen, 'list' = Stationen-Liste
+function showAddView() {
+  currentView = 'add';
+  document.getElementById('addView').style.display = '';
+  document.getElementById('listView').style.display = 'none';
+  // Mini-Header oben anzeigen wenn schon Stationen vorhanden
+  var hdr = document.getElementById('addViewHeader');
+  if (addedStations.length > 0) {
+    hdr.style.display = '';
+    document.getElementById('addViewHeaderCount').textContent =
+      addedStations.length + ' Station' + (addedStations.length === 1 ? '' : 'en') + ' ausgewählt';
+  } else {
+    hdr.style.display = 'none';
+  }
+  // Eingabefeld fokussieren
+  setTimeout(function() {
+    var li = document.getElementById('lineInput');
+    if (li) li.focus();
+  }, 100);
+}
+
+function showListView() {
+  currentView = 'list';
+  document.getElementById('addView').style.display = 'none';
+  document.getElementById('listView').style.display = '';
+  // Stationen-Liste aktualisieren
+  if (typeof updateStationsList === 'function') updateStationsList();
+}
+
+// Automatischer View-Wechsel basierend auf Stationen-Anzahl
+function refreshView() {
+  if (addedStations.length > 0 && currentView !== 'add') {
+    showListView();
+  } else if (addedStations.length === 0) {
+    showAddView();
+  }
+}
 
 // DOM Elements
 const lineInput = document.getElementById('lineInput');
@@ -825,6 +901,8 @@ function loadExistingConfig(rbl, filter) {
     existingConfigLoaded = true;
     existingConfigBanner.classList.add('show');
     updateStationsList();
+    // Stationen vorhanden → direkt zur Liste-Ansicht wechseln
+    showListView();
     console.log(`${addedCount} bestehende Einträge geladen`);
   }
 }
@@ -1322,7 +1400,8 @@ function addStation() {
   });
   
   updateStationsList();
-  
+
+  // Eingabefelder zurücksetzen
   lineInput.value = '';
   stationInput.value = '';
   stationInput.disabled = true;
@@ -1334,8 +1413,9 @@ function addStation() {
   selectedStation = null;
   selectedDirections = [];
   selectedOtherLines = [];
-  
-  lineInput.focus();
+
+  // Nach erfolgreichem Hinzufügen → automatisch zur Liste wechseln
+  showListView();
 }
 
 function updateStationsList() {
@@ -1411,6 +1491,10 @@ function updateStationsList() {
 function removeStation(stationId) {
   addedStations = addedStations.filter(s => s.stationId !== stationId);
   updateStationsList();
+  // Wenn keine Stationen mehr → zurück zur Add-Ansicht
+  if (addedStations.length === 0) {
+    showAddView();
+  }
 }
 
 function continueSetup() {
