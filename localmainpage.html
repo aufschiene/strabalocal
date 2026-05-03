@@ -427,20 +427,37 @@
     }
     
     .station-item .station-icon {
-      width: 40px;
-      height: 40px;
-      background: linear-gradient(135deg, #ffd700, #ff9500);
+      min-width: 44px;
+      height: 44px;
+      padding: 0 8px;
+      background: #ffd700;
+      color: #1a1a2e;
       border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: 16px;
+      font-weight: 800;
       margin-right: 12px;
       flex-shrink: 0;
+      letter-spacing: -0.3px;
     }
-    
-    .station-item.existing .station-icon {
-      background: linear-gradient(135deg, #38ef7d, #11998e);
+    /* Wien Linien-Farben pro Linie */
+    .station-icon.line-u1{background:#E2001A;color:#fff}
+    .station-icon.line-u2{background:#A862A4;color:#fff}
+    .station-icon.line-u3{background:#F39200;color:#fff}
+    .station-icon.line-u4{background:#008D3D;color:#fff}
+    .station-icon.line-u5{background:#00B8AA;color:#fff}
+    .station-icon.line-u6{background:#944210;color:#fff}
+    .station-icon.line-tram{background:#E2001A;color:#fff}      /* Strassenbahn rot */
+    .station-icon.line-bus{background:#005AA0;color:#fff}       /* Bus blau */
+    .station-icon.line-nightbus{background:#1a1a1a;color:#ffd700;border:1px solid #ffd700}
+    .station-icon.line-sbahn{background:#0072BC;color:#fff}
+    .station-icon.line-wlb{background:#1E4D8C;color:#fff}
+
+    /* Existing-Marker dezent */
+    .station-item.existing {
+      border-left: 3px solid #38ef7d;
     }
     
     .station-item .station-info {
@@ -764,6 +781,31 @@ let currentView = 'add';  // 'add' oder 'list'
 function _escHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Wien Linien-Klassifikation → CSS-Klasse für die Badge-Farbe
+function getWienLineIconClass(lineName) {
+  if (!lineName) return '';
+  var name = String(lineName).trim().toUpperCase();
+  // U-Bahn (eigene Farbe pro Linie)
+  if (name === 'U1') return 'line-u1';
+  if (name === 'U2') return 'line-u2';
+  if (name === 'U3') return 'line-u3';
+  if (name === 'U4') return 'line-u4';
+  if (name === 'U5') return 'line-u5';
+  if (name === 'U6') return 'line-u6';
+  // S-Bahn (S1, S2, S40, ...)
+  if (/^S\d+$/.test(name)) return 'line-sbahn';
+  // Nachtbus (N25, N29, N38, ...)
+  if (/^N\d+/.test(name)) return 'line-nightbus';
+  // Bus: Zahl + Buchstabe (1A, 13A, 39A, 60A, ...)
+  if (/^\d+[A-Z]+$/.test(name)) return 'line-bus';
+  // WLB / Badner Bahn
+  if (name === 'WLB' || name === 'BB') return 'line-wlb';
+  // Strassenbahn: pure Zahl (1, 2, 5, 18, 25, ...) oder Buchstaben-Linie (D, O)
+  if (/^\d+$/.test(name) || name === 'D' || name === 'O') return 'line-tram';
+  // Default
+  return '';
 }
 
 // View-Switching: 'add' = Wizard zum Hinzufügen, 'list' = Stationen-Liste
@@ -1529,17 +1571,21 @@ function updateStationsList() {
       }
       lineGroups[l.lineName].push(l.direction);
     });
-    
+
     const lineDisplay = Object.entries(lineGroups).map(([lineName, directions]) => {
       const uniqueDirs = [...new Set(directions)];
       return `<span class="line-badge">${lineName}</span> → ${uniqueDirs.join(', ')}`;
     }).join(' · ');
-    
+
     const existingClass = station.hasExisting ? ' existing' : '';
-    
+
+    // Erste Linie als Badge (Wien-Farbe)
+    const firstLineName = Object.keys(lineGroups)[0] || station.lineName || '?';
+    const iconClass = getWienLineIconClass(firstLineName);
+
     return `
       <div class="station-item${existingClass}">
-        <div class="station-icon">🚏</div>
+        <div class="station-icon ${iconClass}">${firstLineName}</div>
         <div class="station-info">
           <div class="station-name">${station.stationName}</div>
           <div class="station-details">${lineDisplay}</div>
