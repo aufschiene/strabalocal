@@ -2475,20 +2475,23 @@ function enableWizardView() {
 }
 
 // Prüft ob die Config Werte enthält die NICHT im Wizard einstellbar sind
-// (Erweiterte Einstellungen: Textfarbe, Helligkeit, Fun Messages, Display-Mode, Stop-Interval).
-// Wenn ja → User hat schon mal Feintuning genutzt → Wizard nicht mehr zeigen.
+// (Erweiterte Einstellungen). Wenn ja → User hat schon mal Feintuning genutzt → Wizard
+// nicht mehr zeigen.
+//
+// Hinweis: Helligkeit wird NICHT geprüft — sie ist ein normales Setting, kein Power-User-Indikator.
+// Auch Erst-Konfiguration mit Firmware-Defaults soll im Wizard landen.
 function configHasAdvancedSettings(config) {
   if (!config) return false;
-  // Helligkeit ≠ Default "Hell" (3)
-  if (config.displaylight !== undefined && String(config.displaylight) !== '' && String(config.displaylight) !== '3') return true;
-  // Textfarbe ≠ Default "Gelb" (1)
-  if (config.text_color !== undefined && String(config.text_color) !== '' && String(config.text_color) !== '1') return true;
+  // Textfarbe ≠ Default "Gelb" (1) — Weiß/Orange = bewusste User-Wahl
+  if (config.text_color !== undefined && String(config.text_color) !== '' &&
+      String(config.text_color) !== '1' && String(config.text_color) !== '0') return true;
   // Fun Messages explizit aus
   if (config.show_fun_messages === false || config.show_fun_messages === '0' || config.show_fun_messages === 0) return true;
-  // Display-Mode ≠ Default "Gemischt" (1)
-  if (config.display_mode !== undefined && String(config.display_mode) !== '' && String(config.display_mode) !== '1') return true;
-  // Stop-Interval ≠ Default 10
-  if (config.stop_interval !== undefined && config.stop_interval !== '' && parseInt(config.stop_interval) !== 10) return true;
+  // Display-Mode = Slideshow (2) — bewusste User-Wahl
+  if (String(config.display_mode) === '2') return true;
+  // Stop-Interval ≠ Default 10 — bewusste User-Anpassung
+  if (config.stop_interval !== undefined && config.stop_interval !== '' &&
+      parseInt(config.stop_interval) > 0 && parseInt(config.stop_interval) !== 10) return true;
   return false;
 }
 
