@@ -677,6 +677,23 @@
     .construction-loading .loading-hint {
       color: #888;
       font-size: 12px;
+      margin-bottom: 14px;
+    }
+    .construction-progress {
+      width: 100%;
+      max-width: 280px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 3px;
+      margin: 0 auto;
+      overflow: hidden;
+    }
+    .construction-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ffd700, #ffb84d);
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.2s linear;
     }
     /* Error */
     .construction-error {
@@ -964,7 +981,10 @@
     <div id="constructionLoading" class="construction-loading">
       <div class="loading-spinner"></div>
       <div class="loading-text">Hole aktuelle Abfahrten von Wiener Linien...</div>
-      <div class="loading-hint">Das kann bis zu 30 Sekunden dauern</div>
+      <div class="loading-hint" id="constructionLoadingHint">Das kann bis zu 40 Sekunden dauern</div>
+      <div class="construction-progress">
+        <div class="construction-progress-fill" id="constructionProgressFill"></div>
+      </div>
     </div>
 
     <!-- Error State -->
@@ -1046,23 +1066,88 @@ function openConstructionWizard(stationId, stationName) {
 }
 
 function closeConstructionWizard() {
+  if (typeof stopBackgroundPolling === 'function') stopBackgroundPolling();
+  if (typeof stopConstructionProgress === 'function') stopConstructionProgress();
   document.getElementById('constructionModal').classList.remove('show');
 }
 
-// Hole live Abfahrten von der Straba-Backend-API, gruppiere nach line+richtungsId
+// Progress-Bar Animation während Loading
+let constructionProgressInterval = null;
+function startConstructionProgress(durationMs) {
+  const fill = document.getElementById('constructionProgressFill');
+  if (!fill) return;
+  fill.style.width = '0%';
+  const startTime = Date.now();
+  if (constructionProgressInterval) clearInterval(constructionProgressInterval);
+  constructionProgressInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    const pct = Math.min(100, (elapsed / durationMs) * 100);
+    fill.style.width = pct + '%';
+    if (pct >= 100) {
+      clearInterval(constructionProgressInterval);
+      constructionProgressInterval = null;
+    }
+  }, 150);
+}
+function stopConstructionProgress() {
+  if (constructionProgressInterval) {
+    clearInterval(constructionProgressInterval);
+    constructionProgressInterval = null;
+  }
+}
+
+// Hole live Abfahrten von der Straba-Backend-API. Retry bis 40s, falls erste Antwort leer
+// (Backend-Cold-Start o.ä. → erst nach paar Sekunden kommen Daten).
 async function fetchConstructionLines(stationId) {
   const apiUrl = 'https://api.straba.at/api/v1/wl/departures?stopId=' + stationId;
+  const TOTAL_TIMEOUT_MS = 40000;
+  const RETRY_DELAY_MS = 10000;  // 10s zwischen Versuchen — Server nicht zuspammen
 
-  // Timeout 35s
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 35000);
+  startConstructionProgress(TOTAL_TIMEOUT_MS);
+  const overallStart = Date.now();
 
   try {
-    const response = await fetch(apiUrl, { signal: controller.signal });
-    clearTimeout(timeoutId);
+    let data = null;
+    let lastErr = null;
+    while (Date.now() - overallStart < TOTAL_TIMEOUT_MS) {
+      const controller = new AbortController();
+      const remaining = TOTAL_TIMEOUT_MS - (Date.now() - overallStart);
+      const requestTimeout = Math.min(15000, remaining);  // pro Request max 15s
+      const timeoutId = setTimeout(() => controller.abort(), requestTimeout);
+      try {
+        const response = await fetch(apiUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        data = await response.json();
+        // Hat Daten? → fertig
+        const monitorsCheck = (data && data.data && Array.isArray(data.data.monitors))
+                              ? data.data.monitors
+                              : (data && Array.isArray(data.monitors)) ? data.monitors : [];
+        let hasAny = false;
+        for (const m of monitorsCheck) {
+          if (m && Array.isArray(m.lines) && m.lines.length > 0) { hasAny = true; break; }
+        }
+        if (hasAny) break;
+        // Leer → kurz warten und nochmal versuchen
+        if (Date.now() - overallStart + RETRY_DELAY_MS >= TOTAL_TIMEOUT_MS) break;
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      } catch (e) {
+        clearTimeout(timeoutId);
+        lastErr = e;
+        if (e.name === 'AbortError' && Date.now() - overallStart >= TOTAL_TIMEOUT_MS) break;
+        // Sonst: kurz warten, retry
+        if (Date.now() - overallStart + RETRY_DELAY_MS >= TOTAL_TIMEOUT_MS) break;
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+      }
+    }
 
-    if (!response.ok) throw new Error('HTTP ' + response.status);
-    const data = await response.json();
+    stopConstructionProgress();
+    if (!data) {
+      const msg = lastErr ? ('Fehler beim Abrufen: ' + (lastErr.message || lastErr.name || 'Unbekannt'))
+                          : 'Zeitüberschreitung — bitte später erneut versuchen.';
+      showConstructionError(msg);
+      return;
+    }
 
     // Linien gruppieren: line + richtungsId → ein Eintrag
     const grouped = {};
@@ -1126,21 +1211,111 @@ async function fetchConstructionLines(stationId) {
 
     if (constructionLines.length === 0) {
       showConstructionAllGood();
+      // Im Hintergrund nochmal 30s lang weiter pollen — falls Backend doch noch Daten liefert
+      startBackgroundPolling(stationId);
       return;
     }
     renderConstructionResult();
   } catch (err) {
-    clearTimeout(timeoutId);
-    console.error('[Baustelle] Fehler:', err);
-    if (err.name === 'AbortError') {
-      showConstructionError('Zeitüberschreitung — bitte später erneut versuchen.');
-    } else {
-      showConstructionError('Fehler beim Abrufen: ' + (err.message || 'Unbekannt'));
-    }
+    stopConstructionProgress();
+    console.error('[Baustelle] Unerwarteter Fehler:', err);
+    showConstructionError('Fehler beim Abrufen: ' + (err.message || 'Unbekannt'));
   }
 }
 
+// Hintergrund-Polling nachdem "Support"-Meldung gezeigt wurde —
+// weitere 30s versuchen alle 10s. Sobald Daten kommen → Linien zeigen.
+let constructionBgInterval = null;
+let constructionBgTimeout = null;
+function stopBackgroundPolling() {
+  if (constructionBgInterval) { clearInterval(constructionBgInterval); constructionBgInterval = null; }
+  if (constructionBgTimeout) { clearTimeout(constructionBgTimeout); constructionBgTimeout = null; }
+}
+function startBackgroundPolling(stationId) {
+  stopBackgroundPolling();
+  const apiUrl = 'https://api.straba.at/api/v1/wl/departures?stopId=' + stationId;
+  const POLL_INTERVAL_MS = 10000;
+  const POLL_DURATION_MS = 30000;
+  const startedAt = Date.now();
+
+  // Markierung: User hat Modal evtl. schon geschlossen → dann Polling stoppen
+  const originalStationId = constructionStationId;
+
+  async function tryOnce() {
+    // Modal nicht mehr offen oder andere Station → abbrechen
+    const modal = document.getElementById('constructionModal');
+    if (!modal || !modal.classList.contains('show') || constructionStationId !== originalStationId) {
+      stopBackgroundPolling();
+      return;
+    }
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 9000);
+      const response = await fetch(apiUrl, { signal: controller.signal });
+      clearTimeout(t);
+      if (!response.ok) return;
+      const data = await response.json();
+      const monitors = (data && data.data && Array.isArray(data.data.monitors))
+                       ? data.data.monitors
+                       : (data && Array.isArray(data.monitors)) ? data.monitors : [];
+      const grouped = {};
+      monitors.forEach(m => {
+        if (!m || !Array.isArray(m.lines)) return;
+        m.lines.forEach(line => {
+          if (!line || !line.name) return;
+          const key = line.name + '|' + (line.richtungsId || line.towards || '');
+          if (!grouped[key]) {
+            grouped[key] = {
+              lineName: line.name,
+              towards: line.towards || m.towards || '',
+              richtungsId: line.richtungsId || '',
+              lineId: (line.lineID !== undefined) ? line.lineID : '',
+              patternId: (line.patternId !== undefined) ? line.patternId : '',
+              countdowns: [],
+              type: line.type || ''
+            };
+          }
+          if (line.departures && Array.isArray(line.departures.departure)) {
+            line.departures.departure.forEach(d => {
+              if (!d) return;
+              const cd = (d.departureTime && d.departureTime.countdown !== undefined) ? d.departureTime.countdown : null;
+              if (cd !== null) grouped[key].countdowns.push(cd);
+            });
+          }
+        });
+      });
+      const configuredLineNames = new Set();
+      addedStations.forEach(s => {
+        if (s.stationId === constructionStationId && s.lineName) {
+          configuredLineNames.add(String(s.lineName).trim().toUpperCase());
+        }
+      });
+      const filtered = Object.values(grouped).filter(l => {
+        const n = String(l.lineName || '').trim().toUpperCase();
+        return n && !configuredLineNames.has(n);
+      });
+      if (filtered.length > 0) {
+        // Treffer! → Support-Meldung weg, Linien zeigen
+        stopBackgroundPolling();
+        constructionLines = filtered;
+        constructionSelected.clear();
+        renderConstructionResult();
+      }
+    } catch (e) {
+      // Ignorieren — nächster Tick versucht's wieder
+    }
+  }
+
+  // Sofort einmal probieren, dann alle 10s
+  constructionBgInterval = setInterval(tryOnce, POLL_INTERVAL_MS);
+  // Erste Hintergrund-Anfrage erst nach 10s, sonst doppelt mit der vorherigen
+  constructionBgTimeout = setTimeout(() => {
+    stopBackgroundPolling();
+  }, POLL_DURATION_MS);
+}
+
 function showConstructionError(msg) {
+  if (typeof stopConstructionProgress === 'function') stopConstructionProgress();
   document.getElementById('constructionLoading').style.display = 'none';
   document.getElementById('constructionResult').style.display = 'none';
   document.getElementById('constructionError').style.display = '';
@@ -1156,6 +1331,7 @@ function showConstructionAllGood() {
 }
 
 function renderConstructionResult() {
+  if (typeof stopConstructionProgress === 'function') stopConstructionProgress();
   document.getElementById('constructionLoading').style.display = 'none';
   document.getElementById('constructionError').style.display = 'none';
   document.getElementById('constructionResult').style.display = '';

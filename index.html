@@ -359,25 +359,28 @@
       width:0%;
     }
     .wizard-back-link-row{
-      margin-bottom:12px;
+      margin-bottom:14px;
     }
     .wizard-back-link{
-      display:inline-flex;
+      display:flex;
       align-items:center;
-      gap:6px;
-      padding:8px 14px;
-      background:rgba(255,255,255,0.05);
-      border:1px solid rgba(255,255,255,0.08);
-      color:#aaa;
+      justify-content:center;
+      gap:8px;
+      padding:13px 16px;
+      background:linear-gradient(135deg, #11998e, #38ef7d);
+      color:#fff;
       text-decoration:none;
-      font-size:13px;
-      border-radius:8px;
+      font-size:14px;
+      font-weight:600;
+      border-radius:10px;
       transition:all 0.15s;
     }
     .wizard-back-link:hover{
-      background:rgba(255,255,255,0.1);
-      color:#fff;
+      transform:translateY(-1px);
+      box-shadow:0 4px 14px rgba(56,239,125,0.25);
     }
+    /* Im Wizard-Modus den grünen pending-banner sicher verstecken */
+    body.wizard-active #pendingBanner{display:none !important;}
     .wizard-finetune-row{
       text-align:center;
       margin-top:14px;
