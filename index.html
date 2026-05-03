@@ -107,6 +107,13 @@
     /* Breitere Segmented fuer Zeilen */
     .segmented.wide{min-width:180px}
     .segmented.wide .seg-btn{padding:12px 20px;font-size:15px}
+    /* Kompakte 3-Button-Variante (Aus/Linie/Ganz) — alle Buttons gleich breit */
+    .segmented.compact-3 .seg-btn{
+      flex:1;
+      padding:10px 8px;
+      font-size:13px;
+      text-align:center;
+    }
 
     /* Toggle */
     .toggle{
@@ -890,7 +897,7 @@
   <!-- ==================== INTRO ==================== -->
   <div class="intro-box">
     Nun kannst du dein Straba ganz nach deinen Wuenschen einstellen.<br>
-    <a href="localmainpage.html" class="back-link">&larr; Zurueck zu Linien einstellen</a>
+    <a href="#" onclick="goBackToLines();return false;" class="back-link">&larr; Zur&uuml;ck zu Linien einstellen</a>
   </div>
 
   <!-- Banner fuer neue Stationen -->
@@ -900,10 +907,11 @@
   </div>
 
   <!-- ==================== 1. BARRIEREFREIHEIT (Wien) ==================== -->
-  <div class="card" id="cardBarrierefreiheit">
+  <!-- Standardmäßig versteckt — wird nur sichtbar wenn updateFeatureVisibility() es freigibt -->
+  <div class="card feature-hidden" id="cardBarrierefreiheit">
     <h2>Features <span id="wienOnlyBadge1" class="wien-only-badge" style="display:none;">Wien</span></h2>
 
-    <div class="control-row" id="rowChopper">
+    <div class="control-row feature-hidden" id="rowChopper">
       <div class="control-label">
         <span>Hochflurer markieren</span>
         <small>Zeigt nicht barrierefreie Fahrzeuge in hellblau</small>
@@ -914,7 +922,7 @@
       </div>
     </div>
 
-    <div class="control-row" id="rowSilberpfeil">
+    <div class="control-row feature-hidden" id="rowSilberpfeil">
       <div class="control-label">
         <span>U-Bahnen mit Klimaanlage</span>
         <small>Markiert klimatisierte U-Bahn-Zuege mit einem Stern (z.B. <span class="ubahn-preview-row"><span class="ubahn-line-text">U2*</span></span>)</small>
@@ -925,17 +933,15 @@
       </div>
     </div>
 
-    <div class="control-row" id="rowWienBadges" style="flex-direction:column;align-items:stretch;gap:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-        <div class="control-label">
-          <span>Wien U-Bahn Badges</span>
-          <small>Linien in Original-Farben hervorheben</small>
-        </div>
-        <div class="segmented wide" data-name="wienbadges">
-          <div class="seg-btn active" data-value="0">Aus</div>
-          <div class="seg-btn" data-value="1">Linie</div>
-          <div class="seg-btn" data-value="2">Ganze Zeile</div>
-        </div>
+    <div class="control-row feature-hidden" id="rowWienBadges" style="flex-direction:column;align-items:stretch;gap:10px;">
+      <div class="control-label">
+        <span>Wien U-Bahn Badges</span>
+        <small>Linien in Original-Farben hervorheben</small>
+      </div>
+      <div class="segmented compact-3" data-name="wienbadges" style="width:100%;">
+        <div class="seg-btn active" data-value="0">Aus</div>
+        <div class="seg-btn" data-value="1">Linie</div>
+        <div class="seg-btn" data-value="2">Ganz</div>
       </div>
       <!-- Live-Vorschau Beispielzeile -->
       <div id="wienBadgePreview" class="wien-badge-preview wien-preview-off">
@@ -2047,6 +2053,20 @@ function setSegmentValue(name, value) {
   });
 }
 
+// ==================== ZURÜCK ZU LINIEN-EINSTELLUNG ====================
+// Speichert den aktuellen (möglicherweise geänderten) Stations-Zustand in localStorage,
+// damit localmainpage.html ihn statt der alten Device-Config anzeigt
+function goBackToLines() {
+  var rbl = pendingRbl || (currentConfig && currentConfig.rbl_id) || '';
+  var filter = pendingFilter || (currentConfig && currentConfig.lines_filter) || '';
+  if (rbl) {
+    localStorage.setItem('straba_back_rbl', rbl);
+    localStorage.setItem('straba_back_filter', filter);
+    localStorage.setItem('straba_back_active', '1');
+  }
+  window.location.href = 'localmainpage.html';
+}
+
 // ==================== CONFIG LADEN ====================
 function applyConfig(config) {
   if (settingsLoaded) return;
@@ -2056,6 +2076,10 @@ function applyConfig(config) {
   if (!currentCapabilities && config.rbl_id) {
     var network = detectNetworkFromRbl(config.rbl_id);
     updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
+  } else if (currentCapabilities) {
+    // currentCapabilities ist bereits gesetzt (z.B. aus Pending-Pfad) — aber lines_filter
+    // war vielleicht damals leer. Jetzt mit dem geladenen Filter neu prüfen!
+    updateFeatureVisibility(currentCapabilities);
   }
 
   // Default-Fallback: '0' = Aus (NICHT '1' — sonst springt Hochflurer/Klima auf An wenn Wert fehlt)
@@ -2413,9 +2437,17 @@ function updateFeatureVisibility(capabilities) {
 
   var cardBarrierefreiheit = document.getElementById('cardBarrierefreiheit');
   if (cardBarrierefreiheit) {
-    var hasAnyFeature = capabilities && (capabilities.showHighFloor || capabilities.showAirCondition);
-    if (!hasAnyFeature) cardBarrierefreiheit.style.display = 'none';
-    else cardBarrierefreiheit.style.display = '';
+    // Karte zeigen wenn mindestens eine Zeile sichtbar wäre:
+    //   - Hochflurer (showHighFloor) ODER
+    //   - U-Bahn-Klima/Badges (showAirCondition + U-Bahn konfiguriert)
+    var hasChopperRow = capabilities && capabilities.showHighFloor;
+    var hasUBahnRows = capabilities && capabilities.showAirCondition && ubahnConfigured;
+    if (hasChopperRow || hasUBahnRows) {
+      cardBarrierefreiheit.classList.remove('feature-hidden');
+      cardBarrierefreiheit.style.display = '';
+    } else {
+      cardBarrierefreiheit.classList.add('feature-hidden');
+    }
   }
 }
 
