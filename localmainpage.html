@@ -1710,16 +1710,27 @@ window.onload = async function() {
     var backRbl = localStorage.getItem('straba_back_rbl');
     var backFilter = localStorage.getItem('straba_back_filter');
     if (backActive === '1' && backRbl) {
-      console.log('Zurück-Modus: lade pending state aus localStorage statt Device-Config');
-      configLoaded = true;  // Verhindert spätere Device-Config-Anfrage
+      console.log('Zurück-Modus: lade pending state aus localStorage statt Device-Config', { rbl: backRbl, filter: backFilter });
+      // WICHTIG: configLoaded ERST NACH loadExistingConfig setzen — sonst returned die Funktion sofort
       loadExistingConfig(backRbl, backFilter || '');
       // localStorage clearen damit beim nächsten "frischen" Aufruf wieder Device geladen wird
       localStorage.removeItem('straba_back_active');
       localStorage.removeItem('straba_back_rbl');
       localStorage.removeItem('straba_back_filter');
-      loadingText.textContent = 'Stationen wiederhergestellt...';
-      setTimeout(() => loadingOverlay.classList.add('hidden'), 800);
-      return;
+      localStorage.removeItem('straba_pending_rbl');
+      localStorage.removeItem('straba_pending_filter');
+      localStorage.removeItem('straba_pending_details');
+      localStorage.removeItem('straba_pending_fresh');
+
+      if (addedStations.length > 0) {
+        // Erfolgreich geladen → fertig
+        configLoaded = true;
+        loadingText.textContent = 'Stationen wiederhergestellt...';
+        setTimeout(() => loadingOverlay.classList.add('hidden'), 800);
+        return;
+      }
+      // Fallback: Back-Mode hat keine Stationen geladen — fall through zu Device-Config
+      console.warn('Zurück-Modus: keine Stationen aus backRbl gefunden — Fallback auf Device-Config');
     }
 
     processPendingConfig();
