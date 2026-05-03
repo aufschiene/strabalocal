@@ -1559,11 +1559,12 @@ function loadExistingConfig(rbl, filter) {
     const linesToAdd = stationFilter ? stationFilter.split(',').map(l => l.trim()).filter(l => l) : [];
 
     groupStopIds.forEach(stationId => {
-    
+
     console.log(`Station ${stationId}: Filter = ${linesToAdd.join(', ') || 'alle'}`);
-    
+
     let stationName = null;
-    
+    let matchedLineNames = new Set();  // Linien die wir in stationData gefunden haben
+
     stationData.forEach(line => {
       if (Array.isArray(line.lineStation)) {
         line.lineStation.forEach(item => {
@@ -1571,16 +1572,16 @@ function loadExistingConfig(rbl, filter) {
             if (!stationName) {
               stationName = item.station.stationName;
             }
-            
+
             if (linesToAdd.length === 0 || linesToAdd.includes(line.lineName)) {
               const direction = getDirectionName(line, item.patternID);
-              
+
               const exists = addedStations.some(s =>
                 s.stationId === stationId &&
                 s.lineName === line.lineName &&
                 s.patternId === item.patternID
               );
-              
+
               if (!exists) {
                 addedStations.push({
                   stationId: stationId,
@@ -1592,12 +1593,38 @@ function loadExistingConfig(rbl, filter) {
                   isExisting: true
                 });
                 addedCount++;
+                matchedLineNames.add(line.lineName);
                 console.log(`  Hinzugefügt: ${line.lineName} → ${direction}`);
+              } else {
+                matchedLineNames.add(line.lineName);
               }
             }
           }
         });
       }
+    });
+
+    // FALLBACK: Linien aus dem Filter die NICHT in stationData für diese Station gefunden
+    // wurden (z.B. Baustellen-Linien wie 43A die per Live-API/Construction-Wizard hinzugefügt
+    // wurden) trotzdem als Einträge wiederherstellen — sonst gehen sie beim Zurück-Navigieren
+    // verloren.
+    linesToAdd.forEach(lineName => {
+      if (matchedLineNames.has(lineName)) return;
+      const exists = addedStations.some(s =>
+        s.stationId === stationId && s.lineName === lineName
+      );
+      if (exists) return;
+      addedStations.push({
+        stationId: stationId,
+        stationName: stationName || ('Stop ' + stationId),
+        lineName: lineName,
+        lineId: '',
+        patternId: '',
+        direction: '',
+        isExisting: true
+      });
+      addedCount++;
+      console.log(`  Fallback (nicht in DB): ${lineName} an Stop ${stationId}`);
     });
     });  // Ende groupStopIds.forEach
   });  // Ende logicalGroups.forEach
