@@ -442,18 +442,18 @@
       flex-shrink: 0;
       letter-spacing: -0.3px;
     }
-    /* Wien Linien-Farben pro Linie */
-    .station-icon.line-u1{background:#E2001A;color:#fff}
-    .station-icon.line-u2{background:#A862A4;color:#fff}
-    .station-icon.line-u3{background:#F39200;color:#fff}
-    .station-icon.line-u4{background:#008D3D;color:#fff}
-    .station-icon.line-u5{background:#00B8AA;color:#fff}
-    .station-icon.line-u6{background:#944210;color:#fff}
-    .station-icon.line-tram{background:#E2001A;color:#fff}      /* Strassenbahn rot */
-    .station-icon.line-bus{background:#005AA0;color:#fff}       /* Bus blau */
-    .station-icon.line-nightbus{background:#1a1a1a;color:#ffd700;border:1px solid #ffd700}
-    .station-icon.line-sbahn{background:#0072BC;color:#fff}
-    .station-icon.line-wlb{background:#1E4D8C;color:#fff}
+    /* Wien Linien-Farben pro Linie (gilt für station-icon UND line-mini-badge) */
+    .line-u1{background:#E2001A !important;color:#fff !important}
+    .line-u2{background:#A862A4 !important;color:#fff !important}
+    .line-u3{background:#F39200 !important;color:#fff !important}
+    .line-u4{background:#008D3D !important;color:#fff !important}
+    .line-u5{background:#00B8AA !important;color:#fff !important}
+    .line-u6{background:#944210 !important;color:#fff !important}
+    .line-tram{background:#E2001A !important;color:#fff !important}      /* Strassenbahn rot */
+    .line-bus{background:#005AA0 !important;color:#fff !important}       /* Bus blau */
+    .line-nightbus{background:#1a1a1a !important;color:#ffd700 !important;border:1px solid #ffd700}
+    .line-sbahn{background:#0072BC !important;color:#fff !important}
+    .line-wlb{background:#1E4D8C !important;color:#fff !important}
 
     /* Existing-Marker dezent */
     .station-item.existing {
@@ -465,27 +465,50 @@
       min-width: 0;
     }
     
+    .station-item .station-name-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
     .station-item .station-name {
       font-weight: 600;
       font-size: 15px;
-      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      max-width: 100%;
     }
-    
-    .station-item .station-details {
+    .station-item .station-direction {
       color: #888;
-      font-size: 12px;
-      margin-top: 2px;
+      font-size: 13px;
+      font-weight: 500;
     }
-    
-    .station-item .station-details .line-badge {
-      background: rgba(255, 215, 0, 0.2);
-      color: #ffd700;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-weight: 600;
-      margin-right: 6px;
+
+    .station-item .station-details {
+      margin-top: 6px;
+    }
+
+    /* Baustelle-Button */
+    .station-item .construction-btn {
+      background: rgba(255, 165, 0, 0.08);
+      border: 1px dashed rgba(255, 165, 0, 0.35);
+      color: #ffb84d;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .station-item .construction-btn:hover {
+      background: rgba(255, 165, 0, 0.16);
+      border-style: solid;
+    }
+    .station-item .construction-btn .construction-icon {
+      font-size: 13px;
     }
     
     .station-item .delete-btn {
@@ -581,6 +604,163 @@
       box-shadow: none;
     }
     
+    /* ==================== BAUSTELLE-WIZARD MODAL ==================== */
+    .construction-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .construction-modal.show { display: flex; }
+    .construction-modal-content {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 480px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+    }
+    .construction-modal-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .construction-modal-content h2 {
+      color: #ffb84d;
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+    .construction-subtitle {
+      color: #aaa;
+      margin: 0 0 20px;
+      font-size: 13px;
+    }
+    /* Loading */
+    .construction-loading {
+      text-align: center;
+      padding: 30px 10px;
+    }
+    .construction-loading .loading-spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid rgba(255, 215, 0, 0.15);
+      border-top-color: #ffd700;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .construction-loading .loading-text {
+      color: #fff;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .construction-loading .loading-hint {
+      color: #888;
+      font-size: 12px;
+    }
+    /* Error */
+    .construction-error {
+      text-align: center;
+      padding: 20px;
+    }
+    .construction-error .error-icon {
+      font-size: 36px;
+      margin-bottom: 10px;
+    }
+    .construction-error .error-text {
+      color: #fff;
+    }
+    /* Result */
+    .construction-info {
+      color: #ccc;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    .construction-line-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .construction-line-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .construction-line-item:hover {
+      background: rgba(255, 215, 0, 0.06);
+    }
+    .construction-line-item.selected {
+      background: rgba(56, 239, 125, 0.10);
+      border-color: rgba(56, 239, 125, 0.5);
+    }
+    .construction-line-item .line-mini-badge {
+      min-width: 36px;
+      height: 32px;
+      padding: 0 6px;
+      background: #ffd700;
+      color: #1a1a2e;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .construction-line-item .line-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .construction-line-item .line-info .line-dir {
+      font-size: 13px;
+      color: #fff;
+    }
+    .construction-line-item .line-info .line-meta {
+      font-size: 11px;
+      color: #888;
+    }
+    .construction-line-item .line-check {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: transparent;
+    }
+    .construction-line-item.selected .line-check {
+      background: #38ef7d;
+      border-color: #38ef7d;
+      color: #1a1a2e;
+    }
+
     /* Add-View Header (zeigt bereits hinzugefügte Stationen + Fertig-Link) */
     .add-view-header {
       display: flex;
@@ -764,6 +944,36 @@
   </div>
 </div>
 
+<!-- ==================== BAUSTELLE-WIZARD MODAL ==================== -->
+<div class="construction-modal" id="constructionModal">
+  <div class="construction-modal-content">
+    <button class="construction-modal-close" onclick="closeConstructionWizard()">&times;</button>
+    <h2>🚧 Baustelle / Live-Abfrage</h2>
+    <p class="construction-subtitle" id="constructionStationName">Station</p>
+
+    <!-- Loading State -->
+    <div id="constructionLoading" class="construction-loading">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Hole aktuelle Abfahrten von Wiener Linien...</div>
+      <div class="loading-hint">Das kann bis zu 30 Sekunden dauern</div>
+    </div>
+
+    <!-- Error State -->
+    <div id="constructionError" class="construction-error" style="display:none;">
+      <div class="error-icon">⚠️</div>
+      <div class="error-text" id="constructionErrorText">Keine Daten verfügbar.</div>
+      <button class="btn btn-add" onclick="closeConstructionWizard()" style="margin-top:14px;">Schließen</button>
+    </div>
+
+    <!-- Result List -->
+    <div id="constructionResult" class="construction-result" style="display:none;">
+      <p class="construction-info">Diese Linien fahren jetzt an dieser Station. Wähle die, die du anzeigen willst:</p>
+      <div id="constructionLineList" class="construction-line-list"></div>
+      <button class="btn btn-add" id="constructionAddBtn" onclick="addConstructionLines()" disabled>Linien hinzufügen</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // State
 let stationData = [];
@@ -782,6 +992,183 @@ function _escHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+// ==================== BAUSTELLE-WIZARD: LIVE-ABFRAGE ====================
+let constructionStationId = null;
+let constructionStationName = '';
+let constructionLines = [];          // Geladene Linien (gruppiert nach line+richtungsId)
+let constructionSelected = new Set();  // Ausgewählte Indizes
+
+function openConstructionWizard(stationId, stationName) {
+  constructionStationId = stationId;
+  constructionStationName = stationName;
+  constructionLines = [];
+  constructionSelected.clear();
+
+  const modal = document.getElementById('constructionModal');
+  document.getElementById('constructionStationName').textContent = stationName;
+  document.getElementById('constructionLoading').style.display = '';
+  document.getElementById('constructionError').style.display = 'none';
+  document.getElementById('constructionResult').style.display = 'none';
+  modal.classList.add('show');
+
+  fetchConstructionLines(stationId);
+}
+
+function closeConstructionWizard() {
+  document.getElementById('constructionModal').classList.remove('show');
+}
+
+// Hole live Abfahrten von der Wiener Linien API, gruppiere nach line+richtungsId
+async function fetchConstructionLines(stationId) {
+  // Straba-Backend-Proxy für Wiener Linien (umgeht CORS, hat WL-Real-Time-Format)
+  const apiUrl = 'https://api.straba.at/api/v1/wl/departures?stopId=' + stationId;
+  const fallbackUrl = 'https://www.wienerlinien.at/ogd_realtime/monitor?stopID=' + stationId;
+
+  // Timeout 35s
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+  try {
+    let response;
+    try {
+      response = await fetch(apiUrl, { signal: controller.signal });
+      if (!response.ok) throw new Error('Backend HTTP ' + response.status);
+    } catch (e) {
+      console.log('[Baustelle] Backend-Aufruf fehlgeschlagen, versuche direkten WL-API:', e);
+      response = await fetch(fallbackUrl, { signal: controller.signal });
+    }
+    clearTimeout(timeoutId);
+
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const data = await response.json();
+
+    // Linien gruppieren: line + richtungsId → ein Eintrag
+    const grouped = {};
+    if (data.data && Array.isArray(data.data.monitors)) {
+      data.data.monitors.forEach(m => {
+        if (!m.lines || !Array.isArray(m.lines)) return;
+        m.lines.forEach(line => {
+          const lineName = line.name || '';
+          const towards = line.towards || m.towards || '';
+          const richtungsId = line.richtungsId || '';
+          const lineId = (line.lineID !== undefined) ? line.lineID : '';
+          const patternId = (line.patternId !== undefined) ? line.patternId : '';
+          const key = lineName + '|' + (richtungsId || towards);
+          if (!grouped[key]) {
+            grouped[key] = {
+              lineName: lineName,
+              towards: towards,
+              richtungsId: richtungsId,
+              lineId: lineId,
+              patternId: patternId,
+              countdowns: [],
+              type: line.type || ''
+            };
+          }
+          // Countdowns sammeln (für die "live"-Info)
+          if (line.departures && line.departures.departure) {
+            line.departures.departure.forEach(d => {
+              const cd = (d.departureTime && d.departureTime.countdown !== undefined) ? d.departureTime.countdown : null;
+              if (cd !== null) grouped[key].countdowns.push(cd);
+            });
+          }
+        });
+      });
+    }
+
+    constructionLines = Object.values(grouped);
+    if (constructionLines.length === 0) {
+      showConstructionError('Keine aktiven Linien an dieser Station gefunden.');
+      return;
+    }
+    renderConstructionResult();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    console.error('[Baustelle] Fehler:', err);
+    if (err.name === 'AbortError') {
+      showConstructionError('Zeitüberschreitung — bitte später erneut versuchen.');
+    } else {
+      showConstructionError('Fehler beim Abrufen: ' + (err.message || 'Unbekannt'));
+    }
+  }
+}
+
+function showConstructionError(msg) {
+  document.getElementById('constructionLoading').style.display = 'none';
+  document.getElementById('constructionResult').style.display = 'none';
+  document.getElementById('constructionError').style.display = '';
+  document.getElementById('constructionErrorText').textContent = msg;
+}
+
+function renderConstructionResult() {
+  document.getElementById('constructionLoading').style.display = 'none';
+  document.getElementById('constructionError').style.display = 'none';
+  document.getElementById('constructionResult').style.display = '';
+
+  const list = document.getElementById('constructionLineList');
+  list.innerHTML = constructionLines.map((l, idx) => {
+    const cdInfo = l.countdowns.length > 0 ? l.countdowns.slice(0, 3).join(', ') + ' min' : 'keine Echtzeit';
+    const iconClass = (typeof getWienLineIconClass === 'function') ? getWienLineIconClass(l.lineName) : '';
+    return `
+      <div class="construction-line-item" onclick="toggleConstructionLine(${idx})" data-idx="${idx}">
+        <div class="line-mini-badge ${iconClass}">${_escHtml(l.lineName)}</div>
+        <div class="line-info">
+          <div class="line-dir">→ ${_escHtml(l.towards || '–')}</div>
+          <div class="line-meta">in ${cdInfo}</div>
+        </div>
+        <div class="line-check">✓</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('constructionAddBtn').disabled = true;
+}
+
+function toggleConstructionLine(idx) {
+  if (constructionSelected.has(idx)) constructionSelected.delete(idx);
+  else constructionSelected.add(idx);
+  // UI updaten
+  document.querySelectorAll('.construction-line-item').forEach(item => {
+    const i = parseInt(item.dataset.idx);
+    item.classList.toggle('selected', constructionSelected.has(i));
+  });
+  document.getElementById('constructionAddBtn').disabled = (constructionSelected.size === 0);
+}
+
+function addConstructionLines() {
+  if (constructionSelected.size === 0) return;
+  // Ausgewählte Linien als zusätzliche Stationen-Einträge hinzufügen
+  Array.from(constructionSelected).forEach(idx => {
+    const line = constructionLines[idx];
+    const exists = addedStations.some(s =>
+      s.stationId === constructionStationId &&
+      s.lineName === line.lineName &&
+      s.direction === line.towards
+    );
+    if (!exists) {
+      addedStations.push({
+        stationId: constructionStationId,
+        stationName: constructionStationName,
+        lineName: line.lineName,
+        lineId: line.lineId,
+        patternId: line.patternId,
+        direction: line.towards,
+        isExisting: false
+      });
+    }
+  });
+  closeConstructionWizard();
+  updateStationsList();
+}
+
+// Modal beim Klick außerhalb schließen
+document.addEventListener('click', function(e) {
+  const modal = document.getElementById('constructionModal');
+  if (modal && modal.classList.contains('show') && e.target === modal) {
+    closeConstructionWizard();
+  }
+});
 
 // Wien Linien-Klassifikation → CSS-Klasse für die Badge-Farbe
 function getWienLineIconClass(lineName) {
@@ -1572,10 +1959,14 @@ function updateStationsList() {
       lineGroups[l.lineName].push(l.direction);
     });
 
-    const lineDisplay = Object.entries(lineGroups).map(([lineName, directions]) => {
-      const uniqueDirs = [...new Set(directions)];
-      return `<span class="line-badge">${lineName}</span> → ${uniqueDirs.join(', ')}`;
-    }).join(' · ');
+    // Richtungen ohne erneute Linien-Nennung (Linie ist im Badge links)
+    const allDirections = [];
+    Object.values(lineGroups).forEach(dirs => {
+      dirs.forEach(d => { if (d && !allDirections.includes(d)) allDirections.push(d); });
+    });
+    const directionDisplay = allDirections.length > 0
+      ? `→ ${allDirections.join(', ')}`
+      : '';
 
     const existingClass = station.hasExisting ? ' existing' : '';
 
@@ -1587,8 +1978,16 @@ function updateStationsList() {
       <div class="station-item${existingClass}">
         <div class="station-icon ${iconClass}">${firstLineName}</div>
         <div class="station-info">
-          <div class="station-name">${station.stationName}</div>
-          <div class="station-details">${lineDisplay}</div>
+          <div class="station-name-row">
+            <span class="station-name">${station.stationName}</span>
+            ${directionDisplay ? `<span class="station-direction">${directionDisplay}</span>` : ''}
+          </div>
+          <div class="station-details">
+            <button class="construction-btn" onclick="openConstructionWizard(${station.stationId}, '${(station.stationName || '').replace(/'/g, "&#39;")}')">
+              <span class="construction-icon">🚧</span>
+              Baustelle? Andere Linie f&auml;hrt hier
+            </button>
+          </div>
         </div>
         <button class="delete-btn" onclick="removeStation(${station.stationId})" title="Entfernen">✕</button>
       </div>
