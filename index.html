@@ -308,6 +308,89 @@
     .card.feature-hidden{
       display:none;
     }
+
+    /* ==================== WIZARD STYLES ==================== */
+    .wizard-hidden{display:none !important;}
+    .wizard-nav-top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 16px;
+      background:rgba(0,0,0,0.25);
+      border:1px solid rgba(255,255,255,0.06);
+      border-radius:12px;
+      margin-bottom:16px;
+    }
+    .wizard-progress{flex:1;min-width:0}
+    .wizard-progress > span{
+      display:block;
+      font-size:12px;
+      color:#888;
+      margin-bottom:6px;
+      font-weight:500;
+    }
+    .wizard-progress-bar{
+      width:100%;
+      height:4px;
+      background:rgba(255,255,255,0.08);
+      border-radius:2px;
+      overflow:hidden;
+    }
+    .wizard-progress-fill{
+      height:100%;
+      background:#ffd700;
+      border-radius:2px;
+      transition:width 0.3s ease;
+      width:0%;
+    }
+    .wizard-skip-link{
+      flex-shrink:0;
+      color:#ffd700;
+      text-decoration:none;
+      font-size:12px;
+      font-weight:600;
+      padding:6px 10px;
+      border-radius:6px;
+      background:rgba(255,215,0,0.1);
+    }
+    .wizard-skip-link:hover{background:rgba(255,215,0,0.2)}
+    .wizard-nav-bottom{
+      display:flex;
+      gap:8px;
+      margin-top:16px;
+    }
+    .btn-wizard{
+      flex:1;
+      padding:14px;
+      border:none;
+      border-radius:10px;
+      font-size:14px;
+      font-weight:600;
+      cursor:pointer;
+      transition:all 0.2s;
+    }
+    .btn-wizard-back{
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+    }
+    .btn-wizard-back:hover{background:rgba(255,255,255,0.15)}
+    .btn-wizard-back:disabled{opacity:0.3;cursor:not-allowed}
+    .btn-wizard-skip{
+      background:rgba(255,255,255,0.05);
+      color:#aaa;
+    }
+    .btn-wizard-skip:hover{background:rgba(255,255,255,0.12);color:#fff}
+    .btn-wizard-next{
+      background:#ffd700;
+      color:#1a1a2e;
+      flex:1.3;
+    }
+    .btn-wizard-next:hover{background:#ffed4a}
+    .btn-wizard-next.is-finish{
+      background:linear-gradient(135deg,#11998e,#38ef7d);
+      color:#fff;
+    }
     /* U-Bahn Badge-Vorschau (Beispielzeile die sich je nach Toggle ändert) */
     .wien-badge-preview{
       display:flex;
@@ -895,7 +978,7 @@
   <p class="subtitle">Erweiterte Features</p>
 
   <!-- ==================== INTRO ==================== -->
-  <div class="intro-box">
+  <div class="intro-box" id="introBox">
     Nun kannst du dein Straba ganz nach deinen Wuenschen einstellen.<br>
     <a href="#" onclick="goBackToLines();return false;" class="back-link">&larr; Zur&uuml;ck zu Linien einstellen</a>
   </div>
@@ -904,6 +987,17 @@
   <div class="pending-banner" id="pendingBanner" style="display:none;">
     <div class="pending-title">&#10003; Neue Stationen bereit</div>
     <div class="pending-text" id="pendingText">Deine ausgewaehlten Stationen werden beim Speichern uebernommen.</div>
+  </div>
+
+  <!-- ==================== WIZARD NAV (TOP) ==================== -->
+  <div id="wizardNavTop" class="wizard-nav-top" style="display:none;">
+    <div class="wizard-progress">
+      <span id="wizardStepLabel">Schritt 1 von 4</span>
+      <div class="wizard-progress-bar">
+        <div class="wizard-progress-fill" id="wizardProgressFill"></div>
+      </div>
+    </div>
+    <a href="#" onclick="enableFullView();return false;" class="wizard-skip-link">Feintunen &rarr;</a>
   </div>
 
   <!-- ==================== 1. BARRIEREFREIHEIT (Wien) ==================== -->
@@ -1036,7 +1130,7 @@
   </div>
 
   <!-- ==================== 3. NACHTMODUS ==================== -->
-  <div class="card">
+  <div class="card" id="cardNachtmodus">
     <h2>Nachtmodus</h2>
 
     <div class="control-row">
@@ -1066,7 +1160,7 @@
   </div>
 
   <!-- ==================== 4. GEHWEG ==================== -->
-  <div class="card">
+  <div class="card" id="cardGehweg">
     <h2>Gehweg zur Haltestelle</h2>
 
     <div class="control-row">
@@ -1094,7 +1188,7 @@
   </div>
 
   <!-- ==================== 5. ERWEITERTE EINSTELLUNGEN ==================== -->
-  <div class="expand-card">
+  <div class="expand-card" id="cardExpand">
     <div class="expand-header" id="expandHeader" onclick="toggleExpand()">
       <h2>Erweiterte Einstellungen</h2>
       <span class="expand-arrow">&#9660;</span>
@@ -1187,8 +1281,28 @@
     </div>
   </div>
 
+  <!-- ==================== WIZARD NAV (BOTTOM) ==================== -->
+  <div id="wizardNavBottom" class="wizard-nav-bottom" style="display:none;">
+    <button class="btn-wizard btn-wizard-back" id="wizardBackBtn" onclick="wizardBack()">
+      &larr; Zur&uuml;ck
+    </button>
+    <button class="btn-wizard btn-wizard-skip" id="wizardSkipBtn" onclick="wizardSkip()">
+      &Uuml;berspringen
+    </button>
+    <button class="btn-wizard btn-wizard-next" id="wizardNextBtn" onclick="wizardNext()">
+      Weiter &rarr;
+    </button>
+  </div>
+
   <!-- ==================== SPEICHERN ==================== -->
   <button class="btn-primary" id="saveBtn">Speichern &amp; Neustarten</button>
+
+  <!-- ==================== ZURUECK ZUM WIZARD (nur in Full-Mode) ==================== -->
+  <div id="backToWizardLink" style="display:none;text-align:center;margin-top:20px;padding-bottom:20px;">
+    <a href="#" onclick="enableWizardView();return false;" style="color:#888;font-size:13px;text-decoration:none;">
+      &larr; Zur&uuml;ck zum Wizard
+    </a>
+  </div>
 
 </div>
 
@@ -2118,6 +2232,145 @@ function setSegmentValue(name, value) {
   });
 }
 
+// ==================== WIZARD-LOGIK ====================
+// Wizard-Schritte in Reihenfolge: Wien Features → Zeilen+Sortierung → Gehweg → Nachtmodus
+var wizardSteps = [
+  { id: 'cardBarrierefreiheit', label: 'Wien Features',
+    // Nur sichtbar wenn Wien-Capabilities (Hochflurer ODER Klima)
+    isAvailable: function() { return currentCapabilities && (currentCapabilities.showHighFloor || currentCapabilities.showAirCondition); } },
+  { id: 'cardZeilenSortierung', label: 'Zeilen & Sortierung',
+    // Immer verfügbar
+    isAvailable: function() { return true; } },
+  { id: 'cardGehweg', label: 'Gehweg',
+    // Standardmäßig verfügbar (auch ohne capabilities-Info)
+    isAvailable: function() { return !currentCapabilities || currentCapabilities.gehwegFilter !== false; } },
+  { id: 'cardNachtmodus', label: 'Nachtmodus',
+    // Standardmäßig verfügbar (auch ohne capabilities-Info)
+    isAvailable: function() { return !currentCapabilities || currentCapabilities.nightMode !== false; } },
+];
+var wizardCurrentStep = 0;
+var wizardViewMode = 'wizard';  // 'wizard' oder 'full'
+
+function getActiveWizardSteps() {
+  return wizardSteps.filter(function(s) { return s.isAvailable(); });
+}
+
+function applyWizardView() {
+  var saveBtn = document.getElementById('saveBtn');
+  var navTop = document.getElementById('wizardNavTop');
+  var navBottom = document.getElementById('wizardNavBottom');
+  var introBox = document.getElementById('introBox');
+  var expandCard = document.getElementById('cardExpand');
+  var backToWizard = document.getElementById('backToWizardLink');
+
+  if (wizardViewMode === 'full') {
+    // Full-Modus: alles sichtbar, keine Wizard-Navigation
+    if (navTop) navTop.style.display = 'none';
+    if (navBottom) navBottom.style.display = 'none';
+    if (saveBtn) saveBtn.style.display = '';
+    if (introBox) introBox.classList.remove('wizard-hidden');
+    if (expandCard) expandCard.classList.remove('wizard-hidden');
+    if (backToWizard) backToWizard.style.display = '';
+    // Alle Karten zeigen (außer feature-hidden die durch andere Logik versteckt sind)
+    wizardSteps.forEach(function(s) {
+      var el = document.getElementById(s.id);
+      if (el) el.classList.remove('wizard-hidden');
+    });
+    return;
+  }
+
+  // Wizard-Modus
+  if (navTop) navTop.style.display = '';
+  if (navBottom) navBottom.style.display = '';
+  if (saveBtn) saveBtn.style.display = 'none';
+  if (introBox) introBox.classList.add('wizard-hidden');
+  if (expandCard) expandCard.classList.add('wizard-hidden');
+  if (backToWizard) backToWizard.style.display = 'none';
+
+  var activeSteps = getActiveWizardSteps();
+  if (activeSteps.length === 0) {
+    // Keine Schritte verfügbar → Full-Modus erzwingen
+    enableFullView();
+    return;
+  }
+  if (wizardCurrentStep >= activeSteps.length) wizardCurrentStep = activeSteps.length - 1;
+  if (wizardCurrentStep < 0) wizardCurrentStep = 0;
+
+  // Alle Wizard-Karten verstecken
+  wizardSteps.forEach(function(s) {
+    var el = document.getElementById(s.id);
+    if (el) el.classList.add('wizard-hidden');
+  });
+  // Nur die aktive Karte zeigen
+  var current = activeSteps[wizardCurrentStep];
+  var currentEl = document.getElementById(current.id);
+  if (currentEl) currentEl.classList.remove('wizard-hidden');
+
+  // Progress aktualisieren
+  var stepLabel = document.getElementById('wizardStepLabel');
+  var fill = document.getElementById('wizardProgressFill');
+  if (stepLabel) stepLabel.textContent = 'Schritt ' + (wizardCurrentStep + 1) + ' von ' + activeSteps.length + ' — ' + current.label;
+  if (fill) fill.style.width = (((wizardCurrentStep + 1) / activeSteps.length) * 100) + '%';
+
+  // Buttons aktualisieren
+  var backBtn = document.getElementById('wizardBackBtn');
+  var nextBtn = document.getElementById('wizardNextBtn');
+  if (backBtn) backBtn.disabled = (wizardCurrentStep === 0);
+  if (nextBtn) {
+    var isLast = (wizardCurrentStep === activeSteps.length - 1);
+    nextBtn.innerHTML = isLast ? 'Speichern &amp; Fertig' : 'Weiter &rarr;';
+    nextBtn.classList.toggle('is-finish', isLast);
+  }
+
+  window.scrollTo(0, 0);
+}
+
+function wizardBack() {
+  if (wizardCurrentStep > 0) {
+    wizardCurrentStep--;
+    applyWizardView();
+  }
+}
+
+function wizardSkip() {
+  // Skip = einfach weiter ohne Werte zu ändern
+  wizardNext();
+}
+
+function wizardNext() {
+  var activeSteps = getActiveWizardSteps();
+  if (wizardCurrentStep >= activeSteps.length - 1) {
+    // Letzter Schritt → Speichern auslösen
+    var saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) saveBtn.click();
+    return;
+  }
+  wizardCurrentStep++;
+  applyWizardView();
+}
+
+function enableFullView() {
+  wizardViewMode = 'full';
+  try { localStorage.setItem('straba_index_view_mode', 'full'); } catch (e) {}
+  applyWizardView();
+}
+
+function enableWizardView() {
+  wizardViewMode = 'wizard';
+  wizardCurrentStep = 0;
+  try { localStorage.setItem('straba_index_view_mode', 'wizard'); } catch (e) {}
+  applyWizardView();
+}
+
+function initWizardMode() {
+  var saved = null;
+  try { saved = localStorage.getItem('straba_index_view_mode'); } catch (e) {}
+  // Default: Wizard-Modus für Erst-User. Sobald User einmal "Alle anzeigen" gedrückt hat → 'full' gespeichert
+  wizardViewMode = (saved === 'full') ? 'full' : 'wizard';
+  wizardCurrentStep = 0;
+  applyWizardView();
+}
+
 // ==================== ZURÜCK ZU LINIEN-EINSTELLUNG ====================
 // Speichert den aktuellen (möglicherweise geänderten) Stations-Zustand in localStorage,
 // damit localmainpage.html ihn statt der alten Device-Config anzeigt
@@ -2162,6 +2415,9 @@ function applyConfig(config) {
     if (v === 'manual') savedDisplayMode = 'manual';
   } catch (e) {}
   setDisplayAutoMode(savedDisplayMode);
+
+  // Wizard-Modus initialisieren (nur wenn noch nicht initialisiert)
+  if (typeof initWizardMode === 'function') initWizardMode();
   setSegmentValue('textcolor', config.text_color || '1');
   setSegmentValue('displaylight', config.displaylight || '3');
 
@@ -2522,6 +2778,9 @@ function updateFeatureVisibility(capabilities) {
       cardBarrierefreiheit.classList.add('feature-hidden');
     }
   }
+
+  // Wizard neu rendern, da sich die verfügbaren Schritte geändert haben können
+  if (typeof applyWizardView === 'function') applyWizardView();
 }
 
 function detectNetworkFromRbl(rbl) {
@@ -2719,6 +2978,11 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   updateRowOrderList();
+
+  // Wizard-Modus initialisieren — als Fallback wenn applyConfig nicht läuft
+  // (zB bei preConfig-Pfad mit settingsLoaded=true vor dem Device-Reply)
+  if (typeof initWizardMode === 'function') initWizardMode();
+
   console.log('[INIT] DOMContentLoaded handler complete. settingsLoaded=' + settingsLoaded + ' configLoaded=' + configLoaded);
 });
 </script>
