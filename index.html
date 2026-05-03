@@ -382,15 +382,62 @@
     /* Im Wizard-Modus den grünen pending-banner sicher verstecken */
     body.wizard-active #pendingBanner{display:none !important;}
     .wizard-finetune-row{
-      text-align:center;
-      margin-top:18px;
+      margin-top:24px;
     }
-    .wizard-finetune-hint{
+    /* "oder" Trenner */
+    .wizard-finetune-divider{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      margin:0 0 12px;
+      color:#666;
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:1.5px;
+    }
+    .wizard-finetune-divider::before,
+    .wizard-finetune-divider::after{
+      content:"";
+      flex:1;
+      height:1px;
+      background:rgba(255,255,255,0.08);
+    }
+    /* Feintunen-Card */
+    .wizard-finetune-card{
+      background:rgba(255,255,255,0.03);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:12px;
+      padding:14px 16px;
+      text-align:center;
+    }
+    .wizard-finetune-card-title{
+      color:#fff;
+      font-size:14px;
+      font-weight:600;
+      margin-bottom:6px;
+    }
+    .wizard-finetune-card-text{
       color:#888;
       font-size:12px;
       line-height:1.5;
-      margin:0 0 8px;
-      padding:0 8px;
+      margin-bottom:12px;
+    }
+    .wizard-finetune-btn{
+      width:100%;
+      padding:12px 16px;
+      background:rgba(66,133,244,0.15);
+      border:1px solid rgba(66,133,244,0.5);
+      color:#6ea4ff;
+      border-radius:10px;
+      font-size:14px;
+      font-weight:600;
+      cursor:pointer;
+      transition:all 0.15s;
+    }
+    .wizard-finetune-btn:hover{
+      background:rgba(66,133,244,0.25);
+      transform:translateY(-1px);
     }
     /* Beschreibungstext nur im Wizard sichtbar — gibt zusätzlichen Kontext zum aktuellen Schritt */
     .wizard-description{
@@ -1380,15 +1427,21 @@
     </button>
   </div>
 
-  <!-- Feintunen-Link nur im letzten Wizard-Schritt -->
+  <!-- Feintunen-Sektion nur im letzten Wizard-Schritt -->
   <div id="wizardFinetuneRow" class="wizard-finetune-row" style="display:none;">
-    <p class="wizard-finetune-hint">
-      Du kannst jetzt so speichern — oder noch spezifischere Einstellungen wie
-      Reihenfolge, Gruppierungen, Schriftfarbe und mehr setzen.
-    </p>
-    <a href="#" onclick="enableFullView();return false;" class="wizard-finetune-link">
-      Feintunen statt speichern &rarr;
-    </a>
+    <div class="wizard-finetune-divider">
+      <span>oder</span>
+    </div>
+    <div class="wizard-finetune-card">
+      <div class="wizard-finetune-card-title">⚙️ Feintunen</div>
+      <div class="wizard-finetune-card-text">
+        Spezifischere Einstellungen wie Zeilen-Reihenfolge, Linien-Gruppierungen,
+        Schriftfarbe, Helligkeit, Slideshow-Modus und mehr.
+      </div>
+      <button type="button" class="wizard-finetune-btn" onclick="enableFullView()">
+        Erweiterte Einstellungen &rarr;
+      </button>
+    </div>
   </div>
 
   <!-- ==================== SPEICHERN ==================== -->
@@ -2452,7 +2505,15 @@ function wizardSkip() {
 function wizardNext() {
   var activeSteps = getActiveWizardSteps();
   if (wizardCurrentStep >= activeSteps.length - 1) {
-    // Letzter Schritt → Speichern auslösen
+    // Letzter Schritt → vor dem Speichern Auto-Werte sicherstellen.
+    // Im Auto-Modus: Anzahl Zeilen aus der konfigurierten Linienanzahl neu berechnen.
+    // (1 Linie → 3, 2 oder 4 Linien → 2, sonst 3)
+    var dmSeg = document.querySelector('[data-name="displaymode_ui"]');
+    var dmActive = dmSeg ? dmSeg.querySelector('.seg-btn.active') : null;
+    var inAutoMode = !dmActive || dmActive.dataset.value === 'auto';
+    if (inAutoMode && typeof applyDisplayAutoMode === 'function') {
+      applyDisplayAutoMode();  // setzt anzeige-Segment auf calcAutoRows()
+    }
     var saveBtn = document.getElementById('saveBtn');
     if (saveBtn) saveBtn.click();
     return;
