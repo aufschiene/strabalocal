@@ -301,33 +301,55 @@
     .card.feature-hidden{
       display:none;
     }
-    /* U-Bahn Badge-Vorschau in Beschreibungstext (z.B. bei Wien Badges Toggle) */
-    .ubahn-preview-row{
-      display:inline-flex;
-      gap:4px;
-      flex-wrap:wrap;
-      vertical-align:middle;
-      margin-left:4px;
+    /* U-Bahn Badge-Vorschau (Beispielzeile die sich je nach Toggle ändert) */
+    .wien-badge-preview{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:10px;
+      background:#000;
+      border:1px solid rgba(255,255,255,0.08);
+      transition:background 0.2s, color 0.2s;
     }
-    .ubahn-badge{
-      display:inline-block;
-      min-width:24px;
-      padding:2px 6px;
-      border-radius:6px;
-      color:#fff;
-      font-weight:700;
-      font-size:11px;
-      text-align:center;
-      line-height:1.2;
+    .wien-preview-line{
+      font-weight:800;
+      font-size:18px;
+      min-width:30px;
+      text-align:left;
     }
-    .ubahn-line-text{
-      display:inline-block;
-      padding:2px 6px;
-      border-radius:6px;
-      background:rgba(255,255,255,0.08);
+    .wien-preview-dest{
+      flex:1;
+      font-size:14px;
+      font-weight:500;
+    }
+    .wien-preview-cd{
+      font-weight:800;
+      font-size:18px;
+    }
+    /* Aus: gelbe Schrift wie auf Display */
+    .wien-preview-off{
+      background:#000;
       color:#ffd700;
-      font-weight:700;
-      font-size:11px;
+    }
+    /* Linie: kleines Badge um Liniennummer */
+    .wien-preview-line-badge{
+      background:#000;
+      color:#ffd700;
+    }
+    .wien-preview-line-badge .wien-preview-line{
+      background:#A862A4;
+      color:#fff;
+      padding:3px 10px;
+      border-radius:6px;
+      min-width:0;
+      font-size:16px;
+    }
+    /* Ganze Zeile: gesamte Zeile farbig */
+    .wien-preview-full-row{
+      background:#A862A4;
+      color:#fff;
+      border-color:transparent;
     }
 
     /* Zeilen-Reihenfolge Drag & Drop */
@@ -903,26 +925,23 @@
       </div>
     </div>
 
-    <div class="control-row" id="rowWienBadges">
-      <div class="control-label">
-        <span>Wien U-Bahn Badges</span>
-        <small>Linien mit den Original-Farben hinterlegen:
-          <span class="ubahn-preview-row">
-            <span class="ubahn-badge" style="background:#E2001A;">U1</span>
-            <span class="ubahn-badge" style="background:#A862A4;">U2</span>
-            <span class="ubahn-badge" style="background:#F39200;">U3</span>
-            <span class="ubahn-badge" style="background:#008D3D;">U4</span>
-            <span class="ubahn-badge" style="background:#00B8AA;">U5</span>
-            <span class="ubahn-badge" style="background:#944210;">U6</span>
-          </span><br>
-          <em style="color:#888;">Linie</em> = nur kleines Badge um Liniennummer.
-          <em style="color:#888;">Ganze Zeile</em> = ganze Zeile in Linienfarbe mit runden Rändern.
-        </small>
+    <div class="control-row" id="rowWienBadges" style="flex-direction:column;align-items:stretch;gap:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div class="control-label">
+          <span>Wien U-Bahn Badges</span>
+          <small>Linien in Original-Farben hervorheben</small>
+        </div>
+        <div class="segmented wide" data-name="wienbadges">
+          <div class="seg-btn active" data-value="0">Aus</div>
+          <div class="seg-btn" data-value="1">Linie</div>
+          <div class="seg-btn" data-value="2">Ganze Zeile</div>
+        </div>
       </div>
-      <div class="segmented wide" data-name="wienbadges">
-        <div class="seg-btn active" data-value="0">Aus</div>
-        <div class="seg-btn" data-value="1">Linie</div>
-        <div class="seg-btn" data-value="2">Ganze Zeile</div>
+      <!-- Live-Vorschau Beispielzeile -->
+      <div id="wienBadgePreview" class="wien-badge-preview wien-preview-off">
+        <span class="wien-preview-line">U2</span>
+        <span class="wien-preview-dest">Heiligenstadt</span>
+        <span class="wien-preview-cd">5</span>
       </div>
     </div>
   </div>
@@ -1343,12 +1362,29 @@ document.querySelectorAll('.segmented').forEach(function(seg) {
       // Spezialbehandlung fuer sortorder Toggle
       if (seg.dataset.name === 'sortorder') {
         updateManualSortState();
+      } else if (seg.dataset.name === 'wienbadges') {
+        updateWienBadgePreview();
       } else {
         updateUI();
       }
     });
   });
 });
+
+// Wien U-Bahn Badge: Live-Vorschau aktualisieren je nach Toggle
+function updateWienBadgePreview() {
+  var preview = document.getElementById('wienBadgePreview');
+  if (!preview) return;
+  var seg = document.querySelector('[data-name="wienbadges"]');
+  if (!seg) return;
+  var active = seg.querySelector('.seg-btn.active');
+  var val = active ? active.dataset.value : '0';
+  // CSS-Klasse setzen
+  preview.classList.remove('wien-preview-off', 'wien-preview-line-badge', 'wien-preview-full-row');
+  if (val === '1') preview.classList.add('wien-preview-line-badge');
+  else if (val === '2') preview.classList.add('wien-preview-full-row');
+  else preview.classList.add('wien-preview-off');
+}
 
 // ==================== COLOR DOTS ====================
 document.querySelectorAll('.color-row').forEach(function(row) {
@@ -2028,6 +2064,7 @@ function applyConfig(config) {
   setSegmentValue('chopper', (config.chopper !== undefined && config.chopper !== '') ? config.chopper : '0');
   setSegmentValue('silberpfeil', (config.silberpfeil !== undefined && config.silberpfeil !== '') ? config.silberpfeil : '0');
   setSegmentValue('wienbadges', (config.wien_badges !== undefined && config.wien_badges !== '') ? config.wien_badges : '0');
+  updateWienBadgePreview();
   setSegmentValue('textcolor', config.text_color || '1');
   setSegmentValue('displaylight', config.displaylight || '3');
 
