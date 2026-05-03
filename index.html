@@ -1447,13 +1447,6 @@
   <!-- ==================== SPEICHERN ==================== -->
   <button class="btn-primary" id="saveBtn">Speichern &amp; Neustarten</button>
 
-  <!-- ==================== ZURUECK ZUM WIZARD (nur in Full-Mode) ==================== -->
-  <div id="backToWizardLink" style="display:none;text-align:center;margin-top:20px;padding-bottom:20px;">
-    <a href="#" onclick="enableWizardView();return false;" style="color:#888;font-size:13px;text-decoration:none;">
-      &larr; Zur&uuml;ck zum Wizard
-    </a>
-  </div>
-
 </div>
 
 <!-- ==================== VIDEO OVERLAY (Gruppierung Info) ==================== -->
@@ -1656,17 +1649,18 @@ document.querySelectorAll('.segmented').forEach(function(seg) {
 });
 
 // ==================== ZEILEN & SORTIERUNG: AUTO/MANUELL MODUS ====================
-// Zählt die Stations-Einträge im Filter — jede |-separierte Gruppe ist EIN Eintrag,
-// auch wenn sie mehrere Linien enthält (Stop mit mehreren Linien wird zu einer Display-Zeile gruppiert).
+// Zählt die Display-Zeilen-Einträge — pro |-Gruppe genau EINE Zeile, auch wenn
+// die Gruppe mehrere Linien (komma-separiert) enthält. Eine Station mit mehreren
+// Linien wird auf dem Display zu einer wechselnden Zeile gruppiert.
 // Beispiele:
-//   "U2"             → 1 Stop          → 3 Zeilen
-//   "U2,U4"          → 1 Stop (2 Lin.) → 3 Zeilen
-//   "U2|U2"          → 2 Stops         → 2 Zeilen
-//   "U2|U6"          → 2 Stops         → 2 Zeilen
-//   "U2,U4|U6"       → 2 Stops         → 2 Zeilen
-//   "U1|U2|U3"       → 3 Stops         → 3 Zeilen
-//   "U1|U2|U3|U4"    → 4 Stops         → 2 Zeilen
-//   "U1|U2|U3|U4|U6" → 5 Stops         → 3 Zeilen
+//   "U2"                    → 1 Eintrag → 3 Zeilen
+//   "U2,U4"                 → 1 Eintrag → 3 Zeilen   (1 Stop, 2 Lin. = 1 Display-Zeile)
+//   "U2|U2"                 → 2 Eintr.  → 2 Zeilen
+//   "U2|U6"                 → 2 Eintr.  → 2 Zeilen
+//   "U2,U4|U6"              → 2 Eintr.  → 2 Zeilen
+//   "U1|U2|U3"              → 3 Eintr.  → 3 Zeilen
+//   "U1|U2|U3|U4"           → 4 Eintr.  → 2 Zeilen
+//   "U1|U2|U3|U4|U5|U6"     → 6 Eintr.  → 3 Zeilen
 function countConfiguredLines() {
   var filter = pendingFilter || (currentConfig && currentConfig.lines_filter) || '';
   if (!filter) return 0;
@@ -1689,7 +1683,6 @@ function applyDisplayAutoMode() {
   var manualBox = document.getElementById('manualDisplayOptions');
   if (mode === 'auto') {
     if (manualBox) manualBox.style.display = 'none';
-    // Auto-Werte berechnen + setzen
     var autoRows = calcAutoRows(countConfiguredLines());
     setSegmentValue('anzeige', String(autoRows));
     setSegmentValue('sortmode', '1');           // Statisch als Default
@@ -1697,12 +1690,13 @@ function applyDisplayAutoMode() {
     manualSortEnabled = false;
     var manualContent = document.getElementById('manualSortContent');
     if (manualContent) manualContent.classList.remove('open');
-    // localStorage merken
     try { localStorage.setItem('straba_display_auto_mode', 'auto'); } catch (e) {}
   } else {
     if (manualBox) manualBox.style.display = '';
     try { localStorage.setItem('straba_display_auto_mode', 'manual'); } catch (e) {}
   }
+  // updateUI darf NICHT vor dem setSegmentValue aufgerufen werden — sonst fragt updateUI
+  // den Stand vor unserem Update ab. Hier am Ende ist es OK weil updateUI keinen anzeige-Wert ändert.
   updateUI();
 }
 
@@ -2519,11 +2513,8 @@ function wizardNext() {
     // Der Wizard zeigt den Auto/Manuell-Toggle gar nicht — User hatte keine Möglichkeit
     // manuell zu wählen, also gilt automatisch die Auto-Regel.
     if (typeof countConfiguredLines === 'function' && typeof calcAutoRows === 'function') {
-      var lineCount = countConfiguredLines();
-      var autoRows = calcAutoRows(lineCount);
-      console.log('[Wizard] Auto-Zeilen:', lineCount, 'unique Linien →', autoRows, 'Zeilen');
+      var autoRows = calcAutoRows(countConfiguredLines());
       setSegmentValue('anzeige', String(autoRows));
-      // Sortmode default Statisch (1) wenn keine manuelle Wahl getroffen
       setSegmentValue('sortmode', '1');
       setSegmentValue('sortorder', 'auto');
     }
@@ -2576,13 +2567,7 @@ function initWizardMode() {
   // Auto-Detect — kein localStorage mehr nötig:
   // Wenn die geladene Config erweiterte Settings hat (Helligkeit, Textfarbe, Slideshow etc.)
   // → User hat schon mal feingetunt → Full-View. Sonst Wizard.
-  if (configHasAdvancedSettings(currentConfig)) {
-    console.log('[Wizard] Erweiterte Settings erkannt → Full-View');
-    wizardViewMode = 'full';
-  } else {
-    console.log('[Wizard] Keine erweiterten Settings → Wizard-Modus');
-    wizardViewMode = 'wizard';
-  }
+  wizardViewMode = configHasAdvancedSettings(currentConfig) ? 'full' : 'wizard';
   wizardCurrentStep = 0;
   applyWizardView();
 }
@@ -2774,15 +2759,11 @@ document.getElementById('saveBtn').addEventListener('click', function() {
     var dmActive = dmSeg ? dmSeg.querySelector('.seg-btn.active') : null;
     var inAutoMode = !dmActive || dmActive.dataset.value === 'auto';
     var inWizard = (typeof wizardViewMode !== 'undefined' && wizardViewMode === 'wizard');
-    if ((inAutoMode || inWizard) && typeof countConfiguredLines === 'function' && typeof calcAutoRows === 'function') {
-      // Filter-String aus dem aktuell zu speichernden Wert nehmen (nicht aus pendingFilter
-      // weil der könnte stale sein wenn der User in localmainpage gerade weitere hinzugefügt hat)
-      var liveFilter = filterString || '';
-      var groups = liveFilter.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
-      var lineCount = groups.length;
-      var autoRows = calcAutoRows(lineCount);
-      console.log('[Save] Auto-Zeilen Re-Check:', lineCount, 'Stop-Gruppen →', autoRows, 'Zeilen (filter:', liveFilter, ')');
-      setSegmentValue('anzeige', String(autoRows));
+    if ((inAutoMode || inWizard) && typeof calcAutoRows === 'function') {
+      // Filter-String aus dem aktuell zu speichernden Wert nehmen (frischer als pendingFilter)
+      // Nur durch | splitten — mehrere Linien an einer Station (komma-separiert) zählen als 1 Eintrag
+      var groups = (filterString || '').split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+      setSegmentValue('anzeige', String(calcAutoRows(groups.length)));
     }
   })();
 
