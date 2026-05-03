@@ -301,6 +301,34 @@
     .card.feature-hidden{
       display:none;
     }
+    /* U-Bahn Badge-Vorschau in Beschreibungstext (z.B. bei Wien Badges Toggle) */
+    .ubahn-preview-row{
+      display:inline-flex;
+      gap:4px;
+      flex-wrap:wrap;
+      vertical-align:middle;
+      margin-left:4px;
+    }
+    .ubahn-badge{
+      display:inline-block;
+      min-width:24px;
+      padding:2px 6px;
+      border-radius:6px;
+      color:#fff;
+      font-weight:700;
+      font-size:11px;
+      text-align:center;
+      line-height:1.2;
+    }
+    .ubahn-line-text{
+      display:inline-block;
+      padding:2px 6px;
+      border-radius:6px;
+      background:rgba(255,255,255,0.08);
+      color:#ffd700;
+      font-weight:700;
+      font-size:11px;
+    }
 
     /* Zeilen-Reihenfolge Drag & Drop */
     .row-order-section{
@@ -867,7 +895,7 @@
     <div class="control-row" id="rowSilberpfeil">
       <div class="control-label">
         <span>U-Bahnen mit Klimaanlage</span>
-        <small>Markiert klimatisierte U-Bahn-Zuege</small>
+        <small>Markiert klimatisierte U-Bahn-Zuege mit einem Stern (z.B. <span class="ubahn-preview-row"><span class="ubahn-line-text">U2*</span></span>)</small>
       </div>
       <div class="segmented" data-name="silberpfeil">
         <div class="seg-btn active" data-value="0">Aus</div>
@@ -878,7 +906,16 @@
     <div class="control-row" id="rowWienBadges">
       <div class="control-label">
         <span>Wien U-Bahn Badges</span>
-        <small>Linien mit den Original-Farben hinterlegen (U1 rot, U2 lila, …)</small>
+        <small>Linien mit den Original-Farben hinterlegen:
+          <span class="ubahn-preview-row">
+            <span class="ubahn-badge" style="background:#E2001A;">U1</span>
+            <span class="ubahn-badge" style="background:#A862A4;">U2</span>
+            <span class="ubahn-badge" style="background:#F39200;">U3</span>
+            <span class="ubahn-badge" style="background:#008D3D;">U4</span>
+            <span class="ubahn-badge" style="background:#00B8AA;">U5</span>
+            <span class="ubahn-badge" style="background:#944210;">U6</span>
+          </span>
+        </small>
       </div>
       <div class="segmented" data-name="wienbadges">
         <div class="seg-btn active" data-value="0">Aus</div>
@@ -2277,8 +2314,24 @@ window.addEventListener('message', function(event) {
 });
 
 // ==================== FEATURE VISIBILITY ====================
+// Prüft ob in den aktuell konfigurierten Filtern eine U-Bahn-Linie (U1..U6) vorkommt
+function hasUBahnLine() {
+  var filterString = pendingFilter || currentConfig.lines_filter || '';
+  if (!filterString) return false;
+  // Filter ist "|"- oder ","-getrennt: "U1,U4|2|U6"
+  var parts = filterString.split(/[|,]/);
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i].trim().toUpperCase();
+    if (/^U[1-6]$/.test(p)) return true;
+  }
+  return false;
+}
+
 function updateFeatureVisibility(capabilities) {
   currentCapabilities = capabilities;
+
+  // U-Bahn nur sichtbar machen wenn Wien-Capabilities UND mindestens eine U-Bahn-Linie konfiguriert
+  var ubahnConfigured = hasUBahnLine();
 
   var rowChopper = document.getElementById('rowChopper');
   if (rowChopper) {
@@ -2288,8 +2341,22 @@ function updateFeatureVisibility(capabilities) {
 
   var rowSilberpfeil = document.getElementById('rowSilberpfeil');
   if (rowSilberpfeil) {
-    if (capabilities && capabilities.showAirCondition) rowSilberpfeil.classList.remove('feature-hidden', 'feature-disabled');
-    else rowSilberpfeil.classList.add('feature-hidden');
+    // Klimaanlage-Stern: nur wenn U-Bahn konfiguriert (das Feature betrifft nur U-Bahn)
+    if (capabilities && capabilities.showAirCondition && ubahnConfigured) {
+      rowSilberpfeil.classList.remove('feature-hidden', 'feature-disabled');
+    } else {
+      rowSilberpfeil.classList.add('feature-hidden');
+    }
+  }
+
+  var rowWienBadges = document.getElementById('rowWienBadges');
+  if (rowWienBadges) {
+    // Wien U-Bahn Badges: nur wenn U-Bahn konfiguriert
+    if (capabilities && capabilities.showAirCondition && ubahnConfigured) {
+      rowWienBadges.classList.remove('feature-hidden', 'feature-disabled');
+    } else {
+      rowWienBadges.classList.add('feature-hidden');
+    }
   }
 
   var rowTextfarbe = document.getElementById('rowTextfarbe');
@@ -2321,6 +2388,9 @@ function detectNetworkFromRbl(rbl) {
 
 // ==================== PRECONFIG VON CITIES.HTML ====================
 function applyPreConfig(preConfig) {
+  // pendingFilter setzen damit hasUBahnLine() funktioniert wenn updateFeatureVisibility aufgerufen wird
+  if (preConfig.filter) pendingFilter = preConfig.filter;
+
   if (preConfig.capabilities) updateFeatureVisibility(preConfig.capabilities);
   else {
     var network = detectNetworkFromRbl(preConfig.rbl);
