@@ -952,74 +952,86 @@
     </div>
   </div>
 
-  <!-- ==================== 2. ZEILEN ==================== -->
-  <div class="card">
-    <h2>Zeilen</h2>
+  <!-- ==================== ZEILEN & SORTIERUNG (kombiniert) ==================== -->
+  <div class="card" id="cardZeilenSortierung">
+    <h2>Zeilen & Sortierung</h2>
 
-    <div class="control-row" style="border-bottom:none">
-      <div class="control-label"><span>Anzahl Zeilen</span></div>
-      <div class="segmented wide" data-name="anzeige">
-        <div class="seg-btn" data-value="1">1</div>
-        <div class="seg-btn active" data-value="2">2</div>
-        <div class="seg-btn" data-value="3">3</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== 2. SORTIERUNG ==================== -->
-  <div class="card" id="cardSortierung">
-    <h2>Sortierung</h2>
-
-    <div class="control-row">
+    <!-- Top-Toggle: Automatisch / Manuell -->
+    <div class="control-row" id="rowDisplayMode">
       <div class="control-label">
-        <span>Sortier-Modus</span>
-        <small id="sortmodeHint">Statisch = Feste Reihenfolge der Linien</small>
+        <span>Modus</span>
+        <small id="displayModeHint">Automatisch = Optimale Werte basierend auf deinen Linien</small>
       </div>
-      <div class="segmented" data-name="sortmode">
-        <div class="seg-btn active" data-value="1">Statisch</div>
-        <div class="seg-btn" data-value="2">Nach Zeit</div>
-      </div>
-    </div>
-
-    <div class="control-row" id="autoManualRow">
-      <div class="control-label">
-        <span>Reihenfolge</span>
-      </div>
-      <div class="segmented" data-name="sortorder" id="sortOrderSegmented">
+      <div class="segmented" data-name="displaymode_ui">
         <div class="seg-btn active" data-value="auto">Automatisch</div>
         <div class="seg-btn" data-value="manual">Manuell</div>
       </div>
     </div>
 
-    <div class="manual-sort-content" id="manualSortContent">
-      <div class="manual-sort-inner">
+    <!-- Untergeordnete Optionen — nur sichtbar im Manuell-Modus -->
+    <div id="manualDisplayOptions" style="display:none;">
 
-        <!-- Zeilen-Reihenfolge (Drag & Drop) -->
-        <div class="row-order-section" id="rowOrderSection">
-          <div class="row-order-label">Zeilen-Reihenfolge festlegen</div>
-          <div class="row-order-hint">Ziehe die Linien in die gewuenschte Reihenfolge (Zeile 1 = oben)</div>
-          <div class="row-order-list" id="rowOrderList">
-            <div class="row-order-empty">Keine Linien konfiguriert</div>
-          </div>
+      <div class="control-row">
+        <div class="control-label"><span>Anzahl Zeilen</span></div>
+        <div class="segmented wide" data-name="anzeige">
+          <div class="seg-btn" data-value="1">1</div>
+          <div class="seg-btn active" data-value="2">2</div>
+          <div class="seg-btn" data-value="3">3</div>
         </div>
+      </div>
 
-        <!-- Gruppierung -->
-        <div class="ft-grouping-section" id="ftGroupingSection">
-          <div class="ft-grouping-label">Richtungen gruppieren <span class="info-btn" onclick="showGroupingInfo()">?</span></div>
-          <div class="ft-grouping-hint">Gruppiere Linien die die gleiche Strecke fahren (z.B. Linie 1 und 62). Nicht gruppierte Linien werden einzeln angezeigt.</div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>Sortier-Modus</span>
+          <small id="sortmodeHint">Statisch = Feste Reihenfolge der Linien</small>
+        </div>
+        <div class="segmented" data-name="sortmode">
+          <div class="seg-btn active" data-value="1">Statisch</div>
+          <div class="seg-btn" data-value="2">Nach Zeit</div>
+        </div>
+      </div>
 
-          <div class="ft-grouping-area">
-            <div class="ft-groups-container" id="ftGroupsContainer">
+      <div class="control-row" id="autoManualRow">
+        <div class="control-label">
+          <span>Reihenfolge</span>
+        </div>
+        <div class="segmented" data-name="sortorder" id="sortOrderSegmented">
+          <div class="seg-btn active" data-value="auto">Automatisch</div>
+          <div class="seg-btn" data-value="manual">Manuell</div>
+        </div>
+      </div>
+
+      <div class="manual-sort-content" id="manualSortContent">
+        <div class="manual-sort-inner">
+
+          <!-- Zeilen-Reihenfolge (Drag & Drop) -->
+          <div class="row-order-section" id="rowOrderSection">
+            <div class="row-order-label">Zeilen-Reihenfolge festlegen</div>
+            <div class="row-order-hint">Ziehe die Linien in die gewuenschte Reihenfolge (Zeile 1 = oben)</div>
+            <div class="row-order-list" id="rowOrderList">
+              <div class="row-order-empty">Keine Linien konfiguriert</div>
             </div>
+          </div>
 
-            <div class="ft-directions-pool" id="ftDirectionsPool">
-              <div class="pool-header">Verfuegbare Richtungen:</div>
-              <div class="pool-items" id="ftPoolItems">
+          <!-- Gruppierung -->
+          <div class="ft-grouping-section" id="ftGroupingSection">
+            <div class="ft-grouping-label">Richtungen gruppieren <span class="info-btn" onclick="showGroupingInfo()">?</span></div>
+            <div class="ft-grouping-hint">Gruppiere Linien die die gleiche Strecke fahren (z.B. Linie 1 und 62). Nicht gruppierte Linien werden einzeln angezeigt.</div>
+
+            <div class="ft-grouping-area">
+              <div class="ft-groups-container" id="ftGroupsContainer">
+              </div>
+
+              <div class="ft-directions-pool" id="ftDirectionsPool">
+                <div class="pool-header">Verfuegbare Richtungen:</div>
+                <div class="pool-items" id="ftPoolItems">
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
     </div>
   </div>
 
@@ -1370,12 +1382,65 @@ document.querySelectorAll('.segmented').forEach(function(seg) {
         updateManualSortState();
       } else if (seg.dataset.name === 'wienbadges') {
         updateWienBadgePreview();
+      } else if (seg.dataset.name === 'displaymode_ui') {
+        applyDisplayAutoMode();
       } else {
         updateUI();
       }
     });
   });
 });
+
+// ==================== ZEILEN & SORTIERUNG: AUTO/MANUELL MODUS ====================
+// Zählt die konfigurierten Linien aus pendingFilter / currentConfig.lines_filter
+function countConfiguredLines() {
+  var filter = pendingFilter || (currentConfig && currentConfig.lines_filter) || '';
+  if (!filter) return 0;
+  var lines = filter.split(/[|,]/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+  return lines.length;
+}
+
+// Auto-Regel: 1→3, 2→2, 3→3, 4→2, 5+→3
+function calcAutoRows(lineCount) {
+  if (lineCount === 2 || lineCount === 4) return 2;
+  return 3;
+}
+
+// Wendet den aktuellen Modus an: Auto = compute & hide, Manuell = show controls
+function applyDisplayAutoMode() {
+  var seg = document.querySelector('[data-name="displaymode_ui"]');
+  if (!seg) return;
+  var active = seg.querySelector('.seg-btn.active');
+  var mode = active ? active.dataset.value : 'auto';
+  var manualBox = document.getElementById('manualDisplayOptions');
+  if (mode === 'auto') {
+    if (manualBox) manualBox.style.display = 'none';
+    // Auto-Werte berechnen + setzen
+    var autoRows = calcAutoRows(countConfiguredLines());
+    setSegmentValue('anzeige', String(autoRows));
+    setSegmentValue('sortmode', '1');           // Statisch als Default
+    setSegmentValue('sortorder', 'auto');
+    manualSortEnabled = false;
+    var manualContent = document.getElementById('manualSortContent');
+    if (manualContent) manualContent.classList.remove('open');
+    // localStorage merken
+    try { localStorage.setItem('straba_display_auto_mode', 'auto'); } catch (e) {}
+  } else {
+    if (manualBox) manualBox.style.display = '';
+    try { localStorage.setItem('straba_display_auto_mode', 'manual'); } catch (e) {}
+  }
+  updateUI();
+}
+
+// Setzt den Modus-Toggle auf 'auto' oder 'manual'
+function setDisplayAutoMode(mode) {
+  var seg = document.querySelector('[data-name="displaymode_ui"]');
+  if (!seg) return;
+  seg.querySelectorAll('.seg-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.value === mode);
+  });
+  applyDisplayAutoMode();
+}
 
 // Wien U-Bahn Badge: Live-Vorschau aktualisieren je nach Toggle
 function updateWienBadgePreview() {
@@ -2089,6 +2154,14 @@ function applyConfig(config) {
   setSegmentValue('silberpfeil', (config.silberpfeil !== undefined && config.silberpfeil !== '') ? config.silberpfeil : '0');
   setSegmentValue('wienbadges', (config.wien_badges !== undefined && config.wien_badges !== '') ? config.wien_badges : '0');
   updateWienBadgePreview();
+
+  // Display-Modus (Auto/Manuell) aus localStorage holen — default: auto
+  var savedDisplayMode = 'auto';
+  try {
+    var v = localStorage.getItem('straba_display_auto_mode');
+    if (v === 'manual') savedDisplayMode = 'manual';
+  } catch (e) {}
+  setDisplayAutoMode(savedDisplayMode);
   setSegmentValue('textcolor', config.text_color || '1');
   setSegmentValue('displaylight', config.displaylight || '3');
 
