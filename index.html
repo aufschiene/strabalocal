@@ -1656,20 +1656,22 @@ document.querySelectorAll('.segmented').forEach(function(seg) {
 });
 
 // ==================== ZEILEN & SORTIERUNG: AUTO/MANUELL MODUS ====================
-// Zählt die (Station, Linie)-Einträge im Filter — jede solche Kombination ist
-// eine "Display-Zeile". Gleiche Linie an 2 Stationen = 2 Display-Zeilen.
+// Zählt die Stations-Einträge im Filter — jede |-separierte Gruppe ist EIN Eintrag,
+// auch wenn sie mehrere Linien enthält (Stop mit mehreren Linien wird zu einer Display-Zeile gruppiert).
 // Beispiele:
-//   "U2"           → 1 Eintrag       → 3 Zeilen
-//   "U2|U2"        → 2 Einträge      → 2 Zeilen
-//   "U2|U6"        → 2 Einträge      → 2 Zeilen
-//   "U2,U4"        → 2 Einträge      → 2 Zeilen
-//   "U2,U4|U6"     → 3 Einträge      → 3 Zeilen
-//   "U1,U2,U3,U4|U6" → 5 Einträge    → 3 Zeilen
+//   "U2"             → 1 Stop          → 3 Zeilen
+//   "U2,U4"          → 1 Stop (2 Lin.) → 3 Zeilen
+//   "U2|U2"          → 2 Stops         → 2 Zeilen
+//   "U2|U6"          → 2 Stops         → 2 Zeilen
+//   "U2,U4|U6"       → 2 Stops         → 2 Zeilen
+//   "U1|U2|U3"       → 3 Stops         → 3 Zeilen
+//   "U1|U2|U3|U4"    → 4 Stops         → 2 Zeilen
+//   "U1|U2|U3|U4|U6" → 5 Stops         → 3 Zeilen
 function countConfiguredLines() {
   var filter = pendingFilter || (currentConfig && currentConfig.lines_filter) || '';
   if (!filter) return 0;
-  var entries = filter.split(/[|,]/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
-  return entries.length;
+  var groups = filter.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+  return groups.length;
 }
 
 // Auto-Regel: 1→3, 2→2, 3→3, 4→2, 5+→3
@@ -2763,6 +2765,26 @@ document.getElementById('saveBtn').addEventListener('click', function() {
 
   var rblString = pendingRbl || currentConfig.rbl_id || '';
   var filterString = pendingFilter || currentConfig.lines_filter || '';
+
+  // AUTO-ZEILEN: Wenn der Auto-Modus aktiv ist (oder wir im Wizard sind),
+  // immer die Anzahl basierend auf den Stops neu berechnen.
+  // Damit landet die richtige Zeilenanzahl auf dem Device, egal über welchen Pfad gespeichert wird.
+  (function autoRowsFinalCheck() {
+    var dmSeg = document.querySelector('[data-name="displaymode_ui"]');
+    var dmActive = dmSeg ? dmSeg.querySelector('.seg-btn.active') : null;
+    var inAutoMode = !dmActive || dmActive.dataset.value === 'auto';
+    var inWizard = (typeof wizardViewMode !== 'undefined' && wizardViewMode === 'wizard');
+    if ((inAutoMode || inWizard) && typeof countConfiguredLines === 'function' && typeof calcAutoRows === 'function') {
+      // Filter-String aus dem aktuell zu speichernden Wert nehmen (nicht aus pendingFilter
+      // weil der könnte stale sein wenn der User in localmainpage gerade weitere hinzugefügt hat)
+      var liveFilter = filterString || '';
+      var groups = liveFilter.split('|').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+      var lineCount = groups.length;
+      var autoRows = calcAutoRows(lineCount);
+      console.log('[Save] Auto-Zeilen Re-Check:', lineCount, 'Stop-Gruppen →', autoRows, 'Zeilen (filter:', liveFilter, ')');
+      setSegmentValue('anzeige', String(autoRows));
+    }
+  })();
 
   var rowOrder = '';
   var lineGroups = '';
