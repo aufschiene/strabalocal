@@ -1134,6 +1134,7 @@ let currentConfig = {};
 let currentCapabilities = null;
 let configLoaded = false;
 let settingsLoaded = false;
+let pendingPathActive = false;  // true wenn Stationen via Pending-Pfad geladen wurden (Settings vom Device noch laden!)
 let manualSortEnabled = false;
 
 // City Capabilities
@@ -1962,7 +1963,7 @@ function setSegmentValue(name, value) {
 // ==================== CONFIG LADEN ====================
 function applyConfig(config) {
   if (settingsLoaded) return;
-  console.log('Config anwenden:', config);
+  console.log('Config anwenden:', config, 'pendingPathActive=', pendingPathActive);
   currentConfig = config;
 
   if (!currentCapabilities && config.rbl_id) {
@@ -1970,15 +1971,19 @@ function applyConfig(config) {
     updateFeatureVisibility(CITY_CAPABILITIES[network] || CITY_CAPABILITIES.WL);
   }
 
+  // Default-Fallback: '0' = Aus (NICHT '1' — sonst springt Hochflurer/Klima auf An wenn Wert fehlt)
   setSegmentValue('anzeige', config.lines_count || '2');
   setSegmentValue('sortmode', config.sort_mode || config.sortmode || '1');
-  setSegmentValue('chopper', config.chopper || '1');
-  setSegmentValue('silberpfeil', config.silberpfeil || '1');
+  setSegmentValue('chopper', (config.chopper !== undefined && config.chopper !== '') ? config.chopper : '0');
+  setSegmentValue('silberpfeil', (config.silberpfeil !== undefined && config.silberpfeil !== '') ? config.silberpfeil : '0');
   setSegmentValue('textcolor', config.text_color || '1');
   setSegmentValue('displaylight', config.displaylight || '3');
 
+  // Nachtmodus: explizit add ODER remove (sonst bleibt alter Zustand bestehen)
   if (config.night_mode_enabled) {
     document.getElementById('nightmodeToggle').classList.add('on');
+  } else {
+    document.getElementById('nightmodeToggle').classList.remove('on');
   }
   document.getElementById('nightstart').value = config.night_mode_start || '22';
   document.getElementById('nightend').value = config.night_mode_end || '7';
@@ -1992,12 +1997,12 @@ function applyConfig(config) {
   setSegmentValue('displaymode', config.display_mode || '1');
   setSegmentValue('stopinterval', config.stop_interval || '10');
 
-  // Gehweg
-  var stopIds = (config.rbl_id || '').split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  // Gehweg parsen
+  var deviceStopIds = (config.rbl_id || '').split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
   var gehwegString = config.gehweg || '0';
-  var gehwegValues = [];
+  var gehwegMap = {};
+  var gehwegValuesByDeviceOrder = [];
   if (gehwegString.indexOf(':') !== -1) {
-    var gehwegMap = {};
     gehwegString.split('|').forEach(function(entry) {
       var colonPos = entry.indexOf(':');
       if (colonPos !== -1) {
@@ -2006,16 +2011,38 @@ function applyConfig(config) {
         gehwegMap[stopId] = value;
       }
     });
-    gehwegValues = stopIds.map(function(id) { return gehwegMap[id] || 0; });
+    gehwegValuesByDeviceOrder = deviceStopIds.map(function(id) { return gehwegMap[id] || 0; });
   } else {
-    gehwegValues = gehwegString.split('|').map(function(v) { return parseInt(v) || 0; });
+    gehwegValuesByDeviceOrder = gehwegString.split('|').map(function(v) { return parseInt(v) || 0; });
+    deviceStopIds.forEach(function(id, i) { gehwegMap[id] = gehwegValuesByDeviceOrder[i] || 0; });
   }
 
-  updateGehwegList(stopIds, gehwegValues);
-
-  if (config.gehweg && config.gehweg !== '0' && config.gehweg !== '') {
-    if (gehwegValues.some(function(v) { return v > 0; })) {
+  if (pendingPathActive && pendingRbl) {
+    // Pending-Pfad: Stationen kommen von localStorage. Gehweg-Werte aus device per stopId-Match
+    // übernehmen (gleiche Stops behalten ihren Wert), neue Stops bekommen 0.
+    var pendingStopIds = pendingRbl.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+    var mappedGehweg = pendingStopIds.map(function(id) { return gehwegMap[id] || 0; });
+    // updateGehwegList wurde im Pending-Pfad bereits mit Details aufgerufen — Werte hier nachreichen
+    var inputs = document.querySelectorAll('#gehwegList input[type="number"]');
+    inputs.forEach(function(inp, i) {
+      if (mappedGehweg[i] !== undefined) inp.value = String(mappedGehweg[i]);
+    });
+    if (mappedGehweg.some(function(v) { return v > 0; })) {
       document.getElementById('gehwegToggle').classList.add('on');
+    } else {
+      document.getElementById('gehwegToggle').classList.remove('on');
+    }
+  } else {
+    // Normaler Pfad: device stopIds + gehwegValues
+    updateGehwegList(deviceStopIds, gehwegValuesByDeviceOrder);
+    if (config.gehweg && config.gehweg !== '0' && config.gehweg !== '') {
+      if (gehwegValuesByDeviceOrder.some(function(v) { return v > 0; })) {
+        document.getElementById('gehwegToggle').classList.add('on');
+      } else {
+        document.getElementById('gehwegToggle').classList.remove('on');
+      }
+    } else {
+      document.getElementById('gehwegToggle').classList.remove('on');
     }
   }
 
@@ -2417,8 +2444,10 @@ document.addEventListener('DOMContentLoaded', function() {
       updateRowOrderList();
 
       configLoaded = true;
-      settingsLoaded = true;
-      console.log('[INIT] settingsLoaded=true, removing loading overlay');
+      // WICHTIG: settingsLoaded NICHT setzen — Settings vom Device sollen weiterhin geladen werden
+      // (sonst gehen chopper/silberpfeil/nightMode/gehweg-Werte verloren!)
+      pendingPathActive = true;
+      console.log('[INIT] Pending-Pfad: Stationen aus localStorage, Settings werden vom Device nachgeladen');
       var cle2 = document.getElementById('configLoading');
       if (cle2) { cle2.classList.remove('show'); console.log('[INIT] Loading overlay removed'); }
       else console.error('[INIT] configLoading element NOT FOUND!');
