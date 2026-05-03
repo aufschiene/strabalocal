@@ -9,6 +9,20 @@
     html{background:#1a1a2e}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:linear-gradient(135deg,#1a1a2e,#16213e);min-height:100vh;padding:20px;color:#fff}
     .container{max-width:440px;margin:0 auto}
+    /* Wizard-Modus: Container horizontal + vertikal zentrieren */
+    body.wizard-active{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+      padding:20px;
+    }
+    body.wizard-active .container{
+      width:100%;
+      max-width:480px;
+      margin:auto 0;  /* falls flex-Container größer als Inhalt → vertikal zentriert */
+    }
 
     .logo{display:block;max-width:200px;height:auto;margin:0 auto 12px auto}
     .subtitle{text-align:center;color:#aaa;margin-bottom:16px;font-size:14px;text-transform:uppercase;letter-spacing:1px}
@@ -344,17 +358,18 @@
       transition:width 0.3s ease;
       width:0%;
     }
-    .wizard-skip-link{
-      flex-shrink:0;
-      color:#ffd700;
+    .wizard-finetune-row{
+      text-align:center;
+      margin-top:14px;
+    }
+    .wizard-finetune-link{
+      color:#888;
       text-decoration:none;
       font-size:12px;
-      font-weight:600;
+      font-weight:500;
       padding:6px 10px;
-      border-radius:6px;
-      background:rgba(255,215,0,0.1);
     }
-    .wizard-skip-link:hover{background:rgba(255,215,0,0.2)}
+    .wizard-finetune-link:hover{color:#ffd700}
     .wizard-nav-bottom{
       display:flex;
       gap:8px;
@@ -376,11 +391,6 @@
     }
     .btn-wizard-back:hover{background:rgba(255,255,255,0.15)}
     .btn-wizard-back:disabled{opacity:0.3;cursor:not-allowed}
-    .btn-wizard-skip{
-      background:rgba(255,255,255,0.05);
-      color:#aaa;
-    }
-    .btn-wizard-skip:hover{background:rgba(255,255,255,0.12);color:#fff}
     .btn-wizard-next{
       background:#ffd700;
       color:#1a1a2e;
@@ -992,12 +1002,11 @@
   <!-- ==================== WIZARD NAV (TOP) ==================== -->
   <div id="wizardNavTop" class="wizard-nav-top" style="display:none;">
     <div class="wizard-progress">
-      <span id="wizardStepLabel">Schritt 1 von 4</span>
+      <span id="wizardStepLabel">Schritt 1 von 3</span>
       <div class="wizard-progress-bar">
         <div class="wizard-progress-fill" id="wizardProgressFill"></div>
       </div>
     </div>
-    <a href="#" onclick="enableFullView();return false;" class="wizard-skip-link">Feintunen &rarr;</a>
   </div>
 
   <!-- ==================== 1. BARRIEREFREIHEIT (Wien) ==================== -->
@@ -1286,12 +1295,16 @@
     <button class="btn-wizard btn-wizard-back" id="wizardBackBtn" onclick="wizardBack()">
       &larr; Zur&uuml;ck
     </button>
-    <button class="btn-wizard btn-wizard-skip" id="wizardSkipBtn" onclick="wizardSkip()">
-      &Uuml;berspringen
-    </button>
     <button class="btn-wizard btn-wizard-next" id="wizardNextBtn" onclick="wizardNext()">
       Weiter &rarr;
     </button>
+  </div>
+
+  <!-- Feintunen-Link nur im letzten Wizard-Schritt -->
+  <div id="wizardFinetuneRow" class="wizard-finetune-row" style="display:none;">
+    <a href="#" onclick="enableFullView();return false;" class="wizard-finetune-link">
+      Feintunen statt speichern &rarr;
+    </a>
   </div>
 
   <!-- ==================== SPEICHERN ==================== -->
@@ -2233,14 +2246,12 @@ function setSegmentValue(name, value) {
 }
 
 // ==================== WIZARD-LOGIK ====================
-// Wizard-Schritte in Reihenfolge: Wien Features → Zeilen+Sortierung → Gehweg → Nachtmodus
+// Wizard-Schritte in Reihenfolge: Wien Features → Gehweg → Nachtmodus
+// (Zeilen & Sortierung wird übersprungen — ist standardmäßig automatisch)
 var wizardSteps = [
   { id: 'cardBarrierefreiheit', label: 'Wien Features',
     // Nur sichtbar wenn Wien-Capabilities (Hochflurer ODER Klima)
     isAvailable: function() { return currentCapabilities && (currentCapabilities.showHighFloor || currentCapabilities.showAirCondition); } },
-  { id: 'cardZeilenSortierung', label: 'Zeilen & Sortierung',
-    // Immer verfügbar
-    isAvailable: function() { return true; } },
   { id: 'cardGehweg', label: 'Gehweg',
     // Standardmäßig verfügbar (auch ohne capabilities-Info)
     isAvailable: function() { return !currentCapabilities || currentCapabilities.gehwegFilter !== false; } },
@@ -2259,19 +2270,24 @@ function applyWizardView() {
   var saveBtn = document.getElementById('saveBtn');
   var navTop = document.getElementById('wizardNavTop');
   var navBottom = document.getElementById('wizardNavBottom');
+  var finetuneRow = document.getElementById('wizardFinetuneRow');
   var introBox = document.getElementById('introBox');
   var expandCard = document.getElementById('cardExpand');
+  var zeilenCard = document.getElementById('cardZeilenSortierung');
   var backToWizard = document.getElementById('backToWizardLink');
 
   if (wizardViewMode === 'full') {
+    document.body.classList.remove('wizard-active');
     // Full-Modus: alles sichtbar, keine Wizard-Navigation
     if (navTop) navTop.style.display = 'none';
     if (navBottom) navBottom.style.display = 'none';
+    if (finetuneRow) finetuneRow.style.display = 'none';
     if (saveBtn) saveBtn.style.display = '';
     if (introBox) introBox.classList.remove('wizard-hidden');
     if (expandCard) expandCard.classList.remove('wizard-hidden');
+    if (zeilenCard) zeilenCard.classList.remove('wizard-hidden');
     if (backToWizard) backToWizard.style.display = '';
-    // Alle Karten zeigen (außer feature-hidden die durch andere Logik versteckt sind)
+    // Alle Wizard-Karten zeigen (außer feature-hidden die durch andere Logik versteckt sind)
     wizardSteps.forEach(function(s) {
       var el = document.getElementById(s.id);
       if (el) el.classList.remove('wizard-hidden');
@@ -2280,11 +2296,13 @@ function applyWizardView() {
   }
 
   // Wizard-Modus
+  document.body.classList.add('wizard-active');
   if (navTop) navTop.style.display = '';
   if (navBottom) navBottom.style.display = '';
   if (saveBtn) saveBtn.style.display = 'none';
   if (introBox) introBox.classList.add('wizard-hidden');
   if (expandCard) expandCard.classList.add('wizard-hidden');
+  if (zeilenCard) zeilenCard.classList.add('wizard-hidden');  // Zeilen+Sortierung im Wizard verstecken
   if (backToWizard) backToWizard.style.display = 'none';
 
   var activeSteps = getActiveWizardSteps();
@@ -2315,12 +2333,14 @@ function applyWizardView() {
   // Buttons aktualisieren
   var backBtn = document.getElementById('wizardBackBtn');
   var nextBtn = document.getElementById('wizardNextBtn');
+  var isLast = (wizardCurrentStep === activeSteps.length - 1);
   if (backBtn) backBtn.disabled = (wizardCurrentStep === 0);
   if (nextBtn) {
-    var isLast = (wizardCurrentStep === activeSteps.length - 1);
     nextBtn.innerHTML = isLast ? 'Speichern &amp; Fertig' : 'Weiter &rarr;';
     nextBtn.classList.toggle('is-finish', isLast);
   }
+  // Feintunen-Link nur im LETZTEN Schritt anzeigen
+  if (finetuneRow) finetuneRow.style.display = isLast ? '' : 'none';
 
   window.scrollTo(0, 0);
 }
@@ -2350,23 +2370,47 @@ function wizardNext() {
 }
 
 function enableFullView() {
+  // Wechselt zur Full-Ansicht (nur für die aktuelle Session — Auto-Detect entscheidet beim nächsten Laden)
   wizardViewMode = 'full';
-  try { localStorage.setItem('straba_index_view_mode', 'full'); } catch (e) {}
   applyWizardView();
 }
 
 function enableWizardView() {
+  // Wechselt zur Wizard-Ansicht (nur für die aktuelle Session — Auto-Detect entscheidet beim nächsten Laden)
   wizardViewMode = 'wizard';
   wizardCurrentStep = 0;
-  try { localStorage.setItem('straba_index_view_mode', 'wizard'); } catch (e) {}
   applyWizardView();
 }
 
+// Prüft ob die Config Werte enthält die NICHT im Wizard einstellbar sind
+// (Erweiterte Einstellungen: Textfarbe, Helligkeit, Fun Messages, Display-Mode, Stop-Interval).
+// Wenn ja → User hat schon mal Feintuning genutzt → Wizard nicht mehr zeigen.
+function configHasAdvancedSettings(config) {
+  if (!config) return false;
+  // Helligkeit ≠ Default "Hell" (3)
+  if (config.displaylight !== undefined && String(config.displaylight) !== '' && String(config.displaylight) !== '3') return true;
+  // Textfarbe ≠ Default "Gelb" (1)
+  if (config.text_color !== undefined && String(config.text_color) !== '' && String(config.text_color) !== '1') return true;
+  // Fun Messages explizit aus
+  if (config.show_fun_messages === false || config.show_fun_messages === '0' || config.show_fun_messages === 0) return true;
+  // Display-Mode ≠ Default "Gemischt" (1)
+  if (config.display_mode !== undefined && String(config.display_mode) !== '' && String(config.display_mode) !== '1') return true;
+  // Stop-Interval ≠ Default 10
+  if (config.stop_interval !== undefined && config.stop_interval !== '' && parseInt(config.stop_interval) !== 10) return true;
+  return false;
+}
+
 function initWizardMode() {
-  var saved = null;
-  try { saved = localStorage.getItem('straba_index_view_mode'); } catch (e) {}
-  // Default: Wizard-Modus für Erst-User. Sobald User einmal "Alle anzeigen" gedrückt hat → 'full' gespeichert
-  wizardViewMode = (saved === 'full') ? 'full' : 'wizard';
+  // Auto-Detect — kein localStorage mehr nötig:
+  // Wenn die geladene Config erweiterte Settings hat (Helligkeit, Textfarbe, Slideshow etc.)
+  // → User hat schon mal feingetunt → Full-View. Sonst Wizard.
+  if (configHasAdvancedSettings(currentConfig)) {
+    console.log('[Wizard] Erweiterte Settings erkannt → Full-View');
+    wizardViewMode = 'full';
+  } else {
+    console.log('[Wizard] Keine erweiterten Settings → Wizard-Modus');
+    wizardViewMode = 'wizard';
+  }
   wizardCurrentStep = 0;
   applyWizardView();
 }
