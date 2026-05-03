@@ -1681,13 +1681,7 @@ function applyDisplayAutoMode() {
   var manualBox = document.getElementById('manualDisplayOptions');
   if (mode === 'auto') {
     if (manualBox) manualBox.style.display = 'none';
-    var lineCount = countConfiguredLines();
-    var liveFilter = pendingFilter || (currentConfig && currentConfig.lines_filter) || '';
-    var autoRows = calcAutoRows(lineCount);
-    console.log('[applyDisplayAutoMode] AUTO → lineCount=', lineCount, 'autoRows=', autoRows,
-                '\n  filter=', liveFilter,
-                '\n  pendingFilter=', pendingFilter,
-                '\n  currentConfig.lines_filter=', currentConfig && currentConfig.lines_filter);
+    var autoRows = calcAutoRows(countConfiguredLines());
     setSegmentValue('anzeige', String(autoRows));
     setSegmentValue('sortmode', '1');           // Statisch als Default
     setSegmentValue('sortorder', 'auto');
@@ -2517,9 +2511,7 @@ function wizardNext() {
     // Der Wizard zeigt den Auto/Manuell-Toggle gar nicht — User hatte keine Möglichkeit
     // manuell zu wählen, also gilt automatisch die Auto-Regel.
     if (typeof countConfiguredLines === 'function' && typeof calcAutoRows === 'function') {
-      var lineCount = countConfiguredLines();
-      var autoRows = calcAutoRows(lineCount);
-      console.log('[Wizard wizardNext] lineCount=', lineCount, '→ autoRows=', autoRows);
+      var autoRows = calcAutoRows(countConfiguredLines());
       setSegmentValue('anzeige', String(autoRows));
       setSegmentValue('sortmode', '1');
       setSegmentValue('sortorder', 'auto');
@@ -2573,9 +2565,7 @@ function initWizardMode() {
   // Auto-Detect — kein localStorage mehr nötig:
   // Wenn die geladene Config erweiterte Settings hat (Helligkeit, Textfarbe, Slideshow etc.)
   // → User hat schon mal feingetunt → Full-View. Sonst Wizard.
-  var hasAdvanced = configHasAdvancedSettings(currentConfig);
-  console.log('[initWizardMode] hasAdvancedSettings=', hasAdvanced, 'viewMode=', hasAdvanced ? 'full' : 'wizard');
-  wizardViewMode = hasAdvanced ? 'full' : 'wizard';
+  wizardViewMode = configHasAdvancedSettings(currentConfig) ? 'full' : 'wizard';
   wizardCurrentStep = 0;
   applyWizardView();
 }
@@ -2768,17 +2758,9 @@ document.getElementById('saveBtn').addEventListener('click', function() {
     var inAutoMode = !dmActive || dmActive.dataset.value === 'auto';
     var inWizard = (typeof wizardViewMode !== 'undefined' && wizardViewMode === 'wizard');
     if ((inAutoMode || inWizard) && typeof calcAutoRows === 'function') {
-      // Split durch | UND , — jede Linie zählt einzeln (Option A)
+      // Split durch | UND , — jede Linie zählt einzeln
       var entries = (filterString || '').split(/[|,]/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
-      var lineCount = entries.length;
-      var autoRows = calcAutoRows(lineCount);
-      console.log('[Save Re-Check] inAutoMode=', inAutoMode, 'inWizard=', inWizard,
-                  '\n  filterString=', filterString,
-                  '\n  entries=', entries, 'lineCount=', lineCount,
-                  '\n  → autoRows=', autoRows);
-      setSegmentValue('anzeige', String(autoRows));
-    } else {
-      console.log('[Save Re-Check] SKIPPED — inAutoMode=', inAutoMode, 'inWizard=', inWizard);
+      setSegmentValue('anzeige', String(calcAutoRows(entries.length)));
     }
   })();
 
