@@ -129,6 +129,8 @@
     .region-badge.dk { background: #C8102E; color: #fff; }
     .region-badge.fr { background: linear-gradient(90deg, #002395 33%, #fff 33%, #fff 66%, #ED2939 66%); }
     .region-badge.nl { background: linear-gradient(180deg, #AE1C28 33%, #fff 33%, #fff 66%, #21468B 66%); }
+    .region-badge.li { background: linear-gradient(180deg, #002B7F 50%, #CE1126 50%); color: #fff; }
+    .region-badge.cz { background: linear-gradient(180deg, #fff 50%, #D7141A 50%); color: #11457E; }
 
     /* Bundesland-Wappen (stilisierte Schild-Form) */
     .wappen-badge {
@@ -2381,6 +2383,16 @@
         <div class="name">Niederlande</div>
         <div class="desc">Amsterdam, Rotterdam</div>
       </button>
+      <button class="selection-btn" onclick="selectRegion('LI')">
+        <div class="region-badge li">LI</div>
+        <div class="name">Liechtenstein</div>
+        <div class="desc">LIEmobil (Vaduz, Schaan, ...)</div>
+      </button>
+      <button class="selection-btn" onclick="selectRegion('CZ')">
+        <div class="region-badge cz">CZ</div>
+        <div class="name">Tschechien</div>
+        <div class="desc">Prag (PID/DPP)</div>
+      </button>
       <button class="selection-btn disabled" onclick="selectRegion('CH')">
         <div class="region-badge ch">CH</div>
         <div class="name">Schweiz</div>
@@ -2741,6 +2753,8 @@
       <option value="12">ÖBB S-Bahn</option>
       <option value="13">Holding Graz</option>
       <option value="14">Westbahn</option>
+      <option value="15">Liechtenstein / Schweiz Nahverkehr</option>
+      <option value="16">Prag (PID)</option>
     </select>
     <div id="ftWienOptions" style="display:none;"></div>
     <div id="ftGroupingCard" style="display:none;">
@@ -2867,6 +2881,14 @@ const REGIONS = {
       NL_RTD: { name: 'Rotterdam', desc: 'Tram, Bus (RET)', networks: ['RET'] }
     }
   },
+  LI: {
+    name: 'Liechtenstein',
+    networks: ['LIEMOBIL']
+  },
+  CZ: {
+    name: 'Tschechien',
+    networks: ['PID']
+  },
   DK: {
     name: 'Dänemark',
     networks: []
@@ -2948,6 +2970,24 @@ const CITY_CAPABILITIES = {
     defaultColour: 9,             // RATP Paris
     defaultBrightness: 3
   },
+  LIEMOBIL: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 15,            // LIEmobil/SBB orange
+    defaultBrightness: 3
+  },
+  PID: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 16,            // Prag (weiße Schrift)
+    defaultBrightness: 3
+  },
   GVB: {
     textColorChangeable: false,
     showHighFloor: false,
@@ -3027,6 +3067,34 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 5,
+    defaultBrightness: 3
+  },
+  // API-Aliase (so wie Stationen vom Device zurückgeladen werden)
+  OEBBREG: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 12,            // ÖBB S-Bahn / Regionalverkehr
+    defaultBrightness: 3
+  },
+  OEBBFERN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 12,            // ÖBB Fernverkehr
+    defaultBrightness: 3
+  },
+  OVAPI: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 1,             // Wien-Style für NL (wie GVB/RET)
     defaultBrightness: 3
   },
   WESTBAHN: {
@@ -3364,6 +3432,24 @@ const NETWORKS = {
     desc: 'Métro, RER, Tram, Bus',
     searchType: 'server_proxy',
     placeholder: 'z.B. Châtelet, Gare du Nord...',
+    isJourneyBased: false
+  },
+  LIEMOBIL: {
+    name: 'LIEmobil',
+    shortName: 'LIE',
+    region: 'LI',
+    desc: 'Bus (Liechtenstein)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Vaduz, Schaan, Triesen...',
+    isJourneyBased: false
+  },
+  PID: {
+    name: 'Prag (PID)',
+    shortName: 'PID',
+    region: 'CZ',
+    desc: 'Metro, Tram, Bus (DPP/PID)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Národní třída, Můstek, Anděl...',
     isJourneyBased: false
   },
   GVB: {
@@ -6272,8 +6358,14 @@ const NETWORK_COLORS = {
   OEBB_REG_NOE: { id: 12, name: 'ÖBB Regional NÖ', color: '#0055A4' },
   OEBB_REG_OOE: { id: 12, name: 'ÖBB Regional OÖ', color: '#0055A4' },
   WESTBAHN: { id: 14, name: 'Westbahn', color: '#0055A4' },
+  LIEMOBIL: { id: 15, name: 'LIEmobil', color: '#CE1126' },
+  PID: { id: 16, name: 'Prag (PID)', color: '#D7141A' },
   GVB: { id: 1, name: 'GVB Amsterdam', color: '#004B93' },
-  RET: { id: 1, name: 'RET Rotterdam', color: '#E4002B' }
+  RET: { id: 1, name: 'RET Rotterdam', color: '#E4002B' },
+  // API-Aliase (so wie sie vom Device geladen werden)
+  OEBBREG: { id: 12, name: 'ÖBB Regional', color: '#0055A4' },
+  OEBBFERN: { id: 12, name: 'ÖBB Fernverkehr', color: '#E2001A' },
+  OVAPI: { id: 1, name: 'OV Niederlande', color: '#004B93' }
 };
 
 let suggestedColor = 1;
@@ -6494,9 +6586,9 @@ function calculateRecommendedConfig() {
     sortMode: 1,           // Statisch als Default
     displayLight: 3,       // Hell
 
-    // Barrierefreiheit (nur wenn vom Netzwerk unterstützt)
-    chopper: capabilities.showHighFloor ? 1 : 0,
-    silberpfeil: capabilities.showAirCondition ? 1 : 0,
+    // Barrierefreiheit (Default beim Erst-Setup: AUS — User aktiviert es ggf. später manuell)
+    chopper: 0,
+    silberpfeil: 0,
 
     // Nachtmodus (aus als Default)
     nightMode: false,
@@ -7262,7 +7354,7 @@ function updateQuickPreview() {
   const caps = CITY_CAPABILITIES[networkForCapabilities] || CITY_CAPABILITIES.WL;
 
   // Settings Tags aktualisieren
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz'};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -7347,7 +7439,7 @@ function initializeQuickPreview() {
   if (!settingsList) return;
 
   const caps = recommendedConfig.capabilities || {};
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz'};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -7507,8 +7599,12 @@ const DISPLAY_TYPE_FEATURES = {
   11: { rows: false, sorting: false, grouping: false, name: 'ÖBB Fernverkehr' },
   12: { rows: false, sorting: false, grouping: false, name: 'ÖBB S-Bahn' },
   13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz' },
-  14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' }
+  14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
+  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, name: 'Liechtenstein / Schweiz Nahverkehr' }
 };
+
+// Display-Typen die einen Schriftgrößen-Toggle haben (Graz auch)
+DISPLAY_TYPE_FEATURES[13].bigText = true;
 
 let ftIsMultiDisplay = false;
 let ftIsManualAssignment = false;
@@ -7595,13 +7691,30 @@ function renderDisplayTypeSections() {
       html += '</div>';
     });
 
+    // Schriftgröße-Toggle (nur Graz/Liechtenstein) - vor Zeilen
+    if (f.bigText) {
+      var cid = dt.colour;
+      html += '<div class="form-row"><div><div class="form-label">Schriftgröße</div><div class="form-hint">Groß = 2 große Zeilen, Klein = 3-4 kompakte Zeilen</div></div>';
+      html += '<div class="toggle-row" id="ftFontSize_' + cid + '">';
+      html += '<button class="toggle-btn" data-value="big" onclick="setFtFontSize(' + cid + ',\'big\')">Groß</button>';
+      html += '<button class="toggle-btn active" data-value="small" onclick="setFtFontSize(' + cid + ',\'small\')">Klein</button>';
+      html += '</div></div>';
+    }
+
     // Zeilen (nur Stadt-Displays)
     if (f.rows) {
       var maxR = f.maxRows || 3;
       html += '<div class="form-row"><div><div class="form-label">Zeilen</div></div>';
       html += '<div class="toggle-row" id="ftRows_' + dt.colour + '">';
       for (var r = 1; r <= maxR; r++) {
-        html += '<button class="toggle-btn' + (r === 2 ? ' active' : '') + '" data-value="' + r + '" onclick="setFtToggleVal(\'ftRows_' + dt.colour + '\',' + r + ')">' + r + '</button>';
+        // Bei bigText: Buttons 1-2 nur bei "Groß" sichtbar, 3-4 nur bei "Klein"
+        var hidden = '';
+        if (f.bigText) {
+          if (r <= 2) hidden = ' data-bigtext-mode="big" style="display:none;"';
+          else hidden = ' data-bigtext-mode="small"';
+        }
+        var defaultActive = f.bigText ? (r === 3) : (r === 2);
+        html += '<button class="toggle-btn' + (defaultActive ? ' active' : '') + '" data-value="' + r + '"' + hidden + ' onclick="setFtToggleVal(\'ftRows_' + dt.colour + '\',' + r + ')">' + r + '</button>';
       }
       html += '</div></div>';
     }
@@ -7699,12 +7812,14 @@ function renderDisplayTypeSections() {
       html += '</div></div>';
     }
     if (f.chopper) {
+      var chopperActive = (recommendedConfig && recommendedConfig.chopper) ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Hochflurer markieren</div></div>';
-      html += '<div class="toggle-switch active" id="ftChopper_' + dt.colour + '" onclick="toggleFtSwitch(\'ftChopper_' + dt.colour + '\')"></div></div>';
+      html += '<div class="toggle-switch' + chopperActive + '" id="ftChopper_' + dt.colour + '" onclick="toggleFtSwitch(\'ftChopper_' + dt.colour + '\')"></div></div>';
     }
     if (f.silberpfeil) {
+      var silberActive = (recommendedConfig && recommendedConfig.silberpfeil) ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Klimaanlage anzeigen</div></div>';
-      html += '<div class="toggle-switch active" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
+      html += '<div class="toggle-switch' + silberActive + '" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
     }
 
     // Info für Zug-Displays
@@ -7765,6 +7880,53 @@ function setFtToggleVal(containerId, val) {
   container.querySelectorAll('.toggle-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.value === String(val));
   });
+}
+
+// Aus gespeicherter Config: Rows-Toggle + Schriftgröße (Graz/Liechtenstein) initialisieren
+function initFtRowsAndFontSize(config) {
+  if (!config) return;
+  var types = getUniqueDisplayTypes();
+  // rows kann String "2,3" (multi) oder Number 2 (single) sein
+  var rowsList = String(config.rows || '').split(',').map(function(s) { return parseInt(s.trim()); });
+  types.forEach(function(dt, idx) {
+    var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
+    if (!f.rows) return;
+    var savedRows = rowsList[idx] || rowsList[0] || 2;
+    if (f.bigText) {
+      // Modus aus rows ableiten: 1-2 = big, 3-4 = small
+      var mode = (savedRows <= 2) ? 'big' : 'small';
+      setFtFontSize(dt.colour, mode);
+      // setFtFontSize setzt einen Default — danach echten Wert anwenden
+      setFtToggleVal('ftRows_' + dt.colour, savedRows);
+    } else {
+      setFtToggleVal('ftRows_' + dt.colour, savedRows);
+    }
+  });
+}
+
+// Schriftgröße-Toggle (Graz/Liechtenstein): Groß = 1-2 Zeilen, Klein = 3-4 Zeilen
+function setFtFontSize(cid, mode) {
+  var fsContainer = document.getElementById('ftFontSize_' + cid);
+  if (fsContainer) {
+    fsContainer.querySelectorAll('.toggle-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.value === mode);
+    });
+  }
+  var rowsContainer = document.getElementById('ftRows_' + cid);
+  if (!rowsContainer) return;
+  // Buttons je nach Modus zeigen/verstecken und passende Default-Auswahl setzen
+  var currentActiveValid = false;
+  rowsContainer.querySelectorAll('.toggle-btn').forEach(function(b) {
+    var btnMode = b.dataset.bigtextMode;
+    var visible = (btnMode === mode);
+    b.style.display = visible ? '' : 'none';
+    if (visible && b.classList.contains('active')) currentActiveValid = true;
+  });
+  // Wenn aktueller Wert nicht mehr passt → Default für den Modus setzen
+  if (!currentActiveValid) {
+    var defaultVal = (mode === 'big') ? 2 : 3;
+    setFtToggleVal('ftRows_' + cid, defaultVal);
+  }
 }
 
 // ==================== PER-DISPLAY-TYP GRUPPIERUNG ====================
@@ -8031,6 +8193,9 @@ async function initFinetuningStep() {
 
   // Display-Typ Sektionen rendern
   renderDisplayTypeSections();
+
+  // Rows + Schriftgröße aus gespeicherter Config in die per-Typ-Toggles laden
+  initFtRowsAndFontSize(config);
 
   // Helligkeit-Toggle setzen
   setFtBrightness(config.displayLight || 3);
