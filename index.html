@@ -381,6 +381,12 @@
     }
     /* Im Wizard-Modus den grünen pending-banner sicher verstecken */
     body.wizard-active #pendingBanner{display:none !important;}
+    /* Niederflur-Markierung + Warnblinken: nur im Feintuning-Modus konfigurierbar.
+       Im Wizard nicht zeigen — Default ist sowieso "An", User braucht das nicht
+       beim Erstkonfig zu sehen. Wenn er nichts U-Bahn-spezifisches hat, fällt
+       der ganze erste Wizard-Schritt sogar weg (siehe wizardSteps.isAvailable). */
+    body.wizard-active #rowChopper{display:none !important;}
+    body.wizard-active #rowNiederflurBlink{display:none !important;}
     .wizard-finetune-row{
       margin-top:24px;
     }
@@ -1119,8 +1125,11 @@
     <div class="wizard-description" id="featuresWizardDescription">
       <b>Wien-spezifische Anzeige-Optionen.</b><br>
       <span class="desc-chopper">
-        <b>Hochflurer markieren</b> kennzeichnet nicht-barrierefreie Fahrzeuge in hellblauer Schrift —
-        praktisch wenn du auf einen Niederflur-Wagen warten möchtest.
+        <b>Niederflur-Markierung</b> blendet bei Strassenbahnen ein kleines Rollstuhl-Icon
+        nach der Liniennummer ein, wenn die Bim niederflurig ist.
+        Der optionale Sub-Toggle <i>Hochflurer-Warnblinken</i> lässt das Icon zusätzlich
+        kurz blinken, wenn die aktuelle Bim Hochflurer ist und die darauffolgende Niederflur
+        — als Hinweis "kurz warten lohnt sich".
       </span>
       <span class="desc-ubahn">
         <br>
@@ -1132,10 +1141,21 @@
 
     <div class="control-row feature-hidden" id="rowChopper">
       <div class="control-label">
-        <span>Hochflurer markieren</span>
-        <small>Zeigt nicht barrierefreie Fahrzeuge in hellblau</small>
+        <span>Niederflur-Markierung</span>
+        <small>Rollstuhl-Icon nach der Liniennummer bei niederflurigen Strassenbahnen</small>
       </div>
       <div class="segmented" data-name="chopper">
+        <div class="seg-btn" data-value="0">Aus</div>
+        <div class="seg-btn active" data-value="1">An</div>
+      </div>
+    </div>
+
+    <div class="control-row feature-hidden" id="rowNiederflurBlink" style="margin-left:18px;border-left:2px solid #2a2a2a;padding-left:12px;">
+      <div class="control-label">
+        <span>Hochflurer-Warnblinken</span>
+        <small>Icon blinkt bei Hochflurer wenn die nächste Bim Niederflur ist</small>
+      </div>
+      <div class="segmented" data-name="niederflurblink">
         <div class="seg-btn active" data-value="0">Aus</div>
         <div class="seg-btn" data-value="1">An</div>
       </div>
@@ -1641,6 +1661,10 @@ document.querySelectorAll('.segmented').forEach(function(seg) {
         updateWienBadgePreview();
       } else if (seg.dataset.name === 'displaymode_ui') {
         applyDisplayAutoMode();
+      } else if (seg.dataset.name === 'chopper') {
+        // Niederflur-Blink-Subtoggle ein-/ausblenden je nach Chopper-Status
+        if (currentCapabilities) updateFeatureVisibility(currentCapabilities);
+        updateUI();
       } else {
         updateUI();
       }
@@ -2389,8 +2413,14 @@ function setSegmentValue(name, value) {
 // (Zeilen & Sortierung wird übersprungen — ist standardmäßig automatisch)
 var wizardSteps = [
   { id: 'cardBarrierefreiheit', label: 'Wien Features',
-    // Nur sichtbar wenn Wien-Capabilities (Hochflurer ODER Klima)
-    isAvailable: function() { return currentCapabilities && (currentCapabilities.showHighFloor || currentCapabilities.showAirCondition); } },
+    // Im Wizard ist die Niederflur-Markierung ausgeblendet (Default: An, im Feintuning
+    // konfigurierbar). Übrig bleiben nur U-Bahn-Features (Klima-Stern, Badges) — der
+    // Schritt lohnt also nur, wenn der User mindestens eine U-Bahn-Linie hat.
+    isAvailable: function() {
+      return currentCapabilities &&
+             currentCapabilities.showAirCondition &&
+             hasUBahnLine();
+    } },
   { id: 'cardGehweg', label: 'Gehweg',
     // Standardmäßig verfügbar (auch ohne capabilities-Info)
     isAvailable: function() { return !currentCapabilities || currentCapabilities.gehwegFilter !== false; } },
@@ -2599,10 +2629,12 @@ function applyConfig(config) {
     updateFeatureVisibility(currentCapabilities);
   }
 
-  // Default-Fallback: '0' = Aus (NICHT '1' — sonst springt Hochflurer/Klima auf An wenn Wert fehlt)
+  // Default-Fallback: '0' = Aus (NICHT '1' — sonst springt Klima/Badges auf An wenn Wert fehlt)
+  // Ausnahme: chopper (Niederflur-Markierung) defaultet seit dem Rollstuhl-Icon auf '1'.
   setSegmentValue('anzeige', config.lines_count || '2');
   setSegmentValue('sortmode', config.sort_mode || config.sortmode || '1');
-  setSegmentValue('chopper', (config.chopper !== undefined && config.chopper !== '') ? config.chopper : '0');
+  setSegmentValue('chopper', (config.chopper !== undefined && config.chopper !== '') ? config.chopper : '1');
+  setSegmentValue('niederflurblink', (config.niederflurblink !== undefined && config.niederflurblink !== '') ? config.niederflurblink : '0');
   setSegmentValue('silberpfeil', (config.silberpfeil !== undefined && config.silberpfeil !== '') ? config.silberpfeil : '0');
   setSegmentValue('wienbadges', (config.wien_badges !== undefined && config.wien_badges !== '') ? config.wien_badges : '0');
   updateWienBadgePreview();
@@ -2854,6 +2886,7 @@ document.getElementById('saveBtn').addEventListener('click', function() {
     zeilen: getSegmentValue('anzeige'),
     sortmode: sortMode,
     chopper: getSegmentValue('chopper'),
+    niederflurblink: getSegmentValue('niederflurblink'),
     silberpfeil: getSegmentValue('silberpfeil'),
     wienbadges: getSegmentValue('wienbadges'),
     colour: '1',
@@ -2944,6 +2977,17 @@ function updateFeatureVisibility(capabilities) {
   if (rowChopper) {
     if (capabilities && capabilities.showHighFloor) rowChopper.classList.remove('feature-hidden', 'feature-disabled');
     else rowChopper.classList.add('feature-hidden');
+  }
+
+  // Niederflur-Blink-Sub-Toggle: nur sichtbar wenn Hauptfunktion verfügbar UND aktiviert
+  var rowNiederflurBlink = document.getElementById('rowNiederflurBlink');
+  if (rowNiederflurBlink) {
+    var chopperOn = (getSegmentValue('chopper') === '1');
+    if (capabilities && capabilities.showHighFloor && chopperOn) {
+      rowNiederflurBlink.classList.remove('feature-hidden', 'feature-disabled');
+    } else {
+      rowNiederflurBlink.classList.add('feature-hidden');
+    }
   }
 
   var rowSilberpfeil = document.getElementById('rowSilberpfeil');
