@@ -6720,7 +6720,8 @@ function calculateRecommendedConfig() {
 function hasStableRichtungsId(network) {
   // Nur Netzwerke mit stabilen richtungsIds (H/R, 1/2, etc.)
   // ÖBB HAFAS IDs sind NICHT stabil (ändern sich täglich) → Zieltext verwenden
-  return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN'].includes(network);
+  // BODO seit 2026-05-07: liErgRiProj.direction (H/R) statt destID → stabil
+  return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO'].includes(network);
 }
 
 // Für ÖBB: Zieltext verwenden statt richtungsId
