@@ -5126,6 +5126,35 @@ function renderLines() {
 
     } else {
       // === STANDARD-MODUS (Wien, Linz, STV, etc.): Bisheriges Layout ===
+      // Für Netzwerke mit stabiler richtungsId (BODO, LINZ, GRAZ, ...): pro
+      // (Linie, richtungsId) zu einer Card zusammenfassen. Mehrere Endhalte
+      // werden im Anzeige-Text aggregiert ("Hofgut / Schmalegg Ortsmitte").
+      // Klick toggelt alle Endhalte derselben Richtung gleichzeitig.
+      const stableNet = hasStableRichtungsId(selectedNetwork);
+      let renderDirs = directions;
+      if (stableNet) {
+        const byRid = new Map();
+        directions.forEach(d => {
+          const rid = d.richtungsId || '';
+          if (!rid) {
+            // Keine richtungsId → bleib einzeln (Fallback, sollte selten sein)
+            byRid.set(`__solo_${d.idx}`, { ...d, idxs: [d.idx], allTowards: [d.towards] });
+            return;
+          }
+          if (!byRid.has(rid)) {
+            byRid.set(rid, { ...d, idxs: [d.idx], allTowards: d.towards ? [d.towards] : [] });
+          } else {
+            const agg = byRid.get(rid);
+            agg.idxs.push(d.idx);
+            if (d.towards && !agg.allTowards.includes(d.towards)) agg.allTowards.push(d.towards);
+          }
+        });
+        renderDirs = [...byRid.values()].map(d => ({
+          ...d,
+          towards: d.allTowards.join(' / ')
+        }));
+      }
+
       const allSelected = directions.every(d => selectedLines.has(d.idx));
 
       html += `
@@ -5138,14 +5167,26 @@ function renderLines() {
           <div class="line-directions">
       `;
 
-      directions.forEach(dir => {
-        const selected = selectedLines.has(dir.idx);
-        html += `
-          <div class="direction-option ${selected ? 'selected' : ''}" onclick="toggleLine(${dir.idx})">
-            <div class="checkbox">${selected ? '✓' : ''}</div>
-            <div class="direction-text">→ ${dir.towards || 'Alle Richtungen'}</div>
-          </div>
-        `;
+      renderDirs.forEach(dir => {
+        if (dir.idxs && dir.idxs.length > 0) {
+          // Aggregiert: alle idxs müssen selected sein für "selected"
+          const selected = dir.idxs.every(i => selectedLines.has(i));
+          const idxsJson = JSON.stringify(dir.idxs);
+          html += `
+            <div class="direction-option ${selected ? 'selected' : ''}" onclick='toggleLineIdxs(${idxsJson})'>
+              <div class="checkbox">${selected ? '✓' : ''}</div>
+              <div class="direction-text">→ ${dir.towards || 'Alle Richtungen'}</div>
+            </div>
+          `;
+        } else {
+          const selected = selectedLines.has(dir.idx);
+          html += `
+            <div class="direction-option ${selected ? 'selected' : ''}" onclick="toggleLine(${dir.idx})">
+              <div class="checkbox">${selected ? '✓' : ''}</div>
+              <div class="direction-text">→ ${dir.towards || 'Alle Richtungen'}</div>
+            </div>
+          `;
+        }
       });
 
       html += `</div></div>`;
@@ -5304,6 +5345,18 @@ function toggleLineGroup(lineName) {
     directions.forEach(d => selectedLines.add(d.idx));
   }
   
+  renderLines();
+}
+
+// Toggelt mehrere idxs gleichzeitig (für aggregierte richtungsId-Cards bei BODO etc.)
+function toggleLineIdxs(idxs) {
+  if (!Array.isArray(idxs) || idxs.length === 0) return;
+  const allSelected = idxs.every(i => selectedLines.has(i));
+  if (allSelected) {
+    idxs.forEach(i => { selectedLines.delete(i); selectedVias.delete(i); });
+  } else {
+    idxs.forEach(i => selectedLines.add(i));
+  }
   renderLines();
 }
 
