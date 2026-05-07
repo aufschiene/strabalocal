@@ -9035,11 +9035,19 @@ async function initFtGrouping() {
   }
 
   // Ungültige Keys aus ftLineGroups entfernen (Keys die nicht mehr in ftAllDirections existieren)
+  // PLUS: Duplicate-Keys über alle Groups hinweg entfernen (kann durch alte gespeicherte
+  // Config entstehen: "1:R,1:R,3:H,3:H" wird zu "1:R,3:H").
   const validKeys = new Set(ftAllDirections.map(d => d.key));
   console.log('[initFtGrouping] Gültige Keys:', [...validKeys]);
+  const seenKeys = new Set();
   ftLineGroups = ftLineGroups.map(group => {
-    const validDirections = (group.directions || []).filter(key => validKeys.has(key));
-    if (validDirections.length !== group.directions.length) {
+    const validDirections = (group.directions || []).filter(key => {
+      if (!validKeys.has(key)) return false;
+      if (seenKeys.has(key)) return false;  // bereits in früherer Group → Duplicate raus
+      seenKeys.add(key);
+      return true;
+    });
+    if (validDirections.length !== (group.directions || []).length) {
       console.log('[initFtGrouping] Gefilterte Gruppe:', group.directions, '->', validDirections);
     }
     return { directions: validDirections };
@@ -9630,15 +9638,21 @@ function collectFtLineGroups() {
     return '';
   }
 
-  return validGroups.map(g => {
-    return g.directions.map(key => {
+  // Sicherheits-Dedup: gleiche tokens (z.B. "1:R") nicht mehrfach hintereinander
+  const seenTokens = new Set();
+  const groupParts = [];
+  validGroups.forEach(g => {
+    const tokens = [];
+    g.directions.forEach(key => {
       const dir = ftAllDirections.find(d => d.key === key);
-      if (dir && dir.richtungsId) {
-        return `${dir.line}:${dir.richtungsId}`;
-      }
-      return key;
-    }).join('+');
-  }).join(',');
+      const token = (dir && dir.richtungsId) ? `${dir.line}:${dir.richtungsId}` : key;
+      if (seenTokens.has(token)) return;
+      seenTokens.add(token);
+      tokens.push(token);
+    });
+    if (tokens.length > 0) groupParts.push(tokens.join('+'));
+  });
+  return groupParts.join(',');
 }
 
 function shortenDestFt(dest) {
