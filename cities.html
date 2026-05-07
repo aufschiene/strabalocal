@@ -9136,14 +9136,29 @@ async function loadFtDirectionsFromStations() {
           if (!isAllowed) return;
         }
 
-        // Key für UI-Anzeige: Linie:Ziel
-        const key = `${lineName}:${towards}`;
         const richtungsId = dir.richtungsId || '';
-        console.log(`[loadFtDirectionsFromStations] Key: ${key}, richtungsId: ${richtungsId}`);
-        if (!ftAllDirections.some(d => d.key === key)) {
+        // Bei Netzwerken mit stabilen richtungsIds (BODO, LINZ, GRAZ, ...):
+        // Pro (Linie, richtungsId) nur EINE UI-Card. Mehrere Endhalte werden zu
+        // einem Anzeige-Text aggregiert (z.B. "Baindt Marsweiler / Baindt Rathaus").
+        // Sonst wie bisher: pro (Linie, Ziel) eine Card.
+        const isStable = hasStableRichtungsId(station.network);
+        const key = (isStable && richtungsId)
+          ? `${lineName}:${richtungsId}`
+          : `${lineName}:${towards}`;
+        console.log(`[loadFtDirectionsFromStations] Key: ${key}, richtungsId: ${richtungsId}, towards: ${towards}`);
+
+        const existing = ftAllDirections.find(d => d.key === key);
+        if (existing) {
+          // Towards-Texte aggregieren (für Anzeige bei Schulbus-Linien etc.)
+          if (towards && !existing.allTowards.includes(towards)) {
+            existing.allTowards.push(towards);
+            existing.towards = existing.allTowards.join(' / ');
+          }
+        } else {
           ftAllDirections.push({
             key, line: lineName, towards, type,
             richtungsId,
+            allTowards: towards ? [towards] : [],
             station: station.stopName, network: station.network
           });
         }
