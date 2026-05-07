@@ -9903,6 +9903,26 @@ function sendConfigToDeviceDirect(config) {
 
   // Config-Daten für ESP32
   console.log('[sendConfigToDeviceDirect] config.sortMode:', config.sortMode, '(1=Statisch, 2=Zeit)');
+
+  // Final-Dedup: doppelte tokens (z.B. "1:H,1:H") aus linegroups/roworderdestination
+  // entfernen, egal woher sie kommen. Comma-separated tokens, Plus-separated Sub-Gruppen.
+  const dedupTokenString = (s) => {
+    if (!s) return '';
+    const seen = new Set();
+    const groups = [];
+    s.split(',').forEach(grp => {
+      const tokens = [];
+      grp.split('+').forEach(tok => {
+        const t = tok.trim();
+        if (!t || seen.has(t)) return;
+        seen.add(t);
+        tokens.push(t);
+      });
+      if (tokens.length > 0) groups.push(tokens.join('+'));
+    });
+    return groups.join(',');
+  };
+
   const configData = {
     type: 'setRBL',
     rbl: config.rbl,
@@ -9923,11 +9943,11 @@ function sendConfigToDeviceDirect(config) {
     stopintervals: config.stopIntervals || '',
     timewindows: config.timeWindows || '',
     gehweg: gehwegString,
-    linegroups: config.lineGroups || '',  // NEU: Linien-Gruppierung
+    linegroups: dedupTokenString(config.lineGroups || ''),
     linefilter: config.lineFilter || '',  // Linien-Filter (nur Linienname)
     linefilterdestination: config.lineFilterDestination || '',  // NEU: Linien+Ziel Filter für Linz
-    roworder: config.rowOrder || '',  // NEU: Zeilen-Reihenfolge einfach
-    roworderdestination: config.rowOrderDestination || ''  // NEU: Zeilen-Reihenfolge mit Ziel
+    roworder: config.rowOrder || '',
+    roworderdestination: dedupTokenString(config.rowOrderDestination || '')
   };
 
   // Prüfe ob wir im iframe sind
