@@ -2774,9 +2774,9 @@
 
   <!-- Step 0: Display-Preset (Auto-Jump für ein bestimmtes Display, z.B. Wien) -->
   <div class="card hidden" id="stepDisplayPreset">
-    <h2 id="displayPresetTitle">Linien für dein Display</h2>
+    <h2 id="displayPresetTitle">Linien für dein catch-it</h2>
     <p style="color:#666;font-size:13px;margin-bottom:16px;">
-      Diese Verkehrsnetze sind für dein Display relevant. Tipp eines an, um Linien hinzuzufügen.
+      Diese Verkehrsnetze sind für dein catch-it relevant. Tipp eines an, um Linien hinzuzufügen.
     </p>
     <div class="selection-grid" id="displayPresetGrid"></div>
     <div style="margin-top:18px;text-align:center;">
@@ -3051,7 +3051,7 @@
 
   <!-- Wizard-Schritt: Display-Stil (kompakt vs. spielerisch) -->
   <div class="card hidden" id="stepWizardStyle">
-    <h2>Wie soll dein Display aussehen?</h2>
+    <h2>Wie soll dein catch-it aussehen?</h2>
     <p style="color:#666;font-size:13px;margin-bottom:16px;">Du kannst es später jederzeit ändern.</p>
 
     <div class="display-style-grid">
@@ -3101,7 +3101,7 @@
   <div class="card hidden" id="stepWizardGehweg">
     <h2>Gehweg zur Haltestelle</h2>
     <p style="color:#666;font-size:13px;margin-bottom:16px;line-height:1.5;">
-      Trag ein, wie lange du zur Haltestelle brauchst — Abfahrten, die du sowieso nicht mehr erreichst, blendet Straba aus.
+      Trag ein, wie lange du zur Haltestelle brauchst — Abfahrten, die du sowieso nicht mehr erreichst, blendet dein catch-it aus.
     </p>
 
     <div class="wizard-row">
@@ -3174,7 +3174,7 @@
   <div class="card hidden" id="stepWizardAdvanced">
     <h2>Erweiterte Einstellungen</h2>
     <p style="color:#666;font-size:13px;margin-bottom:16px;line-height:1.5;">
-      Optional — diese Werte hat Straba schon vernünftig vorgewählt. Du kannst sie hier oder später anpassen.
+      Optional — diese Werte hat dein catch-it schon vernünftig vorgewählt. Du kannst sie hier oder später anpassen.
     </p>
 
     <div class="wizard-row">
@@ -3745,9 +3745,10 @@ const NETWORKS = {
     shortName: 'WLB',
     region: 'AT',
     desc: 'Badner Bahn (Wien - Baden)',
-    searchType: 'static_list',
-    placeholder: 'Haltestelle auswählen...',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Oper, Meidling, Baden...',
     isJourneyBased: false,
+    // Statische Stations-Liste als Fallback (wenn die Trainboard-API mal nicht erreichbar ist)
     stations: [
       // Wien
       { id: '490097507', name: 'Wien Oper/Karlsplatz', info: 'Kärntner Ring' },
@@ -3966,8 +3967,8 @@ const NETWORKS = {
     shortName: 'SBG',
     region: 'AT',
     desc: 'Obus, Lokalbahn, Pinzgauer Bahn',
-    searchType: 'static_list',
-    placeholder: 'Haltestelle suchen...',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Mirabellplatz, Hauptbahnhof, Schallmoos...',
     isJourneyBased: false,
     stations: [
       // Stadt Salzburg
@@ -4112,6 +4113,135 @@ const SEARCH_API = 'https://api.straba.at/api/v1/stops/search';
 const DEPARTURES_API = 'https://api.straba.at/api/v1/wl/departures';
 const WIEN_DATA_URL = 'https://straba-983965425140.europe-west3.run.app/search/';
 
+// Neue Trainboard-API (cuzimmartin.dev) — deckt OEBB, BVG, DB, Salzburg, RATP,
+// PID Prag, GVB Amsterdam und Badner Bahn (WLB) ab. Per Netzwerk-Konfiguration
+// in NETWORKS[net].trainboard.path z.B. '/at', '/de/berlin', '/wlb', etc.
+const TRAINBOARD_BASE = 'https://prod.cuzimmartin.dev/api';
+
+// Generische Stations-Suche via Trainboard. Mappt aufs interne Format
+// { id, name, info } wie searchViaProxy.
+async function trainboardSearch(path, query) {
+  const url = TRAINBOARD_BASE + path + '/stations?query=' + encodeURIComponent(query) + '&limit=15';
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const j = await r.json();
+  const items = (j && j.data) || [];
+  return items.map(function(s) {
+    const meta = (s.metadata && (s.metadata.zone || s.metadata.parentStation)) ? '' : '';
+    return {
+      id: String(s.id),
+      name: s.name || '',
+      info: s.country ? (s.country + (s.type ? ' · ' + s.type.replace(/_/g, ' ') : '')) : (s.type || '')
+    };
+  });
+}
+
+// Roh-Departures aus der Trainboard-API holen (flache Liste).
+async function trainboardDeparturesRaw(path, stationId, limit) {
+  const url = TRAINBOARD_BASE + path + '/departures?stationId=' + encodeURIComponent(stationId) + (limit ? ('&limit=' + limit) : '');
+  const r = await fetch(url);
+  if (!r.ok) return [];
+  const j = await r.json();
+  return (j && j.data) || [];
+}
+
+// Trainboard category/metadata → WL-Monitor-Typ ("ptMetro", "ptBus", "ptTram", "ptTrain").
+function _trainboardMapType(category, metadata) {
+  const cat = (category || '').toLowerCase();
+  const product = ((metadata && metadata.product) || '').toLowerCase();
+  if (cat.includes('metro') || product === 'metro' || product === 'subway' || product === 'u-bahn') return 'ptMetro';
+  if (cat.includes('s-bahn') || product === 'suburban' || product === 's-bahn') return 'ptTrain';
+  if (cat.includes('tram') || product === 'tram' || product === 'lightrail') return 'ptTram';
+  if (cat.includes('bus') || product === 'bus' || product === 'stadtbus') return 'ptBus';
+  if (cat.includes('train') || cat.includes('zug') || product === 'train' || product === 'railway') return 'ptTrain';
+  return 'ptTrain';
+}
+
+// Konvertiert Trainboard-Antwort → das interne "data.data.monitors[].lines[]"-
+// Format, das der bestehende Code (Linien-Detection, Richtungs-Auswahl, etc.)
+// erwartet. Gruppiert nach Linie + Ziel, mit countdown in Minuten.
+function trainboardToMonitorFormat(items, stationId) {
+  if (!items || items.length === 0) {
+    return { data: { monitors: [] } };
+  }
+  const now = Date.now();
+  const groups = new Map();
+  items.forEach(function(it) {
+    const line = it.line || '?';
+    const towards = it.destination || it.direction || '';
+    const key = line + '||' + towards;
+    if (!groups.has(key)) {
+      groups.set(key, { line: line, towards: towards, items: [], category: it.category, metadata: it.metadata });
+    }
+    groups.get(key).items.push(it);
+  });
+
+  const lines = Array.from(groups.values()).map(function(g) {
+    const departures = g.items.map(function(it) {
+      const sched = it.scheduledTime ? new Date(it.scheduledTime).getTime() : now;
+      const est = it.estimatedTime ? new Date(it.estimatedTime).getTime() : sched;
+      const countdown = Math.max(0, Math.round((est - now) / 60000));
+      return {
+        countdown: countdown,
+        departureTime: {
+          timePlanned: it.scheduledTime || null,
+          timeReal: it.estimatedTime || null,
+          countdown: countdown
+        }
+      };
+    }).sort(function(a, b) { return a.countdown - b.countdown; });
+    return {
+      name: g.line,
+      towards: g.towards,
+      type: _trainboardMapType(g.category, g.metadata),
+      departures: { departure: departures },
+      direction: '',
+      richtungsId: '',
+      lineId: (g.metadata && g.metadata.lineId) || ''
+    };
+  });
+
+  return {
+    data: {
+      monitors: [{
+        locationStop: {
+          properties: {
+            name: (items[0] && items[0].stationName) || stationId,
+            attributes: { rbl: stationId }
+          }
+        },
+        lines: lines
+      }]
+    }
+  };
+}
+
+// Einheitlicher Departures-Fetch — wählt zwischen Trainboard (für Netze mit
+// trainboard-Config) und der alten Straba-API. Liefert immer das "monitors"-
+// Format, das der restliche Code erwartet.
+// fullId-Format: "NETWORK:stopId" (z.B. "WL:490012345" oder "BERLIN:900100711").
+async function fetchDeparturesUnified(fullId) {
+  if (!fullId) return { data: { monitors: [] } };
+  const colonIdx = fullId.indexOf(':');
+  const network = colonIdx > 0 ? fullId.substring(0, colonIdx) : '';
+  const stopId = colonIdx > 0 ? fullId.substring(colonIdx + 1) : fullId;
+  const net = network && NETWORKS[network];
+
+  if (net && net.searchType === 'trainboard' && net.trainboard && net.trainboard.path) {
+    try {
+      const raw = await trainboardDeparturesRaw(net.trainboard.path, stopId);
+      return trainboardToMonitorFormat(raw, stopId);
+    } catch (e) {
+      console.warn('[trainboard departures] Fehler, fallback auf alte API:', e);
+    }
+  }
+  // Fallback / Default — alte Straba-API
+  const apiNetwork = (typeof mapNetworkForApi === 'function') ? mapNetworkForApi(network) : network;
+  const apiFullId = apiNetwork ? (apiNetwork + ':' + stopId) : stopId;
+  const r = await fetch(DEPARTURES_API + '?stopId=' + encodeURIComponent(apiFullId));
+  return await r.json();
+}
+
 // Netzwerk-Alias für API-Calls (lokale Varianten → existierender Server-Endpoint)
 const API_NETWORK_MAP = {
   'OEBB_STAMM_SBAHN': 'OEBB_SBAHN',
@@ -4120,8 +4250,8 @@ const API_NETWORK_MAP = {
   'OEBB_REG_NOE': 'OEBBREG',
   'OEBB_REG_OOE': 'OEBBREG',
   'OEBB_FERN': 'OEBBFERN',
-  'GVB': 'OVAPI',
-  'RET': 'OVAPI',
+  // 'GVB': 'OVAPI',   // GVB läuft jetzt direkt über die Trainboard-Proxy auf dem Server
+  'RET': 'OVAPI',      // Rotterdam bleibt bei OVapi
 };
 function mapNetworkForApi(network) {
   return API_NETWORK_MAP[network] || network;
@@ -4852,7 +4982,7 @@ function renderDisplayPreset(displayKey) {
   if (!preset) return false;
   activeDisplayPreset = displayKey;
   var title = document.getElementById('displayPresetTitle');
-  if (title) title.textContent = 'Linien für dein ' + preset.name + '-Display';
+  if (title) title.textContent = 'Linien für dein catch-it';
 
   var grid = document.getElementById('displayPresetGrid');
   if (!grid) return false;
@@ -5045,12 +5175,30 @@ function detectDisplayPreset() {
 // Test-Trigger: ?wizard=style öffnet den Wizard ab Schritt 1.
 
 var WIZARD_STEPS = [
-  { id: 'stepWizardStyle',    name: 'Display-Stil', validate: function() { return !!getSavedDisplayStyle(); } },
-  { id: 'stepWizardGehweg',   name: 'Gehweg',       validate: function() { return true; } },
-  { id: 'stepWizardNight',    name: 'Nachtmodus',   validate: function() { return true; } },
-  { id: 'stepWizardAdvanced', name: 'Erweitert',    validate: function() { return true; } }
+  { id: 'stepWizardStyle', name: 'Display-Stil',
+    // Nur sinnvoll wenn 2+ verschiedene Netzwerke kombiniert sind — sonst hat
+    // "Kompakt vs. Spielerisch" keinen Effekt (single-Netz-Display ist immer
+    // automatisch kompakt). Schritt wird einfach uebersprungen.
+    isAvailable: function() {
+      if (!Array.isArray(stations) || stations.length < 2) return false;
+      var nets = {};
+      for (var i = 0; i < stations.length; i++) {
+        var n = stations[i].network;
+        if (n) nets[n] = true;
+      }
+      return Object.keys(nets).length >= 2;
+    },
+    validate: function() { return !!getSavedDisplayStyle(); }
+  },
+  { id: 'stepWizardGehweg',   name: 'Gehweg',     isAvailable: function() { return true; }, validate: function() { return true; } },
+  { id: 'stepWizardNight',    name: 'Nachtmodus', isAvailable: function() { return true; }, validate: function() { return true; } },
+  { id: 'stepWizardAdvanced', name: 'Erweitert',  isAvailable: function() { return true; }, validate: function() { return true; } }
 ];
 var wizardCurrentIdx = 0;
+
+function getActiveWizardSteps() {
+  return WIZARD_STEPS.filter(function(s) { return !s.isAvailable || s.isAvailable(); });
+}
 
 var advancedSettings = {
   textcolor:  'amber',
@@ -5088,28 +5236,30 @@ function selectDisplayStyle(value) {
 }
 
 function wizardShowStep(idx) {
+  var active = getActiveWizardSteps();
+  if (active.length === 0) return;
   if (idx < 0) idx = 0;
-  if (idx >= WIZARD_STEPS.length) idx = WIZARD_STEPS.length - 1;
+  if (idx >= active.length) idx = active.length - 1;
   wizardCurrentIdx = idx;
 
-  // Alle Top-Level-Cards verstecken
+  // Alle Top-Level-Cards verstecken (außer stationsCard)
   document.querySelectorAll('.container > .card').forEach(function(c) {
-    c.classList.add('hidden');
+    if (c.id !== 'stationsCard') c.classList.add('hidden');
   });
   // Aktive Wizard-Card zeigen
-  var step = WIZARD_STEPS[idx];
+  var step = active[idx];
   var card = document.getElementById(step.id);
   if (card) card.classList.remove('hidden');
 
-  // Progress-Bar zeigen + updaten
+  // Progress-Bar zeigen + updaten (basierend auf den aktiven Schritten)
   var progress = document.getElementById('wizardProgress');
   if (progress) progress.classList.remove('hidden');
   var label = document.getElementById('wizardStepCount');
   var name = document.getElementById('wizardStepName');
   var fill = document.getElementById('wizardProgressFill');
-  if (label) label.textContent = 'Schritt ' + (idx + 1) + ' von ' + WIZARD_STEPS.length;
+  if (label) label.textContent = 'Schritt ' + (idx + 1) + ' von ' + active.length;
   if (name) name.textContent = step.name;
-  if (fill) fill.style.width = (((idx + 1) / WIZARD_STEPS.length) * 100) + '%';
+  if (fill) fill.style.width = (((idx + 1) / active.length) * 100) + '%';
 
   // Stil-Schritt: ggf. gespeicherte Auswahl wiederherstellen
   if (step.id === 'stepWizardStyle') {
@@ -5204,9 +5354,11 @@ function startSetupWizard() {
 }
 
 function wizardNext() {
-  var step = WIZARD_STEPS[wizardCurrentIdx];
+  var active = getActiveWizardSteps();
+  if (active.length === 0) return;
+  var step = active[wizardCurrentIdx];
   if (step.validate && !step.validate()) return;
-  if (wizardCurrentIdx >= WIZARD_STEPS.length - 1) {
+  if (wizardCurrentIdx >= active.length - 1) {
     wizardFinish();
     return;
   }
@@ -5220,7 +5372,8 @@ function wizardFinish() {
     gehwegPerStop[inp.dataset.stationKey] = parseInt(inp.value || '0', 10) || 0;
   });
   var summary = {
-    style:           getSavedDisplayStyle(),
+    // Default 'compact' wenn der Stil-Schritt uebersprungen wurde (nur 1 Netz).
+    style:           getSavedDisplayStyle() || 'compact',
     gehwegEnabled:   document.getElementById('wizardGehwegToggle')?.classList.contains('active') || false,
     gehwegPerStop:   gehwegPerStop,
     nightEnabled:    document.getElementById('wizardNightToggle')?.classList.contains('active') || false,
@@ -5315,11 +5468,13 @@ function wizardNightToggle() {
       var params = new URLSearchParams(window.location.search);
       var w = params.get('wizard');
       if (!w) return;
-      var idx = 0;
-      if (w === 'gehweg') idx = 1;
-      else if (w === 'night') idx = 2;
-      else if (w === 'advanced') idx = 3;
-      wizardShowStep(idx);
+      var stepId = 'stepWizardStyle';
+      if (w === 'gehweg') stepId = 'stepWizardGehweg';
+      else if (w === 'night') stepId = 'stepWizardNight';
+      else if (w === 'advanced') stepId = 'stepWizardAdvanced';
+      var active = getActiveWizardSteps();
+      var idx = active.findIndex(function(s) { return s.id === stepId; });
+      wizardShowStep(idx < 0 ? 0 : idx);
     } catch (e) {}
   }
   if (document.readyState === 'loading') {
@@ -5839,6 +5994,13 @@ async function performSearch(query) {
       results = searchWien(query);
     } else if (netConfig.searchType === 'static_list') {
       results = searchStaticList(netConfig.stations, query);
+    } else if (netConfig.searchType === 'trainboard' && netConfig.trainboard) {
+      try {
+        results = await trainboardSearch(netConfig.trainboard.path, query);
+      } catch (e) {
+        console.warn('[trainboard] Suche fehlgeschlagen, fallback auf server_proxy:', e);
+        results = await searchViaProxy(selectedNetwork, query);
+      }
     } else {
       results = await searchViaProxy(selectedNetwork, query);
     }
@@ -6020,11 +6182,9 @@ async function selectStop(id, name) {
     linesLoading.classList.remove('hidden');
     linesContainer.classList.add('hidden');
 
-    // Lade Abfahrten um erreichbare Ziele zu sammeln
+    // Lade Abfahrten um erreichbare Ziele zu sammeln (via unified-Fetch)
     try {
-      const apiNetwork = mapNetworkForApi(selectedNetwork);
-      const response = await fetch(`${DEPARTURES_API}?stopId=${apiNetwork}:${id}`);
-      const data = await response.json();
+      const data = await fetchDeparturesUnified(`${selectedNetwork}:${id}`);
       const dests = new Map();  // id → name
       if (data?.data?.monitors) {
         for (const monitor of data.data.monitors) {
@@ -6085,16 +6245,12 @@ async function selectStop(id, name) {
   document.getElementById('selectAllBtn').style.display = '';
 
   try {
-    // Netzwerk-Alias für API (Production-kompatibel)
-    const apiNetwork = mapNetworkForApi(selectedNetwork);
     const stopIds = selectedStop.id.split(',');
 
-    // NL/Wien: Mehrere Perrons → einzeln abfragen und mergen
+    // NL/Wien: Mehrere Perrons → einzeln abfragen und mergen (via unified-Fetch)
     let mergedData = null;
     for (const sid of stopIds) {
-      const apiFullId = `${apiNetwork}:${sid.trim()}`;
-      const response = await fetch(`${DEPARTURES_API}?stopId=${apiFullId}`);
-      const data = await response.json();
+      const data = await fetchDeparturesUnified(`${selectedNetwork}:${sid.trim()}`);
       if (!mergedData) {
         mergedData = data;
       } else {
@@ -7472,9 +7628,28 @@ function updateStationsList() {
     const badgeClass = group.network.toLowerCase();
     const firstIdx = group.indices[0];
 
+    // Primaere Linie fuer das Badge ableiten — "U1" statt "WL". Faellt auf den
+    // Netz-Kuerzel zurueck, wenn keine Linie ableitbar ist (z.B. "Alle Abfahrten").
+    let badgeLabel = group.network;
+    if (group.directions && group.directions.length > 0) {
+      const uniqueLines = [...new Set(group.directions.map(d => d.line).filter(Boolean))];
+      if (uniqueLines.length > 0) {
+        badgeLabel = uniqueLines.length === 1
+          ? uniqueLines[0]
+          : (uniqueLines[0] + '+' + (uniqueLines.length - 1));
+      }
+    } else if (group.filters && group.filters.length > 0) {
+      const firstFilter = group.filters[0].split(',').map(s => s.trim()).filter(Boolean);
+      if (firstFilter.length > 0) {
+        badgeLabel = firstFilter.length === 1
+          ? firstFilter[0]
+          : (firstFilter[0] + '+' + (firstFilter.length - 1));
+      }
+    }
+
     return `
       <div class="station-chip ${group.isExisting ? 'existing' : ''} ${group.isJourney ? 'journey' : ''}">
-        <span class="network-badge ${badgeClass}">${group.network}</span>
+        <span class="network-badge ${badgeClass}">${badgeLabel}</span>
         <div class="info">
           <div class="stop-name">${group.stopName}</div>
           <div class="stop-details">${filterLabel}</div>
@@ -7594,9 +7769,7 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
   addStationBtn.disabled = true;
 
   try {
-    const fullId = `${mapNetworkForApi(selectedNetwork)}:${id}`;
-    const response = await fetch(`${DEPARTURES_API}?stopId=${fullId}`);
-    const data = await response.json();
+    const data = await fetchDeparturesUnified(`${selectedNetwork}:${id}`);
 
     extractLines(data);
 
@@ -11242,7 +11415,7 @@ function sendConfigToDeviceDirect(config) {
     }, 2000);
 
     setTimeout(() => {
-      updateSavingOverlay('Fertig! Dein Straba startet neu...');
+      updateSavingOverlay('Fertig! Dein catch-it startet neu...');
       clearTimeout(saveTimeout);
       saveRetryCount = 0;
     }, 5000);
@@ -11302,7 +11475,7 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     });
 
     if (response.ok) {
-      updateSavingOverlay('Fertig! Dein Straba startet neu...');
+      updateSavingOverlay('Fertig! Dein catch-it startet neu...');
       setTimeout(() => {
         hideSavingOverlay();
         showSuccessMessage();
@@ -11329,8 +11502,8 @@ function showSaveError() {
       <h3>Verbindung fehlgeschlagen</h3>
       <p>straba.local ist nicht erreichbar.</p>
       <ul class="error-tips">
-        <li>Stelle sicher, dass dein Straba eingeschaltet ist</li>
-        <li>Prüfe, ob du mit dem Straba-WLAN verbunden bist</li>
+        <li>Stelle sicher, dass dein catch-it eingeschaltet ist</li>
+        <li>Prüfe, ob du mit dem catch-it-WLAN verbunden bist</li>
         <li>Versuche die Seite neu zu laden</li>
       </ul>
       <div class="error-actions">
@@ -11383,7 +11556,7 @@ function showSuccessMessage() {
     <div class="success-content">
       <div class="success-icon">✓</div>
       <h3>Erfolgreich gespeichert!</h3>
-      <p>Dein Straba startet neu und übernimmt die neuen Einstellungen.</p>
+      <p>Dein catch-it startet neu und übernimmt die neuen Einstellungen.</p>
       <p class="success-hint">Dies dauert etwa 10-15 Sekunden.</p>
     </div>
   `;
@@ -11653,9 +11826,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     } else {
       // Andere Netze: Directions aus API laden (gefiltert)
       try {
-        const apiFullId = `${mapNetworkForApi(network)}:${stopId}`;
-        const response = await fetch(`${DEPARTURES_API}?stopId=${apiFullId}`);
-        const data = await response.json();
+        const data = await fetchDeparturesUnified(`${network}:${stopId}`);
 
         if (data.data && data.data.monitors) {
           data.data.monitors.forEach(monitor => {
@@ -11741,12 +11912,15 @@ async function resolveStationName(network, stopId) {
       return null;
     }
     
-    // Für externe Netze - Departure API nutzen
-    const response = await fetch(`${DEPARTURES_API}?stopId=${mapNetworkForApi(network)}:${stopId}`);
-    const data = await response.json();
-    
+    // Für externe Netze - Departure API nutzen (via unified-Fetch)
+    const data = await fetchDeparturesUnified(`${network}:${stopId}`);
+
     if (data.data?.monitors?.[0]?.locationStop?.properties?.title) {
       return data.data.monitors[0].locationStop.properties.title;
+    }
+    // Trainboard nutzt 'name' statt 'title'
+    if (data.data?.monitors?.[0]?.locationStop?.properties?.name) {
+      return data.data.monitors[0].locationStop.properties.name;
     }
     
     return null;
