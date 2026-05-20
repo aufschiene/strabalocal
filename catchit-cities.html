@@ -2800,8 +2800,7 @@
       <button class="region-photo-card" style="background-image:url('Stadt%20fotos/Lichtenstein.jpg');background-position:center bottom;" onclick="selectRegion('LI')">
         <div class="name">Liechtenstein</div>
       </button>
-      <button class="region-photo-card" style="background-color:#002395;" onclick="selectRegion('FR')">
-        <span class="photo-pending">Foto folgt</span>
+      <button class="region-photo-card" style="background-image:url('Stadt%20fotos/Paris.jpg');" onclick="selectRegion('FR')">
         <div class="name">Frankreich</div>
       </button>
       <button class="region-photo-card" style="background-image:url('Stadt%20fotos/Prag.jpg');" onclick="selectRegion('CZ')">
@@ -4800,7 +4799,7 @@ DISPLAY_PRESETS.bw = {
 DISPLAY_PRESETS.paris = {
   name: 'Paris',
   parent: 'FR',
-  // photo: 'Stadt fotos/Paris.jpg', // folgt
+  photo: 'Stadt fotos/Paris.jpg',
   networks: [
     { id: 'PARIS', jumpTo: { region: 'FR' } }
   ]
@@ -5215,8 +5214,7 @@ function wizardNext() {
 }
 
 function wizardFinish() {
-  // TODO: in echte Config integrieren + an Firmware senden (sendWithSuggestion oder ähnliches).
-  // Vorerst alles in localStorage zusammenfassen und Bestätigung zeigen.
+  // Wizard-Werte einsammeln
   var gehwegPerStop = {};
   document.querySelectorAll('#wizardGehwegList .wizard-num-input[data-station-key]').forEach(function(inp) {
     gehwegPerStop[inp.dataset.stationKey] = parseInt(inp.value || '0', 10) || 0;
@@ -5231,7 +5229,66 @@ function wizardFinish() {
     advanced:        Object.assign({}, advancedSettings)
   };
   try { localStorage.setItem('catchit_wizard_summary', JSON.stringify(summary)); } catch (e) {}
-  alert('Wizard abgeschlossen:\n' + JSON.stringify(summary, null, 2) + '\n\n(Firmware-Anbindung kommt in einem weiteren Step.)');
+
+  // Config bauen via existierende Logik (rbl/filter/colour aus stations) und mit
+  // Wizard-Werten überschreiben, dann ans Gerät senden — gleiche Pipeline wie
+  // sendWithSuggestion(), nur ohne den alten stepDisplayConfig dazwischen.
+  if (typeof calculateRecommendedConfig !== 'function' ||
+      typeof sendConfigToDeviceDirect !== 'function') {
+    console.warn('[wizardFinish] Save-Funktionen fehlen, breche ab');
+    return;
+  }
+  if (!stations || stations.length === 0) {
+    alert('Keine Stationen ausgewählt — kann nicht speichern.');
+    return;
+  }
+
+  var cfg = calculateRecommendedConfig();
+  if (!cfg) {
+    alert('Konfiguration konnte nicht berechnet werden.');
+    return;
+  }
+
+  // Gehweg pro Station: Map fullId → Minuten in Array über stations-Reihenfolge übersetzen.
+  if (summary.gehwegEnabled && Object.keys(summary.gehwegPerStop).length > 0) {
+    cfg.gehweg = stations.map(function(s, i) {
+      var key = s.fullId || ('idx_' + i);
+      return summary.gehwegPerStop[key] || 0;
+    });
+  } else {
+    cfg.gehweg = stations.map(function() { return 0; });
+  }
+
+  // Nachtmodus
+  cfg.nightMode  = !!summary.nightEnabled;
+  cfg.nightStart = summary.nightStart;
+  cfg.nightEnd   = summary.nightEnd;
+
+  // Erweitert: Textfarbe, Helligkeit, Anzeige-Modus, Interval
+  var TEXTCOLOR_MAP = { amber: 1, white: 2, orange: 3 };
+  var BRIGHTNESS_MAP = { dark: 1, mid: 2, bright: 3 };
+  var MODE_MAP = { mixed: 1, slideshow: 2 };
+  if (summary.advanced) {
+    if (TEXTCOLOR_MAP[summary.advanced.textcolor]   !== undefined) cfg.textColor    = TEXTCOLOR_MAP[summary.advanced.textcolor];
+    if (BRIGHTNESS_MAP[summary.advanced.brightness] !== undefined) cfg.displayLight = BRIGHTNESS_MAP[summary.advanced.brightness];
+    if (MODE_MAP[summary.advanced.mode]             !== undefined) cfg.displayMode  = MODE_MAP[summary.advanced.mode];
+    if (summary.advanced.interval) cfg.stopInterval = parseInt(summary.advanced.interval, 10) || cfg.stopInterval;
+  }
+
+  // Display-Stil (kompakt vs. spielerisch) als brand-Setting — der Firmware-Brand
+  // greift das CSS auf der Web-UI ein. "spielerisch" = REGENBOGEN als Mischfarbe,
+  // "kompakt" = leer (Standard-Look des Display-Typs).
+  // TODO: Feinheit "Display wechselt je Betreiber" muss noch tatsaechlich an die
+  // Firmware uebersetzt werden — vorerst ueber Brand abgebildet.
+  // (Brand wird nicht über sendConfigToDeviceDirect mitgeschickt, lokal speichern.)
+  try {
+    localStorage.setItem('catchit_brand_pref', summary.style === 'playful' ? 'REGENBOGEN' : '');
+  } catch (e) {}
+
+  // Lade-Overlay zeigen + an Geraet senden
+  if (typeof showSavingOverlay === 'function') showSavingOverlay('Speichere Einstellungen...');
+  recommendedConfig = cfg; // damit andere Stellen den finalen Stand sehen
+  sendConfigToDeviceDirect(cfg);
 }
 
 // Toggles für die Sub-Bereiche der einzelnen Schritte
