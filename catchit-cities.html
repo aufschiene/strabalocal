@@ -4307,7 +4307,7 @@ const OEBB_GATTUNGEN = ['RJX', 'RJ', 'ICE', 'IC', 'EC', 'NJ', 'EN', 'D'];
 
 // Stammstrecke: Produktkategorien für S-Bahn Wien
 const STAMM_PRODUKTE = ['S-Bahn', 'REX', 'R', 'CJX'];
-let stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']); // Default: beide
+let stamm_selectedRichtungen = new Set(); // Default: nichts vorausgewaehlt — User waehlt aktiv
 let stamm_deselectedProdukte = new Set(); // Default: alle an
 
 // Stammstrecke richtungsIds (müssen mit Server übereinstimmen: R1=1, R2=2)
@@ -5232,6 +5232,10 @@ var advancedSettings = {
 };
 
 function setAdv(field, value) {
+  // Kompakt sperrt Slideshow ab — Mode-Aenderungen werden auf "mixed" geforced.
+  if (field === 'mode' && getSavedDisplayStyle() === 'compact' && value !== 'mixed') {
+    value = 'mixed';
+  }
   advancedSettings[field] = value;
   var rowMap = { textcolor: 'advTextColor', brightness: 'advBrightness', mode: 'advMode', interval: 'advInterval' };
   var row = document.getElementById(rowMap[field]);
@@ -5257,6 +5261,30 @@ function selectDisplayStyle(value) {
   try { localStorage.setItem('catchit_display_style', value); } catch (e) {}
   var nextBtn = document.getElementById('wizardStyleNextBtn');
   if (nextBtn) nextBtn.disabled = false;
+
+  // "Kompakt" impliziert kein Durchwechseln: Slideshow-Toggle visuell deaktivieren
+  // und zwingend auf Gemischt setzen. Beim Wechsel zurueck auf "spielerisch"
+  // wird der Toggle wieder klickbar.
+  var slideBtn = document.querySelector('#advMode .toggle-btn[data-value="slideshow"]');
+  var mixedBtn = document.querySelector('#advMode .toggle-btn[data-value="mixed"]');
+  var slideSub = document.getElementById('advSlideshow');
+  if (value === 'compact') {
+    advancedSettings.mode = 'mixed';
+    if (mixedBtn) mixedBtn.classList.add('active');
+    if (slideBtn) {
+      slideBtn.classList.remove('active');
+      slideBtn.disabled = true;
+      slideBtn.style.opacity = '0.4';
+      slideBtn.style.cursor = 'not-allowed';
+    }
+    if (slideSub) slideSub.classList.add('disabled');
+  } else {
+    if (slideBtn) {
+      slideBtn.disabled = false;
+      slideBtn.style.opacity = '';
+      slideBtn.style.cursor = '';
+    }
+  }
 }
 
 function wizardShowStep(idx) {
@@ -5450,6 +5478,25 @@ function wizardFinish() {
     if (BRIGHTNESS_MAP[summary.advanced.brightness] !== undefined) cfg.displayLight = BRIGHTNESS_MAP[summary.advanced.brightness];
     if (MODE_MAP[summary.advanced.mode]             !== undefined) cfg.displayMode  = MODE_MAP[summary.advanced.mode];
     if (summary.advanced.interval) cfg.stopInterval = parseInt(summary.advanced.interval, 10) || cfg.stopInterval;
+  }
+
+  // "Kompakt" impliziert kein Durchwechseln zwischen Display-Typen — alles auf
+  // einer Seite, EIN Display-Stil. Spielerisch laesst Multi-Display + Slideshow zu.
+  // Hier sowohl displayMode (kein Slideshow) als auch colour (kein Multi-Display)
+  // auf Single-Werte kollabieren. Firmware liest dann colour ohne Komma → multi=0
+  // → kein Renderer-Wechsel.
+  if (summary.style === 'compact') {
+    cfg.displayMode = 1;
+    if (cfg.multiDisplay) {
+      var singleColour = cfg.colourSingle;
+      if (singleColour === undefined && cfg.colour) {
+        singleColour = String(cfg.colour).split(',')[0];
+      }
+      if (singleColour !== undefined) {
+        cfg.colour = String(singleColour);
+      }
+      cfg.multiDisplay = false;
+    }
   }
 
   // Display-Stil (kompakt vs. spielerisch) als brand-Setting — der Firmware-Brand
@@ -6258,7 +6305,7 @@ async function selectStop(id, name) {
     if (isStammStation && selectedNetwork !== 'OEBB_STAMM_SBAHN') {
       selectedNetwork = 'OEBB_STAMM_SBAHN';
     }
-    stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']);
+    stamm_selectedRichtungen = new Set();
     stamm_deselectedProdukte = new Set();
     showStep('lines');
     linesLoading.classList.add('hidden');
@@ -7130,7 +7177,7 @@ function addStationFromStamm() {
 
   // Reset
   selectedStop = null;
-  stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']);
+  stamm_selectedRichtungen = new Set();
   stamm_deselectedProdukte = new Set();
   selectedLines = new Set();
   selectedVias = new Map();
@@ -7768,7 +7815,7 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
 
   // OEBB Stammstrecke: Richtung + Produktfilter
   if (selectedNetwork === 'OEBB_STAMM_SBAHN') {
-    stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']);
+    stamm_selectedRichtungen = new Set();
     stamm_deselectedProdukte = new Set();
 
     // Richtungen aus lineGroups rekonstruieren
@@ -8113,9 +8160,12 @@ function calculateRecommendedConfig() {
     sortMode: 1,           // Statisch als Default
     displayLight: 3,       // Hell
 
-    // Barrierefreiheit (Default beim Erst-Setup: AUS — User aktiviert es ggf. später manuell)
-    chopper: 0,
+    // Barrierefreiheit (Wien: Niederflur-Markierung standardmaessig an, Blinken aus)
+    // chopper:    0=aus, 1=Symbol, 2=Symbol+Text
+    // niederflurBlink: 0=solid, 1=pulsiert wenn naechstes Fahrzeug Niederflur ist
+    chopper: dominantNetwork === 'WL' ? 1 : 0,
     silberpfeil: 0,
+    niederflurBlink: 0,
 
     // Nachtmodus (aus als Default)
     nightMode: false,
@@ -8367,6 +8417,7 @@ function goToDisplayConfig() {
     displayLight: recommendedConfig.displayLight,
     chopper: recommendedConfig.chopper,
     silberpfeil: recommendedConfig.silberpfeil,
+    niederflurBlink: recommendedConfig.niederflurBlink,
     nightMode: recommendedConfig.nightMode,
     nightStart: recommendedConfig.nightStart,
     nightEnd: recommendedConfig.nightEnd,
@@ -8395,6 +8446,7 @@ function goToDisplayConfig() {
     if (previousSettings.displayLight !== undefined) recommendedConfig.displayLight = previousSettings.displayLight;
     if (previousSettings.chopper !== undefined) recommendedConfig.chopper = previousSettings.chopper;
     if (previousSettings.silberpfeil !== undefined) recommendedConfig.silberpfeil = previousSettings.silberpfeil;
+    if (previousSettings.niederflurBlink !== undefined) recommendedConfig.niederflurBlink = previousSettings.niederflurBlink;
     if (previousSettings.nightMode !== undefined) recommendedConfig.nightMode = previousSettings.nightMode;
     if (previousSettings.nightStart !== undefined) recommendedConfig.nightStart = previousSettings.nightStart;
     if (previousSettings.nightEnd !== undefined) recommendedConfig.nightEnd = previousSettings.nightEnd;
@@ -9354,6 +9406,10 @@ function renderDisplayTypeSections() {
       var chopperActive = (recommendedConfig && recommendedConfig.chopper) ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Hochflurer markieren</div></div>';
       html += '<div class="toggle-switch' + chopperActive + '" id="ftChopper_' + dt.colour + '" onclick="toggleFtSwitch(\'ftChopper_' + dt.colour + '\')"></div></div>';
+      // Niederflur-Blink: pulsiert das Icon wenn das folgende Fahrzeug Niederflur ist
+      var nfBlinkActive = (recommendedConfig && recommendedConfig.niederflurBlink) ? ' active' : '';
+      html += '<div class="form-row"><div><div class="form-label">Niederflur-Hinweis blinken</div><div class="form-hint">Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht</div></div>';
+      html += '<div class="toggle-switch' + nfBlinkActive + '" id="ftNfBlink_' + dt.colour + '" onclick="toggleFtSwitch(\'ftNfBlink_' + dt.colour + '\')"></div></div>';
     }
     if (f.silberpfeil) {
       var silberActive = (recommendedConfig && recommendedConfig.silberpfeil) ? ' active' : '';
@@ -11249,6 +11305,7 @@ function saveFromFinetuning() {
   let textColor = getFtTextColor();
   let chopper = isFtToggleActive('ftChopperToggle') ? 1 : 0;
   let silberpfeil = isFtToggleActive('ftSilberpfeilToggle') ? 1 : 0;
+  let niederflurBlink = (recommendedConfig && recommendedConfig.niederflurBlink) ? 1 : 0;
 
   // Werte aus per-Display-Typ Sektionen lesen
   types.forEach(function(dt) {
@@ -11264,6 +11321,10 @@ function saveFromFinetuning() {
     }
     if (f.chopper) {
       chopper = isFtToggleActive('ftChopper_' + dt.colour) ? 1 : 0;
+      // Blink-Toggle existiert nur zusammen mit Chopper
+      if (document.getElementById('ftNfBlink_' + dt.colour)) {
+        niederflurBlink = isFtToggleActive('ftNfBlink_' + dt.colour) ? 1 : 0;
+      }
     }
     if (f.silberpfeil) {
       silberpfeil = isFtToggleActive('ftSilber_' + dt.colour) ? 1 : 0;
@@ -11313,6 +11374,7 @@ function saveFromFinetuning() {
   recommendedConfig.textColor = textColor;  // Wien Schriftfarbe
   recommendedConfig.chopper = chopper;
   recommendedConfig.silberpfeil = silberpfeil;
+  recommendedConfig.niederflurBlink = niederflurBlink;
   recommendedConfig.nightMode = nightMode;
   recommendedConfig.nightStart = nightStart;
   recommendedConfig.nightEnd = nightEnd;
@@ -11416,6 +11478,7 @@ function sendConfigToDeviceDirect(config) {
     sortmode: String(config.sortMode),
     chopper: String(config.chopper),
     silberpfeil: String(config.silberpfeil),
+    niederflurblink: String(config.niederflurBlink || 0),
     colour: String(config.colour),
     displaylight: String(config.displayLight),
     textcolor: String(config.textColor || 1),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
@@ -11494,6 +11557,7 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('sortmode', configData.sortmode);
     formData.append('chopper', configData.chopper);
     formData.append('silberpfeil', configData.silberpfeil);
+    formData.append('niederflurblink', configData.niederflurblink);
     formData.append('colour', configData.colour);
     formData.append('displaylight', configData.displaylight);
     formData.append('textcolor', configData.textcolor);  // Wien Schriftfarbe
@@ -12064,6 +12128,13 @@ async function handleConfigMessage(data) {
     }
     if (data.config.silberpfeil !== undefined) {
       recommendedConfig.silberpfeil = parseInt(data.config.silberpfeil) || 0;
+    }
+    // niederflur_blink (Firmware-Feldname mit Underscore, vgl. main.cpp json key)
+    if (data.config.niederflur_blink !== undefined) {
+      recommendedConfig.niederflurBlink = parseInt(data.config.niederflur_blink) || 0;
+    } else if (data.config.niederflurblink !== undefined) {
+      // Fallback fuer das Form-Feldnamen-Format
+      recommendedConfig.niederflurBlink = parseInt(data.config.niederflurblink) || 0;
     }
     // Wien Schriftfarbe
     if (data.config.text_color !== undefined) {
