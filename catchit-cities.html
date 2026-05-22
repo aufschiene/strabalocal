@@ -3170,11 +3170,11 @@
 
     <div class="wizard-or-divider">oder</div>
 
-    <button class="btn btn-secondary btn-large" style="width:100%;" onclick="wizardNext()">
+    <button class="btn btn-secondary btn-large" style="width:100%;" onclick="wizardOpenFinetuning()">
       Feintuning →
     </button>
     <p style="text-align:center;color:#888;font-size:12px;margin-top:10px;">
-      Helligkeit, Textfarbe, Anzeige-Modus
+      Pro Display: Zeilen, Helligkeit, Textfarbe, Sortierung …
     </p>
   </div>
 
@@ -3234,6 +3234,11 @@
       </div>
     </div>
 
+    <div style="margin:8px 0 4px;">
+      <button class="btn btn-secondary" style="width:100%;" onclick="wizardOpenFinetuning()">Pro-Display Feintuning →</button>
+      <div style="font-size:12px;color:#999;margin-top:6px;text-align:center;">Jedes Stadt-Display einzeln anpassen (Zeilen, Farben, Niederflur …)</div>
+    </div>
+
     <div class="wizard-step-actions">
       <button class="btn btn-secondary" onclick="wizardBack()">Zurück</button>
       <button class="btn btn-primary" onclick="wizardFinish()">Fertig</button>
@@ -3256,17 +3261,41 @@
       </div>
     </div>
 
-    <!-- 1. Anzeige-Stil: Kompakt / Getrennt -->
+    <!-- 1. Anzeige-Stil: Kompakt / Spielerisch (animierte Vorschau wie im Wizard) -->
     <div class="config-card" id="ftDisplayStyleCard">
       <h3>Anzeige-Stil</h3>
-      <div class="form-row" id="ftCompactSeparateRow" style="display:none;">
-        <div>
-          <div class="form-label">Ansicht</div>
-        </div>
-        <div class="toggle-row" id="ftCompactSeparateToggle">
-          <button class="toggle-btn active" data-value="separate" onclick="setFtCompactSeparate('separate')">Getrennt</button>
-          <button class="toggle-btn" data-value="compact" onclick="setFtCompactSeparate('compact')">Kompakt</button>
-        </div>
+      <div class="display-style-grid" id="ftStyleGrid" style="margin-bottom:8px;">
+        <button class="display-style-btn" data-value="compact" onclick="ftSelectDisplayStyle('compact')">
+          <div class="style-preview compact">
+            <div class="preview-frame wien">
+              <div class="line"><span class="num">U6</span><span class="dest">Floridsdorf</span><span class="min">2'</span></div>
+              <div class="line"><span class="num">13A</span><span class="dest">Hauptbhf</span><span class="min">5'</span></div>
+              <div class="line"><span class="num">71</span><span class="dest">Schottenring</span><span class="min">8'</span></div>
+            </div>
+          </div>
+          <div class="label-box">
+            <div class="name">Kompakt</div>
+            <div class="desc">Ein einheitlicher Look — immer gleich lesbar.</div>
+          </div>
+        </button>
+        <button class="display-style-btn" data-value="playful" onclick="ftSelectDisplayStyle('playful')">
+          <div class="style-preview playful">
+            <div class="preview-frame wien">
+              <div class="line"><span class="num">U6</span><span class="dest">Floridsdorf</span><span class="min">2'</span></div>
+              <div class="line"><span class="num">13A</span><span class="dest">Hauptbhf</span><span class="min">5'</span></div>
+              <div class="line"><span class="num">71</span><span class="dest">Schottenring</span><span class="min">8'</span></div>
+            </div>
+            <div class="preview-frame oebb">
+              <div class="oebb-header"><span class="oebb-clock">12:06</span></div>
+              <div class="line primary"><span class="num">RJ</span><span class="dest">Wien Hbf</span><span class="min">12'</span></div>
+              <div class="line secondary"><span class="num">S7</span><span class="dest">Floridsd.</span><span class="min">7'</span></div>
+            </div>
+          </div>
+          <div class="label-box">
+            <div class="name">Spielerisch</div>
+            <div class="desc">Display wechselt je Betreiber — WL gelb/schwarz, ÖBB weiß/blau …</div>
+          </div>
+        </button>
       </div>
       <div class="form-row">
         <div>
@@ -3285,12 +3314,14 @@
       </div>
     </div>
 
-    <!-- 2. Per-Display-Typ Sektionen (dynamisch generiert) -->
+    <!-- 2. Pro-Display-Sektionen (dynamisch, zum Aufklappen) -->
+    <h3 style="margin:20px 4px 8px;color:#333;font-size:15px;">Displays im Detail</h3>
+    <p class="form-hint" style="margin:0 4px 12px;">Jedes Stadt-Display einzeln anpassen — tippe auf eine Box zum Aufklappen.</p>
     <div id="ftDisplayTypeSections">
       <!-- Wird von renderDisplayTypeSections() gefüllt -->
     </div>
 
-    <!-- 3. Gemeinsame Einstellungen -->
+    <!-- 3. Gemeinsame (generelle) Einstellungen unterhalb -->
 
     <!-- Helligkeit -->
     <div class="config-card">
@@ -3367,6 +3398,10 @@
       <option value="14">Westbahn</option>
       <option value="15">Liechtenstein / Schweiz Nahverkehr</option>
       <option value="16">Prag (PID)</option>
+      <option value="17">Brünn (DPMB)</option>
+      <option value="18">BVG Berlin</option>
+      <option value="19">KVB Köln</option>
+      <option value="20">AVV Aachen</option>
     </select>
     <div id="ftWienOptions" style="display:none;"></div>
     <div id="ftGroupingCard" style="display:none;">
@@ -3552,7 +3587,25 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 3,             // VBB Berlin
+    defaultColour: 18,            // BVG Berlin (Bodo-Style, dunkelgrünes Badge)
+    defaultBrightness: 3
+  },
+  KOELN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 19,            // KVB Köln (Bodo-Style, dunkelgrünes Badge)
+    defaultBrightness: 3
+  },
+  AACHEN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 20,            // AVV Aachen (Bodo-Style, dunkelgrünes Badge)
     defaultBrightness: 3
   },
   BODO: {
@@ -3968,6 +4021,24 @@ const NETWORKS = {
     desc: 'Bodensee-Oberschwaben',
     searchType: 'server_proxy',
     placeholder: 'z.B. Ravensburg, Bahnhof...',
+    isJourneyBased: false
+  },
+  KOELN: {
+    name: 'KVB Köln',
+    shortName: 'KVB',
+    region: 'DE',
+    desc: 'Stadtbahn, Bus (Kölner Verkehrs-Betriebe)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Neumarkt, Dom/Hbf, Appellhofplatz...',
+    isJourneyBased: false
+  },
+  AACHEN: {
+    name: 'AVV Aachen',
+    shortName: 'AVV',
+    region: 'DE',
+    desc: 'Bus, Regionalverkehr (Aachener Verkehrsverbund)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Elisenbrunnen, Bushof, Hauptbahnhof...',
     isJourneyBased: false
   },
   SALZBURG: {
@@ -4865,6 +4936,8 @@ var NETWORK_BRANDS = {
   SALZBURG:      { bg: '#E3000F', fg: '#fff' }, // Salzburg Rot
   LIEMOBIL:      { bg: '#EF7D00', fg: '#fff' }, // LIEmobil Orange
   BERLIN:        { bg: '#F0AB00', fg: '#000' }, // VBB Berlin Gelb
+  KOELN:         { bg: '#E2001A', fg: '#fff' }, // KVB Köln Rot
+  AACHEN:        { bg: '#006AB3', fg: '#fff' }, // AVV Aachen Blau
   BODO:          { bg: '#005BBB', fg: '#fff' }, // BODO Bodensee Blau
   DB:            { bg: '#EC0016', fg: '#fff' }, // DB Regio Rot
   PARIS:         { bg: '#003B80', fg: '#fff' }, // RATP Paris Blau
@@ -4946,6 +5019,17 @@ DISPLAY_PRESETS.bw = {
   networks: [
     { id: 'BODO', jumpTo: { region: 'DE' } },
     { id: 'DB',   label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
+  ]
+};
+DISPLAY_PRESETS.nrw = {
+  name: 'Nordrhein-Westfalen',
+  parent: 'DE',
+  // Kein Foto vorhanden → Card fällt auf Brand-Farbe des ersten Netzes (KVB) zurück.
+  // Sobald 'Stadt fotos/koeln.jpg' existiert, hier als photo: '...' eintragen.
+  networks: [
+    { id: 'KOELN',  jumpTo: { region: 'DE' } },
+    { id: 'AACHEN', jumpTo: { region: 'DE' } },
+    { id: 'DB',     label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
   ]
 };
 
@@ -5215,8 +5299,9 @@ var WIZARD_STEPS = [
     validate: function() { return !!getSavedDisplayStyle(); }
   },
   { id: 'stepWizardGehweg',   name: 'Gehweg',     isAvailable: function() { return true; }, validate: function() { return true; } },
-  { id: 'stepWizardNight',    name: 'Nachtmodus', isAvailable: function() { return true; }, validate: function() { return true; } },
-  { id: 'stepWizardAdvanced', name: 'Erweitert',  isAvailable: function() { return true; }, validate: function() { return true; } }
+  { id: 'stepWizardNight',    name: 'Nachtmodus', isAvailable: function() { return true; }, validate: function() { return true; } }
+  // 'stepWizardAdvanced' (alter simpler Erweitert-Screen) entfernt — ersetzt durch
+  // das Pro-Display-Feintuning (Button "Feintuning →" auf dem Nachtmodus-Schritt).
 ];
 var wizardCurrentIdx = 0;
 
@@ -5255,7 +5340,8 @@ function getSavedDisplayStyle() {
 }
 
 function selectDisplayStyle(value) {
-  document.querySelectorAll('#stepWizardStyle .display-style-btn').forEach(function(btn) {
+  // Alle Style-Karten synchron halten (Wizard-Schritt UND Feintuning-Karte)
+  document.querySelectorAll('.display-style-btn').forEach(function(btn) {
     btn.classList.toggle('active', btn.dataset.value === value);
   });
   try { localStorage.setItem('catchit_display_style', value); } catch (e) {}
@@ -5313,10 +5399,11 @@ function wizardShowStep(idx) {
   if (name) name.textContent = step.name;
   if (fill) fill.style.width = (((idx + 1) / active.length) * 100) + '%';
 
-  // Stil-Schritt: ggf. gespeicherte Auswahl wiederherstellen
+  // Stil-Schritt: gespeicherte Auswahl wiederherstellen, sonst "Kompakt" als
+  // vordefinierter Standard vorauswaehlen (Weiter ist damit sofort aktiv).
   if (step.id === 'stepWizardStyle') {
     var saved = getSavedDisplayStyle();
-    if (saved === 'compact' || saved === 'playful') selectDisplayStyle(saved);
+    selectDisplayStyle(saved === 'playful' ? 'playful' : 'compact');
   }
   // Gehweg-Schritt: Liste pro Haltestelle rendern
   if (step.id === 'stepWizardGehweg') {
@@ -5417,7 +5504,10 @@ function wizardNext() {
   wizardShowStep(wizardCurrentIdx + 1);
 }
 
-function wizardFinish() {
+// Baut die finale Config aus Wizard-Werten (Gehweg/Nacht/Erweitert/Stil) und
+// setzt recommendedConfig. Liefert cfg oder null. Wird von wizardFinish (speichern)
+// UND wizardOpenFinetuning (detailliertes Pro-Display-Feintuning) genutzt.
+function wizardBuildConfig() {
   // Wizard-Werte einsammeln
   var gehwegPerStop = {};
   document.querySelectorAll('#wizardGehwegList .wizard-num-input[data-station-key]').forEach(function(inp) {
@@ -5488,14 +5578,53 @@ function wizardFinish() {
   if (summary.style === 'compact') {
     cfg.displayMode = 1;
     if (cfg.multiDisplay) {
-      var singleColour = cfg.colourSingle;
-      if (singleColour === undefined && cfg.colour) {
-        singleColour = String(cfg.colour).split(',')[0];
-      }
-      if (singleColour !== undefined) {
-        cfg.colour = String(singleColour);
-      }
+      // Single-Display-Typ waehlen. WICHTIG: Bahnhofs-Ansichten (ÖBB Fern 11,
+      // ÖBB S-Bahn 12, Westbahn 14) koennen KEIN gemischtes Öffi-Layout (U-Bahn/
+      // Tram/Bus). Daher bei gemischten Netzen die Stadt-/Öffi-Ansicht bevorzugen
+      // (Wien 1, Linz 2, etc.) — die kann auch Zuege als Zeile darstellen.
+      var trainColours = [11, 12, 14];
+      var allColours = String(cfg.colour || cfg.colourSingle || '1')
+        .split(',').map(function(c) { return parseInt(c.trim(), 10); })
+        .filter(function(n) { return !isNaN(n); });
+      var singleColour = allColours.find(function(c) { return trainColours.indexOf(c) < 0; });
+      if (singleColour === undefined) singleColour = allColours[0];
+      if (singleColour === undefined) singleColour = parseInt(cfg.colourSingle, 10) || 1;
+      cfg.colour = String(singleColour);
       cfg.multiDisplay = false;
+      // rows war im Multi-Format ("3,2") — auf einen einzelnen Wert reduzieren,
+      // basierend auf der tatsaechlichen Gesamtzahl der Richtungen ueber alle
+      // Stationen. Sonst nimmt die Firmware den ersten Multi-Wert (z.B. "3")
+      // und zeigt zu viele Leerzeilen.
+      var totalDirs = 0;
+      stations.forEach(function(s) {
+        if (s.allDepartures) return;
+        if (s.lineGroups && s.lineGroups.length > 0) {
+          totalDirs += s.lineGroups.split(',').length;
+        } else if (s.directions && s.directions.length > 0) {
+          totalDirs += s.directions.length;
+        } else if (s.filter) {
+          totalDirs += s.filter.split(',').length;
+        } else {
+          totalDirs += 1;
+        }
+      });
+      var dt = parseInt(singleColour, 10) || 1;
+      var newRows;
+      if (dt === 12 || dt === 14) {
+        // OEBB / Westbahn: 2..3 (1 Haupt + 1-2 Kompakt)
+        newRows = Math.max(Math.min(totalDirs, 3), 2);
+      } else if (dt === 2 || dt === 13) {
+        // Linz / Graz: 1..4
+        newRows = Math.min(Math.max(totalDirs, 1), 4);
+      } else {
+        // Wien & andere
+        if (totalDirs <= 1) newRows = 3;
+        else if (totalDirs === 2) newRows = 2;
+        else if (totalDirs === 3) newRows = 3;
+        else if (totalDirs === 4) newRows = 2;
+        else newRows = 3;
+      }
+      cfg.rows = newRows;
     }
   }
 
@@ -5509,10 +5638,36 @@ function wizardFinish() {
     localStorage.setItem('catchit_brand_pref', summary.style === 'playful' ? 'REGENBOGEN' : '');
   } catch (e) {}
 
-  // Lade-Overlay zeigen + an Geraet senden
-  if (typeof showSavingOverlay === 'function') showSavingOverlay('Speichere Einstellungen...');
   recommendedConfig = cfg; // damit andere Stellen den finalen Stand sehen
+  return cfg;
+}
+
+// Wizard abschliessen: Config bauen + direkt ans Geraet senden.
+function wizardFinish() {
+  var cfg = wizardBuildConfig();
+  if (!cfg) return;
+  if (typeof showSavingOverlay === 'function') showSavingOverlay('Speichere Einstellungen...');
   sendConfigToDeviceDirect(cfg);
+}
+
+// Aus dem Wizard ins detaillierte Pro-Display-Feintuning wechseln (farbige Boxen
+// je Stadt-Display). Baut zuerst die Config, blendet die Wizard-Cards aus und
+// zeigt den Feintuning-Screen. Gespeichert wird dort ueber den eigenen Button.
+function wizardOpenFinetuning() {
+  var cfg = wizardBuildConfig();
+  if (!cfg) return;
+  ftCameFromWizard = true;  // Zurueck-Button fuehrt dann zum neuen Wizard, nicht zum alten Screen
+  document.querySelectorAll('.container > .card').forEach(function(c) {
+    if (c.id !== 'stationsCard') c.classList.add('hidden');
+  });
+  var prog = document.getElementById('wizardProgress');
+  if (prog) prog.classList.add('hidden');
+  var ft = document.getElementById('stepFinetuning');
+  if (ft) ft.classList.remove('hidden');
+  var ftBottom = document.getElementById('ftBottomActions');
+  if (ftBottom) ftBottom.style.display = '';
+  if (typeof initFinetuningStep === 'function') initFinetuningStep();
+  window.scrollTo(0, 0);
 }
 
 // Toggles für die Sub-Bereiche der einzelnen Schritte
@@ -6436,6 +6591,7 @@ function extractLines(data) {
               towards,
               type: line.type || '',
               richtungsId: rid,
+              dirTerminus: line.dirTerminus || '',  // weitester Endpunkt der Richtung (Server)
               stopovers: line.stopovers || []
             });
           }
@@ -6552,19 +6708,12 @@ function renderLines() {
 
     if (isRegional) {
       // === REGIONAL-MODUS: 2 Richtungen pro Linie ===
-      // Gruppiere nach Strecke (gleiche erste 2 Stopovers = gleiche Richtung)
+      // Gruppiere primaer nach der vom Server gelieferten richtungsId
+      // (Cluster aus tripId-Endpunkten → mehrere Ziele derselben Richtung teilen
+      // dieselbe ID). Fallback auf Stopovers, dann Ziel.
       const ridGroups = new Map();
       directions.forEach(dir => {
-        const stops = dir.stopovers || [];
-        let dirKey;
-        if (stops.length >= 2) {
-          dirKey = stops.slice(0, 2).join('|');
-        } else if (stops.length === 1) {
-          dirKey = stops[0];
-        } else {
-          // Keine Stopovers → jedes Ziel separat (nicht ideal, aber korrekt)
-          dirKey = dir.towards || 'unknown';
-        }
+        const dirKey = getRegionalDirKey(dir);
         if (!ridGroups.has(dirKey)) ridGroups.set(dirKey, []);
         ridGroups.get(dirKey).push(dir);
       });
@@ -6584,23 +6733,21 @@ function renderLines() {
       }
 
       ridGroups.forEach((ridDirs, dirKey) => {
-        // Sortiere: meiste Stopovers = weiteste Route → als Richtungsname verwenden
-        ridDirs.sort((a, b) => (a.stopovers?.length || 0) - (b.stopovers?.length || 0));
-
-        // Weitester Endbahnhof (letzter in der sortierten Liste) = Richtungsname
-        const furthestDest = ridDirs[ridDirs.length - 1]?.towards || 'Unbekannt';
+        // Richtungsname = weitester Endpunkt. Server liefert dirTerminus (laengste
+        // Fahrtdauer der Richtung, z.B. "St.Pölten" statt "Tullnerfeld"). Fallback:
+        // meiste Stopovers, sonst erstes Ziel.
+        let furthestDest = ridDirs.find(d => d.dirTerminus)?.dirTerminus;
+        if (!furthestDest) {
+          ridDirs.sort((a, b) => (a.stopovers?.length || 0) - (b.stopovers?.length || 0));
+          furthestDest = ridDirs[ridDirs.length - 1]?.towards || 'Unbekannt';
+        }
         const dirLabel = `Richtung ${shortenStopName(furthestDest)}`;
 
         const anySelected = ridDirs.some(d => selectedLines.has(d.idx));
-        // Welcher Endhalt ist gerade ausgewählt?
-        const selectedEndIdx = ridDirs.reduce((best, d) => {
-          if (selectedLines.has(d.idx)) return d.idx;
-          return best;
-        }, -1);
-
         const escapedKey = dirKey.replace(/'/g, "\\'").replace(/\|/g, "\\|");
 
-        // Klick wählt ALLE Züge dieser Richtung (den weitesten Endhalt = alle inklusive)
+        // Klick waehlt ALLE Zuege dieser Richtung. Die richtungsId deckt im Filter
+        // ohnehin die gesamte Richtung ab (alle Ziele), daher reicht ein Repr-idx.
         const furthestIdx = ridDirs[ridDirs.length - 1].idx;
 
         html += `
@@ -6608,28 +6755,6 @@ function renderLines() {
             <div class="checkbox">${anySelected ? '✓' : ''}</div>
             <div class="direction-text">${dirLabel}</div>
           </div>`;
-
-        // BETA: "Nur Züge bis..." Filter (nur wenn Richtung ausgewählt und >1 Endhalt)
-        if (anySelected && ridDirs.length > 1) {
-          const endStops = ridDirs.map(d => ({idx: d.idx, name: shortenStopName(d.towards)}));
-          html += `<div style="margin-left:32px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-            <span style="font-size:11px;color:#999;background:#f0f0f0;padding:2px 6px;border-radius:4px;">BETA</span>
-            <span style="font-size:12px;color:#888;">Mindestens bis:</span>
-            <select style="padding:5px 10px;border:1px solid #ddd;border-radius:8px;font-size:12px;background:#fafafa;" onchange="changeBisStop('${lineName}', '${escapedKey}', this.value)">
-              <option value="${furthestIdx}" ${selectedEndIdx === furthestIdx || selectedEndIdx === -1 ? 'selected' : ''}>Alle</option>`;
-          // Endhalte in Streckenreihenfolge (kürzeste → längste)
-          endStops.forEach(es => {
-            if (es.idx !== furthestIdx) {
-              html += `<option value="${es.idx}" ${es.idx === selectedEndIdx ? 'selected' : ''}>${es.name}</option>`;
-            }
-          });
-          html += `</select></div>`;
-          // Info-Text unter dem Dropdown
-          const firstStop = endStops[0]?.name || '?';
-          html += `<div style="margin-left:32px;margin-bottom:6px;font-size:11px;color:#aaa;line-height:1.4;">
-            Zeige nur ${lineName}-Züge an, die mindestens einen bestimmten Zwischenstopp erreichen. <span style="color:#cc8800;">Beta — kann Fehler enthalten.</span>
-          </div>`;
-        }
       });
 
       html += `</div></div>`;
@@ -6708,8 +6833,12 @@ function renderLines() {
   updateSelectAllButton();
 }
 
-// Gruppierungskey für Regional-Richtungen (gleiche erste 2 Stopovers)
+// Gruppierungskey für Regional-Richtungen.
+// Primaer: vom Server gelieferte richtungsId (Cluster aus tripId-Endpunkten —
+// mehrere Ziele derselben Fahrtrichtung teilen dieselbe ID, z.B. St.Pölten +
+// Tulln Stadt + Tullnerfeld). Fallback: erste 2 Stopovers, dann Ziel.
 function getRegionalDirKey(line) {
+  if (line.richtungsId) return 'rid:' + line.richtungsId;
   const stops = line.stopovers || [];
   if (stops.length >= 2) return stops.slice(0, 2).join('|');
   if (stops.length === 1) return stops[0];
@@ -7919,7 +8048,9 @@ const NETWORK_COLORS = {
   LINZ: { id: 2, name: 'Linz AG', color: '#009640' },
   DB_FERN: { id: 6, name: 'DB Fernverkehr', color: '#EC0016' },
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
-  BERLIN: { id: 3, name: 'VBB Berlin', color: '#F0AB00' },
+  BERLIN: { id: 18, name: 'BVG Berlin', color: '#1B5E20' },
+  KOELN: { id: 19, name: 'KVB Köln', color: '#1B5E20' },
+  AACHEN: { id: 20, name: 'AVV Aachen', color: '#1B5E20' },
   BODO: { id: 7, name: 'BODO Bodensee', color: '#005BBB' },
   SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
@@ -7931,6 +8062,10 @@ const NETWORK_COLORS = {
   OEBB_STAMM_SBAHN: { id: 12, name: 'ÖBB Stammstrecke', color: '#003366' },
   OEBB_REG_NOE: { id: 12, name: 'ÖBB Regional NÖ', color: '#0055A4' },
   OEBB_REG_OOE: { id: 12, name: 'ÖBB Regional OÖ', color: '#0055A4' },
+  // API-Alias-Keys (aus geladenen rbl-Prefixen), damit Stationen korrekt einer
+  // Farbe/colour-Id zugeordnet werden — sonst Fallback auf Wien (colour 1).
+  OEBBREG: { id: 12, name: 'ÖBB Regionalverkehr', color: '#0055A4' },
+  OEBBFERN: { id: 11, name: 'ÖBB Fernverkehr', color: '#E2001A' },
   WESTBAHN: { id: 14, name: 'Westbahn', color: '#0055A4' },
   LIEMOBIL: { id: 15, name: 'LIEmobil', color: '#CE1126' },
   PID: { id: 16, name: 'Prag (PID)', color: '#D7141A' },
@@ -8062,8 +8197,13 @@ function calculateRecommendedConfig() {
   }
 
   function getRowsForDisplayType(colour, dirCount) {
-    if (colour === 12 || colour === 14) {
-      // ÖBB/Westbahn: Fixes Layout, mindestens 2 (1 Haupt + 1 Kompakt), max 3
+    if (colour === 12) {
+      // ÖBB S-Bahn: Standard IMMER 2 Zeilen. 3 Zeilen kann der User nur manuell
+      // im Feintuning aktivieren (Zeilen-Toggle 2/3).
+      return 2;
+    }
+    if (colour === 14) {
+      // Westbahn: mindestens 2 (1 Haupt + 1 Kompakt), max 3
       return Math.max(Math.min(dirCount, 3), 2);
     }
     if (colour === 2 || colour === 13) {
@@ -8166,6 +8306,7 @@ function calculateRecommendedConfig() {
     chopper: dominantNetwork === 'WL' ? 1 : 0,
     silberpfeil: 0,
     niederflurBlink: 0,
+    delayHighlight: 0,
 
     // Nachtmodus (aus als Default)
     nightMode: false,
@@ -8178,33 +8319,22 @@ function calculateRecommendedConfig() {
     gehweg: gehwegValues,
     showFunMessages: true,
     sortMode: (stammstreckeSortMode || stations.some(s => s.allDepartures) || isTrainNetwork) ? 2 : 1,  // dynamisch wenn Zug-Netzwerk, Stammstrecke oder "Alle Abfahrten"
-    // Zeilen-Reihenfolge: Wien nutzt stopId:Linie Format
+    // Zeilen-Reihenfolge: NUR Wien-Eintraege (stopId:Linie). Nicht-Wien-Stationen
+    // (OEBB Regional, Linz, etc.) wandern ueber rowOrderDestination — sonst landen
+    // dieselben Eintraege doppelt im firmwareseitig kombinierten rowOrder
+    // (Display zeigt sonst z.B. zweimal "S45 -> Wien Handelskai").
     rowOrder: (function() {
       const items = [];
       stations.forEach(s => {
         if (s.allDepartures) return;
-        if (s.network === 'WL') {
-          // Wien: stopId:Linie pro Bahnsteig (z.B. "4131:U1", "4136:U1", "4272:U2")
-          if (s.directions && s.directions.length > 0) {
-            s.directions.forEach(d => {
-              // Pro Bahnsteig einzeln (d.stopId) statt zusammengefasst (s.stopId)
-              const rbl = d.stopId || s.stopId || '';
-              const item = `${rbl}:${d.line}`;
-              if (!items.includes(item)) items.push(item);
-            });
-          }
-        } else if (isRegOebb(s.network)) {
-          // ÖBB Regional: Linie:Zieltext (z.B. "S3:Pregarten Bahnhof")
-          // Wird als Via-Referenz verwendet (Firmware zeigt "via Pregarten" wenn Zug weiter fährt)
-          if (s.directions && s.directions.length > 0) {
-            s.directions.forEach(d => {
-              if (d.towards) {
-                const item = `${d.line}:${d.towards}`;
-                if (!items.includes(item)) items.push(item);
-              }
-            });
-          }
-        }
+        if (s.network !== 'WL') return;
+        if (!s.directions || s.directions.length === 0) return;
+        s.directions.forEach(d => {
+          // Pro Bahnsteig einzeln (d.stopId) statt zusammengefasst (s.stopId)
+          const rbl = d.stopId || s.stopId || '';
+          const item = `${rbl}:${d.line}`;
+          if (!items.includes(item)) items.push(item);
+        });
       });
       return items.join(',');
     })(),
@@ -8295,10 +8425,14 @@ function calculateRecommendedConfig() {
 // ÖBB HAFAS richtungsIds sind instabil (ändern sich täglich).
 // Netzwerke mit stabilen richtungsIds (Server normalisiert ÖBB richtungsIds pro Strecke):
 function hasStableRichtungsId(network) {
-  // Nur Netzwerke mit stabilen richtungsIds (H/R, 1/2, etc.)
-  // ÖBB HAFAS IDs sind NICHT stabil (ändern sich täglich) → Zieltext verwenden
+  // Netzwerke mit stabilen richtungsIds (H/R, 1/2, etc.)
   // BODO seit 2026-05-07: liErgRiProj.direction (H/R) statt destID → stabil
-  return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO'].includes(network);
+  // OEBB* seit 2026-05-22: Server clustert pro Fahrtrichtung aus tripId-Endpunkten
+  //   (richtungsId = "d<terminusId>", stabil) → mehrere Ziele einer Richtung teilen
+  //   eine ID. Ersetzt den frueheren instabilen HAFAS-Hash.
+  return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO',
+          'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
+          'OEBB_REG_NOE', 'OEBB_REG_OOE'].includes(network);
 }
 
 // Für ÖBB: Zieltext verwenden statt richtungsId
@@ -8363,10 +8497,19 @@ function buildLineFilterDestination(stationsList) {
         return;
       }
 
-      // ÖBB Regional mit Direction-Buchstabe: directionLetter ist nur ein UI-Label
-      // (A/B fuer die Richtungsgruppierung). Die Firmware kann "S45A" nirgendwo
-      // matchen — Trainboard liefert hash-richtungsIds und keine stopovers.
-      // Stattdessen den Ziel-Text verwenden (Firmware hat partial-match auf dest).
+      // Stabile richtungsId (inkl. OEBB Richtungs-Cluster "d<terminusId>"): bevorzugt.
+      // Eine richtungsId deckt ALLE Ziele derselben Fahrtrichtung ab — die Firmware
+      // matcht alle Zuege dieser Richtung, nicht nur ein einzelnes Ziel.
+      if (dir.richtungsId && hasStableRichtungsId(station.network)) {
+        if (!lineToDestinations[line]) lineToDestinations[line] = [];
+        if (!lineToDestinations[line].includes(dir.richtungsId)) {
+          lineToDestinations[line].push(dir.richtungsId);
+        }
+        return;
+      }
+
+      // ÖBB Regional ohne richtungsId (kein tripId): directionLetter ist nur ein
+      // UI-Label. Firmware kann "S45A" nicht matchen → Ziel-Text als Fallback.
       if (dir.directionLetter) {
         if (!lineToDestinations[line]) lineToDestinations[line] = [];
         const target = dir.towards || `${line}${dir.directionLetter}`;
@@ -8374,13 +8517,7 @@ function buildLineFilterDestination(stationsList) {
         return;
       }
 
-      // Für Netzwerke mit stabilen richtungsIds: richtungsId verwenden
-      if (dir.richtungsId && hasStableRichtungsId(station.network)) {
-        if (!lineToDestinations[line]) lineToDestinations[line] = [];
-        if (!lineToDestinations[line].includes(dir.richtungsId)) {
-          lineToDestinations[line].push(dir.richtungsId);
-        }
-      } else if (dir.towards) {
+      if (dir.towards) {
         // Andere: Zieltext verwenden
         if (!lineToDestinations[line]) lineToDestinations[line] = [];
         if (!lineToDestinations[line].includes(dir.towards)) {
@@ -8418,6 +8555,7 @@ function goToDisplayConfig() {
     chopper: recommendedConfig.chopper,
     silberpfeil: recommendedConfig.silberpfeil,
     niederflurBlink: recommendedConfig.niederflurBlink,
+    delayHighlight: recommendedConfig.delayHighlight,
     nightMode: recommendedConfig.nightMode,
     nightStart: recommendedConfig.nightStart,
     nightEnd: recommendedConfig.nightEnd,
@@ -8447,6 +8585,7 @@ function goToDisplayConfig() {
     if (previousSettings.chopper !== undefined) recommendedConfig.chopper = previousSettings.chopper;
     if (previousSettings.silberpfeil !== undefined) recommendedConfig.silberpfeil = previousSettings.silberpfeil;
     if (previousSettings.niederflurBlink !== undefined) recommendedConfig.niederflurBlink = previousSettings.niederflurBlink;
+    if (previousSettings.delayHighlight !== undefined) recommendedConfig.delayHighlight = previousSettings.delayHighlight;
     if (previousSettings.nightMode !== undefined) recommendedConfig.nightMode = previousSettings.nightMode;
     if (previousSettings.nightStart !== undefined) recommendedConfig.nightStart = previousSettings.nightStart;
     if (previousSettings.nightEnd !== undefined) recommendedConfig.nightEnd = previousSettings.nightEnd;
@@ -8498,15 +8637,9 @@ function goToDisplayConfig() {
     else setFtToggleVal('quickSpeed', 10);
   }
 
-  // Show config step, hide others (inkl. Regions-Card)
-  document.getElementById('stationsCard').classList.add('hidden');
-  var regionsCard = document.querySelector('.card:not(.hidden):not(#stepDisplayConfig):not(#stationsCard)');
-  // Verstecke alle Cards außer stepDisplayConfig
-  document.querySelectorAll('.container > .card').forEach(function(c) {
-    if (c.id !== 'stepDisplayConfig') c.classList.add('hidden');
-  });
-  document.getElementById('stepDisplayConfig').classList.remove('hidden');
-  document.querySelector('.bottom-bar').style.display = 'none';
+  // Der alte Quick-Config-Screen (stepDisplayConfig) existiert nicht mehr im Flow —
+  // direkt in den neuen Wizard (Stil → Gehweg → Nachtmodus → Erweitert).
+  startSetupWizard();
 }
 
 function suggestDisplayConfig() {
@@ -8684,6 +8817,24 @@ function updateRealisticPreview(config) {
       text: '#ffffff',
       highlight: '#78787e',
       name: 'Holding Graz'
+    },
+    18: { // BVG Berlin (Bodo-Style, dunkelgrünes Badge)
+      bg: '#1e2328',
+      text: '#ffffff',
+      highlight: '#1B5E20',
+      name: 'BVG Berlin'
+    },
+    19: { // KVB Köln (Bodo-Style, dunkelgrünes Badge)
+      bg: '#1e2328',
+      text: '#ffffff',
+      highlight: '#1B5E20',
+      name: 'KVB Köln'
+    },
+    20: { // AVV Aachen (Bodo-Style, dunkelgrünes Badge)
+      bg: '#1e2328',
+      text: '#ffffff',
+      highlight: '#1B5E20',
+      name: 'AVV Aachen'
     }
   };
 
@@ -8726,7 +8877,10 @@ function updateRealisticPreview(config) {
       8: [{ line: '1', dest: 'Hellbrunn', time: 3 }, { line: 'S3', dest: 'Salzburg Hbf', time: 7 }, { line: '22', dest: 'Aigen', time: 11 }],
       9: [{ line: '1', dest: 'La Defense', time: 2 }, { line: '4', dest: 'Porte de Clignan.', time: 4 }, { line: '14', dest: 'Saint-Denis', time: 6 }],
       10: [{ line: 'U2', dest: 'Aspernstrasse', time: 6, dest2: 'Seestadt', time2: 8 }, { line: '46', dest: 'Ring, Volksthea', time: 6, dest2: 'Ring, Volksthea', time2: 8 }],
-      13: [{ line: '1', dest: 'Eggenberg/UKH', time: 3 }, { line: '3', dest: 'Krenngasse', time: 5 }, { line: '5', dest: 'Puntigam', time: 7 }, { line: '7', dest: 'LKH Med Uni', time: 10 }]
+      13: [{ line: '1', dest: 'Eggenberg/UKH', time: 3 }, { line: '3', dest: 'Krenngasse', time: 5 }, { line: '5', dest: 'Puntigam', time: 7 }, { line: '7', dest: 'LKH Med Uni', time: 10 }],
+      18: [{ line: 'U6', dest: 'Alt-Tegel', time: 3 }, { line: 'M10', dest: 'Warschauer Str.', time: 6 }, { line: '100', dest: 'Alexanderplatz', time: 9 }],
+      19: [{ line: '1', dest: 'Weiden West', time: 3 }, { line: '9', dest: 'Sülz', time: 6 }, { line: '18', dest: 'Klettenberg', time: 9 }],
+      20: [{ line: '3A', dest: 'Uniklinik', time: 4 }, { line: '5', dest: 'Kaiserplatz', time: 7 }, { line: '25', dest: 'Vaals', time: 11 }]
     };
     sampleData = (fallbackData[colour] || fallbackData[1]).slice(0, rows);
   }
@@ -8835,6 +8989,22 @@ function updateRealisticPreview(config) {
         `).join('')}
       </div>
     `;
+  } else if (colour === 18 || colour === 19 || colour === 20) {
+    // Deutsche Städte (BVG/KVB/AVV): Bodo-Style, dunkelgrünes Linien-Badge
+    previewEl.style.background = '#1e2328';
+    previewEl.style.backgroundImage = 'none';
+
+    previewEl.innerHTML = `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+        ${sampleData.slice(0, rows).map((dep, i) => `
+          <div style="flex:1;display:flex;align-items:center;padding:0 4px;${i < rows - 1 ? 'border-bottom:1px solid #32383e;' : ''}">
+            <span style="background:#1B5E20;color:#fff;border-radius:4px;padding:2px 5px;min-width:22px;text-align:center;font-weight:bold;font-size:10px;">${dep.line}</span>
+            <span style="flex:1;font-size:9px;color:#fff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-left:5px;">${dep.dest}</span>
+            <span style="font-size:13px;font-weight:bold;color:#fff;margin-left:4px;">${dep.time}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
   } else {
     // Standard Display Style (Wien, etc.)
     previewEl.style.background = style.bg;
@@ -8930,7 +9100,9 @@ function updateQuickPreview() {
   else if (colour === 2) networkForCapabilities = 'LINZ';
   else if (colour === 4) networkForCapabilities = 'WLB';
   else if (colour === 5 || colour === 6) networkForCapabilities = 'DB';
-  else if (colour === 3) networkForCapabilities = 'BERLIN';
+  else if (colour === 3 || colour === 18) networkForCapabilities = 'BERLIN';
+  else if (colour === 19) networkForCapabilities = 'KOELN';
+  else if (colour === 20) networkForCapabilities = 'AACHEN';
   else if (colour === 7) networkForCapabilities = 'BODO';
   else if (colour === 8) networkForCapabilities = 'SALZBURG';
   else if (colour === 9) networkForCapabilities = 'PARIS';
@@ -8945,7 +9117,7 @@ function updateQuickPreview() {
   const caps = CITY_CAPABILITIES[networkForCapabilities] || CITY_CAPABILITIES.WL;
 
   // Settings Tags aktualisieren
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr'};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr',16:'Prag (PID)',17:'Brünn (DPMB)',18:'BVG Berlin',19:'KVB Köln',20:'AVV Aachen'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -9030,7 +9202,7 @@ function initializeQuickPreview() {
   if (!settingsList) return;
 
   const caps = recommendedConfig.capabilities || {};
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr'};
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr',16:'Prag (PID)',17:'Brünn (DPMB)',18:'BVG Berlin',19:'KVB Köln',20:'AVV Aachen'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -9164,6 +9336,7 @@ function sendWithSuggestion() {
 // ==================== FEINTUNING - INTEGRIERT IN CITIES.HTML ====================
 function goToFinetuning() {
   if (!recommendedConfig) return;
+  ftCameFromWizard = false;  // klassischer Pfad: Zurueck fuehrt zum Display-Config-Screen
 
   // Verstecke Display-Config, zeige Finetuning
   document.getElementById('stepDisplayConfig').classList.add('hidden');
@@ -9188,7 +9361,7 @@ const DISPLAY_TYPE_FEATURES = {
   9:  { rows: true, sorting: true, grouping: true, name: 'RATP Paris' },
   10: { rows: true, sorting: true, grouping: true, name: 'Straba' },
   11: { rows: false, sorting: false, grouping: false, name: 'ÖBB Fernverkehr' },
-  12: { rows: false, sorting: false, grouping: false, name: 'ÖBB S-Bahn' },
+  12: { rows: true, minRows: 2, maxRows: 3, defaultRows: 2, sorting: false, grouping: false, delayHighlight: true, name: 'ÖBB S-Bahn' },
   13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz' },
   14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
   15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, name: 'Liechtenstein / Schweiz Nahverkehr' }
@@ -9199,6 +9372,7 @@ DISPLAY_TYPE_FEATURES[13].bigText = true;
 
 let ftIsMultiDisplay = false;
 let ftIsManualAssignment = false;
+let ftCameFromWizard = false;  // true wenn Feintuning aus dem neuen Wizard geoeffnet wurde
 let ftPerStationColour = [];  // Pro Station der Display-Typ
 
 function setFtCompactSeparate(mode) {
@@ -9206,6 +9380,14 @@ function setFtCompactSeparate(mode) {
   btns.forEach(function(b) { b.classList.toggle('active', b.dataset.value === mode); });
   ftIsMultiDisplay = (mode === 'separate');
   renderDisplayTypeSections();
+}
+
+// Feintuning: Klick auf eine Stil-Karte (Kompakt/Spielerisch) setzt direkt die
+// Ansicht — Kompakt = eine vereinte Ansicht, Spielerisch = getrennte Ansichten
+// pro Betreiber. Ersetzt den frueheren Getrennt/Kompakt-Toggle.
+function ftSelectDisplayStyle(value) {
+  selectDisplayStyle(value);  // Karten-Aktiv-Status + Stil-Vorwahl synchronisieren
+  setFtCompactSeparate(value === 'compact' ? 'compact' : 'separate');
 }
 
 function setFtAutoManual(mode) {
@@ -9238,6 +9420,16 @@ function renderStationDisplayList() {
   container.innerHTML = html;
 }
 
+// Netzwerk → colour-Id, robust gegen unmapped Keys (z.B. OEBB-Varianten aus
+// geladenen Configs). Sonst Fallback auf Wien (1) → alle Stationen in eine Box.
+function netColourId(network) {
+  var nc = NETWORK_COLORS[network];
+  if (nc) return nc.id;
+  if (network && network.indexOf('OEBB') === 0) return 12;  // OEBB-Bahn-Ansicht
+  if (network === 'WESTBAHN') return 14;
+  return 1;
+}
+
 function getUniqueDisplayTypes() {
   if (!ftIsMultiDisplay) {
     // Kompakt: ein Display-Typ
@@ -9247,12 +9439,44 @@ function getUniqueDisplayTypes() {
   // Getrennt: pro unique colour
   var byColour = {};
   stations.forEach(function(s, i) {
-    var nc = NETWORK_COLORS[s.network];
-    var col = ftIsManualAssignment ? (ftPerStationColour[i] || (nc ? nc.id : 1)) : (nc ? nc.id : 1);
+    var col = ftIsManualAssignment ? (ftPerStationColour[i] || netColourId(s.network)) : netColourId(s.network);
     if (!byColour[col]) byColour[col] = { colour: col, stations: [] };
     byColour[col].stations.push(s);
   });
   return Object.values(byColour);
+}
+
+// Pro-Display-Box auf-/zuklappen (Header-Klick)
+function toggleFtDisplayBox(headerEl) {
+  var body = headerEl.nextElementSibling;
+  if (!body || !body.classList.contains('ft-display-body')) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  var chev = headerEl.querySelector('.ft-chev');
+  if (chev) chev.textContent = open ? '▸' : '▾';
+}
+
+// Display-colour-Id → Markenfarbe (konsistent mit dem Box-Namen aus
+// DISPLAY_TYPE_FEATURES). colour 12 = ÖBB S-Bahn → Blau, nicht ÖBB-Rot.
+var COLOUR_HEX = {
+  1:  '#E20613', // Wiener Linien
+  2:  '#009640', // Linz AG
+  3:  '#F0AB00', // VBB Berlin
+  4:  '#1E4D8C', // WLB
+  5:  '#009640', // DB S-Bahn
+  6:  '#EC0016', // DB Fernverkehr
+  7:  '#005BBB', // BODO
+  8:  '#E3000F', // Salzburg
+  9:  '#003B80', // Paris
+  10: '#1e1e1e', // Straba
+  11: '#E2001A', // ÖBB Fernverkehr
+  12: '#003366', // ÖBB S-Bahn (Blau)
+  13: '#F39200', // Holding Graz
+  14: '#0055A4', // Westbahn
+  15: '#CE1126'  // Liechtenstein
+};
+function colourIdToColor(colourId) {
+  return COLOUR_HEX[colourId] || '#666';
 }
 
 function renderDisplayTypeSections() {
@@ -9261,15 +9485,23 @@ function renderDisplayTypeSections() {
   var types = getUniqueDisplayTypes();
   var html = '';
 
-  types.forEach(function(dt) {
+  types.forEach(function(dt, dtIdx) {
     var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
-    var netColor = '#666';
-    // Finde Netzwerk-Farbe
-    for (var nk in NETWORK_COLORS) {
-      if (NETWORK_COLORS[nk].id === dt.colour) { netColor = NETWORK_COLORS[nk].color; break; }
-    }
-    html += '<div class="config-card">';
-    html += '<h3><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + netColor + ';margin-right:8px;"></span>' + (f.name || 'Display') + '</h3>';
+    // Farbe aus der DISPLAY-colour ableiten (passt zum Box-Namen + aendert sich
+    // korrekt bei manueller Umzuordnung). NICHT aus dem Stations-Netz.
+    var netColor = colourIdToColor(dt.colour);
+    // Box in Netz-Markenfarbe: farbiger Header-Balken + Akzent-Rahmen, klappbar.
+    // Erste Box offen, weitere eingeklappt (Liste zum Aufklappen).
+    var openByDefault = (dtIdx === 0);
+    html += '<div class="config-card ft-display-card" style="border:1px solid ' + netColor + '55;border-top:4px solid ' + netColor + ';padding-top:0;">';
+    html += '<div class="ft-display-head" onclick="toggleFtDisplayBox(this)" style="cursor:pointer;margin:0 -20px 14px;padding:11px 20px;background:' + netColor + '14;border-bottom:1px solid ' + netColor + '33;display:flex;align-items:center;gap:10px;">';
+    html += '<span style="display:inline-block;width:16px;height:16px;border-radius:4px;background:' + netColor + ';flex:0 0 auto;"></span>';
+    html += '<span style="font-weight:700;font-size:16px;color:' + netColor + ';">' + (f.name || 'Display') + '</span>';
+    html += '<span style="margin-left:auto;font-size:11px;color:#999;">' + dt.stations.length + (dt.stations.length === 1 ? ' Station' : ' Stationen') + '</span>';
+    html += '<span class="ft-chev" style="font-size:14px;color:' + netColor + ';width:14px;text-align:center;">' + (openByDefault ? '▾' : '▸') + '</span>';
+    html += '</div>';
+    // Aufklappbarer Inhalt
+    html += '<div class="ft-display-body" style="display:' + (openByDefault ? 'block' : 'none') + ';">';
     // Stationen mit Netzwerk-Herkunft auflisten
     dt.stations.forEach(function(s) {
       var snc = NETWORK_COLORS[s.network];
@@ -9295,38 +9527,31 @@ function renderDisplayTypeSections() {
     // Zeilen (nur Stadt-Displays)
     if (f.rows) {
       var maxR = f.maxRows || 3;
-      html += '<div class="form-row"><div><div class="form-label">Zeilen</div></div>';
+      var minR = f.minRows || 1;
+      // ÖBB S-Bahn: 2 = grosses Layout (1 Abfahrt + via), 3 = drei Abfahrten
+      var rowsHint = (dt.colour === 12)
+        ? '<div class="form-hint">2 = groß mit Zwischenstopps · 3 = drei Abfahrten</div>' : '';
+      html += '<div class="form-row"><div><div class="form-label">Zeilen</div>' + rowsHint + '</div>';
       html += '<div class="toggle-row" id="ftRows_' + dt.colour + '">';
-      for (var r = 1; r <= maxR; r++) {
+      for (var r = minR; r <= maxR; r++) {
         // Bei bigText: Buttons 1-2 nur bei "Groß" sichtbar, 3-4 nur bei "Klein"
         var hidden = '';
         if (f.bigText) {
           if (r <= 2) hidden = ' data-bigtext-mode="big" style="display:none;"';
           else hidden = ' data-bigtext-mode="small"';
         }
-        var defaultActive = f.bigText ? (r === 3) : (r === 2);
+        var defRows = f.defaultRows || (f.bigText ? 3 : 2);
+        var defaultActive = (r === defRows);
         html += '<button class="toggle-btn' + (defaultActive ? ' active' : '') + '" data-value="' + r + '"' + hidden + ' onclick="setFtToggleVal(\'ftRows_' + dt.colour + '\',' + r + ')">' + r + '</button>';
       }
       html += '</div></div>';
     }
 
-    // Sortierung (nur Stadt-Displays)
+    // Reihenfolge & Sortierung (nur Stadt-Displays) — EIN Master-Schalter
     if (f.sorting) {
       var cid = dt.colour;
-      html += '<div class="form-row"><div><div class="form-label">Sortierung</div><div class="form-hint">Statisch = Feste Reihenfolge der Linien</div></div>';
-      html += '<div class="toggle-row" id="ftSort_' + cid + '">';
-      html += '<button class="toggle-btn active" data-value="1" onclick="setFtToggleVal(\'ftSort_' + cid + '\',1);toggleDtSubsections(' + cid + ')">Statisch</button>';
-      html += '<button class="toggle-btn" data-value="2" onclick="setFtToggleVal(\'ftSort_' + cid + '\',2);toggleDtSubsections(' + cid + ')">Zeit</button>';
-      html += '</div></div>';
 
-      // Reihenfolge: Automatisch / Manuell
-      html += '<div id="ftOrderRow_' + cid + '">';
-      html += '<div class="form-row"><div><div class="form-label">Reihenfolge</div></div>';
-      html += '<div class="toggle-row" id="ftOrder_' + cid + '">';
-      html += '<button class="toggle-btn active" data-value="auto" onclick="setFtToggleVal(\'ftOrder_' + cid + '\',\'auto\');toggleDtSubsections(' + cid + ')">Automatisch</button>';
-      html += '<button class="toggle-btn" data-value="manual" onclick="setFtToggleVal(\'ftOrder_' + cid + '\',\'manual\');toggleDtSubsections(' + cid + ')">Manuell</button>';
-      html += '</div></div>';
-      // Alle Richtungen für diesen Display-Typ sammeln
+      // Alle Richtungen für diesen Display-Typ sammeln (fuer Gruppierung/Reihenfolge)
       var allDirs = [];
       dt.stations.forEach(function(s) {
         if (s.directions && s.directions.length > 0) {
@@ -9340,7 +9565,25 @@ function renderDisplayTypeSections() {
         }
       });
 
-      // === GRUPPIERUNG (VOR Reihenfolge) ===
+      // EIN Master-Schalter: Automatisch / Manuell. Automatisch = catch-it ordnet
+      // selbst (Details versteckt). Manuell oeffnet Sortierung + Gruppierung + Reihenfolge.
+      html += '<div class="form-row"><div><div class="form-label">Reihenfolge</div><div class="form-hint">Automatisch = catch-it ordnet selbst. Manuell = selbst festlegen.</div></div>';
+      html += '<div class="toggle-row" id="ftAdvMode_' + cid + '">';
+      html += '<button class="toggle-btn active" data-value="auto" onclick="setFtToggleVal(\'ftAdvMode_' + cid + '\',\'auto\');toggleDtSubsections(' + cid + ')">Automatisch</button>';
+      html += '<button class="toggle-btn" data-value="manual" onclick="setFtToggleVal(\'ftAdvMode_' + cid + '\',\'manual\');toggleDtSubsections(' + cid + ')">Manuell</button>';
+      html += '</div></div>';
+
+      // === Detail-Panel — nur bei Manuell sichtbar ===
+      html += '<div id="ftAdvPanel_' + cid + '" style="display:none;">';
+
+      // Sortierung: Statisch / Zeit
+      html += '<div class="form-row"><div><div class="form-label">Sortierung</div><div class="form-hint">Statisch = feste Reihenfolge · Zeit = chronologisch</div></div>';
+      html += '<div class="toggle-row" id="ftSort_' + cid + '">';
+      html += '<button class="toggle-btn active" data-value="1" onclick="setFtToggleVal(\'ftSort_' + cid + '\',1);toggleDtSubsections(' + cid + ')">Statisch</button>';
+      html += '<button class="toggle-btn" data-value="2" onclick="setFtToggleVal(\'ftSort_' + cid + '\',2);toggleDtSubsections(' + cid + ')">Zeit</button>';
+      html += '</div></div>';
+
+      // Gruppierung (nur bei Statisch)
       html += '<div id="ftGroupRow_' + cid + '">';
       html += '<div class="form-row"><div><div class="form-label">Gruppierung</div><div class="form-hint">Richtungen zusammenfassen die gleiche Strecke fahren</div></div>';
       html += '<div class="toggle-row" id="ftGroup_' + cid + '">';
@@ -9349,11 +9592,8 @@ function renderDisplayTypeSections() {
       html += '</div></div>';
       // Gruppierung Panel — Boxen-System wie index.html
       html += '<div id="ftGroupPanel_' + cid + '" style="display:none;margin-top:8px;">';
-      // Gruppen-Container (hier werden erstellte Gruppen angezeigt)
       html += '<div id="ftDtGroups_' + cid + '" style="margin-bottom:10px;"></div>';
-      // Neue Gruppe Button
       html += '<button onclick="startDtGroup(' + cid + ')" id="ftDtNewGroupBtn_' + cid + '" style="width:100%;padding:10px;background:rgba(66,133,244,0.08);border:1px dashed rgba(66,133,244,0.4);border-radius:8px;color:#4285f4;font-size:13px;cursor:pointer;margin-bottom:10px;">+ Neue Gruppe erstellen</button>';
-      // Neue Gruppe erstellen Panel (hidden)
       html += '<div id="ftDtNewGroupPanel_' + cid + '" style="display:none;background:#fff;border:2px solid #4285f4;border-radius:10px;margin-bottom:10px;overflow:hidden;">';
       html += '<div style="padding:8px 12px;background:rgba(66,133,244,0.1);font-weight:600;font-size:13px;color:#4285f4;">Neue Gruppe <span id="ftDtNewGroupCount_' + cid + '">(0 ausgewählt)</span></div>';
       html += '<div id="ftDtNewGroupSelected_' + cid + '" style="padding:10px;min-height:30px;display:flex;flex-wrap:wrap;gap:6px;"></div>';
@@ -9361,7 +9601,6 @@ function renderDisplayTypeSections() {
       html += '<button onclick="cancelDtGroup(' + cid + ')" style="flex:1;padding:8px;border:none;background:#f0f0f0;border-radius:8px;cursor:pointer;font-size:13px;">Abbrechen</button>';
       html += '<button onclick="confirmDtGroup(' + cid + ')" id="ftDtConfirmBtn_' + cid + '" disabled style="flex:1;padding:8px;border:none;background:#4285f4;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Gruppe erstellen</button>';
       html += '</div></div>';
-      // Pool: Verfügbare Richtungen
       html += '<div style="background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:10px;">';
       html += '<div style="font-size:12px;color:#888;margin-bottom:8px;">Verfügbare Richtungen:</div>';
       html += '<div id="ftDtPool_' + cid + '" style="display:flex;flex-wrap:wrap;gap:6px;">';
@@ -9372,23 +9611,18 @@ function renderDisplayTypeSections() {
         html += '</div>';
       });
       html += '</div></div>';
-      html += '</div>';
-      html += '</div>';
+      html += '</div>';   // ftGroupPanel
+      html += '</div>';   // ftGroupRow
 
-      // === REIHENFOLGE (NACH Gruppierung) ===
-      html += '<div id="ftOrderRow_' + cid + '">';
-      html += '<div class="form-row"><div><div class="form-label">Reihenfolge</div></div>';
-      html += '<div class="toggle-row" id="ftOrder_' + cid + '">';
-      html += '<button class="toggle-btn active" data-value="auto" onclick="setFtToggleVal(\'ftOrder_' + cid + '\',\'auto\');toggleDtSubsections(' + cid + ')">Automatisch</button>';
-      html += '<button class="toggle-btn" data-value="manual" onclick="setFtToggleVal(\'ftOrder_' + cid + '\',\'manual\');toggleDtSubsections(' + cid + ')">Manuell</button>';
-      html += '</div></div>';
-      // Manuelle Reihenfolge Liste (dynamisch gerendert)
+      // Reihenfolge Drag&Drop (nur bei Statisch) — kein separater Auto/Manuell-Toggle mehr
       html += '<div id="ftManualOrder_' + cid + '" style="display:none;margin-top:8px;padding:12px;background:#f8f9fa;border-radius:10px;">';
-      html += '<div class="form-hint" style="margin-bottom:8px;">Reihenfolge festlegen (Zeile 1 = oben)</div>';
+      html += '<div class="form-label" style="margin-bottom:4px;">Reihenfolge</div>';
+      html += '<div class="form-hint" style="margin-bottom:8px;">Zeile 1 = oben · ziehen zum Umsortieren</div>';
       html += '<div id="ftOrderList_' + cid + '"></div>';
       html += '</div>';
-      html += '</div>';
-      // allDirs für diese cid speichern für dynamisches Rendern
+
+      html += '</div>';   // ftAdvPanel
+
       if (!window._dtAllDirs) window._dtAllDirs = {};
       window._dtAllDirs[cid] = allDirs;
     }
@@ -9415,6 +9649,11 @@ function renderDisplayTypeSections() {
       var silberActive = (recommendedConfig && recommendedConfig.silberpfeil) ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Klimaanlage anzeigen</div></div>';
       html += '<div class="toggle-switch' + silberActive + '" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
+    }
+    if (f.delayHighlight) {
+      var dhActive = (recommendedConfig && recommendedConfig.delayHighlight) ? ' active' : '';
+      html += '<div class="form-row"><div><div class="form-label">Verspätung herausstechend</div><div class="form-hint">Zeigt "+X" farbig (orange/rot) und färbt die Abfahrtszeit</div></div>';
+      html += '<div class="toggle-switch' + dhActive + '" id="ftDelayHl_' + dt.colour + '" onclick="toggleFtSwitch(\'ftDelayHl_' + dt.colour + '\')"></div></div>';
     }
 
     // Info für Zug-Displays
@@ -9457,15 +9696,16 @@ function renderDisplayTypeSections() {
       html += '</div>';
     }
 
-    html += '</div>';
+    html += '</div>';   // .ft-display-body
+    html += '</div>';   // .config-card
   });
 
   container.innerHTML = html;
 
-  // Reihenfolge initial rendern für alle Display-Typen
+  // Reihenfolge initial rendern + initiale Sichtbarkeit (Panel versteckt bei Auto)
   types.forEach(function(dt) {
     var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
-    if (f.sorting) renderDtOrderList(dt.colour);
+    if (f.sorting) { renderDtOrderList(dt.colour); toggleDtSubsections(dt.colour); }
   });
 }
 
@@ -9732,23 +9972,25 @@ function moveFtOrderItem(listId, idx, dir) {
 }
 
 function toggleDtSubsections(cid) {
-  var sortVal = getFtToggleVal('ftSort_' + cid);
-  var orderVal = getFtToggleVal('ftOrder_' + cid);
-  var groupVal = getFtToggleVal('ftGroup_' + cid);
+  var advVal = getFtToggleVal('ftAdvMode_' + cid);   // auto / manual (Master)
+  var sortVal = getFtToggleVal('ftSort_' + cid);     // 1 = Statisch / 2 = Zeit
+  var groupVal = getFtToggleVal('ftGroup_' + cid);   // off / on
+  var manual = (advVal === 'manual');
 
-  // Reihenfolge + Gruppierung nur bei Statisch sichtbar
-  var orderRow = document.getElementById('ftOrderRow_' + cid);
+  // Detail-Panel nur bei Manuell
+  var advPanel = document.getElementById('ftAdvPanel_' + cid);
+  if (advPanel) advPanel.style.display = manual ? '' : 'none';
+
+  // Gruppierung + Reihenfolge nur bei Manuell UND Statisch sichtbar
   var groupRow = document.getElementById('ftGroupRow_' + cid);
-  if (orderRow) orderRow.style.display = sortVal === '1' ? '' : 'none';
-  if (groupRow) groupRow.style.display = sortVal === '1' ? '' : 'none';
+  if (groupRow) groupRow.style.display = (manual && sortVal === '1') ? '' : 'none';
 
-  // Manuelle Reihenfolge Liste nur bei Manuell sichtbar
   var manualOrder = document.getElementById('ftManualOrder_' + cid);
-  if (manualOrder) manualOrder.style.display = (sortVal === '1' && orderVal === 'manual') ? '' : 'none';
+  if (manualOrder) manualOrder.style.display = (manual && sortVal === '1') ? '' : 'none';
 
   // Gruppierung Panel nur bei An sichtbar
   var groupPanel = document.getElementById('ftGroupPanel_' + cid);
-  if (groupPanel) groupPanel.style.display = (sortVal === '1' && groupVal === 'on') ? '' : 'none';
+  if (groupPanel) groupPanel.style.display = (manual && sortVal === '1' && groupVal === 'on') ? '' : 'none';
 }
 
 function getFtToggleVal(containerId) {
@@ -9771,11 +10013,13 @@ async function initFinetuningStep() {
   var hasMultipleNetworks = uniqueNetworks.length > 1;
   var compactRow = document.getElementById('ftCompactSeparateRow');
   if (compactRow) compactRow.style.display = hasMultipleNetworks ? '' : 'none';
+  // Stil-Karten (Kompakt/Spielerisch) nur bei mehreren Netzen sinnvoll
+  var styleGrid = document.getElementById('ftStyleGrid');
+  if (styleGrid) styleGrid.style.display = hasMultipleNetworks ? '' : 'none';
 
-  // Per-Station colours initialisieren
+  // Per-Station colours initialisieren (robust gegen unmapped Netz-Keys)
   ftPerStationColour = stations.map(function(s) {
-    var nc = NETWORK_COLORS[s.network];
-    return nc ? nc.id : 1;
+    return netColourId(s.network);
   });
 
   // Multi-Display Status aus Schnellansicht übernehmen
@@ -9788,6 +10032,14 @@ async function initFinetuningStep() {
 
   // Display-Typ Sektionen rendern
   renderDisplayTypeSections();
+
+  // Anzeige-Stil-Karten: aktiven Status aus der tatsaechlichen Ansicht ableiten
+  // (getrennt = Spielerisch, kompakt = Kompakt). Nur visuell — kein Re-Render.
+  try {
+    if (typeof selectDisplayStyle === 'function') {
+      selectDisplayStyle(ftIsMultiDisplay ? 'playful' : 'compact');
+    }
+  } catch (e) {}
 
   // Rows + Schriftgröße aus gespeicherter Config in die per-Typ-Toggles laden
   initFtRowsAndFontSize(config);
@@ -10122,21 +10374,20 @@ function moveRowOrder(index, direction) {
 }
 
 function getRowOrderString() {
-  // NEUES KONZEPT: ftLineGroups ist die Reihenfolge
-  // Kombiniert Wien-Format (stopId:Linie) und Nicht-Wien-Format (Linie:Ziel)
-  // So können Wien und BODO/Linz auf einem Display gemischt werden!
+  // rowOrder enthaelt NUR Wien-Format-Eintraege (stopId:Linie).
+  // Non-Wien-Eintraege laufen ueber rowOrderDestination — sonst hat die Firmware,
+  // die rowOrder + rowOrderDestination kombiniert, die Non-Wien-Zeile doppelt
+  // (sichtbar als 2x "S45 -> Wien Huetteldorf" Duplikate).
 
   const items = [];
 
   ftLineGroups.forEach(group => {
     if (group.directions && group.directions.length > 0) {
-      // Sammle alle Einträge dieser Gruppe
       const groupItems = [];
       group.directions.forEach(key => {
         const dirInfo = ftAllDirections.find(d => d.key === key);
         if (!dirInfo) return;
 
-        // Finde die Station für diese Richtung
         let stationForDir = null;
         stations.forEach(station => {
           if (station.directions) {
@@ -10149,15 +10400,12 @@ function getRowOrderString() {
         });
 
         if (!stationForDir) return;
+        // Non-Wien skippen — kommt ueber rowOrderDestination
+        if (stationForDir.network !== 'WL') return;
 
-        let item;
-        if (stationForDir.network === 'WL') {
-          const stopIdParts = stationForDir.stopId.split(',');
-          const stopId = stopIdParts[0];
-          item = `${stopId}:${dirInfo.line}`;
-        } else {
-          item = `${dirInfo.line}:${dirInfo.towards}`;
-        }
+        const stopIdParts = stationForDir.stopId.split(',');
+        const stopId = stopIdParts[0];
+        const item = `${stopId}:${dirInfo.line}`;
 
         if (!groupItems.includes(item)) {
           groupItems.push(item);
@@ -10274,7 +10522,10 @@ function updateFinetuningPreview() {
       7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
       8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }],
       9: [{ line: '1', dest: 'La Defense', time: 2, timeStr: '14:22' }, { line: '4', dest: 'Porte de Clignancourt', time: 4, timeStr: '14:24' }, { line: '14', dest: 'Saint-Denis Pleyel', time: 6, timeStr: '14:26' }],
-      13: [{ line: '1', dest: 'Eggenberg/UKH', time: 3 }, { line: '3', dest: 'Krenngasse', time: 5 }, { line: '5', dest: 'Puntigam', time: 7 }, { line: '7', dest: 'LKH Med Uni', time: 10 }]
+      13: [{ line: '1', dest: 'Eggenberg/UKH', time: 3 }, { line: '3', dest: 'Krenngasse', time: 5 }, { line: '5', dest: 'Puntigam', time: 7 }, { line: '7', dest: 'LKH Med Uni', time: 10 }],
+      18: [{ line: 'U6', dest: 'Alt-Tegel', time: 3 }, { line: 'M10', dest: 'Warschauer Str.', time: 6 }, { line: '100', dest: 'Alexanderplatz', time: 9 }],
+      19: [{ line: '1', dest: 'Weiden West', time: 3 }, { line: '9', dest: 'Sülz', time: 6 }, { line: '18', dest: 'Klettenberg', time: 9 }],
+      20: [{ line: '3A', dest: 'Uniklinik', time: 4 }, { line: '5', dest: 'Kaiserplatz', time: 7 }, { line: '25', dest: 'Vaals', time: 11 }]
     };
     data = fallbackData[colour] || fallbackData[1];
   }
@@ -10380,6 +10631,19 @@ function updateFinetuningPreview() {
         </div>`).join('')}
     </div>`;
   }
+  else if (colour === 18 || colour === 19 || colour === 20) {
+    // Deutsche Städte (BVG/KVB/AVV): Bodo-Style, dunkelgrünes Linien-Badge
+    previewEl.style.background = '#1e2328';
+    previewEl.style.backgroundImage = 'none';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
+      ${data.map((dep, i) => `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;color:#fff;${i < data.length - 1 ? 'border-bottom:1px solid #32383e;' : ''}">
+          <span style="background:#1B5E20;color:#fff;border-radius:5px;padding:2px 7px;min-width:30px;text-align:center;font-weight:bold;font-size:14px;">${dep.line}</span>
+          <span style="flex:1;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:18px;">${dep.time}</span>
+        </div>`).join('')}
+    </div>`;
+  }
   else if (colour === 8) {
     // Salzburg Style: Schwarz/Weiß alternierend mit Uhrzeit
     previewEl.style.background = '#000';
@@ -10480,7 +10744,17 @@ function backFromFinetuning() {
   document.getElementById('stepFinetuning').classList.add('hidden');
   var ftBottom = document.getElementById('ftBottomActions');
   if (ftBottom) ftBottom.style.display = 'none';
-  document.getElementById('stepDisplayConfig').classList.remove('hidden');
+  // Der alte stepDisplayConfig-Screen existiert nicht mehr — immer zurueck zum
+  // neuen Wizard-Schritt "Erweitert" (Fallback: Stations-Karte).
+  var active = (typeof getActiveWizardSteps === 'function') ? getActiveWizardSteps() : [];
+  if (active.length > 0 && typeof wizardShowStep === 'function') {
+    wizardShowStep(active.length - 1);
+  } else {
+    var st = document.getElementById('stationsCard');
+    if (st) st.classList.remove('hidden');
+    var bb = document.querySelector('.bottom-bar');
+    if (bb) bb.style.display = '';
+  }
 }
 
 // ==================== FEINTUNING: LINZ LINIEN-FILTER ====================
@@ -11306,6 +11580,7 @@ function saveFromFinetuning() {
   let chopper = isFtToggleActive('ftChopperToggle') ? 1 : 0;
   let silberpfeil = isFtToggleActive('ftSilberpfeilToggle') ? 1 : 0;
   let niederflurBlink = (recommendedConfig && recommendedConfig.niederflurBlink) ? 1 : 0;
+  let delayHighlight = (recommendedConfig && recommendedConfig.delayHighlight) ? 1 : 0;
 
   // Werte aus per-Display-Typ Sektionen lesen
   types.forEach(function(dt) {
@@ -11314,7 +11589,11 @@ function saveFromFinetuning() {
       rows = parseInt(getFtToggleVal('ftRows_' + dt.colour)) || rows;
     }
     if (f.sorting) {
-      sortMode = parseInt(getFtToggleVal('ftSort_' + dt.colour)) || sortMode;
+      // Per-Display-Sortierung nur uebernehmen wenn der Master auf "Manuell" steht.
+      // Bei "Automatisch" bleibt der auto-berechnete sortMode erhalten.
+      if (getFtToggleVal('ftAdvMode_' + dt.colour) === 'manual') {
+        sortMode = parseInt(getFtToggleVal('ftSort_' + dt.colour)) || sortMode;
+      }
     }
     if (f.textColor) {
       textColor = parseInt(getFtToggleVal('ftTxtCol_' + dt.colour)) || textColor;
@@ -11328,6 +11607,9 @@ function saveFromFinetuning() {
     }
     if (f.silberpfeil) {
       silberpfeil = isFtToggleActive('ftSilber_' + dt.colour) ? 1 : 0;
+    }
+    if (f.delayHighlight) {
+      delayHighlight = isFtToggleActive('ftDelayHl_' + dt.colour) ? 1 : 0;
     }
   });
 
@@ -11372,6 +11654,7 @@ function saveFromFinetuning() {
   recommendedConfig.rows = rows;
   recommendedConfig.displayLight = displayLight;
   recommendedConfig.textColor = textColor;  // Wien Schriftfarbe
+  recommendedConfig.delayHighlight = delayHighlight;
   recommendedConfig.chopper = chopper;
   recommendedConfig.silberpfeil = silberpfeil;
   recommendedConfig.niederflurBlink = niederflurBlink;
@@ -11479,6 +11762,7 @@ function sendConfigToDeviceDirect(config) {
     chopper: String(config.chopper),
     silberpfeil: String(config.silberpfeil),
     niederflurblink: String(config.niederflurBlink || 0),
+    delayhighlight: String(config.delayHighlight || 0),
     colour: String(config.colour),
     displaylight: String(config.displayLight),
     textcolor: String(config.textColor || 1),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
@@ -11558,6 +11842,7 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('chopper', configData.chopper);
     formData.append('silberpfeil', configData.silberpfeil);
     formData.append('niederflurblink', configData.niederflurblink);
+    formData.append('delayhighlight', configData.delayhighlight);
     formData.append('colour', configData.colour);
     formData.append('displaylight', configData.displaylight);
     formData.append('textcolor', configData.textcolor);  // Wien Schriftfarbe
@@ -12135,6 +12420,12 @@ async function handleConfigMessage(data) {
     } else if (data.config.niederflurblink !== undefined) {
       // Fallback fuer das Form-Feldnamen-Format
       recommendedConfig.niederflurBlink = parseInt(data.config.niederflurblink) || 0;
+    }
+    // delay_highlight (Verspaetungs-Hervorhebung OEBB)
+    if (data.config.delay_highlight !== undefined) {
+      recommendedConfig.delayHighlight = parseInt(data.config.delay_highlight) || 0;
+    } else if (data.config.delayhighlight !== undefined) {
+      recommendedConfig.delayHighlight = parseInt(data.config.delayhighlight) || 0;
     }
     // Wien Schriftfarbe
     if (data.config.text_color !== undefined) {
