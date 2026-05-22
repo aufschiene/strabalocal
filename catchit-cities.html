@@ -405,6 +405,14 @@
       background: #0055A4;
       color: #fff;
     }
+    /* Wien S-Bahn Stammstrecke - Pink/Magenta */
+    .line-badge.type-stamm {
+      background: #c50057;
+      color: #fff;
+    }
+    .line-group.is-stamm .line-name { color: #c50057; }
+    .line-group.is-stamm .direction-option.selected { border-color: #c50057; background: #ffeef4; }
+    .line-group.is-stamm .direction-option.selected .checkbox { background: #c50057; color: #fff; }
     /* O-Bus / Trolleybus - Orange */
     .line-badge.type-obus {
       background: #e67700;
@@ -4306,6 +4314,22 @@ let stamm_deselectedProdukte = new Set(); // Default: alle an
 const STAMM_RICHTUNG_R1 = '1';  // Richtung Meidling (Gleis 1-2)
 const STAMM_RICHTUNG_R2 = '2';  // Richtung Floridsdorf (Gleis 3-4)
 
+// Stammstrecken-Stationen (Wiener Stammstrecke Floridsdorf↔Meidling). Wenn der
+// User im normalen OEBB-Flow eine dieser Stationen wählt, kommt automatisch der
+// vereinfachte 2-Richtungs-Picker (statt einer Liste aller S-Bahn-Endziele).
+const STAMM_STATION_KEYS = [
+  'floridsdorf', 'handelskai', 'praterstern', 'traisengasse',
+  'wien mitte', 'rennweg', 'quartier belvedere',
+  'hauptbahnhof', 'matzleinsdorf', 'meidling'
+];
+function isStammstreckeStation(stopName) {
+  if (!stopName) return false;
+  const n = stopName.toLowerCase();
+  // Muss in Wien sein
+  if (!n.includes('wien')) return false;
+  return STAMM_STATION_KEYS.some(k => n.includes(k));
+}
+
 // ==================== DOM ====================
 const stepRegion = document.getElementById('stepRegion');
 const stepNetwork = document.getElementById('stepNetwork');
@@ -6223,8 +6247,17 @@ async function selectStop(id, name) {
     return;
   }
 
-  // OEBB Stammstrecke: Richtung + Produktfilter (kein Departures-Call nötig)
-  if (selectedNetwork === 'OEBB_STAMM_SBAHN') {
+  // OEBB Stammstrecke: Richtung + Produktfilter (kein Departures-Call nötig).
+  // Kickt auch im normalen OEBB-Flow auto-magisch ein, wenn der User eine
+  // Stammstrecken-Station (Floridsdorf, Praterstern, Wien Mitte, …) wählt.
+  const isOebbContext = (selectedNetwork || '').startsWith('OEBB');
+  const isStammStation = isOebbContext && isStammstreckeStation(selectedStop?.name || name);
+  if (selectedNetwork === 'OEBB_STAMM_SBAHN' || isStammStation) {
+    // Bei Auto-Detection: Netzwerk fuer den weiteren Flow auf STAMM_SBAHN umschalten,
+    // damit Save-Logik (richtungsId R1/R2) + Server-Routing (Platform-Logik) greifen.
+    if (isStammStation && selectedNetwork !== 'OEBB_STAMM_SBAHN') {
+      selectedNetwork = 'OEBB_STAMM_SBAHN';
+    }
     stamm_selectedRichtungen = new Set(['floridsdorf', 'meidling']);
     stamm_deselectedProdukte = new Set();
     showStep('lines');
@@ -6411,7 +6444,17 @@ function isRegionalOebbNetwork() {
 
 function renderLines() {
   if (availableLines.length === 0) {
-    linesList.innerHTML = '<div class="no-results">Keine Abfahrten gefunden</div>';
+    // Bei OEBB-Stations: oft sind das HAFAS-Subknoten ohne echte Bahn-Abfahrten
+    // (Tram-/Bus-Halte im Bahn-Index). Zur Haupt-Station zurueck-routen.
+    const isOebbCtx = (selectedNetwork || '').startsWith('OEBB');
+    const hint = isOebbCtx
+      ? 'Diese Station wird vom Bahn-Netz nicht bedient. Wähle eine andere Variante in der Suche (z.B. "Wien Hernals" statt "Wien Hernalser …").'
+      : 'Aktuell keine Abfahrten für diese Station verfügbar.';
+    linesList.innerHTML = '<div class="no-results" style="text-align:center;padding:24px 16px;color:#666;line-height:1.5;">' +
+      '<div style="font-weight:600;margin-bottom:8px;color:#333;">Keine Abfahrten gefunden</div>' +
+      '<div style="font-size:13px;">' + hint + '</div>' +
+      '<button onclick="goBack(\'search\')" style="margin-top:16px;padding:10px 18px;border:1px solid #ddd;background:#fff;border-radius:8px;color:#0055a4;cursor:pointer;font-weight:600;">&larr; Andere Station wählen</button>' +
+    '</div>';
     return;
   }
 
@@ -6950,41 +6993,38 @@ function toggleOebbGattung(gattung) {
 // ==================== STAMMSTRECKE CONFIG ====================
 function renderStammstreckeConfig() {
   const linesList = document.getElementById('linesList');
-  const stationName = selectedStop?.name || '';
 
-  // Header anpassen
-  document.querySelector('#linesContainer .lines-header h3').textContent = 'Stammstrecke konfigurieren';
+  // Header wie bei normaler Linien-Wahl
+  document.querySelector('#linesContainer .lines-header h3').textContent = 'Linien auswählen:';
   document.getElementById('selectAllBtn').style.display = 'none';
-  addStationBtn.style.display = 'none';  // Versteckt — alles über fixierten saveBtn
+  addStationBtn.style.display = 'none';
   addStationBtn.disabled = stamm_selectedRichtungen.size === 0;
   addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
 
-  let html = '';
-
-  // Station
-  html += `<div class="oebb-from-label">Station: <strong>${stationName}</strong></div>`;
-
-  // Richtungswahl
-  html += `<div class="strecke-section-title">Richtung</div>`;
-  html += `<div class="strecke-gattungen-filter">`;
+  // Eine "virtuelle" Linie "S-Bahn Stammstrecke" mit 2 Richtungs-Options. Optik
+  // identisch zum normalen Line-Group-Layout (Badge + Name + Direction-Cards).
   const richtungen = [
     { id: 'floridsdorf', label: 'Richtung Floridsdorf' },
-    { id: 'meidling', label: 'Richtung Meidling' }
+    { id: 'meidling',    label: 'Richtung Meidling' }
   ];
+
+  let html = `<div class="line-group is-stamm">
+    <div class="line-group-header">
+      <div class="line-badge type-stamm">S</div>
+      <div class="line-name">S-Bahn Stammstrecke</div>
+    </div>
+    <div class="line-directions">`;
+
   for (const r of richtungen) {
     const isOn = stamm_selectedRichtungen.has(r.id);
-    html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleStammRichtung('${r.id}')">${r.label}</span>`;
+    html += `
+      <div class="direction-option ${isOn ? 'selected' : ''}" onclick="toggleStammRichtung('${r.id}')">
+        <div class="checkbox">${isOn ? '✓' : ''}</div>
+        <div class="direction-text">${r.label}</div>
+      </div>`;
   }
-  html += `</div>`;
 
-  // Produktfilter
-  html += `<div class="strecke-section-title">Zugarten</div>`;
-  html += `<div class="strecke-gattungen-filter">`;
-  for (const p of STAMM_PRODUKTE) {
-    const isOn = !stamm_deselectedProdukte.has(p);
-    html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleStammProdukt('${p}')">${p}</span>`;
-  }
-  html += `</div>`;
+  html += `</div></div>`;
 
   linesList.innerHTML = html;
 }
@@ -6995,20 +7035,17 @@ function toggleStammRichtung(id) {
   } else {
     stamm_selectedRichtungen.add(id);
   }
-  addStationBtn.disabled = stamm_selectedRichtungen.size === 0;
-  // Update chips
-  document.querySelectorAll('.gattung-chip').forEach(chip => {
-    const text = chip.textContent;
-    const richtungMatch = text.startsWith('Richtung ');
-    if (richtungMatch) {
-      const rid = text.includes('Floridsdorf') ? 'floridsdorf' : 'meidling';
-      if (stamm_selectedRichtungen.has(rid)) {
-        chip.classList.add('on'); chip.classList.remove('off');
-      } else {
-        chip.classList.remove('on'); chip.classList.add('off');
-      }
-    }
-  });
+  // Save-Button-State + komplette Linien-Card neu zeichnen.
+  // Diese Implementierung nutzt das normale direction-option-Layout, daher
+  // re-rendern wir einfach die ganze Card statt einzelne Chips zu mutieren.
+  if (typeof addStationBtn !== 'undefined' && addStationBtn) {
+    addStationBtn.disabled = stamm_selectedRichtungen.size === 0;
+  }
+  renderStammstreckeConfig();
+  // saveBtn (bottom bar) auch synchron halten — er wird in showStep() gesetzt,
+  // aber dort ist `selectedLines.size === 0`-Check. Wir aktualisieren manuell:
+  const saveBtn = document.getElementById('saveBtn');
+  if (saveBtn) saveBtn.disabled = stamm_selectedRichtungen.size === 0;
 }
 
 function toggleStammProdukt(produkt) {
@@ -8219,8 +8256,13 @@ function getDirectionKey(dir, network) {
   if (dir.richtungsId && hasStableRichtungsId(network)) {
     return `${dir.line}:${dir.richtungsId}`;
   }
-  // ÖBB Regional: Direction-Buchstabe wenn vorhanden (z.B. S3A, S3B)
-  // Der "Mindestens bis" Filter wird separat über bisTargets gelöst
+  // ÖBB Regional: directionLetter ist nur ein UI-Label fuer die Gruppierung.
+  // Die Firmware kann "S45A" nicht matchen (Trainboard hat hash-richtungsIds
+  // und keine stopovers). Stattdessen den Ziel-Text verwenden — den kann
+  // die Firmware ueber partial-match gegen destination matchen.
+  if (dir.directionLetter && dir.towards) {
+    return `${dir.line}:${dir.towards}`;
+  }
   if (dir.directionLetter) {
     return `${dir.line}:${dir.line}${dir.directionLetter}`;
   }
@@ -8238,7 +8280,10 @@ function getDirectionFilterKey(dir, network) {
   if (dir.bisTargets && dir.bisTargets.length > 0) {
     return `${dir.line}:${dir.bisTargets.join('|')}`;
   }
-  // Standard: Direction-Buchstabe (alle Züge dieser Richtung)
+  // ÖBB Regional: directionLetter ist UI-Label, Firmware braucht Zieltext
+  if (dir.directionLetter && dir.towards) {
+    return `${dir.line}:${dir.towards}`;
+  }
   if (dir.directionLetter) {
     return `${dir.line}:${dir.line}${dir.directionLetter}`;
   }
@@ -8268,11 +8313,14 @@ function buildLineFilterDestination(stationsList) {
         return;
       }
 
-      // ÖBB Regional mit Direction-Buchstabe: Direction-ID als Filter (alle Züge)
+      // ÖBB Regional mit Direction-Buchstabe: directionLetter ist nur ein UI-Label
+      // (A/B fuer die Richtungsgruppierung). Die Firmware kann "S45A" nirgendwo
+      // matchen — Trainboard liefert hash-richtungsIds und keine stopovers.
+      // Stattdessen den Ziel-Text verwenden (Firmware hat partial-match auf dest).
       if (dir.directionLetter) {
         if (!lineToDestinations[line]) lineToDestinations[line] = [];
-        const dirId = `${line}${dir.directionLetter}`;
-        if (!lineToDestinations[line].includes(dirId)) lineToDestinations[line].push(dirId);
+        const target = dir.towards || `${line}${dir.directionLetter}`;
+        if (!lineToDestinations[line].includes(target)) lineToDestinations[line].push(target);
         return;
       }
 
