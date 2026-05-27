@@ -158,6 +158,85 @@
     }
 
     /* Display-Hero: Foto-Banner mit Stadt-Titel oben drauf (über dem Preset-Grid) */
+    /* Länder-Dropdown (ersetzt die lange Foto-Liste) */
+    .country-select {
+      width: 100%;
+      padding: 14px 44px 14px 16px;
+      font-size: 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      background-color: #fff;
+      color: #333;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='8' viewBox='0 0 14 8'%3E%3Cpath fill='%23666' d='M1 1l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+    }
+    .country-select:focus { outline: none; border-color: #0055a4; box-shadow: 0 0 0 3px rgba(0,85,164,0.12); }
+
+    /* Land-Intro: fokussierter, smoother Einstieg */
+    @keyframes introRise {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes introIconPop {
+      0%   { opacity: 0; transform: scale(.6); }
+      60%  { transform: scale(1.08); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    #stepRegion.country-chooser {
+      background: radial-gradient(120% 90% at 50% 0%, #f3f8ff 0%, #ffffff 60%);
+      border: 1px solid #e6edf7;
+      padding: 40px 24px 30px;
+      text-align: center;
+      animation: introRise .5s cubic-bezier(.2,.7,.3,1) both;
+    }
+    .country-intro-icon {
+      width: 76px; height: 76px; margin: 0 auto 20px;
+      border-radius: 22px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #1a78d6 0%, #0a4a99 100%);
+      box-shadow: 0 10px 24px rgba(0,85,164,0.30);
+      animation: introIconPop .5s .08s cubic-bezier(.2,.9,.3,1.2) both;
+    }
+    .country-intro-icon svg { width: 40px; height: 40px; }
+    #stepRegion.country-chooser h2 {
+      font-size: 23px; font-weight: 800; color: #1d2530;
+      margin: 0 0 8px; letter-spacing: -0.2px;
+    }
+    .country-intro-sub {
+      font-size: 14px; color: #6b7480; line-height: 1.55;
+      max-width: 330px; margin: 0 auto 24px;
+    }
+    #stepRegion.country-chooser .country-select {
+      max-width: 360px; margin: 0 auto; text-align: left; font-weight: 600;
+    }
+    .country-intro-hint {
+      font-size: 12px; color: #9aa3ad; margin: 16px auto 0;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+
+    /* Fernverkehr (Korridor-Titel dynamisch: Westbahn, Südstrecke, Tauernbahn …) +
+       2-Richtungen-Checkboxen + farbige Zugtyp-Chips */
+    .fv-corridor-title { font-weight: 800; font-size: 12px; color: #9aa3ad; text-transform: uppercase; letter-spacing: 0.05em; margin: 2px 4px 12px; }
+    .fv-dir { background: #fff; border: 1px solid #e6e9ee; border-radius: 14px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+    .fv-dir-header { display: flex; align-items: center; gap: 10px; padding: 15px 16px; cursor: pointer; user-select: none; }
+    .fv-dir-header:hover { background: #f7f9fc; }
+    .fv-chevron { color: #0055a4; font-size: 13px; width: 14px; flex: none; }
+    .fv-dir-name { font-weight: 700; font-size: 16px; color: #1d2530; flex: 1; }
+    .fv-dir-summary { font-size: 12px; color: #9aa3ad; }
+    .fv-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 16px 16px; }
+    .fv-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 8px 16px; font-weight: 700; font-size: 14px; cursor: pointer; border: 2px solid #dfe3e8; background: #fff; color: #9aa3ad; transition: transform 0.1s; }
+    .fv-chip.on { color: #fff; }
+    .fv-chip.off { opacity: 0.85; }
+    .fv-chip:active { transform: scale(0.95); }
+    .fv-chip-mark { font-size: 13px; margin-right: 6px; opacity: 0.95; }
+    .fv-feature-filter { background: #fff; border: 1px solid #e6e9ee; border-radius: 14px; padding: 14px 16px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+    .fv-filter-label { font-size: 12px; font-weight: 700; color: #9aa3ad; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+    .fv-filter-hint { font-size: 12px; color: #9aa3ad; font-weight: 400; margin-bottom: 12px; }
+
     .display-hero {
       position: relative;
       height: 150px;
@@ -335,7 +414,7 @@
       padding: 14px 16px;
       cursor: pointer;
       transition: all 0.15s;
-      border-bottom: 1px solid #f0f0f0;
+      border-bottom: 2px solid #e3e7ec;
     }
     .search-result-item:last-child { border-bottom: none; }
     .search-result-item:hover { background: #f8f8f8; }
@@ -2456,6 +2535,19 @@
       background: #0055a4;
       color: #fff;
     }
+    /* Farb-Wahl-Buttons (Schrift- und Hintergrundfarbe) - inaktiv ausgegraut */
+    .ft-color-btn {
+      opacity: 0.32;
+      filter: grayscale(0.7);
+      border: 2px solid transparent !important;
+      transition: all 0.15s;
+    }
+    .ft-color-btn.active {
+      opacity: 1;
+      filter: none;
+      border: 2px solid #222 !important;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+    }
 
     /* ==================== Display-Stil Schritt (kompakt vs. spielerisch) ==================== */
     .display-style-grid {
@@ -2536,6 +2628,38 @@
     .preview-frame.wien .line .dest {
       font-weight: 500;
       opacity: 0.9;
+    }
+
+    /* BVG-Look: Schwarz + Orange-LED, Stationsname-Footer in Weiß */
+    .preview-frame.bvg {
+      background: #000;
+      color: #ff8c00;
+      justify-content: flex-start;
+      padding: 4px 6px 0;
+      gap: 0;
+    }
+    .preview-frame.bvg .line {
+      font-size: 8.5px;
+      line-height: 1.15;
+      gap: 4px;
+    }
+    .preview-frame.bvg .line .num { font-weight: 900; }
+    .preview-frame.bvg .line .dest { font-weight: 500; opacity: 0.95; }
+    .preview-frame.bvg.big .line {
+      font-size: 14px;
+      line-height: 1.25;
+      padding: 2px 0;
+    }
+    .preview-frame.bvg.big .line .dest { font-size: 9px; }
+    .preview-frame.bvg .bvg-footer {
+      margin: auto -6px 0;
+      padding: 1px 6px;
+      background: #fff;
+      color: #000;
+      font-size: 7.5px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      line-height: 1.4;
     }
 
     /* ÖBB-Look: kräftiges ÖBB-Blau + Weiß + gelbe Echtzeit + Hierarchie */
@@ -2794,34 +2918,21 @@
     </div>
   </div>
 
-  <!-- Step 1: Region (mit Stadt-Fotos pro Land) -->
-  <div class="card" id="stepRegion">
-    <h2>Land wählen</h2>
-    <p style="color:#666;font-size:13px;margin-bottom:16px;">In welchem Land sind die Stationen, die du anzeigen willst?</p>
-    <div class="region-photo-grid">
-      <button class="region-photo-card" style="background-image:url('Stadt%20fotos/Wien.jpg');" onclick="selectRegion('AT')">
-        <div class="name">Österreich</div>
-      </button>
-      <button class="region-photo-card" style="background-image:url('Stadt%20fotos/berlin.jpg');" onclick="selectRegion('DE')">
-        <div class="name">Deutschland</div>
-      </button>
-      <button class="region-photo-card" style="background-image:url('Stadt%20fotos/Lichtenstein.jpg');background-position:center bottom;" onclick="selectRegion('LI')">
-        <div class="name">Liechtenstein</div>
-      </button>
-      <button class="region-photo-card" style="background-image:url('Stadt%20fotos/Paris.jpg');" onclick="selectRegion('FR')">
-        <div class="name">Frankreich</div>
-      </button>
-      <button class="region-photo-card" style="background-image:url('Stadt%20fotos/Prag.jpg');" onclick="selectRegion('CZ')">
-        <div class="name">Tschechien</div>
-      </button>
-      <button class="region-photo-card disabled" style="background-image:url('Stadt%20fotos/Bratislava.jpg');" onclick="showRegionComingSoon('Slowakei')">
-        <span class="photo-pending">Bald</span>
-        <div class="name">Slowakei</div>
-      </button>
+  <!-- Step 1: Land-Auswahl (fokussierter Intro-Screen mit Dropdown) -->
+  <div class="card country-chooser" id="stepRegion">
+    <div class="country-intro-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M3 12h18"/>
+        <path d="M12 3c2.6 2.6 3.9 5.9 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.9-3.9-9S9.4 5.6 12 3z"/>
+      </svg>
     </div>
-    <p style="text-align:center;color:#aaa;font-size:12px;font-style:italic;margin-top:14px;">
-      Weitere Länder folgen…
-    </p>
+    <h2>Wo bist du unterwegs?</h2>
+    <p class="country-intro-sub">Wähle dein Land – wir zeigen dir sofort die passenden Regionen, Netze &amp; Linien.</p>
+    <select id="countrySelect" class="country-select" onchange="onCountrySelectChange(this.value)">
+      <option value="">Land wählen…</option>
+    </select>
+    <p class="country-intro-hint">🚆 Über 30 Städte &amp; Bahnnetze in Europa</p>
   </div>
   
   <!-- Step 2: Network (oder Bundesland bei AT) -->
@@ -3106,6 +3217,49 @@
   </div>
 
   <!-- Wizard-Schritt: Gehweg-Filter -->
+  <!-- Wizard-Schritt: BVG Schriftgröße (nur bei Berlin-Stationen) -->
+  <div class="card hidden" id="stepWizardBvgRows">
+    <h2>Wie soll dein BVG-Display aussehen?</h2>
+    <p style="color:#666;font-size:13px;margin-bottom:16px;">Wähle die Darstellung. Du kannst das später im Feintuning ändern.</p>
+
+    <div class="display-style-grid">
+      <button class="display-style-btn" data-value="small" onclick="selectBvgRowsStyle('small')">
+        <div class="style-preview compact">
+          <div class="preview-frame bvg">
+            <div class="line"><span class="num">U2</span><span class="dest">Pankow</span><span class="min">3'</span></div>
+            <div class="line"><span class="num">M4</span><span class="dest">Hackesch.</span><span class="min">5'</span></div>
+            <div class="line"><span class="num">12</span><span class="dest">Pasedag.</span><span class="min">8'</span></div>
+            <div class="line"><span class="num">M2</span><span class="dest">Heinersd.</span><span class="min">11'</span></div>
+            <div class="bvg-footer">Alexanderplatz</div>
+          </div>
+        </div>
+        <div class="label-box">
+          <div class="name">Klein · 4 Zeilen</div>
+          <div class="desc">Mehr Abfahrten gleichzeitig — kompakte Schrift, sehr viele Linien auf einen Blick.</div>
+        </div>
+      </button>
+
+      <button class="display-style-btn" data-value="big" onclick="selectBvgRowsStyle('big')">
+        <div class="style-preview compact">
+          <div class="preview-frame bvg big">
+            <div class="line"><span class="num">U2</span><span class="dest">Pankow</span><span class="min">3'</span></div>
+            <div class="line"><span class="num">M4</span><span class="dest">Hackesch.</span><span class="min">5'</span></div>
+            <div class="bvg-footer">Alexanderplatz</div>
+          </div>
+        </div>
+        <div class="label-box">
+          <div class="name">Groß · 2 Zeilen</div>
+          <div class="desc">Größere LED-Punkte — auch aus der Distanz gut lesbar, weniger Linien auf einmal.</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="wizard-step-actions">
+      <button class="btn btn-secondary" onclick="wizardBack()">Zurück</button>
+      <button class="btn btn-primary" id="wizardBvgRowsNextBtn" onclick="wizardNext()" disabled>Weiter</button>
+    </div>
+  </div>
+
   <div class="card hidden" id="stepWizardGehweg">
     <h2>Gehweg zur Haltestelle</h2>
     <p style="color:#666;font-size:13px;margin-bottom:16px;line-height:1.5;">
@@ -3392,8 +3546,7 @@
       <option value="8">Salzburg AG</option>
       <option value="9">RATP Paris</option>
       <option value="10">Straba Ansicht</option>
-      <option value="11">ÖBB Fernverkehr</option>
-      <option value="12">ÖBB S-Bahn</option>
+      <option value="12">ÖBB</option>
       <option value="13">Holding Graz</option>
       <option value="14">Westbahn</option>
       <option value="15">Liechtenstein / Schweiz Nahverkehr</option>
@@ -3481,7 +3634,7 @@ window.addEventListener('message', function(event) {
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
+    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'INNSBRUCK', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
     // Verkehrsart → dann Bundesland oder direkt Netzwerk
     verkehrsarten: {
       stadt: {
@@ -3492,41 +3645,34 @@ const REGIONS = {
           AT_W: { name: 'Wien', wappen: 'wien', desc: 'U-Bahn, Tram, Bus, Badner Bahn', networks: ['WL', 'WLB'] },
           AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus', networks: ['LINZ'] },
           AT_STMK: { name: 'Steiermark', wappen: 'stmk', desc: 'Straßenbahn, Bus', networks: ['STV'] },
-          AT_SBG: { name: 'Salzburg', wappen: 'sbg', desc: 'Obus, Lokalbahn', networks: ['SALZBURG'] }
+          AT_SBG: { name: 'Salzburg', wappen: 'sbg', desc: 'Obus, Lokalbahn', networks: ['SALZBURG'] },
+          AT_T: { name: 'Tirol & Vorarlberg', wappen: 'tirol', desc: 'Bus, Tram, Obus', networks: ['INNSBRUCK'] }
         }
       },
-      zug: {
-        name: 'Zugverkehr',
-        icon: '\uD83D\uDE86',
-        desc: 'ÖBB, Westbahn',
-        subCategories: {
-          nah: { name: 'Nahverkehr', icon: '🚈', desc: 'S-Bahn, REX, Regionalzug, IR', networks: ['OEBB_REGIONAL'] },
-          fern: { name: 'Fernverkehr', icon: '🚄', desc: 'Railjet, IC, EC, Nightjet, Westbahn', networks: ['OEBB_FERN', 'WESTBAHN'] }
-        }
-      }
+      // 'zug' verkehrsart entfernt — Fernverkehr/Regional läuft jetzt ausschließlich
+      // über die Fernverkehr-Kachel bzw. den Bundesland-WESTBAHN-Button
+      // (siehe DISPLAY_PRESETS.westbahn). Eine "Zugverkehr"-Zwischenebene gibt es nicht mehr.
     },
     // Legacy subRegions für Kompatibilität (wird von verkehrsarten ersetzt)
     subRegions: {}
   },
   DE: {
     name: 'Deutschland',
-    networks: ['DB', 'BERLIN', 'BODO']
+    networks: ['DB', 'BERLIN', 'KOELN', 'AACHEN', 'BODO']
   },
   CH: {
     name: 'Schweiz',
-    networks: []
+    // Eine Schnittstelle für die ganze Schweiz: entweder Öffis (Bus/Tram) oder Zug.
+    networks: ['CH_OEFFI', 'SBB']
   },
   FR: {
     name: 'Frankreich',
-    networks: ['PARIS']
+    networks: ['PARIS', 'SNCF']
   },
   NL: {
     name: 'Niederlande',
-    networks: ['GVB', 'RET'],
-    subRegions: {
-      NL_AMS: { name: 'Amsterdam', desc: 'Metro, Tram, Bus, Fähre (GVB)', networks: ['GVB'] },
-      NL_RTD: { name: 'Rotterdam', desc: 'Tram, Bus (RET)', networks: ['RET'] }
-    }
+    // Zwei Live-Optionen (Trainboard): Amsterdam Öffis ODER Züge NS landesweit.
+    networks: ['GVB', 'NS']
   },
   LI: {
     name: 'Liechtenstein',
@@ -3538,8 +3684,21 @@ const REGIONS = {
   },
   DK: {
     name: 'Dänemark',
-    networks: []
-  }
+    networks: ['REJSEPLANEN']
+  },
+  // ===== NEU: weitere Länder (Trainboard) =====
+  GB:  { name: 'Großbritannien', networks: ['LONDON', 'UKRAIL'] },
+  HU:  { name: 'Ungarn',         networks: ['BUDAPEST'] },
+  SI:  { name: 'Slowenien',      networks: ['LJUBLJANA'] },
+  IT:  { name: 'Italien',        networks: ['TRENITALIA'] },
+  NO:  { name: 'Norwegen',       networks: ['VY'] },
+  SE:  { name: 'Schweden',       networks: ['TRAFIKLAB'] },
+  FI:  { name: 'Finnland',       networks: ['HELSINKI', 'VR'] },
+  EE:  { name: 'Estland',        networks: ['PEATUS'] },
+  IE:  { name: 'Irland',         networks: ['IRISHRAIL'] },
+  BE:  { name: 'Belgien',        networks: ['SNCB'] },
+  LU:  { name: 'Luxemburg',      networks: ['CFL'] },
+  INT: { name: 'International',   networks: ['FLIXBUS', 'EUSLEEPER'] }
 };
 
 // ==================== CITY CAPABILITIES ====================
@@ -3779,7 +3938,33 @@ const CITY_CAPABILITIES = {
     nightMode: true,
     defaultColour: 13,            // Holding Graz
     defaultBrightness: 3
-  }
+  },
+
+  // ===== NEU: Trainboard-Netze =====
+  // defaultColour = Firmware-Display (DisplayFactory). Netze ohne eigenen
+  // Renderer -> colour 1 (DisplayWien = "WL Standard"-Fallback der main.cpp).
+  // Schweiz -> colour 15 (DisplayLiechtenstein / SBB-Renderer).
+  LONDON:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  BUDAPEST:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  CH_OEFFI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 15, defaultBrightness: 3 },
+  HELSINKI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  INNSBRUCK:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  LJUBLJANA:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  SBB:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 15, defaultBrightness: 3 },
+  NS:         { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  SNCF:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  UKRAIL:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  TRENITALIA: { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  VY:         { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  TRAFIKLAB:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  REJSEPLANEN:{ textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  VR:         { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  PEATUS:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  IRISHRAIL:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  SNCB:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  CFL:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  FLIXBUS:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  EUSLEEPER:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 }
 };
 
 const NETWORKS = {
@@ -3984,12 +4169,13 @@ const NETWORKS = {
     isJourneyBased: false
   },
   WESTBAHN: {
-    name: 'Westbahn',
-    shortName: 'WB',
+    name: 'Fernverkehr',
+    shortName: 'FV',
     region: 'AT',
-    desc: 'Westbahn (Wien Westbahnhof \u2194 Salzburg)',
-    searchType: 'static_list',
-    placeholder: 'Westbahn-Station auswählen...',
+    desc: '\u00d6BB/Westbahn',
+    searchType: 'trainboard',
+    trainboard: { path: '/at' },
+    placeholder: 'z.B. Wien, Linz, Salzburg, Graz, Villach...',
     isJourneyBased: false,
     stations: [
       { id: '1291501', name: 'Wien Westbahnhof', info: 'Westbahn' },
@@ -4137,11 +4323,12 @@ const NETWORKS = {
     isJourneyBased: false
   },
   GVB: {
-    name: 'GVB Amsterdam',
+    name: 'Amsterdam (Öffis)',
     shortName: 'GVB',
     region: 'NL',
-    desc: 'Metro, Tram, Bus, Fähre',
-    searchType: 'server_proxy',
+    desc: 'Metro, Tram, Bus, Fähre – live',
+    searchType: 'trainboard',
+    trainboard: { path: '/nl/amsterdam' },
     placeholder: 'z.B. Centraal, Dam, Leidseplein...',
     isJourneyBased: false,
     fallbackStations: [
@@ -4185,136 +4372,51 @@ const NETWORKS = {
     searchType: 'server_proxy',
     placeholder: 'z.B. Centraal, Beurs, Jericholaan...',
     isJourneyBased: false
-  }
+  },
+
+  // ========== NEU: Trainboard-Netze (prod.cuzimmartin.dev) ==========
+  // Nur Netze, die in der Trainboard-API aktuell live Daten liefern.
+  // Stadtnetze:
+  LONDON:     { name: 'Transport for London', shortName: 'TfL',  region: 'GB', desc: 'Tube, Overground, DLR, Bus', searchType: 'trainboard', trainboard: { path: '/gb/london' },    placeholder: 'z.B. Oxford Circus, Victoria...',  isJourneyBased: false },
+  BUDAPEST:   { name: 'BKK Budapest',          shortName: 'BKK',  region: 'HU', desc: 'Metró, Villamos, Busz',       searchType: 'trainboard', trainboard: { path: '/hu/budapest' },   placeholder: 'z.B. Deák tér, Keleti...',         isJourneyBased: false },
+  CH_OEFFI:   { name: 'Öffis (Bus, Tram)',     shortName: 'Öffi', region: 'CH', desc: 'Bus, Tram, Obus – ganze Schweiz', searchType: 'trainboard', trainboard: { path: '/ch/zuerich' }, placeholder: 'z.B. Zürich, Bern, Basel, Luzern...', isJourneyBased: false },
+  HELSINKI:   { name: 'HSL Helsinki',          shortName: 'HSL',  region: 'FI', desc: 'Metro, Tram, Bus, Zug',       searchType: 'trainboard', trainboard: { path: '/fi/helsinki' },   placeholder: 'z.B. Rautatientori, Kamppi...',    isJourneyBased: false },
+  INNSBRUCK:  { name: 'Tirol & Vorarlberg',     shortName: 'VVT',  region: 'AT', desc: 'Bus, Tram, Obus (ganz Tirol & Vorarlberg)', searchType: 'trainboard', trainboard: { path: '/at/innsbruck' },  placeholder: 'z.B. Innsbruck, Kufstein, Bregenz, Dornbirn...', isJourneyBased: false },
+  LJUBLJANA:  { name: 'LPP Ljubljana',         shortName: 'LPP',  region: 'SI', desc: 'Bus',                         searchType: 'trainboard', trainboard: { path: '/si/ljubljana' },  placeholder: 'z.B. Bavarski dvor...',            isJourneyBased: false },
+  // Nationale Bahn-Netze:
+  SBB:        { name: 'Zug (SBB)',             shortName: 'SBB',  region: 'CH', desc: 'IC, IR, RE, S-Bahn – ganze Schweiz', searchType: 'trainboard', trainboard: { path: '/ch' },           placeholder: 'z.B. Zürich HB, Bern, Basel...',   isJourneyBased: false },
+  NS:         { name: 'Züge NS (landesweit)',  shortName: 'NS',   region: 'NL', desc: 'IC, Sprinter, Intercity – ganze Niederlande, live', searchType: 'trainboard', trainboard: { path: '/nl' },           placeholder: 'z.B. Amsterdam Centraal, Rotterdam, Utrecht...', isJourneyBased: false },
+  SNCF:       { name: 'SNCF (Frankreich)',     shortName: 'SNCF', region: 'FR', desc: 'TGV, TER, Intercités',        searchType: 'trainboard', trainboard: { path: '/fr' },           placeholder: 'z.B. Paris Gare de Lyon...',       isJourneyBased: false },
+  UKRAIL:     { name: 'National Rail (UK)',    shortName: 'NR',   region: 'GB', desc: 'Zug landesweit',              searchType: 'trainboard', trainboard: { path: '/gb' },           placeholder: 'z.B. London Kings Cross...',       isJourneyBased: false },
+  TRENITALIA: { name: 'Trenitalia (Italien)',  shortName: 'TI',   region: 'IT', desc: 'Frecce, Regionale, IC',       searchType: 'trainboard', trainboard: { path: '/it' },           placeholder: 'z.B. Roma Termini, Milano...',     isJourneyBased: false },
+  VY:         { name: 'Entur / VY (Norwegen)', shortName: 'VY',   region: 'NO', desc: 'Zug landesweit',              searchType: 'trainboard', trainboard: { path: '/no' },           placeholder: 'z.B. Oslo S, Bergen...',           isJourneyBased: false },
+  TRAFIKLAB:  { name: 'Trafiklab (Schweden)',  shortName: 'SE',   region: 'SE', desc: 'Zug & Nahverkehr',            searchType: 'trainboard', trainboard: { path: '/se' },           placeholder: 'z.B. Stockholm, Göteborg...',      isJourneyBased: false },
+  REJSEPLANEN:{ name: 'Rejseplanen (Dänemark)',shortName: 'DSB',  region: 'DK', desc: 'Zug & Nahverkehr',            searchType: 'trainboard', trainboard: { path: '/dk' },           placeholder: 'z.B. København H...',              isJourneyBased: false },
+  VR:         { name: 'VR (Finnland)',         shortName: 'VR',   region: 'FI', desc: 'Zug landesweit',              searchType: 'trainboard', trainboard: { path: '/fi' },           placeholder: 'z.B. Helsinki, Tampere...',        isJourneyBased: false },
+  PEATUS:     { name: 'Peatus (Estland)',      shortName: 'EE',   region: 'EE', desc: 'Zug, Bus, Tram',              searchType: 'trainboard', trainboard: { path: '/ee' },           placeholder: 'z.B. Tallinn, Tartu...',           isJourneyBased: false },
+  IRISHRAIL:  { name: 'Irish Rail',            shortName: 'IÉ',   region: 'IE', desc: 'Zug landesweit',              searchType: 'trainboard', trainboard: { path: '/ie' },           placeholder: 'z.B. Dublin, Cork...',             isJourneyBased: false },
+  SNCB:       { name: 'SNCB/NMBS (Belgien)',   shortName: 'SNCB', region: 'BE', desc: 'Zug landesweit',              searchType: 'trainboard', trainboard: { path: '/be' },           placeholder: 'z.B. Brussel, Antwerpen...',       isJourneyBased: false },
+  CFL:        { name: 'Alle Öffis (Bus, Tram, Zug)', shortName: 'LU', region: 'LU', desc: 'Landesweit – ganz Luxemburg (Gratis-ÖV)', searchType: 'trainboard', trainboard: { path: '/lu' },           placeholder: 'z.B. Luxembourg, Esch, Ettelbruck, Hamilius...', isJourneyBased: false },
+  FLIXBUS:    { name: 'Flixbus',               shortName: 'FLIX', region: 'INT',desc: 'Fernbus (international)',      searchType: 'trainboard', trainboard: { path: '/flixbus' },       placeholder: 'z.B. Berlin, Wien, München...',    isJourneyBased: false },
+  EUSLEEPER:  { name: 'European Sleeper',      shortName: 'ES',   region: 'INT',desc: 'Nachtzug (international)',     searchType: 'trainboard', trainboard: { path: '/european-sleeper' }, placeholder: 'z.B. Brussels, Berlin, Praha...', isJourneyBased: false }
 };
 
 const SEARCH_API = 'https://api.straba.at/api/v1/stops/search';
 const DEPARTURES_API = 'https://api.straba.at/api/v1/wl/departures';
 const WIEN_DATA_URL = 'https://straba-983965425140.europe-west3.run.app/search/';
 
-// Neue Trainboard-API (cuzimmartin.dev) — deckt OEBB, BVG, DB, Salzburg, RATP,
-// PID Prag, GVB Amsterdam und Badner Bahn (WLB) ab. Per Netzwerk-Konfiguration
-// in NETWORKS[net].trainboard.path z.B. '/at', '/de/berlin', '/wlb', etc.
-const TRAINBOARD_BASE = 'https://prod.cuzimmartin.dev/api';
-
-// Generische Stations-Suche via Trainboard. Mappt aufs interne Format
-// { id, name, info } wie searchViaProxy.
-async function trainboardSearch(path, query) {
-  const url = TRAINBOARD_BASE + path + '/stations?query=' + encodeURIComponent(query) + '&limit=15';
-  const r = await fetch(url);
-  if (!r.ok) return [];
-  const j = await r.json();
-  const items = (j && j.data) || [];
-  return items.map(function(s) {
-    const meta = (s.metadata && (s.metadata.zone || s.metadata.parentStation)) ? '' : '';
-    return {
-      id: String(s.id),
-      name: s.name || '',
-      info: s.country ? (s.country + (s.type ? ' · ' + s.type.replace(/_/g, ' ') : '')) : (s.type || '')
-    };
-  });
-}
-
-// Roh-Departures aus der Trainboard-API holen (flache Liste).
-async function trainboardDeparturesRaw(path, stationId, limit) {
-  const url = TRAINBOARD_BASE + path + '/departures?stationId=' + encodeURIComponent(stationId) + (limit ? ('&limit=' + limit) : '');
-  const r = await fetch(url);
-  if (!r.ok) return [];
-  const j = await r.json();
-  return (j && j.data) || [];
-}
-
-// Trainboard category/metadata → WL-Monitor-Typ ("ptMetro", "ptBus", "ptTram", "ptTrain").
-function _trainboardMapType(category, metadata) {
-  const cat = (category || '').toLowerCase();
-  const product = ((metadata && metadata.product) || '').toLowerCase();
-  if (cat.includes('metro') || product === 'metro' || product === 'subway' || product === 'u-bahn') return 'ptMetro';
-  if (cat.includes('s-bahn') || product === 'suburban' || product === 's-bahn') return 'ptTrain';
-  if (cat.includes('tram') || product === 'tram' || product === 'lightrail') return 'ptTram';
-  if (cat.includes('bus') || product === 'bus' || product === 'stadtbus') return 'ptBus';
-  if (cat.includes('train') || cat.includes('zug') || product === 'train' || product === 'railway') return 'ptTrain';
-  return 'ptTrain';
-}
-
-// Konvertiert Trainboard-Antwort → das interne "data.data.monitors[].lines[]"-
-// Format, das der bestehende Code (Linien-Detection, Richtungs-Auswahl, etc.)
-// erwartet. Gruppiert nach Linie + Ziel, mit countdown in Minuten.
-function trainboardToMonitorFormat(items, stationId) {
-  if (!items || items.length === 0) {
-    return { data: { monitors: [] } };
-  }
-  const now = Date.now();
-  const groups = new Map();
-  items.forEach(function(it) {
-    const line = it.line || '?';
-    const towards = it.destination || it.direction || '';
-    const key = line + '||' + towards;
-    if (!groups.has(key)) {
-      groups.set(key, { line: line, towards: towards, items: [], category: it.category, metadata: it.metadata });
-    }
-    groups.get(key).items.push(it);
-  });
-
-  const lines = Array.from(groups.values()).map(function(g) {
-    const departures = g.items.map(function(it) {
-      const sched = it.scheduledTime ? new Date(it.scheduledTime).getTime() : now;
-      const est = it.estimatedTime ? new Date(it.estimatedTime).getTime() : sched;
-      const countdown = Math.max(0, Math.round((est - now) / 60000));
-      return {
-        countdown: countdown,
-        departureTime: {
-          timePlanned: it.scheduledTime || null,
-          timeReal: it.estimatedTime || null,
-          countdown: countdown
-        }
-      };
-    }).sort(function(a, b) { return a.countdown - b.countdown; });
-    return {
-      name: g.line,
-      towards: g.towards,
-      type: _trainboardMapType(g.category, g.metadata),
-      departures: { departure: departures },
-      direction: '',
-      richtungsId: '',
-      lineId: (g.metadata && g.metadata.lineId) || ''
-    };
-  });
-
-  return {
-    data: {
-      monitors: [{
-        locationStop: {
-          properties: {
-            name: (items[0] && items[0].stationName) || stationId,
-            attributes: { rbl: stationId }
-          }
-        },
-        lines: lines
-      }]
-    }
-  };
-}
-
-// Einheitlicher Departures-Fetch — wählt zwischen Trainboard (für Netze mit
-// trainboard-Config) und der alten Straba-API. Liefert immer das "monitors"-
-// Format, das der restliche Code erwartet.
+// Einheitlicher Departures-Fetch — laeuft immer ueber unseren Server
+// (api.straba.at), der Trainboard & Co. mit Caching proxyt. Liefert das
+// "monitors"-Format, das der restliche Code erwartet.
 // fullId-Format: "NETWORK:stopId" (z.B. "WL:490012345" oder "BERLIN:900100711").
 async function fetchDeparturesUnified(fullId) {
   if (!fullId) return { data: { monitors: [] } };
   const colonIdx = fullId.indexOf(':');
   const network = colonIdx > 0 ? fullId.substring(0, colonIdx) : '';
   const stopId = colonIdx > 0 ? fullId.substring(colonIdx + 1) : fullId;
-  const net = network && NETWORKS[network];
 
-  if (net && net.searchType === 'trainboard' && net.trainboard && net.trainboard.path) {
-    try {
-      const raw = await trainboardDeparturesRaw(net.trainboard.path, stopId);
-      return trainboardToMonitorFormat(raw, stopId);
-    } catch (e) {
-      console.warn('[trainboard departures] Fehler, fallback auf alte API:', e);
-    }
-  }
-  // Fallback / Default — alte Straba-API
+  // Immer ueber unseren Server (api.straba.at) — der proxyt Trainboard & Co.
+  // mit Caching/Rate-Limiting. Nie direkt an die Trainboard-API.
   const apiNetwork = (typeof mapNetworkForApi === 'function') ? mapNetworkForApi(network) : network;
   const apiFullId = apiNetwork ? (apiNetwork + ':' + stopId) : stopId;
   const r = await fetch(DEPARTURES_API + '?stopId=' + encodeURIComponent(apiFullId));
@@ -4331,6 +4433,7 @@ const API_NETWORK_MAP = {
   'OEBB_FERN': 'OEBBFERN',
   // 'GVB': 'OVAPI',   // GVB läuft jetzt direkt über die Trainboard-Proxy auf dem Server
   'RET': 'OVAPI',      // Rotterdam bleibt bei OVapi
+  'WESTBAHN': 'OEBB',  // Westbahn-Abfahrten über Trainboard /at (Server-Kennung OEBB) statt HAFAS
 };
 function mapNetworkForApi(network) {
   return API_NETWORK_MAP[network] || network;
@@ -4343,6 +4446,219 @@ let selectedNetwork = null;
 let selectedStop = null;
 let availableLines = [];
 let selectedLines = new Set();
+// Fernverkehr (Weststrecke): Richtungen wie eine Linie ankreuzen + Zugtyp-Feature-Filter.
+// Zugtypen werden IMMER alle angeboten (auch wenn z.B. tagsüber kein NJ fährt).
+const FV_CATS = ['RJX', 'WB', 'IC', 'ICE', 'NJ', 'IR', 'RGJ'];
+const FV_CAT_GATTUNGEN = { RJX: ['RJX', 'RJ'], WB: ['WB'], IC: ['IC', 'EC'], ICE: ['ICE'], NJ: ['NJ', 'EN'], IR: ['IR'], RGJ: ['RGJ', 'REGIOJET', 'RJET'] };
+const FV_CAT_LABEL = { RJX: 'Railjet', WB: 'Westbahn', IC: 'Intercity / EC', ICE: 'ICE', NJ: 'Nightjet', IR: 'InterRegio', RGJ: 'RegioJet' };
+const FV_CAT_COLOR = { RJX: '#E2002A', WB: '#1f9fb0', IC: '#3c4a54', ICE: '#2b6cb0', NJ: '#1a2e66', IR: '#6f3aa5', RGJ: '#F39200' };
+// Wikipedia / ÖBB: welche FV-Zugtypen tatsächlich auf welcher Strecke verkehren.
+// Diese Liste steuert, welche Chips am Bahnhof angezeigt werden — auch wenn
+// gerade kein Zug der Gattung in den aktuellen Daten ist (NJ tagsüber etc.).
+const FV_CORRIDOR_CATS = {
+  'Westbahn':            ['RJX', 'WB', 'IC', 'ICE', 'NJ'],
+  'Südstrecke':          ['RJX', 'IC', 'NJ'],
+  'Tauernbahn':          ['RJX', 'IC', 'NJ'],
+  'Brennerbahn':         ['RJX', 'IC', 'NJ', 'ICE'],
+  'Arlbergbahn':         ['RJX', 'IC', 'NJ', 'IR'],
+  'Salzburg-Tirol-Bahn': ['RJX', 'IC', 'ICE', 'NJ'],
+  'Pyhrn-Schober-Bahn':  ['IC', 'NJ', 'IR'],
+  // Ennstalbahn (Graz/Bruck ↔ Selzthal ↔ Schladming ↔ Salzburg): RJ Wien-Graz-Salzburg + IC
+  'Ennstalbahn':         ['RJX', 'IC'],
+  'Pontebbana':          ['RJX', 'IC'],
+  'Ostbahn':             ['RJX', 'IC', 'NJ'],
+  'Marchegger Ostbahn':  ['IC', 'IR'],
+  'Nordbahn':            ['RJX', 'IC', 'NJ', 'RGJ'],
+  // Summerauerbahn (Linz ↔ Praha): ÖBB IC/EC + RegioJet
+  'Summerauerbahn':      ['IC', 'RGJ'],
+  // Fernverkehr = Fallback (alle anbieten)
+  'Fernverkehr':         ['RJX', 'WB', 'IC', 'ICE', 'NJ', 'IR', 'RGJ']
+};
+let fvCheckedDirs = new Set();   // 'E' / 'W' (intern; Anzeige-Labels stammen aus den Echt-Termini)
+let fvActiveCats = new Set();    // aktive Zugtypen (Feature-Filter), Default: alle außer IC/NJ
+
+// ==================== FERNVERKEHR: Korridor- & Terminus-Labels ====================
+// Aus den geladenen FV-Linien (`availableLines`) ableitbar:
+//  • Pro Richtung (E/W) die häufigsten Endpunkt-Namen → dynamische Direction-Labels
+//    "Richtung Wien Westbf" / "Richtung Salzburg / Villach" usw.
+//  • Daraus + Stationsname → Korridor-Name nach ÖBB-Streckenkategorien
+//    (Westbahn, Südstrecke, Tauernbahn, Brennerbahn, Arlbergbahn, Pyhrn-Schober-Bahn,
+//    Salzburg-Tirol-Bahn, Ostbahn, Marchegger Ostbahn). Fällt auf "Fernverkehr" zurück.
+function fvCollectTermNames() {
+  const counts = { E: new Map(), W: new Map() };
+  availableLines.forEach(function(l) {
+    if (!l.towards || !counts[l.direction]) return;
+    var n = shortenStopName(l.towards);
+    counts[l.direction].set(n, (counts[l.direction].get(n) || 0) + 1);
+  });
+  var out = { E: [], W: [] };
+  ['E', 'W'].forEach(function(d) {
+    out[d] = Array.from(counts[d].entries())
+      .sort(function(a, b) { return b[1] - a[1]; })
+      .slice(0, 2)
+      .map(function(x) { return x[0]; });
+  });
+  return out;
+}
+
+function fvDirLabel(dir, termNames) {
+  var names = (termNames && termNames[dir]) || [];
+  if (!names.length) return dir === 'E' ? 'Richtung Wien' : 'Richtung Westen';
+  return 'Richtung ' + names.join(' / ');
+}
+
+// Ein einzelner Terminus → Ziel-„Region" (Wien / Salzburg+München / Tschechien / Polen …).
+// Diese feinere Achse ermöglicht an Hubs wie Wien Hbf/Meidling mehrere Richtungen
+// PRO Korridor (Nordbahn: Tschechien vs Polen, Westbahn: Wien vs Salzburg/München …).
+function fvTerminusRegion(name) {
+  var t = (name || '').toLowerCase();
+  if (!t) return 'Sonstige';
+  if (/^wien|wiener|flughafen wien|^vienna/.test(t)) return 'Wien';
+  if (/^salzburg|^linz|^st\.?\s*p[öo]lten|^wels|^attnang|^m[üu]nchen|^munich|^passau/.test(t)) return 'Salzburg / München';
+  if (/^frankfurt|^hannover|^hamburg|^berlin|^k[öo]ln|^d[üu]sseldorf|^dortmund|^bremen|^bonn|^mannheim|^dresden|^leipzig/.test(t)) return 'Deutschland-Nord';
+  if (/^stuttgart|^n[üu]rnberg|^w[üu]rzburg/.test(t)) return 'Süddeutschland';
+  if (/^amsterdam|^br[üu]ssel|^brussels|^bruxelles/.test(t)) return 'Benelux';
+  if (/^bregenz|^feldkirch|^bludenz|^landeck|^st\.?\s*anton/.test(t)) return 'Vorarlberg';
+  if (/^z[üu]rich|^basel|^bern|^st\.?\s*gallen/.test(t)) return 'Schweiz';
+  if (/^innsbruck|^w[öo]rgl|^kufstein|^jenbach|^saalfelden|^bischofshofen|^schwarzach|^zell\s+am\s+see/.test(t)) return 'Tirol';
+  if (/^villach|^klagenfurt|^spittal/.test(t)) return 'Kärnten';
+  if (/^graz|^spielfeld|^bruck/.test(t)) return 'Graz';
+  if (/^maribor|^ljubljana|^zagreb|^beograd|^belgrade/.test(t)) return 'Slowenien / Kroatien';
+  if (/^budapest|^hegyeshalom|^gy[őo]r/.test(t)) return 'Ungarn';
+  if (/^bratislava|^petr[zž]alka|^marchegg/.test(t)) return 'Slowakei';
+  if (/^praha|^prag\b|^brno|^břeclav|^breclav/.test(t)) return 'Tschechien';
+  if (/^warszawa|^warschau|^krak[óo]w|^krakow|^krakau|^katowice|^bohumin|^ostrava|^wroclaw/.test(t)) return 'Polen';
+  if (/^venezia|^venedig|^bologna|^milano|^mailand|^verona|^bozen|^bolzano|^roma|^rom\b|^firenze/.test(t)) return 'Italien';
+  if (/^udine|^tarvisio|^trieste/.test(t)) return 'Italien (Pontebbana)';
+  return shortenStopName(name) || 'Sonstige';
+}
+
+// Westbahn-Strecken-Bahnhöfe ZWISCHEN Linz und Wien — dort werden alle Westbahn-
+// klassifizierten Termini auf 2 physische Richtungen (Wien-bound / Salzburg-bound)
+// gebündelt. Wien selbst und Salzburg sind eigenständige Hubs → bleiben region-split.
+function fvIsLocalWestbahnTrunk(stationName) {
+  return /^(linz|wels|attnang|amstetten|st\.?\s*v[ae]lentin|melk|st\.?\s*p[öo]lten|tullnerfeld)/i.test((stationName || '').trim());
+}
+
+// Achsen-Key fürs Gruppieren — feinste Auflösung: Korridor + Region.
+// Spezialfall: An Westbahn-Trunk-Bahnhöfen (Linz, Wels, St. Pölten …) klappt der
+// Westbahn-Korridor auf 2 E/W-Achsen zusammen, statt nach Zielregion zu splitten —
+// physisch fahren die Züge ja alle entweder Richtung Wien oder Richtung Salzburg.
+function fvLineAxis(line) {
+  if (!line) return '';
+  if (fvCurrentMode === 'multiCorridor') {
+    const c = line.corridor || fvTerminusCorridor(line.towards);
+    if (c === 'Westbahn' && fvIsLocalWestbahnTrunk(selectedStop && selectedStop.name)) {
+      return 'Westbahn::' + (line.direction === 'E' ? 'Wien' : 'Salzburg / München');
+    }
+    return c + '::' + fvTerminusRegion(line.towards);
+  }
+  return line.direction;
+}
+
+// Ein einzelner Terminus → Korridor — AUS Sicht der aktuellen Station.
+// Stützt sich auf ÖBB-Streckenkategorien (Wikipedia). Reihenfolge: spezifische
+// Marker zuerst. Wenn die User-Station auf der Westbahn-Achse liegt (Linz, Wels,
+// St. Pölten …), dann gehören alle Westbahn-Anschluss-Termini (Salzburg, Innsbruck,
+// Bregenz, Ungarn via Wien …) ebenfalls zur "Westbahn"-Achse vom Bahnhof aus.
+// Echte Abzweigungen (Linz → Selzthal/Graz = Pyhrn-Schober; Linz → Summerau =
+// Summerauerbahn) bleiben separat.
+function fvTerminusCorridor(name, stationName) {
+  var t = (name || '').toLowerCase();
+  if (!t) return 'Fernverkehr';
+  var cs = (stationName || (selectedStop && selectedStop.name) || '').toLowerCase();
+  // Station-Trunks (Wikipedia: Westbahn / Südbahn / Pyhrnbahn / Tauernbahn).
+  var onWestbahnTrunk = /linz|st\.?\s*p[öo]lten|wels|attnang|amstetten|st\.?\s*v[ae]lentin|salzburg|melk|p[öo]chlarn|ybbs|v[öo]cklabruck|timelkam|stra[ßs]walchen|tullnerfeld|h[üu]tteldorf/.test(cs);
+  var onSüdbahnTrunk = /wiener\s+neustadt|wr\.\s*neustadt|m[öo]dling|baden\s+bei\s+wien|neunkirchen|gloggnitz|payerbach|semmering|m[üu]rzzuschlag|kindberg|kapfenberg|bruck\s+an\s+der\s+mur|bruck\/mur|leoben|frohnleiten|^graz|leibnitz|spielfeld/.test(cs);
+  var onPyhrnTrunk = /kremsm[üu]nster|kirchdorf\s+an\s+der\s+krems|micheldorf|klaus\s+(an\s+der|a\.\s*d\.)\s+pyhrnbahn|hinterstoder|windischgarsten|spital\s+am\s+pyhrn|ardning|selzthal/.test(cs);
+  var onTauernTrunk = /schwarzach|bad\s+(hofgastein|gastein)|b[öo]ckstein|mallnitz|spittal/.test(cs);
+
+  // Italien-Termini: Route hängt von Startstation ab.
+  var isItalyTerm = /(brennero|\bbrenner\b|bozen|bolzano|verona|venezia|venedig|milano|mailand|bologna|firenze|roma|\brom\b|napoli|trieste)/.test(t);
+  if (isItalyTerm) {
+    if (/innsbruck/.test(cs)) return 'Brennerbahn';
+    if (/villach|klagenfurt|spittal/.test(cs)) return 'Pontebbana';
+    if (onTauernTrunk || /salzburg/.test(cs)) return 'Tauernbahn';
+    if (/wien/.test(cs) || onSüdbahnTrunk) return 'Südstrecke';
+    return 'Brennerbahn';
+  }
+  if (/udine|tarvisio|gorizia/.test(t)) {
+    if (/wien/.test(cs) || onSüdbahnTrunk) return 'Südstrecke';
+    return 'Pontebbana';
+  }
+
+  // Pyhrn-Schober-Bahn (Linz/Wels ↔ Selzthal ↔ Graz)
+  if (/selzthal|hieflau|kirchdorf|garsten|kremsm[üu]nster|micheldorf|klaus\s+(an\s+der|a\.\s*d\.)\s+pyhrnbahn|hinterstoder|windischgarsten|spital\s+am\s+pyhrn|ardning|rohr.bad\s+hall|neuhofen/.test(t)) return 'Pyhrn-Schober-Bahn';
+  if (/graz|spielfeld|leoben/.test(t) && (/linz|wels/.test(cs) || onPyhrnTrunk)) return 'Pyhrn-Schober-Bahn';
+  if (/^linz|wels/.test(t) && (onPyhrnTrunk || /leoben|^graz|bruck\s+an\s+der\s+mur|bruck\/mur/.test(cs))) return 'Pyhrn-Schober-Bahn';
+
+  // Ennstalbahn (Selzthal ↔ Bischofshofen): Schladming/Liezen + von Graz/Bruck nach Salzburg
+  if (/schladming|liezen|stainach.?irdning|gr[öo]bming|haus\s+im\s+ennstal/.test(t)) return 'Ennstalbahn';
+  if (/bischofshofen|salzburg|saalfelden/.test(t) && (onSüdbahnTrunk || /^graz|leoben|bruck\s+an\s+der\s+mur|bruck\/mur/.test(cs))) return 'Ennstalbahn';
+  // Summerauerbahn (Linz ↔ Summerau ↔ Praha)
+  if (/summerau|česk[éy]\s*bud[eě]jovice|cesky\s*budejovice/.test(t)) return 'Summerauerbahn';
+
+  // Tauernbahn-Stationen: Wien-bound und Salzburg-bound bleiben auf Tauern
+  if (onTauernTrunk) {
+    if (/villach|klagenfurt|spittal|udine|tarvisio/.test(t)) return 'Tauernbahn';
+    if (/salzburg|schwarzach|bad\s+gastein/.test(t)) return 'Tauernbahn';
+  }
+
+  // Westbahn-Trunk-Stations: alle FV-Endpunkte ohne eigenen Abzweig → Westbahn
+  if (onWestbahnTrunk) {
+    if (/(budapest|hegyeshalom|gy[őo]r|bratislava|petr[zž]alka|marchegg|villach|klagenfurt|spittal|maribor|ljubljana|zagreb|belgrade|beograd|innsbruck|w[öo]rgl|kufstein|jenbach|saalfelden|bischofshofen|schwarzach|bad\s+gastein|bregenz|feldkirch|bludenz|landeck|st\.?\s*anton|z[üu]rich|basel|st\.?\s*gallen|salzburg|m[üu]nchen|munich|linz|wels|attnang|amstetten|st\.?\s*v[ae]lentin|melk|p[öo]chlarn|ybbs|v[öo]cklabruck|timelkam|stra[ßs]walchen|st\.?\s*p[öo]lten|tullnerfeld|h[üu]tteldorf|wien|westbahnhof|passau|n[üu]rnberg|frankfurt|hannover|hamburg|k[öo]ln|d[üu]sseldorf|stuttgart|amsterdam|br[üu]ssel|brussels|bruxelles|dortmund)/.test(t)) return 'Westbahn';
+    if (/(praha|prag\b|brno|břeclav|breclav|pardubice|kol[íi]n|hodon[íi]n|otrokovice|přerov|hranice\s+na)/.test(t)) return 'Summerauerbahn';
+    if (/(warszawa|warschau|krak[óo]w|krakow|krakau|katowice|bohumin|petrovice|gdynia|gdansk|przemysl)/.test(t)) return 'Nordbahn';
+  }
+
+  // Südbahn-Trunk: Wien-bound + Süd-bound = Südbahn
+  if (onSüdbahnTrunk) {
+    if (/wien|wiener\s+neustadt|wr\.\s*neustadt|m[öo]dling|baden|gloggnitz|semmering|m[üu]rzzuschlag|kapfenberg|bruck|leoben|graz|spielfeld|villach|klagenfurt|spittal|maribor|ljubljana|zagreb|leibnitz/.test(t)) return 'Südstrecke';
+  }
+
+  // Nicht-Trunk: vollständige Klassifikation per Ziel.
+  if (/budapest|hegyeshalom|gy[őo]r/.test(t)) return 'Ostbahn';
+  if (/bratislava|petr[zž]alka|marchegg/.test(t)) return 'Marchegger Ostbahn';
+  if (/praha|prag\b|brno|břeclav|breclav|pardubice|kol[íi]n|hodon[íi]n|otrokovice|přerov|hranice\s+na|warszawa|warschau|krak[óo]w|krakow|krakau|katowice|bohumin|petrovice|gdynia|gdansk|przemysl|ostrava|wroclaw|dresden|\bberlin\b/.test(t)) return 'Nordbahn';
+  if (/villach|klagenfurt|spittal/.test(t)) return 'Südstrecke';
+  if (/graz|spielfeld|maribor|ljubljana|zagreb|belgrade|beograd|wiener\s+neustadt|wr\.\s*neustadt|m[öo]dling|baden\s+bei\s+wien|neunkirchen|gloggnitz|semmering|m[üu]rzzuschlag|kindberg|kapfenberg|bruck\s+(an\s+der\s+mur|\/mur)|frohnleiten|leoben|leibnitz/.test(t)) return 'Südstrecke';
+  if (/innsbruck|w[öo]rgl|kufstein|jenbach|telfs|saalfelden|bischofshofen|schwarzach/.test(t)) return 'Salzburg-Tirol-Bahn';
+  if (/bregenz|feldkirch|bludenz|landeck|st\.?\s*anton|z[üu]rich|basel|st\.?\s*gallen/.test(t)) return 'Arlbergbahn';
+  if (/salzburg|m[üu]nchen|munich|linz|wels|attnang|amstetten|st\.?\s*v[ae]lentin|melk|p[öo]chlarn|ybbs|v[öo]cklabruck|timelkam|stra[ßs]walchen|st\.?\s*p[öo]lten|tullnerfeld|h[üu]tteldorf|wien|westbahnhof|passau|n[üu]rnberg|frankfurt|hannover|hamburg|k[öo]ln|d[üu]sseldorf|stuttgart|amsterdam|br[üu]ssel|brussels|bruxelles|dortmund/.test(t)) return 'Westbahn';
+  return 'Fernverkehr';
+}
+
+// Welche Linien-Korridore tatsächlich am Bahnhof zusammenkommen → Liste der
+// belegten Korridore (nach Häufigkeit sortiert).
+function fvStationCorridors() {
+  var counts = new Map();
+  availableLines.forEach(function(l) {
+    var c = l.corridor || fvTerminusCorridor(l.towards);
+    counts.set(c, (counts.get(c) || 0) + 1);
+  });
+  return Array.from(counts.entries()).sort(function(a, b) { return b[1] - a[1]; }).map(function(x) { return x[0]; });
+}
+
+// Stations-Mode: 1 Korridor → klassisch E/W; mehrere Korridore → ein Eintrag je Korridor.
+// fvCurrentCorridors enthält im single-mode 1 Eintrag (für Titel), im multi-mode N.
+var fvCurrentMode = 'eastwest';
+var fvCurrentCorridors = ['Fernverkehr'];
+
+function fvCorridorName(stationName, termNames) {
+  // Behält die alte Signatur bei (single-corridor Titel) — leitet das Ergebnis
+  // aus den geladenen Linien ab. Für multiCorridor-Mode wird statt eines einzigen
+  // Titels eine Liste verwendet (siehe renderLines).
+  var cs = (stationName || '').toLowerCase();
+  var corridors = fvStationCorridors();
+  if (corridors.length === 1) return corridors[0];
+  // Wenn Station selbst zur Westbahn-Trunk gehört: bevorzugen
+  if (/(salzburg|linz|st\.? *p[öo]lten|wien|westbahnhof)/.test(cs) && corridors.indexOf('Westbahn') !== -1) return 'Westbahn';
+  if (/(villach|klagenfurt|spittal)/.test(cs) && corridors.indexOf('Tauernbahn') !== -1) return 'Tauernbahn';
+  if (/graz/.test(cs) && corridors.indexOf('Südstrecke') !== -1) return 'Südstrecke';
+  if (/innsbruck/.test(cs) && corridors.indexOf('Salzburg-Tirol-Bahn') !== -1) return 'Salzburg-Tirol-Bahn';
+  if (/bregenz|feldkirch|bludenz/.test(cs) && corridors.indexOf('Arlbergbahn') !== -1) return 'Arlbergbahn';
+  return corridors[0] || 'Fernverkehr';
+}
 let selectedVias = new Map();     // idx → stopover-name (via-Filter pro Richtung)
 let stations = [];
 let editingStationIndex = null;  // Index der Station die bearbeitet wird (null = neue Station)
@@ -4421,9 +4737,74 @@ const saveBtn = document.getElementById('saveBtn');
 const breadcrumb = document.getElementById('breadcrumb');
 
 // ==================== NAVIGATION ====================
+// ===== Region-Titelfoto (Hero) — bleibt sichtbar von Region → Netzwerk → Stationssuche =====
+// Foto pro Land (gleiche Bilder wie im Region-Picker). Ohne Foto -> Brand-Farbe.
+const REGION_HERO = {
+  AT:  { photo: 'Stadt fotos/Wiener Linien.jpg' },
+  DE:  { photo: 'Stadt fotos/berlin.jpg' },
+  LI:  { photo: 'Stadt fotos/Lichtenstein.jpg', pos: 'center bottom' },
+  FR:  { photo: 'Stadt fotos/Paris.jpg' },
+  CZ:  { photo: 'Stadt fotos/Prag.jpg' },
+  HU:  { photo: 'Stadt fotos/budapest.jpg' },
+  FI:  { photo: 'Stadt fotos/helsinki-nahverkehr.jpg' },
+  CH:  { photo: 'Stadt fotos/schweiz tram.jpg' }, NL: { photo: 'Stadt fotos/netherlands.jpg' },
+  GB:  { photo: 'Stadt fotos/UKK.avif' },
+  IT:  { color: '#008c45' }, BE: { photo: 'Stadt fotos/belgien.jpg' }, LU: { photo: 'Stadt fotos/luxenburg.jpg' },
+  DK:  { color: '#c8102e' }, NO: { photo: 'Stadt fotos/norway.jpg' }, SE: { color: '#006aa7' },
+  EE:  { photo: 'Stadt fotos/estland.webp' }, IE: { photo: 'Stadt fotos/IRLAND.png' }, SI: { color: '#005da4' },
+  INT: { color: '#3a6073' }
+};
+// Netz-spezifischer Hero (überschreibt Land/Bundesland, wenn dieses Netz gewählt ist)
+const NETWORK_HERO = {
+  LONDON: { photo: 'Stadt fotos/LONDON .jpg', title: 'London' }
+};
+// Foto pro Bundesland/Sub-Region (überschreibt das Landesfoto, wenn gewählt)
+const SUBREGION_HERO = {
+  AT_W:    { photo: 'Stadt fotos/Wiener Linien.jpg' },
+  AT_OOE:  { photo: 'Stadt fotos/Oberösterreich.jpg' },
+  AT_STMK: { photo: 'Stadt fotos/GRAZ.jpg' },
+  AT_SBG:  { photo: 'Stadt fotos/Salzburg.jpg' }
+};
+
+function updateRegionHero() {
+  // Im Display-Preset-Modus verwaltet renderDisplayPreset das Hero selbst
+  if (typeof activeDisplayPreset !== 'undefined' && activeDisplayPreset) return;
+  var hero = document.getElementById('displayHero');
+  var title = document.getElementById('displayHeroTitle');
+  if (!hero || !title) return;
+  // Auf der Region-Auswahl (Picker) selbst: kein Hero
+  if (currentStep === 'region' || !selectedRegion) {
+    hero.classList.add('hidden');
+    hero.style.backgroundImage = '';
+    hero.style.backgroundColor = '';
+    return;
+  }
+  var region = REGIONS[selectedRegion];
+  // Priorität: gewähltes Netz (z.B. London) > Bundesland > Land
+  var net = (typeof selectedNetwork !== 'undefined' && selectedNetwork) ? NETWORK_HERO[selectedNetwork] : null;
+  var sub = selectedSubRegion && SUBREGION_HERO[selectedSubRegion];
+  var conf = (net && (net.photo || net.color)) ? net
+           : (sub && (sub.photo || sub.color)) ? sub
+           : (REGION_HERO[selectedRegion] || {});
+  // Titel: Netz-Override > Bundesland-Name > Landesname
+  var name = region ? region.name : '';
+  if (selectedSubRegion && region) {
+    var rs = region.verkehrsarten && region.verkehrsarten.stadt && region.verkehrsarten.stadt.subRegions && region.verkehrsarten.stadt.subRegions[selectedSubRegion];
+    var ls = region.subRegions && region.subRegions[selectedSubRegion];
+    name = (rs && rs.name) || (ls && ls.name) || name;
+  }
+  if (conf.title) name = conf.title;
+  hero.style.backgroundColor = conf.color || '#444';
+  hero.style.backgroundImage = conf.photo ? ('url(' + encodeURI(conf.photo) + ')') : '';
+  hero.style.backgroundPosition = conf.pos || 'center';
+  title.textContent = name;
+  hero.classList.remove('hidden');
+}
+
 function showStep(step) {
   currentStep = step;
   stepRegion.classList.toggle('hidden', step !== 'region');
+  if (step === 'region' && typeof populateCountrySelect === 'function') populateCountrySelect();
   stepNetwork.classList.toggle('hidden', step !== 'network');
   stepSearch.classList.toggle('hidden', step !== 'search');
   stepLines.classList.toggle('hidden', step !== 'lines');
@@ -4455,9 +4836,15 @@ function showStep(step) {
     if (bottomBar) bottomBar.style.display = '';
     saveBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
     saveBtn.onclick = function() { showGroupingStep(); };
-    // P2P: oebb_toStop prüfen, sonst selectedLines
+    // P2P: oebb_toStop; Fernverkehr: Richtungen×Zugtypen; sonst selectedLines
     const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
-    saveBtn.disabled = isP2P ? !oebb_toStop : selectedLines.size === 0;
+    if (isP2P) {
+      saveBtn.disabled = !oebb_toStop;
+    } else if (selectedNetwork === 'WESTBAHN') {
+      saveBtn.disabled = (fvCheckedDirs.size === 0 || fvActiveCats.size === 0);
+    } else {
+      saveBtn.disabled = selectedLines.size === 0;
+    }
   } else if (stations.length > 0) {
     // Stationen vorhanden: "Weiter"
     if (bottomBar) bottomBar.style.display = '';
@@ -4469,6 +4856,7 @@ function showStep(step) {
     if (bottomBar) bottomBar.style.display = 'none';
   }
 
+  updateRegionHero();
   updateBreadcrumb();
 }
 
@@ -4482,12 +4870,10 @@ function updateBreadcrumb() {
     html += `<span class="breadcrumb-item ${currentStep === 'network' && !selectedVerkehrsart && !selectedSubRegion ? 'active' : ''}" onclick="goBack('network')">${REGIONS[selectedRegion].name}</span>`;
   }
 
-  if (selectedVerkehrsart) {
-    const region = REGIONS[selectedRegion];
-    const artName = region.verkehrsarten?.[selectedVerkehrsart]?.name || selectedVerkehrsart;
-    html += `<span class="breadcrumb-sep">›</span>`;
-    html += `<span class="breadcrumb-item ${currentStep === 'network' && !selectedSubRegion && !selectedNetwork ? 'active' : ''}" onclick="goBackToVerkehrsart(); renderNetworkGrid(); showStep('network');">${artName}</span>`;
-  }
+  // Hinweis: Die Verkehrsart-Zwischenebene (Stadtverkehr/Zugverkehr) ist seit dem
+  // Foto-Preset-Flow Geschichte — sie wird zwar intern noch gesetzt (für die
+  // Stadt-Subregionen) aber nicht mehr als Breadcrumb-Chip angezeigt. Klick auf
+  // "Österreich" geht über die goBack-Wrapper zurück zum Bundesland-Chooser.
 
   if (selectedSubRegion) {
     const region = REGIONS[selectedRegion];
@@ -4611,6 +4997,7 @@ const WAPPEN = {
   ooe: 'OÖ',
   stmk: 'ST',
   sbg: 'S',
+  tirol: 'T',
   oebb: 'ÖBB'
 };
 
@@ -4618,6 +5005,7 @@ function renderNetworkGrid() {
   const region = REGIONS[selectedRegion];
   const titleEl = document.getElementById('networkStepTitle');
   const backBtn = document.getElementById('networkBackBtn');
+  updateRegionHero();  // Titelfoto bei jedem Drill-In (Bundesland etc.) aktualisieren
 
   // === AT: Verkehrsart-Auswahl (Stadtverkehr / Zugverkehr) ===
   if (region.verkehrsarten && !selectedVerkehrsart) {
@@ -4921,7 +5309,7 @@ async function loadWienData() {
 
 // Global deaktivierte Netze — werden überall ausgeblendet (Wien-Preset und der
 // normale Region/Bundesland-Flow). Vorbereitung für Step 6 (Admin-Panel-Toggle).
-var DISABLED_NETWORKS = new Set(['OEBB_FERN', 'WESTBAHN']);
+var DISABLED_NETWORKS = new Set(['OEBB_FERN']);
 function isNetworkEnabled(id) { return !DISABLED_NETWORKS.has(id); }
 
 // Brand-Farben pro Netz — werden für die vollflächigen Preset-Buttons genutzt.
@@ -4934,6 +5322,9 @@ var NETWORK_BRANDS = {
   LINZ:          { bg: '#009640', fg: '#fff' }, // Linz AG Grün
   STV:           { bg: '#009640', fg: '#fff' }, // STMK Grün
   SALZBURG:      { bg: '#E3000F', fg: '#fff' }, // Salzburg Rot
+  INNSBRUCK:     { bg: '#C8102E', fg: '#fff' }, // Tirol/IVB Rot
+  CH_OEFFI:      { bg: '#D52B1E', fg: '#fff' }, // Schweiz Öffis Rot
+  SBB:           { bg: '#EB0000', fg: '#fff' }, // SBB Rot
   LIEMOBIL:      { bg: '#EF7D00', fg: '#fff' }, // LIEmobil Orange
   BERLIN:        { bg: '#F0AB00', fg: '#000' }, // VBB Berlin Gelb
   KOELN:         { bg: '#E2001A', fg: '#fff' }, // KVB Köln Rot
@@ -4947,13 +5338,13 @@ var NETWORK_BRANDS = {
 var DISPLAY_PRESETS = {
   wien: {
     name: 'Wien',
-    photo: 'Stadt fotos/Wien.jpg',
+    photo: 'Stadt fotos/Wiener Linien.jpg',
     networks: [
       { id: 'WL',            jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_W' } },
       { id: 'WLB',           jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_W' } },
-      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT', verkehrsart: 'zug',   zugKategorie: 'nah'  } },
-      { id: 'OEBB_FERN',     jumpTo: { region: 'AT', verkehrsart: 'zug',   zugKategorie: 'fern' } },
-      { id: 'WESTBAHN',      jumpTo: { region: 'AT', verkehrsart: 'zug',   zugKategorie: 'fern' } }
+      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
+      { id: 'OEBB_FERN',     jumpTo: { region: 'AT' } },
+      { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
     ]
   },
   lichtenstein: {
@@ -4971,7 +5362,8 @@ var DISPLAY_PRESETS = {
     photo: 'Stadt fotos/Oberösterreich.jpg',
     networks: [
       { id: 'LINZ',          jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
-      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT', verkehrsart: 'zug',   zugKategorie: 'nah'  } }
+      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
+      { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
     ]
   },
   stmk: {
@@ -4981,7 +5373,8 @@ var DISPLAY_PRESETS = {
     photo: 'Stadt fotos/GRAZ.jpg',
     networks: [
       { id: 'STV',           jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_STMK' } },
-      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT', verkehrsart: 'zug',   zugKategorie: 'nah'  } }
+      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
+      { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
     ]
   },
   sbg: {
@@ -4991,7 +5384,8 @@ var DISPLAY_PRESETS = {
     photo: 'Stadt fotos/Salzburg.jpg',
     networks: [
       { id: 'SALZBURG',      jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_SBG' } },
-      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT', verkehrsart: 'zug',   zugKategorie: 'nah'  } }
+      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
+      { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
     ]
   }
 };
@@ -5000,6 +5394,29 @@ var DISPLAY_PRESETS = {
 DISPLAY_PRESETS.wien.parent = 'AT';
 DISPLAY_PRESETS.wien.wappen = 'wien';
 DISPLAY_PRESETS.lichtenstein.parent = 'LI';
+
+// Tirol & Vorarlberg (VVT/VVV) — Österreich → Tirol & Vorarlberg → Bus/Tram
+DISPLAY_PRESETS.tirol = {
+  name: 'Tirol & Vorarlberg',
+  parent: 'AT',
+  wappen: 'tirol',
+  photo: 'Stadt fotos/tirol.jpg',
+  networks: [
+    { id: 'INNSBRUCK',     jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_T' } },
+    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
+    { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
+  ]
+};
+
+// Westbahn — eigener Button bei den österreichischen Bundesländern (Wien Westbf ↔ Salzburg)
+DISPLAY_PRESETS.westbahn = {
+  name: 'Fernverkehr',
+  parent: 'AT',
+  photo: 'Stadt fotos/westbahn.png',
+  networks: [
+    { id: 'WESTBAHN', jumpTo: { region: 'AT' } }
+  ]
+};
 
 // Deutschland-Bundesländer
 DISPLAY_PRESETS.berlin = {
@@ -5021,13 +5438,20 @@ DISPLAY_PRESETS.bw = {
     { id: 'DB',   label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
   ]
 };
-DISPLAY_PRESETS.nrw = {
-  name: 'Nordrhein-Westfalen',
+DISPLAY_PRESETS.koeln = {
+  name: 'Köln',
   parent: 'DE',
-  // Kein Foto vorhanden → Card fällt auf Brand-Farbe des ersten Netzes (KVB) zurück.
-  // Sobald 'Stadt fotos/koeln.jpg' existiert, hier als photo: '...' eintragen.
+  photo: 'Stadt fotos/koeln.jpg',
   networks: [
-    { id: 'KOELN',  jumpTo: { region: 'DE' } },
+    { id: 'KOELN', jumpTo: { region: 'DE' } },
+    { id: 'DB',    label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
+  ]
+};
+DISPLAY_PRESETS.aachen = {
+  name: 'Aachen',
+  parent: 'DE',
+  photo: 'Stadt fotos/aaachen.jpg',
+  networks: [
     { id: 'AACHEN', jumpTo: { region: 'DE' } },
     { id: 'DB',     label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
   ]
@@ -5084,10 +5508,27 @@ function _setHero(preset) {
 function _hideHero() { _setHero(null); }
 
 var activeDisplayPreset = null;
+var presetAutoJumped = false;  // true wenn der Zwischenschritt (1 Netz) übersprungen wurde
 
 function renderDisplayPreset(displayKey) {
   var preset = DISPLAY_PRESETS[displayKey];
   if (!preset) return false;
+
+  // Einzel-Netz-Kachel aus einem Bundesland-Chooser (z.B. „Fernverkehr"): der
+  // „Linien wählen"-Zwischenschritt ist überflüssig → direkt zur Stationssuche.
+  var enabledNets = preset.networks.filter(function(e) { return isNetworkEnabled(e.id); });
+  var siblingCount = Object.keys(DISPLAY_PRESETS).filter(function(k){ return DISPLAY_PRESETS[k].parent === preset.parent; }).length;
+  if (enabledNets.length === 1 && siblingCount > 1) {
+    activeDisplayPreset = displayKey;
+    presetAutoJumped = true;
+    // Andere Cards (Bundesland-Chooser etc.) ausblenden — nur Hero + Suche zeigen
+    document.querySelectorAll('.container > .card').forEach(function(c){ if (c.id !== 'stationsCard') c.classList.add('hidden'); });
+    _setHero(preset);                                   // Foto-Banner zeigen
+    jumpToPresetNetwork(enabledNets[0].id, enabledNets[0].jumpTo);
+    return true;
+  }
+  presetAutoJumped = false;
+
   activeDisplayPreset = displayKey;
   var title = document.getElementById('displayPresetTitle');
   if (title) title.textContent = 'Linien für dein catch-it';
@@ -5132,9 +5573,10 @@ function jumpToPresetNetwork(networkId, jumpTo) {
   if (typeof selectedSubRegion !== 'undefined') selectedSubRegion = jumpTo.subRegion || null;
   if (typeof selectedZugKategorie !== 'undefined') selectedZugKategorie = jumpTo.zugKategorie || null;
 
-  // Preset-Card + Hero ausblenden — selectNetwork zeigt den nächsten passenden Schritt
+  // Preset-Card ausblenden — selectNetwork zeigt den nächsten passenden Schritt.
+  // Hero (Stadt-Titelfoto) bleibt absichtlich sichtbar: er soll auch bei der
+  // Linien-/Stationssuche oben als Banner stehen bleiben.
   document.getElementById('stepDisplayPreset')?.classList.add('hidden');
-  _hideHero();
   if (typeof selectNetwork === 'function') selectNetwork(networkId);
 }
 
@@ -5156,10 +5598,19 @@ function leaveDisplayPreset() {
   window.goBack = function(step) {
     var result = origGoBack(step);
     if (activeDisplayPreset && (step === 'region' || step === 'network')) {
-      // Selectors sind schon von origGoBack gecleared — jetzt Preset wieder einblenden
       document.getElementById('stepRegion')?.classList.add('hidden');
       document.getElementById('stepNetwork')?.classList.add('hidden');
-      renderDisplayPreset(activeDisplayPreset);
+      if (presetAutoJumped) {
+        // Zwischenschritt wurde übersprungen → zurück zum Bundesland-Chooser (Kacheln)
+        var parent = DISPLAY_PRESETS[activeDisplayPreset] && DISPLAY_PRESETS[activeDisplayPreset].parent;
+        presetAutoJumped = false;
+        activeDisplayPreset = null;
+        if (parent && typeof renderBundeslandChooser === 'function') renderBundeslandChooser(parent);
+        else if (typeof showStep === 'function') showStep('region');
+      } else {
+        // Selectors sind schon von origGoBack gecleared — Preset-Card wieder einblenden
+        renderDisplayPreset(activeDisplayPreset);
+      }
     }
     return result;
   };
@@ -5264,10 +5715,62 @@ function detectDisplayPreset() {
   return null;
 }
 
+// ==================== LAND-AUSWAHL (Dropdown statt Foto-Liste) ====================
+// Jedes catch-it ist ab Werk mit einem Land konfiguriert. Der Einstieg springt
+// direkt in die Bundesland-/Netz-Auswahl dieses Landes. Nur wenn KEIN Land
+// bekannt ist (?country=none / window.deviceCountry===''), fragt der Dropdown nach.
+const DEFAULT_COUNTRY = 'AT';
+const COUNTRY_ORDER = ['AT','DE','CH','LI','CZ','FR','NL','BE','LU','IT','GB','HU','SI','DK','NO','SE','FI','EE','IE','INT'];
+const COUNTRY_FLAGS = {AT:'🇦🇹',DE:'🇩🇪',CH:'🇨🇭',LI:'🇱🇮',CZ:'🇨🇿',FR:'🇫🇷',NL:'🇳🇱',BE:'🇧🇪',LU:'🇱🇺',IT:'🇮🇹',GB:'🇬🇧',HU:'🇭🇺',SI:'🇸🇮',DK:'🇩🇰',NO:'🇳🇴',SE:'🇸🇪',FI:'🇫🇮',EE:'🇪🇪',IE:'🇮🇪',INT:'🌍'};
+
+function populateCountrySelect() {
+  var sel = document.getElementById('countrySelect');
+  if (!sel || typeof REGIONS === 'undefined') return;
+  var opts = ['<option value="">Land wählen…</option>'];
+  COUNTRY_ORDER.forEach(function(cc) {
+    if (!REGIONS[cc]) return;
+    var flag = COUNTRY_FLAGS[cc] ? COUNTRY_FLAGS[cc] + ' ' : '';
+    opts.push('<option value="' + cc + '">' + flag + REGIONS[cc].name + '</option>');
+  });
+  sel.innerHTML = opts.join('');
+  // Aktuelles Land vorauswählen, falls schon eines aktiv ist
+  if (selectedRegion && REGIONS[selectedRegion]) sel.value = selectedRegion;
+}
+
+function onCountrySelectChange(cc) {
+  if (!cc || !REGIONS[cc]) return;
+  selectRegion(cc);  // (überschriebene selectRegion → Bundesland-Chooser / Netz-Liste)
+}
+
+// Ermittelt das Land des Geräts: ?country=XX  >  window.deviceCountry  >  ?display-Parent  >  DEFAULT_COUNTRY.
+// 'none'/'ask' (oder leer gesetztes deviceCountry) => null => Dropdown fragt nach.
+function detectCountry() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var c = (params.get('country') || params.get('land') || '').toUpperCase();
+    if (c === 'NONE' || c === 'ASK') return null;
+    if (c && REGIONS[c]) return c;
+  } catch (e) {}
+  if (typeof window.deviceCountry === 'string') {
+    var dc = window.deviceCountry.toUpperCase();
+    if (dc === '') return null;
+    if (REGIONS[dc]) return dc;
+  }
+  var d = detectDisplayPreset();
+  if (d && DISPLAY_PRESETS[d] && REGIONS[DISPLAY_PRESETS[d].parent]) return DISPLAY_PRESETS[d].parent;
+  return (REGIONS[DEFAULT_COUNTRY]) ? DEFAULT_COUNTRY : null;
+}
+
 (function() {
   function tryAutoJump() {
+    populateCountrySelect();
+    // 1) Konkretes Display-Preset (?display=) hat Vorrang
     var d = detectDisplayPreset();
-    if (d) renderDisplayPreset(d);
+    if (d) { renderDisplayPreset(d); return; }
+    // 2) Land des Geräts → direkt in dessen Bundesland-/Netz-Auswahl
+    var c = detectCountry();
+    if (c && REGIONS[c]) { selectRegion(c); return; }
+    // 3) Kein Land bekannt → Dropdown (stepRegion) bleibt sichtbar und fragt nach
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', tryAutoJump);
@@ -5297,6 +5800,14 @@ var WIZARD_STEPS = [
       return Object.keys(nets).length >= 2;
     },
     validate: function() { return !!getSavedDisplayStyle(); }
+  },
+  { id: 'stepWizardBvgRows',  name: 'BVG-Darstellung',
+    // Nur wenn min. 1 Berlin-Station ausgewählt ist
+    isAvailable: function() {
+      if (!Array.isArray(stations)) return false;
+      return stations.some(function(s) { return s.network === 'BERLIN'; });
+    },
+    validate: function() { return !!getSavedBvgRowsStyle(); }
   },
   { id: 'stepWizardGehweg',   name: 'Gehweg',     isAvailable: function() { return true; }, validate: function() { return true; } },
   { id: 'stepWizardNight',    name: 'Nachtmodus', isAvailable: function() { return true; }, validate: function() { return true; } }
@@ -5337,6 +5848,23 @@ function setAdv(field, value) {
 
 function getSavedDisplayStyle() {
   try { return localStorage.getItem('catchit_display_style') || ''; } catch (e) { return ''; }
+}
+
+function getSavedBvgRowsStyle() {
+  try { return localStorage.getItem('catchit_bvg_rows_style') || ''; } catch (e) { return ''; }
+}
+
+function selectBvgRowsStyle(value) {
+  // Karten im BVG-Schritt aktivieren/deaktivieren
+  var card = document.getElementById('stepWizardBvgRows');
+  if (card) {
+    card.querySelectorAll('.display-style-btn').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.value === value);
+    });
+  }
+  try { localStorage.setItem('catchit_bvg_rows_style', value); } catch (e) {}
+  var nextBtn = document.getElementById('wizardBvgRowsNextBtn');
+  if (nextBtn) nextBtn.disabled = false;
 }
 
 function selectDisplayStyle(value) {
@@ -5404,6 +5932,11 @@ function wizardShowStep(idx) {
   if (step.id === 'stepWizardStyle') {
     var saved = getSavedDisplayStyle();
     selectDisplayStyle(saved === 'playful' ? 'playful' : 'compact');
+  }
+  // BVG-Schritt: gespeicherte Auswahl wiederherstellen, sonst "Groß" vorwählen.
+  if (step.id === 'stepWizardBvgRows') {
+    var savedBvg = getSavedBvgRowsStyle();
+    selectBvgRowsStyle(savedBvg === 'small' ? 'small' : 'big');
   }
   // Gehweg-Schritt: Liste pro Haltestelle rendern
   if (step.id === 'stepWizardGehweg') {
@@ -5625,6 +6158,23 @@ function wizardBuildConfig() {
         else newRows = 3;
       }
       cfg.rows = newRows;
+    }
+  }
+
+  // BVG-Wizard: User-Auswahl Klein/Groß auf rows abbilden (4 = klein, 2 = groß).
+  // Greift sowohl im Single- als auch Multi-Display-Fall.
+  var bvgRowsStyle = getSavedBvgRowsStyle();
+  if (bvgRowsStyle) {
+    var newBvgRows = (bvgRowsStyle === 'big') ? 2 : 4;
+    var colours = String(cfg.colour || '').split(',').map(function(c) { return c.trim(); });
+    if (colours.length === 1 && colours[0] === '18') {
+      cfg.rows = newBvgRows;
+    } else if (colours.length > 1) {
+      var rowsArr = String(cfg.rows || '').split(',').map(function(r) { return r.trim(); });
+      colours.forEach(function(c, idx) {
+        if (c === '18' && idx < rowsArr.length) rowsArr[idx] = String(newBvgRows);
+      });
+      cfg.rows = rowsArr.join(',');
     }
   }
 
@@ -6207,6 +6757,75 @@ searchInput.addEventListener('focus', function() {
   }
 });
 
+// ===== Fernverkehrsbahnhöfe Österreich (Whitelist) =====
+// Quelle: Wikipedia „Liste der Fernverkehrsbahnhöfe in Österreich". Die Fernverkehr-
+// Suche zeigt nur Halte aus dieser Liste (kleine Regional-/Bus-Halte fallen weg).
+const FV_AT_STATIONS = [
+  'Jennersdorf','Annenheim','Feldkirchen in Kärnten','Friesach','Greifenburg-Weißensee',
+  'Kappel am Krappfeld','Klagenfurt Annabichl','Klagenfurt Hbf','Krumpendorf','Kühnsdorf-Klopeiner See',
+  'Launsdorf-Hochosterwitz','Mallnitz-Obervellach','Micheldorf-Hirt','Oberdrauburg','Ossiach-Bodensdorf',
+  'Passering','Pörtschach am Wörthersee','Spittal-Millstättersee','Sattendorf','Steindorf am Ossiacher See',
+  'St. Georgen am Längsee','St. Paul im Lavanttal','St. Urban am Ossiachersee','St. Veit an der Glan',
+  'Treibach-Althofen','Velden am Wörthersee','Villach Hbf','Amstetten','Flughafen Wien','Semmering',
+  'St. Pölten Hbf','St. Valentin','Tullnerfeld','Ulmerfeld-Hausmening','Waidhofen an der Ybbs',
+  'Wiener Neustadt Hbf','Altmünster','Attnang-Puchheim','Bad Ischl','Bad Goisern','Ebensee','Freistadt',
+  'Gmunden','Hallstatt','Hinterstoder','Kefermarkt','Kirchdorf an der Krems','Klaus','Kleinreifling',
+  'Kremsmünster','Lasberg-St. Oswald','Linz Hbf','Micheldorf','Neuhofen an der Krems','Obertraun-Dachsteinhöhlen',
+  'Pregarten','Rohr-Bad Hall','Roßleithen','Schärding','Spital am Pyhrn','Steeg-Gosau','Summerau','Traun',
+  'Vöcklabruck','Wels Hbf','Weyer','Windischgarsten','Altenmarkt im Pongau','Bad Gastein','Bad Hofgastein',
+  'Bischofshofen','Bruck-Fusch','Dorfgastein','Eben im Pongau','Golling-Abtenau','Gries im Pinzgau','Hallein',
+  'Kuchl','Lend','Maishofen-Saalbach','Neumarkt am Wallersee','Puch Urstein','Radstadt','Saalfelden',
+  'Salzburg Hbf','Salzburg Süd','Schwarzach-St. Veit','St. Johann im Pongau','Taxenbach-Rauris','Werfen',
+  'Zell am See','Admont','Bad Aussee','Bad Mitterndorf','Bad Mitterndorf-Heilbrunn','Bruck an der Mur',
+  'Ehrenhausen','Fehring','Feldbach','Frohnleiten','Gleisdorf','Graz Don Bosco','Graz Hbf',
+  'Graz Liebenau-Murpark','Graz Ostbahnhof-Messe','Graz Puntigam','Gröbming','Gstatterboden im Nationalpark',
+  'Haus','Hieflau','Johnsbach im Nationalpark','Judenburg','Kaindorf an der Sulm','Kainisch','Kapfenberg',
+  'Knittelfeld','Laßnitzhöhe','Leibnitz','Leoben Hbf','Liezen','Mariahof-St. Lambrecht','Mürzzuschlag',
+  'Neumarkt in Steiermark','Öblarn','Raaba','Scheifling','Schladming','Selzthal','Spielfeld-Straß',
+  'St. Georgen ob Judenburg','St. Michael','Stadt Rottenmann','Stainach-Irdning','Studenzen-Fladnitz',
+  'Tauplitz','Thalheim-Pöls','Weißenbach-St.Gallen','Unzmarkt','Fieberbrunn','Hochfilzen','Hopfgarten Berglift',
+  'Imst-Pitztal','Innsbruck Hbf','Jenbach','Kirchberg in Tirol','Kitzbühel','Kitzbühel Hahnenkamm','Kufstein',
+  'Landeck-Zams','Lienz','Ötztal','St. Anton am Arlberg','St. Johann in Tirol','Telfs-Pfaffenhofen',
+  'Westendorf','Wörgl Hbf','Altach','Bludenz','Bregenz','Dornbirn','Feldkirch','Frastanz','Götzis','Hohenems',
+  'Langen am Arlberg','Nenzing','Rankweil','Riedenburg','Wien Hbf','Wien Hütteldorf','Wien Meidling','Wien Westbf'
+];
+// Normalisierung: kleinschreiben, Umlaute, Klammern/Slash-Zusätze weg, Hbf/Westbf
+// vereinheitlichen, „Bahnhof/Bahnhst/Haltestelle" entfernen, dann nur a–z0–9.
+function normFvName(s) {
+  s = (s || '').toLowerCase();
+  s = s.replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'ss');
+  s = s.replace(/\([^)]*\)/g,'');         // (U), (VIE) ...
+  s = s.replace(/\/[a-z]+/g,'');          // /donau, /ybbs, /krems ...
+  s = s.replace(/hauptbahnhof/g,'hbf');
+  s = s.replace(/westbahnhof/g,'westbf');
+  s = s.replace(/bahnhaltestelle|bahnhst|haltestelle|bahnhof|bahnst/g,'');
+  s = s.replace(/[^a-z0-9]/g,'');
+  return s;
+}
+const FV_AT_SET = new Set(FV_AT_STATIONS.map(normFvName));
+
+// Score = Anzahl verschiedener Fernverkehr-Zugtypen, die an der Station halten
+// (D, EC, EN, IC, ICE, IR, NJ, RJ, RJX, WB). Mehr Typen = wichtigerer Halt → weiter
+// oben in der Suche (z.B. Graz Hbf vor Graz Don Bosco). Pro Station gecacht.
+const FV_SCORE_CACHE = new Map();
+async function fvStationScore(stationId) {
+  if (FV_SCORE_CACHE.has(stationId)) return FV_SCORE_CACHE.get(stationId);
+  let score = 0;
+  try {
+    // Abfahrten über unseren Server (mappt WESTBAHN→OEBB / Trainboard /at)
+    const dep = await fetchDeparturesUnified('WESTBAHN:' + stationId);
+    const mons = (dep && dep.data && dep.data.monitors) || [];
+    const types = new Set();
+    mons.forEach(m => (m.lines || []).forEach(ln => {
+      const mt = String(ln.name || '').trim().toUpperCase().match(/^(RJX|RJ|ICE|IC|EC|NJ|EN|IR|WB|D)(?=\s|\d|$)/);
+      if (mt) types.add(mt[1]);
+    }));
+    score = types.size;
+  } catch (e) {}
+  FV_SCORE_CACHE.set(stationId, score);
+  return score;
+}
+
 async function performSearch(query) {
   if (!selectedNetwork) return;
   
@@ -6220,14 +6839,8 @@ async function performSearch(query) {
       results = searchWien(query);
     } else if (netConfig.searchType === 'static_list') {
       results = searchStaticList(netConfig.stations, query);
-    } else if (netConfig.searchType === 'trainboard' && netConfig.trainboard) {
-      try {
-        results = await trainboardSearch(netConfig.trainboard.path, query);
-      } catch (e) {
-        console.warn('[trainboard] Suche fehlgeschlagen, fallback auf server_proxy:', e);
-        results = await searchViaProxy(selectedNetwork, query);
-      }
     } else {
+      // Alles andere (server_proxy & trainboard) laeuft ueber unseren Server.
       results = await searchViaProxy(selectedNetwork, query);
     }
 
@@ -6279,6 +6892,50 @@ async function performSearch(query) {
         }
       });
       results = Array.from(seen.values());
+    }
+
+    // Tirol & Vorarlberg: Der /at/innsbruck-Endpoint liefert ganz Österreich
+    // (Linz, Wien, …). Geografisch auf Tirol + Vorarlberg begrenzen (nur AT).
+    // Box: lat 46.6–47.75, lon 9.4–12.95 → schließt Linz/Wien/Salzburg/München/LI aus.
+    if (selectedNetwork === 'INNSBRUCK') {
+      results = results.filter(s =>
+        typeof s.lat === 'number' && typeof s.lon === 'number' &&
+        (!s.country || s.country === 'AT') &&
+        !/\(Liechtenstein\)/i.test(s.name || '') &&   // LI ist als country=AT fehlmarkiert
+        s.lat >= 46.6 && s.lat <= 47.75 &&
+        s.lon >= 9.4 && s.lon <= 12.95
+      );
+    }
+
+    // Schweiz Öffis: schweizweiter Endpoint → nur CH-Halte (Grenzhalte DE/FR/IT raus)
+    if (selectedNetwork === 'CH_OEFFI') {
+      results = results.filter(s => !s.country || s.country === 'CH');
+    }
+
+    // Fernverkehr (WESTBAHN): 1) nur echte Fernverkehrsbahnhöfe (Whitelist),
+    // 2) nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben,
+    //    z.B. Graz Hbf vor Graz Don Bosco).
+    if (selectedNetwork === 'WESTBAHN') {
+      results = results.filter(s => FV_AT_SET.has(normFvName(s.name)));
+      const haveNorms = new Set(results.map(s => normFvName(s.name)));
+      // Whitelist-Bahnhöfe, die zur Eingabe passen, aber wegen Trainboard-Ranking
+      // fehlen (z.B. „Wien Meidling", „Wien Westbahnhof" bei Suche „Wien") → gezielt nachladen.
+      const ql = query.toLowerCase();
+      const missing = FV_AT_STATIONS.filter(n => n.toLowerCase().includes(ql) && !haveNorms.has(normFvName(n)));
+      for (const name of missing.slice(0, 6)) {
+        try {
+          const extra = await searchViaProxy(selectedNetwork, name);
+          const match = extra.find(e => normFvName(e.name) === normFvName(name));
+          if (match && !haveNorms.has(normFvName(match.name))) {
+            results.push(match);
+            haveNorms.add(normFvName(match.name));
+          }
+        } catch (e) {}
+      }
+      // nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben)
+      const scored = await Promise.all(results.slice(0, 15).map(async s => ({ s, score: await fvStationScore(s.id) })));
+      scored.sort((a, b) => b.score - a.score);
+      results = scored.map(x => x.s);
     }
 
     displaySearchResults(results);
@@ -6335,7 +6992,13 @@ async function searchViaProxy(network, query) {
   const params = new URLSearchParams({ network: mapNetworkForApi(network), q: query });
   const response = await fetch(`${SEARCH_API}?${params}`);
   const data = await response.json();
-  return (data.stops || []).map(s => ({ id: s.id, name: s.name, info: s.info || '' }));
+  return (data.stops || []).map(s => ({
+    id: s.id, name: s.name, info: s.info || '',
+    // Zusatzfelder fuer netz-spezifische Geofilter (Tirol/Vorarlberg, CH)
+    country: (s.country || '').toUpperCase(),
+    lat: (typeof s.lat === 'number') ? s.lat : null,
+    lon: (typeof s.lon === 'number') ? s.lon : null
+  }));
 }
 
 function displaySearchResults(results) {
@@ -6369,7 +7032,6 @@ function displaySearchResults(results) {
     searchResults.innerHTML = filtered.map(r => `
       <div class="search-result-item" onclick="selectStop('${r.id}', '${r.name.replace(/'/g, "\\'")}')">
         <div class="stop-name">${r.name}</div>
-        <div class="stop-info">${r.info || `ID: ${r.id}`}</div>
       </div>
     `).join('');
   }
@@ -6568,17 +7230,62 @@ function extractLines(data) {
             }
           }
 
-          // WESTBAHN: Nach richtungsId gruppieren (1=Richtung Salzburg, 2=Richtung Wien)
+          // Tirol & Vorarlberg (INNSBRUCK) + Schweiz Öffis (CH_OEFFI):
+          // nur Bus/Tram/Obus — Züge raus (RJ, RJX, REX, S-Bahn, IC, EC, "High Speed",
+          // "Urban Train" … → Typ ptTrain)
+          if (selectedNetwork === 'INNSBRUCK' || selectedNetwork === 'CH_OEFFI') {
+            const t = (line.type || '').toLowerCase();
+            if (t === 'pttrain') return;
+            if (/^(RJX|RJ|ICE|IC|EC|EN|NJ|REX|RE|CJX|S)\s*\d/i.test(name.trim())) return; // Backup per Name
+          }
+
           const rid = line.richtungsId || '';
-          if (selectedNetwork === 'WESTBAHN' && rid) {
-            const wbKey = `${name}|${rid}`;
-            const wbTowards = rid === '2' ? 'Richtung Wien Westbahnhof' : 'Richtung Salzburg / Westen';
-            if (!linesMap.has(wbKey)) {
-              linesMap.set(wbKey, {
-                name,
-                towards: wbTowards,
-                type: line.type || '',
-                richtungsId: rid,
+
+          // FERNVERKEHR (Netz-Key WESTBAHN, über Trainboard /at): Fernverkehr-Kategorien
+          // (Railjet/Westbahn/IC/Nightjet) je in ZWEI Richtungen.
+          // Ost = Richtung Wien Westbahnhof (towards enthält "Wien"), sonst West.
+          // richtungsId normiert (2=Wien, 1=West). filterCodes = echte Gattungen für den Filter.
+          if (selectedNetwork === 'WESTBAHN') {
+            const nm = name.trim().toUpperCase();
+            // An Wien-Bahnhöfen: FV-Züge, die in Wien Westbahnhof terminieren,
+            // sind reine Stadt-Kurzfahrten (z.B. WESTbahn-Wendezüge im Großraum
+            // Wien) — die wollen wir am Display nicht haben.
+            const _curStation = (selectedStop && selectedStop.name || '').toLowerCase();
+            if (/^wien/.test(_curStation) && /wien\s+westbahnhof/i.test(towards || '')) return;
+            // echte Gattung (längste Alternativen zuerst: RJX vor RJ, ICE vor IC, RGJ als eigene Gattung)
+            const gm = nm.match(/^(RJX|RJ|ICE|IC|EC|NJ|EN|IR|WB|RGJ|REGIOJET|RJET)/);
+            if (!gm) return;  // kein Fernverkehr (S-Bahn, REX, R, CJX, Bus … raus)
+            const gattung = gm[1];
+            let cat;
+            if (gattung === 'RJX' || gattung === 'RJ') cat = 'RJX';       // Railjet
+            else if (gattung === 'WB') cat = 'WB';                        // Westbahn
+            else if (gattung === 'IC' || gattung === 'EC') cat = 'IC';    // Intercity/Eurocity
+            else if (gattung === 'ICE') cat = 'ICE';                      // ICE (eigener Typ)
+            else if (gattung === 'IR') cat = 'IR';                        // InterRegio
+            else if (gattung === 'RGJ' || gattung === 'REGIOJET' || gattung === 'RJET') cat = 'RGJ';  // RegioJet (CZ)
+            else cat = 'NJ';                                              // Nightjet (NJ, EN)
+            // Korridor wird AUS dem Terminus abgeleitet (Wikipedia-Mapping).
+            // Erlaubt später Multi-Korridor-UI an Hubs wie Wien Hbf/Meidling.
+            const corridor = fvTerminusCorridor(towards);
+            // E/W aus Sicht der Westbahn-Trunk-Stationen (Linz/Wels/St. Pölten/Salzburg):
+            //  E = alles in oder ÖSTLICH von Wien (Wien, Flughafen Wien, Budapest, Bratislava …)
+            //  W = alles in oder WESTLICH von Salzburg (Salzburg, München, Innsbruck, Bregenz …)
+            // Damit landet z.B. "Richtung Budapest" am Linz korrekt im Ost-Bündel.
+            const _tl = (towards || '').toLowerCase();
+            const east = /(wien|flughafen\s+wien|budapest|bratislava|petr[zž]alka|hegyeshalom|gy[őo]r|keleti|wschodnia|marchegg)/.test(_tl);
+            // Eine Zeile je ECHTER Gattung + ECHTER richtungsId (d<terminusId>) —
+            // genau darauf matcht die Firmware (linefilterdestination).
+            const fvKey = gattung + '|' + rid;
+            if (!linesMap.has(fvKey)) {
+              linesMap.set(fvKey, {
+                name: gattung,            // echte Gattung → Filter + linefilterdestination
+                towards: towards,         // echtes Ziel
+                type: line.type || 'ptTrain',
+                richtungsId: rid,         // ab Server-Build: platform-basiert (p<gleis>) für FV
+                category: cat,            // nur für UI-Gruppierung
+                corridor: corridor,       // Wikipedia-Korridor (Westbahn/Südstrecke/…)
+                direction: east ? 'E' : 'W',
+                platform: line.platform || '',  // dominanter Bahnsteig (server-side ermittelt)
                 stopovers: []
               });
             }
@@ -6631,6 +7338,43 @@ function extractLines(data) {
       }
     }
   }
+
+  // Fernverkehr (WESTBAHN): Stationstyp ermitteln, Richtungen + Zugtypen seedeen.
+  // - Single-Korridor (Linz, St.Pölten, Wels…): klassisch 2 Richtungen E/W
+  //   (Wien-bound vs. Westen) auf EINEM Korridor.
+  // - Multi-Korridor (Wien Hbf/Meidling/Westbahnhof, Salzburg, Innsbruck, Graz,
+  //   Villach…): pro Korridor ein "Richtung"-Eintrag (Südstrecke / Nordbahn /
+  //   Tauernbahn / …) — der User kreuzt die Achsen an, die ihn interessieren.
+  if (selectedNetwork === 'WESTBAHN') {
+    const corridors = fvStationCorridors();  // alle am Bahnhof belegten Korridore
+    fvCurrentMode = corridors.length > 1 ? 'multiCorridor' : 'eastwest';
+    fvCurrentCorridors = corridors.length ? corridors : ['Fernverkehr'];
+
+    if (editingStationIndex !== null && selectedLines.size > 0) {
+      // Bearbeiten: aus bestehender Auswahl ableiten.
+      fvCheckedDirs = new Set();
+      fvActiveCats = new Set();
+      selectedLines.forEach(i => {
+        const l = availableLines[i];
+        if (!l) return;
+        fvCheckedDirs.add(fvLineAxis(l));
+        fvActiveCats.add(l.category);
+      });
+    } else {
+      // Neu: alle vorhandenen Achsen ankreuzen. Zugtypen-Defaults: Railjet/Westbahn/ICE an,
+      // Intercity/EC + Nightjet + InterRegio + RegioJet AUS — der User aktiviert sie selbst.
+      fvCheckedDirs = new Set(availableLines.map(l => fvLineAxis(l)));
+      fvActiveCats = new Set(FV_CATS);
+      fvActiveCats.delete('IC');
+      fvActiveCats.delete('NJ');
+      fvActiveCats.delete('IR');
+      fvActiveCats.delete('RGJ');
+    }
+    if (!fvCheckedDirs.size) {
+      fvCheckedDirs = new Set(availableLines.map(l => fvLineAxis(l)));
+    }
+    recomputeFvSelection();
+  }
 }
 
 // Prüft ob ein Netzwerk ein ÖBB Regional-Netzwerk ist (für beliebiges network)
@@ -6658,6 +7402,115 @@ function renderLines() {
       '<div style="font-size:13px;">' + hint + '</div>' +
       '<button onclick="goBack(\'search\')" style="margin-top:16px;padding:10px 18px;border:1px solid #ddd;background:#fff;border-radius:8px;color:#0055a4;cursor:pointer;font-weight:600;">&larr; Andere Station wählen</button>' +
     '</div>';
+    return;
+  }
+
+  // === FERNVERKEHR (Netz WESTBAHN): „Weststrecke" = EINE Linie mit 2 Richtungen
+  // (zum Ankreuzen) + darunter ein Zugtyp-FEATURE-FILTER (Railjet/Westbahn/IC/NJ
+  // an/aus, gilt für beide Richtungen). selectedLines wird aus (Richtungen × Typen)
+  // berechnet (recomputeFvSelection). ===
+  if (selectedNetwork === 'WESTBAHN') {
+    // Direction-Labels = echte Termini (z.B. "Richtung Wien Westbf / Wien Hbf")
+    const fvTermNames = fvCollectTermNames();
+    let fvHtml = '';
+
+    if (fvCurrentMode === 'multiCorridor') {
+      // Achsen via fvLineAxis sammeln (single source of truth — auch für die
+      // Westbahn-Trunk-Collapse-Logik bei Linz/Wels/St. Pölten).
+      const byAxis = new Map();  // axisKey → {corridor, region, termini:Set, platforms:Set, count}
+      availableLines.forEach(function(l) {
+        const axisKey = fvLineAxis(l);
+        const c = l.corridor || fvTerminusCorridor(l.towards);
+        const region = (axisKey.split('::')[1]) || (axisKey || '');
+        if (!byAxis.has(axisKey)) byAxis.set(axisKey, { corridor: c, region: region, termini: new Set(), platforms: new Set(), count: 0 });
+        const slot = byAxis.get(axisKey);
+        slot.count++;
+        if (l.towards) slot.termini.add(shortenStopName(l.towards));
+        if (l.platform) slot.platforms.add(String(l.platform));
+      });
+      // Pro Korridor die zugehörigen Achsen sammeln (sortiert nach Häufigkeit).
+      const byCorr = new Map();
+      byAxis.forEach(function(slot, axisKey) {
+        if (!byCorr.has(slot.corridor)) byCorr.set(slot.corridor, []);
+        byCorr.get(slot.corridor).push({ axisKey: axisKey, region: slot.region, termini: slot.termini, platforms: slot.platforms, count: slot.count });
+      });
+
+      fvCurrentCorridors.forEach(function(corridor) {
+        const axes = byCorr.get(corridor);
+        if (!axes || !axes.length) return;
+        fvHtml += '<div class="fv-corridor-title">' + corridor + '</div>';
+        fvHtml += '<div class="line-group"><div class="line-directions">';
+        axes.sort(function(a, b) { return b.count - a.count; }).forEach(function(ax) {
+          const checked = fvCheckedDirs.has(ax.axisKey);
+          const termArr = Array.from(ax.termini).slice(0, 3);
+          const detail = termArr.length ? ' — ' + termArr.join(' / ') : '';
+          // Bahnsteig-Hinweis (ab Server-Deploy v.: ´p2-3´-Cluster verfügbar)
+          const platArr = Array.from(ax.platforms || []).sort(function(a,b) {
+            return (parseInt(a)||0) - (parseInt(b)||0);
+          });
+          // Gleis-Info nicht mehr im Label anzeigen — die richtungsId ist jetzt
+          // korridor-basiert (wbw/wbe/sde/…) und Bahnsteig spielt nur intern eine Rolle.
+          const label = 'Richtung ' + ax.region + detail;
+          const escAxis = ax.axisKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          fvHtml += '<div class="direction-option ' + (checked ? 'selected' : '') + '" onclick="toggleFvDirCheck(\'' + escAxis + '\')">'
+                 + '<div class="checkbox">' + (checked ? '✓' : '') + '</div>'
+                 + '<div class="direction-text">→ ' + label + '</div>'
+                 + '</div>';
+        });
+        fvHtml += '</div></div>';
+      });
+    } else {
+      // Single-Korridor-Bahnhof — klassisches E/W-Layout mit echtem Korridor-Namen
+      // (Westbahn / Südstrecke / …).
+      const haveDirs = new Set(availableLines.map(l => l.direction));
+      const fvCorridor = fvCurrentCorridors[0] || fvCorridorName(selectedStop && selectedStop.name, fvTermNames);
+      let dirSections = ['E', 'W'].filter(d => haveDirs.has(d)).map(d => [fvDirLabel(d, fvTermNames), d]);
+      if (!dirSections.length) dirSections = [['Richtung Wien', 'E'], ['Richtung Westen', 'W']];
+
+      fvHtml += '<div class="fv-corridor-title">' + fvCorridor + '</div>';
+      fvHtml += '<div class="line-group"><div class="line-directions">';
+      dirSections.forEach(function(d) {
+        const title = d[0], dcode = d[1];
+        const checked = fvCheckedDirs.has(dcode);
+        fvHtml += '<div class="direction-option ' + (checked ? 'selected' : '') + '" onclick="toggleFvDirCheck(\'' + dcode + '\')">'
+               + '<div class="checkbox">' + (checked ? '✓' : '') + '</div>'
+               + '<div class="direction-text">→ ' + title + '</div>'
+               + '</div>';
+      });
+      fvHtml += '</div></div>';
+    }
+
+    // Zugtyp-Chips: nur die Gattungen anbieten, die laut Wikipedia auf den
+    // BELEGTEN Korridoren überhaupt verkehren (Union). Beispiel:
+    //   Tauernbahn → kein ICE/WB
+    //   Westbahn   → kein IR
+    // Damit verschwinden „unmögliche" Chips — aber realistische bleiben sichtbar,
+    // auch wenn aktuell kein Zug der Gattung im Datensatz ist (NJ tagsüber etc.).
+    const corridorsActive = fvCurrentMode === 'multiCorridor'
+      ? fvCurrentCorridors.filter(c => fvCheckedDirs.has(c))
+      : fvCurrentCorridors;
+    const allowedCats = new Set();
+    (corridorsActive.length ? corridorsActive : fvCurrentCorridors).forEach(function(c) {
+      (FV_CORRIDOR_CATS[c] || FV_CATS).forEach(function(x) { allowedCats.add(x); });
+    });
+    const chipCats = FV_CATS.filter(c => allowedCats.has(c));
+
+    fvHtml += '<div class="fv-feature-filter">'
+           +   '<div class="fv-filter-label">Zugtypen</div>'
+           +   '<div class="fv-filter-hint">Tippen zum Aus-/Einblenden</div>'
+           +   '<div class="fv-chips">';
+    chipCats.forEach(function(cat) {
+      const active = fvActiveCats.has(cat);
+      const color = FV_CAT_COLOR[cat] || '#555';
+      const style = active ? 'background:' + color + ';border-color:' + color + ';color:#fff' : '';
+      const mark = active ? '✓' : '+';
+      fvHtml += '<button class="fv-chip ' + (active ? 'on' : 'off') + '" style="' + style + '" onclick="toggleFvCat(\'' + cat + '\')"><span class="fv-chip-mark">' + mark + '</span>' + (FV_CAT_LABEL[cat] || cat) + '</button>';
+    });
+    fvHtml += '</div></div>';
+
+    linesList.innerHTML = fvHtml;
+    updateAddButton();
+    updateSelectAllButton();
     return;
   }
 
@@ -7009,6 +7862,139 @@ function toggleLine(idx) {
   renderLines();
 }
 
+// Fernverkehr: aus angekreuzten Achsen × aktiven Zugtypen die selectedLines berechnen.
+// Achse = Korridor + Zielregion (multiCorridor-Mode) bzw. E/W (eastwest-Mode).
+function recomputeFvSelection() {
+  selectedLines = new Set();
+  availableLines.forEach((l, i) => {
+    const axis = fvLineAxis(l);
+    if (fvCheckedDirs.has(axis) && fvActiveCats.has(l.category)) selectedLines.add(i);
+  });
+}
+
+// Baut Filter + Richtungen für den Fernverkehr-Save aus (aktive Zugtypen × gewählte
+// Richtungen). richtungsId ist pro Ziel-Terminus (d<id>) und über Gattungen GETEILT —
+// daher bekommt z.B. NJ dieselben Richtungs-IDs wie RJX/WB, auch wenn gerade kein NJ
+// fährt. Sobald ein NJ-Zug zu einem dieser Termini auftaucht, matcht er.
+function buildFvSave() {
+  // Pro Achse ein Eintrag mit allen richtungsIds (statt N Einträge je rid) — sonst
+  // bekommt das Display für jede einzelne richtungsId eine eigene Zeile und der User
+  // sieht "WB -99" mehrfach. Pro (cat × axis) generieren wir genau EINE Direction;
+  // die Liste der richtungsIds landet im richtungsId-Feld pipe-getrennt (`d1|d2|d3`)
+  // — exakt das Format, das buildLineFilterDestination und die Firmware schon können.
+  //
+  // Außerdem getrennt: PRO-GATTUNG vs. AXIS-WEIT. Die WB-Zeile bekommt nur richtungsIds
+  // von Linien deren Gattung tatsächlich WB ist (kein RJX-rid mehr in der WB-Liste).
+  // Fallback: wenn (cat × axis) keine echten Linien hat (z.B. NJ tagsüber), kommen
+  // die richtungsIds der ganzen Achse als "matching whitelist" rein.
+  const axisRidsByCat  = new Map(); // "axisKey|cat" → Set(rid)
+  const axisRidsAll    = new Map(); // axisKey → Set(rid)
+  const axisDestsByCat = new Map(); // "axisKey|cat" → Set(destName) — exakte (cat × axis) Endbahnhöfe
+  const axisDestsAll   = new Map(); // axisKey → Set(destName)     — Fallback (alle Gattungen)
+  const axisLabel      = new Map(); // axisKey → Display-Label
+  const axisCorridor   = new Map(); // axisKey → corridor
+
+  function pushSet(map, key, val) {
+    if (!map.has(key)) map.set(key, new Set());
+    if (val) map.get(key).add(val);
+  }
+
+  if (fvCurrentMode === 'multiCorridor') {
+    const termByAxis = new Map();
+    availableLines.forEach(function(l) {
+      const axis = fvLineAxis(l);
+      if (!termByAxis.has(axis)) termByAxis.set(axis, new Map());
+      const sn = shortenStopName(l.towards || '');
+      termByAxis.get(axis).set(sn, (termByAxis.get(axis).get(sn) || 0) + 1);
+      pushSet(axisRidsAll, axis, l.richtungsId);
+      pushSet(axisDestsAll, axis, sn);
+      if (l.category) {
+        pushSet(axisRidsByCat,  axis + '|' + l.category, l.richtungsId);
+        pushSet(axisDestsByCat, axis + '|' + l.category, sn);
+      }
+      axisCorridor.set(axis, l.corridor || fvTerminusCorridor(l.towards));
+    });
+    termByAxis.forEach(function(cnt, axis) {
+      const parts = axis.split('::');
+      const region = parts[1] || '';
+      const tops = Array.from(cnt.entries()).sort(function(a,b){ return b[1]-a[1]; }).slice(0, 3).map(function(x){ return x[0]; });
+      axisLabel.set(axis, 'Richtung ' + region + (tops.length ? ' (' + tops.join(' / ') + ')' : ''));
+    });
+  } else {
+    const fvTermNames = fvCollectTermNames();
+    ['E', 'W'].forEach(function(d) {
+      axisRidsAll.set(d, new Set());
+      axisDestsAll.set(d, new Set());
+      axisLabel.set(d, fvDirLabel(d, fvTermNames));
+      axisCorridor.set(d, fvCurrentCorridors[0] || 'Fernverkehr');
+    });
+    availableLines.forEach(function(l) {
+      const sn = shortenStopName(l.towards || '');
+      pushSet(axisRidsAll, l.direction, l.richtungsId);
+      pushSet(axisDestsAll, l.direction, sn);
+      if (l.category) {
+        pushSet(axisRidsByCat,  l.direction + '|' + l.category, l.richtungsId);
+        pushSet(axisDestsByCat, l.direction + '|' + l.category, sn);
+      }
+    });
+  }
+
+  const gattungen = new Set();
+  const directions = [];
+  FV_CATS.forEach(function(cat) {
+    if (!fvActiveCats.has(cat)) return;
+    const codes = FV_CAT_GATTUNGEN[cat] || [cat];
+    codes.forEach(function(g) { gattungen.add(g); });
+    const axes = (fvCurrentMode === 'multiCorridor')
+      ? Array.from(axisLabel.keys())
+      : ['E', 'W'];
+    axes.forEach(function(axisKey) {
+      if (!fvCheckedDirs.has(axisKey)) return;
+      const corr = axisCorridor.get(axisKey);
+      const allowed = (FV_CORRIDOR_CATS[corr] || FV_CATS);
+      if (corr && allowed.indexOf(cat) === -1) return;
+      // Exakte (cat × axis) rids/dests — wenn vorhanden, NUR die. Sonst Fallback
+      // auf die ganze Achse (alle Gattungen) damit ein NJ-Filter auch matcht wenn
+      // aktuell nur RJX/IC fährt und der NJ später dazu kommt.
+      const exactRids  = axisRidsByCat.get(axisKey + '|' + cat);
+      const exactDests = axisDestsByCat.get(axisKey + '|' + cat);
+      const ridSet  = (exactRids && exactRids.size) ? exactRids
+                    : (axisRidsAll.get(axisKey) || new Set());
+      const destSet = (exactDests && exactDests.size) ? exactDests
+                    : (axisDestsAll.get(axisKey) || new Set());
+      const ridList = Array.from(ridSet);
+      // Ziel-Texte als Sekundär-Match (Bahnsteigsänderungs-Fallback):
+      // Wenn die ÖBB heute ausnahmsweise Gleis 8 statt Gl. 5/6 nutzt, matcht der
+      // platform-rid "p5-6" nicht mehr — der Firmware-Partial-Match auf den Ziel-
+      // Text greift dann ("Salzburg Hbf" indexOf "Salzburg" → match). Das System
+      // "lernt" damit aus dem Endbahnhof statt blind am Bahnsteig zu hängen.
+      // PER-CAT: für WB nur WB-Termini (Salzburg/Wels/Westbf), nicht z.B. NJ-Bruxelles.
+      const destList = Array.from(destSet);
+      const allEntries = ridList.concat(destList).filter(function(x) { return x && x.length; });
+      const towards = axisLabel.get(axisKey) || axisKey;
+      codes.forEach(function(g) {
+        directions.push({
+          line: g,
+          towards: towards,
+          type: 'ptTrain',
+          richtungsId: allEntries.join('|')
+        });
+      });
+    });
+  });
+  return { filter: Array.from(gattungen).join(','), directions };
+}
+function toggleFvDirCheck(code) {
+  if (fvCheckedDirs.has(code)) fvCheckedDirs.delete(code); else fvCheckedDirs.add(code);
+  recomputeFvSelection();
+  renderLines();
+}
+function toggleFvCat(cat) {
+  if (fvActiveCats.has(cat)) fvActiveCats.delete(cat); else fvActiveCats.add(cat);
+  recomputeFvSelection();
+  renderLines();
+}
+
 function toggleVia(idx, stopName) {
   if (selectedVias.get(idx) === stopName) {
     selectedVias.delete(idx);  // Deselect
@@ -7020,6 +8006,8 @@ function toggleVia(idx, stopName) {
 
 function shortenStopName(name) {
   return name
+    // Plattform-/Gleis-Suffixe (z.B. „München Hbf Gl.5-10")
+    .replace(/\s*Gl\.?\s*\d+(?:\s*[-–]\s*\d+)?\s*$/gi, '')
     .replace(/\s+Hauptbahnhof\s*\d*/g, '')
     .replace(/\s+Bahnhof\s*\d*/g, '')
     .replace(/\s+Bahnhst\.?/g, '')
@@ -7530,9 +8518,12 @@ function updateSelectAllButton() {
 }
 
 function updateAddButton() {
-  // P2P (Fernverkehr): oebb_toStop prüfen statt selectedLines
+  // P2P: oebb_toStop; Fernverkehr (WESTBAHN): Richtungen×Zugtypen; sonst selectedLines
   const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
-  const enabled = isP2P ? !!oebb_toStop : selectedLines.size > 0;
+  let enabled;
+  if (isP2P) enabled = !!oebb_toStop;
+  else if (selectedNetwork === 'WESTBAHN') enabled = (fvCheckedDirs.size > 0 && fvActiveCats.size > 0);
+  else enabled = selectedLines.size > 0;
   addStationBtn.disabled = !enabled;
   // Auch den fixierten bottom-bar Button updaten wenn im Lines-Step
   if (['lines', 'search'].includes(currentStep)) {
@@ -7634,9 +8625,21 @@ function addStation() {
 
   if (!selectedNetwork || !selectedStop || selectedLines.size === 0) return;
 
-  const selectedLineNames = Array.from(selectedLines).map(idx => availableLines[idx].name);
-  const uniqueLineNames = [...new Set(selectedLineNames)];
-  const filter = uniqueLineNames.join(',');
+  // Filter: Kategorien (Fernverkehr) zu echten Gattungen expandieren (Railjet → RJX,RJ),
+  // sonst normaler Linienname.
+  // Fernverkehr: Filter + Richtungen aus (aktiven Zugtypen × Richtungen) bauen —
+  // unabhängig davon, ob ein Typ gerade fährt (z.B. NJ tagsüber).
+  let filter, fvDirections = null;
+  if (selectedNetwork === 'WESTBAHN') {
+    const fv = buildFvSave();
+    filter = fv.filter;
+    fvDirections = fv.directions;
+  } else {
+    const selectedLineNames = Array.from(selectedLines).flatMap(idx =>
+      availableLines[idx].filterCodes || [availableLines[idx].name]
+    );
+    filter = [...new Set(selectedLineNames)].join(',');
+  }
 
   // Netzwerk-Mapping: OEBB_SBAHN → OEBBREG, OEBB_FERN → OEBBFERN etc.
   // Server filtert automatisch nach Produkt basierend auf dem Netzwerk-Prefix
@@ -7647,7 +8650,7 @@ function addStation() {
     : `${apiNetwork}:${selectedStop.id}`;
 
   // Ausgewaehlte Richtungen speichern (Linie + towards + optionaler via-Filter + richtungsId)
-  const selectedDirections = Array.from(selectedLines).map(idx => {
+  const selectedDirections = fvDirections || Array.from(selectedLines).map(idx => {
     const line = availableLines[idx];
     const dir = {
       line: line.name,
@@ -7797,27 +8800,47 @@ function updateStationsList() {
   stationCount.textContent = groupedStations.size;
 
   const openFinetuningBtn = document.getElementById('openFinetuningBtn');
+  const stationsCardEl = document.getElementById('stationsCard');
 
   if (stations.length === 0) {
     emptyState.style.display = 'block';
     saveBtn.disabled = true;
     if (openFinetuningBtn) openFinetuningBtn.classList.add('hidden');
+    // Leere "Deine Stationen"-Karte ganz ausblenden (z.B. am Anfang bei der Länderauswahl)
+    if (stationsCardEl) stationsCardEl.classList.add('hidden');
   } else {
     emptyState.style.display = 'none';
     saveBtn.disabled = false;
     // openFinetuningBtn nicht mehr verwenden — alles über saveBtn in bottom-bar
     if (openFinetuningBtn) openFinetuningBtn.classList.add('hidden');
+    if (stationsCardEl) stationsCardEl.classList.remove('hidden');
+  }
+
+  // Helper: Direction-Towards-Text kompakt machen ("Richtung Wien (Flughafen / Wien)" → "Wien")
+  function _cleanFvDirection(towards) {
+    if (!towards) return '';
+    return String(towards)
+      .replace(/^Richtung\s+/i, '')          // "Richtung " Präfix weg
+      .replace(/\s*\([^)]*\)\s*/g, '')       // alles in Klammern weg
+      .replace(/\s+\/\s+Westen\s*$/i, '')   // "Salzburg / Westen" → "Salzburg"
+      .replace(/^Westbahnhof$/i, 'Wien Westbf.')  // wenn nur "Westbahnhof" übrigbleibt
+      .trim();
   }
 
   const chips = Array.from(groupedStations.values()).map((group) => {
     let filterLabel;
     // Prüfe ob eine der Stationen "Alle Abfahrten" ist
     const isAllDeps = group.indices.some(idx => stations[idx]?.allDepartures);
+    const isFv = group.network === 'WESTBAHN';
     if (isAllDeps) {
       filterLabel = 'Alle Abfahrten';
     } else if (group.isJourney) {
       const uniqueFilters = [...new Set(group.filters)];
       filterLabel = `Produkte: ${uniqueFilters.join(', ') || 'Alle'}`;
+    } else if (isFv && group.directions && group.directions.length > 0) {
+      // Fernverkehr: kompakt "→ Wien / Salzburg" statt langer Gattungs-Liste
+      const dirs = [...new Set(group.directions.map(d => _cleanFvDirection(d.towards)).filter(Boolean))];
+      filterLabel = dirs.length ? '→ ' + dirs.join(' / ') : 'Alle Richtungen';
     } else if (group.network === 'OEBB' && group.directions && group.directions.length > 0) {
       // OEBB: Nur Gattungen auflisten (Ziel steht schon im stopName)
       const gattungen = [...new Set(group.directions.map(d => d.line))];
@@ -7830,7 +8853,6 @@ function updateStationsList() {
         }
         return d.line;
       });
-      // Unique und sortiert
       const uniqueLabels = [...new Set(directionLabels)];
       filterLabel = uniqueLabels.join(', ');
     } else {
@@ -7841,10 +8863,19 @@ function updateStationsList() {
     const badgeClass = group.network.toLowerCase();
     const firstIdx = group.indices[0];
 
-    // Primaere Linie fuer das Badge ableiten — "U1" statt "WL". Faellt auf den
-    // Netz-Kuerzel zurueck, wenn keine Linie ableitbar ist (z.B. "Alle Abfahrten").
+    // Badge-Label: kurz und sprechend. Spezialfälle:
+    //   • S-Bahn (OEBB_*SBAHN, OEBB_STAMM_SBAHN, OEBB_REG_*) → "S"
+    //   • Fernverkehr (WESTBAHN) → "FV"
+    //   • Standard OEBB → "ÖBB"
+    //   • sonst: erste Linie aus directions, oder Filter-Kürzel
     let badgeLabel = group.network;
-    if (group.directions && group.directions.length > 0) {
+    if (/^OEBB_(STAMM_)?SBAHN$|^OEBB_REG/.test(group.network)) {
+      badgeLabel = 'S';
+    } else if (group.network === 'WESTBAHN') {
+      badgeLabel = 'FV';
+    } else if (group.network === 'OEBB' || group.network === 'OEBB_FERN') {
+      badgeLabel = 'ÖBB';
+    } else if (group.directions && group.directions.length > 0) {
       const uniqueLines = [...new Set(group.directions.map(d => d.line).filter(Boolean))];
       if (uniqueLines.length > 0) {
         badgeLabel = uniqueLines.length === 1
@@ -8055,8 +9086,10 @@ const NETWORK_COLORS = {
   SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
   STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
+  // Alle OEBB-Varianten benützen den gleichen Renderer (colour=12 / DisplayOEBBSBahn).
+  // Die alte ÖBB-Fernverkehr-Anzeige (colour=11 / DisplayOEBB) wurde gelöscht.
   OEBB: { id: 12, name: 'ÖBB', color: '#E2001A' },
-  OEBB_FERN: { id: 12, name: 'ÖBB Fernverkehr', color: '#E2001A' },
+  OEBB_FERN: { id: 12, name: 'ÖBB', color: '#E2001A' },
   OEBB_REGIONAL: { id: 12, name: 'ÖBB Regionalverkehr', color: '#0055A4' },
   OEBB_SBAHN: { id: 12, name: 'ÖBB S-Bahn', color: '#003366' },
   OEBB_STAMM_SBAHN: { id: 12, name: 'ÖBB Stammstrecke', color: '#003366' },
@@ -8064,16 +9097,13 @@ const NETWORK_COLORS = {
   OEBB_REG_OOE: { id: 12, name: 'ÖBB Regional OÖ', color: '#0055A4' },
   // API-Alias-Keys (aus geladenen rbl-Prefixen), damit Stationen korrekt einer
   // Farbe/colour-Id zugeordnet werden — sonst Fallback auf Wien (colour 1).
-  OEBBREG: { id: 12, name: 'ÖBB Regionalverkehr', color: '#0055A4' },
-  OEBBFERN: { id: 11, name: 'ÖBB Fernverkehr', color: '#E2001A' },
+  OEBBREG: { id: 12, name: 'ÖBB Regional', color: '#0055A4' },
+  OEBBFERN: { id: 12, name: 'ÖBB', color: '#E2001A' },
   WESTBAHN: { id: 14, name: 'Westbahn', color: '#0055A4' },
   LIEMOBIL: { id: 15, name: 'LIEmobil', color: '#CE1126' },
   PID: { id: 16, name: 'Prag (PID)', color: '#D7141A' },
   GVB: { id: 1, name: 'GVB Amsterdam', color: '#004B93' },
   RET: { id: 1, name: 'RET Rotterdam', color: '#E4002B' },
-  // API-Aliase (so wie sie vom Device geladen werden)
-  OEBBREG: { id: 12, name: 'ÖBB Regional', color: '#0055A4' },
-  OEBBFERN: { id: 12, name: 'ÖBB Fernverkehr', color: '#E2001A' },
   OVAPI: { id: 1, name: 'OV Niederlande', color: '#004B93' }
 };
 
@@ -8113,10 +9143,11 @@ function calculateRecommendedConfig() {
   let displayName = NETWORK_COLORS[dominantNetwork]?.name || 'Wiener Linien';
   let description = `Optimiert für ${NETWORKS[dominantNetwork]?.name || dominantNetwork}`;
 
-  // Spezialfall OEBB Fernverkehr (Point-to-Point)
+  // Spezialfall OEBB Fernverkehr (Point-to-Point) — verwendet den ÖBB-Renderer
+  // (colour 12 / DisplayOEBBSBahn), nicht mehr den alten FV-Renderer (colour 11).
   if (dominantNetwork === 'OEBB_FERN') {
     displayType = 12;
-    displayName = 'ÖBB Fernverkehr';
+    displayName = 'ÖBB';
     description = 'Von A nach B (Railjet, IC, EC, Nightjet)';
   }
 
@@ -8157,11 +9188,26 @@ function calculateRecommendedConfig() {
     description = 'S-Bahn, REX Anzeige';
   }
 
-  // Spezialfall Westbahn
+  // Spezialfall Fernverkehr (Netz-Key WESTBAHN):
+  // Nur Westbahn (WB) gewählt → Westbahn-Design (colour 14, DisplayWestbahn).
+  // Gemischt FV (RJX/IC/EC/NJ/…) → vereinheitlichtes ÖBB-Display (colour 12,
+  // DisplayOEBBSBahn) — der separate FV-Renderer (colour 11) wurde entfernt.
   if (dominantNetwork === 'WESTBAHN') {
-    displayType = 14;
-    displayName = 'Westbahn';
-    description = 'Optimiert für Westbahn Anzeige';
+    const fvStations = stations.filter(s => s.network === 'WESTBAHN');
+    const codes = new Set();
+    fvStations.forEach(s => (s.filter || '').split(',').forEach(c => {
+      const t = c.trim().toUpperCase(); if (t) codes.add(t);
+    }));
+    const onlyWB = codes.size > 0 && [...codes].every(c => c === 'WB');
+    if (onlyWB) {
+      displayType = 14;
+      displayName = 'Westbahn';
+      description = 'Optimiert für Westbahn Anzeige';
+    } else {
+      displayType = 12;
+      displayName = 'ÖBB';
+      description = 'Railjet, IC/EC, Nightjet, Westbahn';
+    }
   }
 
   // Spezialfall DB/ÖBB: S-Bahn vs Fernverkehr vs Regionalverkehr
@@ -8206,8 +9252,8 @@ function calculateRecommendedConfig() {
       // Westbahn: mindestens 2 (1 Haupt + 1 Kompakt), max 3
       return Math.max(Math.min(dirCount, 3), 2);
     }
-    if (colour === 2 || colour === 13) {
-      // Linz/Graz: 1-4 Zeilen
+    if (colour === 2 || colour === 13 || colour === 18) {
+      // Linz/Graz/BVG: 1-4 Zeilen
       return Math.min(Math.max(dirCount, 1), 4);
     }
     // Wien (colour 1) und andere:
@@ -8223,12 +9269,25 @@ function calculateRecommendedConfig() {
     return 3; // 5+
   }
 
+  // Per-Station colour (FV-aware): WESTBAHN-Stationen mit gemischtem Filter laufen
+  // auf ÖBB-Display (12), pure-WB-Filter auf Westbahn-Renderer (14). Damit stimmen
+  // Anzeige-Stil + Fine-tuning + Device alle überein.
+  function _colourForStation(s) {
+    if (s.network === 'WESTBAHN') {
+      const codes = new Set();
+      (s.filter || '').split(',').forEach(c => { const t = c.trim().toUpperCase(); if (t) codes.add(t); });
+      const onlyWB = codes.size > 0 && Array.from(codes).every(c => c === 'WB');
+      return onlyWB ? 14 : 12;
+    }
+    return NETWORK_COLORS[s.network]?.id || displayType;
+  }
+
   // Rows pro Gruppe berechnen
   const stationsByColour = new Map();
   // Reihenfolge beibehalten: uniqueColours in Stations-Reihenfolge
   const colourOrder = [];
   stations.forEach(s => {
-    const c = NETWORK_COLORS[s.network]?.id || displayType;
+    const c = _colourForStation(s);
     if (!stationsByColour.has(c)) {
       stationsByColour.set(c, []);
       colourOrder.push(c);
@@ -8272,11 +9331,8 @@ function calculateRecommendedConfig() {
   // Gehweg-Werte (alle auf 0 als Default) - WICHTIG: basiert auf uniqueStationDetails!
   const gehwegValues = uniqueStationDetails.map(() => 0);
 
-  // Multi-Display: Per-Station colour berechnen
-  const perStationColours = stations.map(s => {
-    const nc = NETWORK_COLORS[s.network];
-    return nc ? nc.id : displayType;
-  });
+  // Multi-Display: Per-Station colour berechnen (FV-aware via _colourForStation)
+  const perStationColours = stations.map(s => _colourForStation(s));
   const uniqueColours = [...new Set(perStationColours)];
   const hasMultipleDisplayTypes = uniqueColours.length > 1;
 
@@ -8500,11 +9556,13 @@ function buildLineFilterDestination(stationsList) {
       // Stabile richtungsId (inkl. OEBB Richtungs-Cluster "d<terminusId>"): bevorzugt.
       // Eine richtungsId deckt ALLE Ziele derselben Fahrtrichtung ab — die Firmware
       // matcht alle Zuege dieser Richtung, nicht nur ein einzelnes Ziel.
+      // FV/buildFvSave kann mehrere richtungsIds pipe-getrennt liefern (z.B. WB-Achse
+      // sammelt Wien Hbf + Wien Westbahnhof + Flughafen Wien) — splitten + dedupen.
       if (dir.richtungsId && hasStableRichtungsId(station.network)) {
         if (!lineToDestinations[line]) lineToDestinations[line] = [];
-        if (!lineToDestinations[line].includes(dir.richtungsId)) {
-          lineToDestinations[line].push(dir.richtungsId);
-        }
+        String(dir.richtungsId).split('|').map(function(r) { return r.trim(); }).filter(Boolean).forEach(function(r) {
+          if (!lineToDestinations[line].includes(r)) lineToDestinations[line].push(r);
+        });
         return;
       }
 
@@ -9117,7 +10175,9 @@ function updateQuickPreview() {
   const caps = CITY_CAPABILITIES[networkForCapabilities] || CITY_CAPABILITIES.WL;
 
   // Settings Tags aktualisieren
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr',16:'Prag (PID)',17:'Brünn (DPMB)',18:'BVG Berlin',19:'KVB Köln',20:'AVV Aachen'};
+  // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
+  // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr',16:'Prag (PID)',17:'Brünn (DPMB)',18:'BVG Berlin',19:'KVB Köln',20:'AVV Aachen'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -9202,7 +10262,9 @@ function initializeQuickPreview() {
   if (!settingsList) return;
 
   const caps = recommendedConfig.capabilities || {};
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',11:'ÖBB Fernverkehr',12:'ÖBB S-Bahn',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr',16:'Prag (PID)',17:'Brünn (DPMB)',18:'BVG Berlin',19:'KVB Köln',20:'AVV Aachen'};
+  // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
+  // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
+  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr',16:'Prag (PID)',17:'Brünn (DPMB)',18:'BVG Berlin',19:'KVB Köln',20:'AVV Aachen'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -9364,7 +10426,8 @@ const DISPLAY_TYPE_FEATURES = {
   12: { rows: true, minRows: 2, maxRows: 3, defaultRows: 2, sorting: false, grouping: false, delayHighlight: true, name: 'ÖBB S-Bahn' },
   13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz' },
   14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
-  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, name: 'Liechtenstein / Schweiz Nahverkehr' }
+  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, name: 'Liechtenstein / Schweiz Nahverkehr' },
+  18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'BVG Berlin' }
 };
 
 // Display-Typen die einen Schriftgrößen-Toggle haben (Graz auch)
@@ -9631,9 +10694,16 @@ function renderDisplayTypeSections() {
     if (f.textColor) {
       html += '<div class="form-row"><div><div class="form-label">Schriftfarbe</div></div>';
       html += '<div class="toggle-row" id="ftTxtCol_' + dt.colour + '">';
-      html += '<button class="toggle-btn active" data-value="1" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',1)" style="background:#FFD700;color:#000">Gelb</button>';
-      html += '<button class="toggle-btn" data-value="2" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',2)" style="background:#FFF;color:#000">Weiß</button>';
-      html += '<button class="toggle-btn" data-value="3" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',3)" style="background:#FF8C00;color:#000">Orange</button>';
+      html += '<button class="toggle-btn ft-color-btn active" data-value="1" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',1)" style="background:#FFD700;color:#000">Gelb</button>';
+      html += '<button class="toggle-btn ft-color-btn" data-value="2" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',2)" style="background:#FFF;color:#000">Weiß</button>';
+      html += '<button class="toggle-btn ft-color-btn" data-value="3" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',3)" style="background:#FF8C00;color:#000">Orange</button>';
+      html += '</div></div>';
+
+      // Hintergrundfarbe: Schwarz (kontrastreich, Default) oder Grün (schlicht/realistisch)
+      html += '<div class="form-row"><div><div class="form-label">Hintergrundfarbe</div><div class="form-hint">Schwarz = kontrastreicher · Grün = schlicht/realistisch</div></div>';
+      html += '<div class="toggle-row" id="ftWienBg_' + dt.colour + '">';
+      html += '<button class="toggle-btn ft-color-btn active" data-value="0" onclick="setFtToggleVal(\'ftWienBg_' + dt.colour + '\',0)" style="background:#000;color:#FFD700">Schwarz</button>';
+      html += '<button class="toggle-btn ft-color-btn" data-value="1" onclick="setFtToggleVal(\'ftWienBg_' + dt.colour + '\',1)" style="background:#0a3d1f;color:#FFD700">Grün</button>';
       html += '</div></div>';
     }
     if (f.chopper) {
@@ -9706,6 +10776,13 @@ function renderDisplayTypeSections() {
   types.forEach(function(dt) {
     var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
     if (f.sorting) { renderDtOrderList(dt.colour); toggleDtSubsections(dt.colour); }
+    // Wien-Toggles aus gespeicherter Config restoren (sonst zeigt UI immer Default)
+    if (f.textColor) {
+      var savedTxt = (recommendedConfig && recommendedConfig.textColor) || 1;
+      setFtToggleVal('ftTxtCol_' + dt.colour, savedTxt);
+      var savedBg = (recommendedConfig && recommendedConfig.wienBg !== undefined) ? recommendedConfig.wienBg : 0;
+      setFtToggleVal('ftWienBg_' + dt.colour, savedBg);
+    }
   });
 }
 
@@ -11577,6 +12654,7 @@ function saveFromFinetuning() {
   let rows = getFtRows();  // Fallback
   let sortMode = getFtSortMode();  // Fallback
   let textColor = getFtTextColor();
+  let wienBg = (recommendedConfig && recommendedConfig.wienBg !== undefined) ? recommendedConfig.wienBg : 0;  // Default: 0=Schwarz
   let chopper = isFtToggleActive('ftChopperToggle') ? 1 : 0;
   let silberpfeil = isFtToggleActive('ftSilberpfeilToggle') ? 1 : 0;
   let niederflurBlink = (recommendedConfig && recommendedConfig.niederflurBlink) ? 1 : 0;
@@ -11597,6 +12675,11 @@ function saveFromFinetuning() {
     }
     if (f.textColor) {
       textColor = parseInt(getFtToggleVal('ftTxtCol_' + dt.colour)) || textColor;
+      // Wien-BG: 1=Grün, 0=Schwarz. parseInt('0') ist falsy, daher explizit prüfen.
+      var wienBgVal = getFtToggleVal('ftWienBg_' + dt.colour);
+      if (wienBgVal !== null && wienBgVal !== undefined && wienBgVal !== '') {
+        wienBg = parseInt(wienBgVal);
+      }
     }
     if (f.chopper) {
       chopper = isFtToggleActive('ftChopper_' + dt.colour) ? 1 : 0;
@@ -11654,6 +12737,7 @@ function saveFromFinetuning() {
   recommendedConfig.rows = rows;
   recommendedConfig.displayLight = displayLight;
   recommendedConfig.textColor = textColor;  // Wien Schriftfarbe
+  recommendedConfig.wienBg = wienBg;          // Wien Hintergrund (1=Grün, 0=Schwarz)
   recommendedConfig.delayHighlight = delayHighlight;
   recommendedConfig.chopper = chopper;
   recommendedConfig.silberpfeil = silberpfeil;
@@ -11766,6 +12850,7 @@ function sendConfigToDeviceDirect(config) {
     colour: String(config.colour),
     displaylight: String(config.displayLight),
     textcolor: String(config.textColor || 1),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
+    wienbg: String(config.wienBg !== undefined ? config.wienBg : 0),  // Wien BG (0=Schwarz Default, 1=Grün)
     nightmode: config.nightMode ? '1' : '0',
     nightstart: String(config.nightStart),
     nightend: String(config.nightEnd),
@@ -11846,6 +12931,7 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('colour', configData.colour);
     formData.append('displaylight', configData.displaylight);
     formData.append('textcolor', configData.textcolor);  // Wien Schriftfarbe
+    formData.append('wienbg', configData.wienbg);          // Wien BG (1=Grün, 0=Schwarz)
     formData.append('nightmode', configData.nightmode);
     formData.append('nightstart', configData.nightstart);
     formData.append('nightend', configData.nightend);
@@ -12431,6 +13517,10 @@ async function handleConfigMessage(data) {
     if (data.config.text_color !== undefined) {
       recommendedConfig.textColor = parseInt(data.config.text_color) || 1;
     }
+    // Wien Hintergrund (1=Grün, 0=Schwarz). 0 ist gültig, deshalb explizite Prüfung.
+    if (data.config.wien_bg !== undefined && data.config.wien_bg !== null && data.config.wien_bg !== '') {
+      recommendedConfig.wienBg = parseInt(data.config.wien_bg);
+    }
     if (data.config.night_mode_enabled !== undefined) {
       recommendedConfig.nightMode = data.config.night_mode_enabled;
     }
@@ -12838,6 +13928,9 @@ window.addEventListener('DOMContentLoaded', () => {
       journeyToTimeout = setTimeout(() => performJourneyToSearch(query), 300);
     });
   }
+
+  // Stationsliste initial rendern → leere "Deine Stationen"-Karte wird ausgeblendet
+  updateStationsList();
 });
 </script>
 
