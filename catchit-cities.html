@@ -10856,16 +10856,16 @@ function renderDisplayTypeSections() {
     if (f.textColor) {
       html += '<div class="form-row"><div><div class="form-label">Schriftfarbe</div></div>';
       html += '<div class="toggle-row" id="ftTxtCol_' + dt.colour + '">';
-      html += '<button class="toggle-btn ft-color-btn active" data-value="1" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',1)" style="background:#FFD700;color:#000">Gelb</button>';
-      html += '<button class="toggle-btn ft-color-btn" data-value="2" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',2)" style="background:#FFF;color:#000">Weiß</button>';
-      html += '<button class="toggle-btn ft-color-btn" data-value="3" onclick="setFtToggleVal(\'ftTxtCol_' + dt.colour + '\',3)" style="background:#FF8C00;color:#000">Orange</button>';
+      html += '<button class="toggle-btn ft-color-btn active" data-value="1" onclick="setFtTextColorVal(' + dt.colour + ',1)" style="background:#FFD700;color:#000">Gelb</button>';
+      html += '<button class="toggle-btn ft-color-btn" data-value="2" onclick="setFtTextColorVal(' + dt.colour + ',2)" style="background:#FFF;color:#000">Weiß</button>';
+      html += '<button class="toggle-btn ft-color-btn" data-value="3" onclick="setFtTextColorVal(' + dt.colour + ',3)" style="background:#FF8C00;color:#000">Orange</button>';
       html += '</div></div>';
 
       // Hintergrundfarbe: Schwarz (kontrastreich, Default) oder Grün (schlicht/realistisch)
       html += '<div class="form-row"><div><div class="form-label">Hintergrundfarbe</div><div class="form-hint">Schwarz = kontrastreicher · Grün = schlicht/realistisch</div></div>';
       html += '<div class="toggle-row" id="ftWienBg_' + dt.colour + '">';
-      html += '<button class="toggle-btn ft-color-btn active" data-value="0" onclick="setFtToggleVal(\'ftWienBg_' + dt.colour + '\',0)" style="background:#000;color:#FFD700">Schwarz</button>';
-      html += '<button class="toggle-btn ft-color-btn" data-value="1" onclick="setFtToggleVal(\'ftWienBg_' + dt.colour + '\',1)" style="background:#0a3d1f;color:#FFD700">Grün</button>';
+      html += '<button class="toggle-btn ft-color-btn active" data-value="0" onclick="setFtWienBg(' + dt.colour + ',0)" style="background:#000;color:#FFD700">Schwarz</button>';
+      html += '<button class="toggle-btn ft-color-btn" data-value="1" onclick="setFtWienBg(' + dt.colour + ',1)" style="background:#0a3d1f;color:#FFD700">Grün</button>';
       html += '</div></div>';
     }
     if (f.chopper) {
@@ -10954,6 +10954,19 @@ function setFtToggleVal(containerId, val) {
   container.querySelectorAll('.toggle-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.value === String(val));
   });
+}
+
+// Wien Hintergrundfarbe: Toggle setzen UND recommendedConfig sofort aktualisieren,
+// damit ein späterer Re-Render (renderDisplayTypeSections) den Wert nicht zurücksetzt.
+function setFtWienBg(cid, val) {
+  setFtToggleVal('ftWienBg_' + cid, val);
+  if (recommendedConfig) recommendedConfig.wienBg = parseInt(val);
+}
+
+// Wien Schriftfarbe: analog persistieren (gleiches Re-Render-Reset-Problem)
+function setFtTextColorVal(cid, val) {
+  setFtToggleVal('ftTxtCol_' + cid, val);
+  if (recommendedConfig) recommendedConfig.textColor = parseInt(val);
 }
 
 // Aus gespeicherter Config: Rows-Toggle + Schriftgröße (Graz/Liechtenstein) initialisieren
