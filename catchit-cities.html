@@ -3090,7 +3090,39 @@
       Weiter
     </button>
   </div>
-  
+
+  <!-- Auswahl-Menü bei bestehender Config: Linien ändern oder Einstellungen ändern -->
+  <div id="configChoiceOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(15,18,25,0.97);overflow:auto;">
+    <div style="max-width:480px;margin:0 auto;padding:48px 20px 40px;font-family:-apple-system,'Segoe UI',sans-serif;">
+      <h1 style="color:#fff;font-size:24px;text-align:center;margin:0 0 8px;">Was möchtest du ändern?</h1>
+      <p style="color:#9aa3b2;font-size:14px;text-align:center;margin:0 0 28px;">Dein catch-it ist schon eingerichtet. Wähle, was du anpassen willst.</p>
+
+      <button onclick="chooseEditLines()" style="display:block;width:100%;text-align:left;background:#1c2230;border:1px solid #2e3647;border-radius:14px;padding:20px;margin-bottom:16px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='#4285f4'" onmouseout="this.style.borderColor='#2e3647'">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <span style="font-size:30px;line-height:1;">🚏</span>
+          <div>
+            <div style="color:#fff;font-weight:700;font-size:17px;margin-bottom:3px;">Linien ändern</div>
+            <div style="color:#9aa3b2;font-size:13px;line-height:1.4;">Haltestellen und Linien hinzufügen, entfernen oder bearbeiten.</div>
+          </div>
+        </div>
+      </button>
+
+      <button onclick="chooseEditSettings()" style="display:block;width:100%;text-align:left;background:#1c2230;border:1px solid #2e3647;border-radius:14px;padding:20px;margin-bottom:24px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='#4285f4'" onmouseout="this.style.borderColor='#2e3647'">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <span style="font-size:30px;line-height:1;">⚙️</span>
+          <div>
+            <div style="color:#fff;font-weight:700;font-size:17px;margin-bottom:3px;">Einstellungen ändern</div>
+            <div style="color:#9aa3b2;font-size:13px;line-height:1.4;">Design, Reihenfolge, Helligkeit, Gehweg und mehr im Feintuning.</div>
+          </div>
+        </div>
+      </button>
+
+      <div style="text-align:center;">
+        <span id="configChoiceStations" style="color:#6b7280;font-size:12px;"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- Step: Schnellansicht nach Station-Auswahl -->
   <div class="card hidden" id="stepDisplayConfig">
     <button class="back-btn" onclick="backFromDisplayConfig()">Zurück</button>
@@ -5815,6 +5847,8 @@ var WIZARD_STEPS = [
   // das Pro-Display-Feintuning (Button "Feintuning →" auf dem Nachtmodus-Schritt).
 ];
 var wizardCurrentIdx = 0;
+// Persistenter Gehweg-State im Wizard (überlebt Schritt-Wechsel; DOM allein reicht nicht)
+var wizardGehwegState = { enabled: false, values: {} };  // values: stationKey -> Minuten
 
 function getActiveWizardSteps() {
   return WIZARD_STEPS.filter(function(s) { return !s.isAvailable || s.isAvailable(); });
@@ -5938,8 +5972,14 @@ function wizardShowStep(idx) {
     var savedBvg = getSavedBvgRowsStyle();
     selectBvgRowsStyle(savedBvg === 'small' ? 'small' : 'big');
   }
-  // Gehweg-Schritt: Liste pro Haltestelle rendern
+  // Gehweg-Schritt: Toggle-Status aus persistentem State wiederherstellen, dann Liste rendern
   if (step.id === 'stepWizardGehweg') {
+    var gwToggle = document.getElementById('wizardGehwegToggle');
+    var gwSub = document.getElementById('wizardGehwegSub');
+    if (gwToggle) {
+      gwToggle.classList.toggle('active', wizardGehwegState.enabled);
+      if (gwSub) gwSub.classList.toggle('disabled', !wizardGehwegState.enabled);
+    }
     renderWizardGehwegList();
   }
 
@@ -5957,7 +5997,7 @@ function renderWizardGehwegList() {
     return;
   }
 
-  // Vorherige Werte vor dem Re-Render merken
+  // Vorherige Werte vor dem Re-Render aus dem DOM merken (falls State noch leer)
   var prev = {};
   list.querySelectorAll('.wizard-num-input[data-station-key]').forEach(function(inp) {
     prev[inp.dataset.stationKey] = inp.value;
@@ -5969,13 +6009,16 @@ function renderWizardGehwegList() {
     var lineChips = lines.length
       ? lines.map(function(l) { return '<span class="line-chip">' + escapeHtml(l) + '</span>'; }).join('')
       : '<span style="color:#aaa;font-size:11px;">alle Linien</span>';
-    var savedVal = prev[key] != null ? prev[key] : '0';
+    // Persistenter State hat Vorrang, dann DOM-Wert, sonst 0
+    var savedVal = (wizardGehwegState.values[key] != null) ? String(wizardGehwegState.values[key])
+                 : (prev[key] != null ? prev[key] : '0');
     return '<div class="wizard-gehweg-item">' +
       '<div class="stop-block">' +
         '<div class="stop-name">' + escapeHtml(s.stopName || 'Unbenannt') + '</div>' +
         '<div class="stop-lines">' + lineChips + '</div>' +
       '</div>' +
-      '<input type="number" class="wizard-num-input" data-station-key="' + escapeHtml(key) + '" min="0" max="15" value="' + escapeHtml(savedVal) + '">' +
+      '<input type="number" class="wizard-num-input" data-station-key="' + escapeHtml(key) + '" min="0" max="15" value="' + escapeHtml(savedVal) + '" ' +
+        'onchange="wizardGehwegState.values[this.dataset.stationKey] = parseInt(this.value||\'0\',10)||0">' +
       '<span class="wizard-unit">min</span>' +
     '</div>';
   }).join('');
@@ -6041,15 +6084,22 @@ function wizardNext() {
 // setzt recommendedConfig. Liefert cfg oder null. Wird von wizardFinish (speichern)
 // UND wizardOpenFinetuning (detailliertes Pro-Display-Feintuning) genutzt.
 function wizardBuildConfig() {
-  // Wizard-Werte einsammeln
-  var gehwegPerStop = {};
+  // Wizard-Werte einsammeln — aktuelle DOM-Werte zuerst in den persistenten State spiegeln
   document.querySelectorAll('#wizardGehwegList .wizard-num-input[data-station-key]').forEach(function(inp) {
-    gehwegPerStop[inp.dataset.stationKey] = parseInt(inp.value || '0', 10) || 0;
+    wizardGehwegState.values[inp.dataset.stationKey] = parseInt(inp.value || '0', 10) || 0;
   });
+  // Falls der Toggle gerade im DOM sichtbar ist, dessen Status übernehmen
+  var gwToggleEl = document.getElementById('wizardGehwegToggle');
+  if (gwToggleEl && document.getElementById('stepWizardGehweg') &&
+      !document.getElementById('stepWizardGehweg').classList.contains('hidden')) {
+    wizardGehwegState.enabled = gwToggleEl.classList.contains('active');
+  }
+  // Aus persistentem State lesen (überlebt Schritt-Wechsel)
+  var gehwegPerStop = Object.assign({}, wizardGehwegState.values);
   var summary = {
     // Default 'compact' wenn der Stil-Schritt uebersprungen wurde (nur 1 Netz).
     style:           getSavedDisplayStyle() || 'compact',
-    gehwegEnabled:   document.getElementById('wizardGehwegToggle')?.classList.contains('active') || false,
+    gehwegEnabled:   wizardGehwegState.enabled,
     gehwegPerStop:   gehwegPerStop,
     nightEnabled:    document.getElementById('wizardNightToggle')?.classList.contains('active') || false,
     nightStart:      parseInt(document.getElementById('wizardNightStart')?.value || '22', 10),
@@ -6226,7 +6276,9 @@ function wizardGehwegToggle() {
   var sub = document.getElementById('wizardGehwegSub');
   if (!toggle || !sub) return;
   toggle.classList.toggle('active');
-  sub.classList.toggle('disabled', !toggle.classList.contains('active'));
+  var active = toggle.classList.contains('active');
+  sub.classList.toggle('disabled', !active);
+  wizardGehwegState.enabled = active;  // persistieren, damit Status Schritt-Wechsel überlebt
 }
 
 function wizardNightToggle() {
@@ -8918,6 +8970,52 @@ function removeStationGroup(key) {
   updateStationsList();
 }
 
+// ==================== AUSWAHL-MENÜ BEI BESTEHENDER CONFIG ====================
+let _configChoiceShown = false;  // verhindert mehrfaches Einblenden bei wiederholtem loadFullConfig
+
+// Zeigt das Vollbild-Menü "Linien ändern / Einstellungen ändern" wenn eine
+// bestehende Config geladen wurde. Wird nach loadFullConfig aufgerufen.
+function maybeShowConfigChoice() {
+  if (_configChoiceShown) return;
+  if (!hasExistingConfig) return;
+  if (!Array.isArray(stations) || stations.length === 0) return;
+  const overlay = document.getElementById('configChoiceOverlay');
+  if (!overlay) return;
+  _configChoiceShown = true;
+  // Stationsnamen-Hinweis
+  const info = document.getElementById('configChoiceStations');
+  if (info) {
+    const names = [...new Set(stations.map(s => s.stopName).filter(Boolean))];
+    info.textContent = names.length ? ('Aktuell: ' + names.slice(0, 4).join(', ') + (names.length > 4 ? ' …' : '')) : '';
+  }
+  overlay.style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+// "Linien ändern" → Overlay weg, Stationen-Übersicht (mit bestehenden Linien) zeigen
+function chooseEditLines() {
+  const overlay = document.getElementById('configChoiceOverlay');
+  if (overlay) overlay.style.display = 'none';
+  // Alle anderen Cards verstecken, nur Stationen-Übersicht zeigen
+  document.querySelectorAll('.container > .card').forEach(function(c) {
+    if (c.id !== 'stationsCard') c.classList.add('hidden');
+  });
+  const stationsCard = document.getElementById('stationsCard');
+  if (stationsCard) stationsCard.classList.remove('hidden');
+  const ft = document.getElementById('stepFinetuning');
+  if (ft) ft.classList.add('hidden');
+  if (typeof updateStationsList === 'function') updateStationsList();
+  window.scrollTo(0, 0);
+}
+
+// "Einstellungen ändern" → Overlay weg, direkt ins Feintuning
+function chooseEditSettings() {
+  const overlay = document.getElementById('configChoiceOverlay');
+  if (overlay) overlay.style.display = 'none';
+  goToDisplayConfig();  // Config berechnen
+  goToFinetuning();     // direkt Feintuning
+}
+
 // Nächster Schritt nach Stationen-Auswahl
 function handleStationsNextStep() {
   if (hasExistingConfig) {
@@ -10615,15 +10713,39 @@ function renderDisplayTypeSections() {
       var cid = dt.colour;
 
       // Alle Richtungen für diesen Display-Typ sammeln (fuer Gruppierung/Reihenfolge)
+      // WICHTIG: Nach richtungsId deduplizieren! Linz/Graz liefern pro richtungsId
+      // mehrere Ziele (z.B. 2:H = "solarCity" + "Remise Kleinmünchen"). Ohne Dedup
+      // entstehen pro Richtung mehrere Zeilen statt einer → falsche Gruppierung.
       var allDirs = [];
+      var seenDir = {};  // dedup-key -> index in allDirs
       dt.stations.forEach(function(s) {
         if (s.directions && s.directions.length > 0) {
           s.directions.forEach(function(d) {
-            allDirs.push({ line: d.line, towards: d.towards || '', richtungsId: d.richtungsId || '', station: s.stopName || '', stopId: s.stopId || '' });
+            var rid = d.richtungsId || '';
+            var stopId = s.stopId || '';
+            // Bei vorhandener richtungsId nach (Linie, richtungsId, stopId) deduplizieren,
+            // sonst nach (Linie, Ziel, stopId) — fehlende richtungsId darf nicht mergen.
+            var key = rid
+              ? (d.line + '|R' + rid + '|' + stopId)
+              : (d.line + '|D' + (d.towards || '') + '|' + stopId);
+            if (seenDir[key] !== undefined) {
+              // Weiteres Ziel derselben Richtung nur für die Anzeige anhängen ("A / B")
+              var ex = allDirs[seenDir[key]];
+              if (d.towards && ex.towards.indexOf(d.towards) < 0) {
+                ex.towards = ex.towards ? (ex.towards + ' / ' + d.towards) : d.towards;
+              }
+              return;
+            }
+            seenDir[key] = allDirs.length;
+            allDirs.push({ line: d.line, towards: d.towards || '', richtungsId: rid, station: s.stopName || '', stopId: stopId });
           });
         } else if (s.filter) {
           s.filter.split(',').forEach(function(line) {
-            if (line.trim()) allDirs.push({ line: line.trim(), towards: '', richtungsId: '', station: s.stopName || '', stopId: s.stopId || '' });
+            if (!line.trim()) return;
+            var key = line.trim() + '|F|' + (s.stopId || '');
+            if (seenDir[key] !== undefined) return;
+            seenDir[key] = allDirs.length;
+            allDirs.push({ line: line.trim(), towards: '', richtungsId: '', station: s.stopName || '', stopId: s.stopId || '' });
           });
         }
       });
@@ -10876,6 +10998,7 @@ function confirmDtGroup(cid) {
   gd.groups.push(gd.selected.slice());
   gd.creating = false;
   gd.selected = [];
+  gd.orderList = null;  // Reihenfolge neu aufbauen (neue Gruppe einsortieren)
   document.getElementById('ftDtNewGroupPanel_' + cid).style.display = 'none';
   document.getElementById('ftDtNewGroupBtn_' + cid).style.display = '';
   renderDtGroups(cid);
@@ -10888,6 +11011,7 @@ function confirmDtGroup(cid) {
 function deleteDtGroup(cid, gIdx) {
   var gd = getDtGroupData(cid);
   gd.groups.splice(gIdx, 1);
+  gd.orderList = null;  // Reihenfolge neu aufbauen (Gruppe aufgelöst)
   renderDtGroups(cid);
 }
 
@@ -10929,40 +11053,89 @@ function updateDtGroupUI(cid) {
   }
 }
 
+// Baut die orderList (Reihenfolge der Gruppen/Einzel-Einträge) aus dtGroupData neu.
+// Speichert das Ergebnis in gd.orderList, damit die manuelle Reihenfolge (moveFtOrderItem)
+// und die Serialisierung (collectFtLineGroups/getRowOrderDestinationString) eine
+// gemeinsame Datenquelle haben.
+// Sind Gruppen für diesen Display-Typ aktiv? (Toggle 'ftGroup_<cid>' = on)
+function dtGroupsActive(cid) {
+  var el = document.getElementById('ftGroup_' + cid);
+  if (!el) return true;  // kein Toggle gerendert → Gruppen erlauben
+  var active = el.querySelector('.toggle-btn.active');
+  return active ? (active.dataset.value === 'on') : false;
+}
+
+function rebuildDtOrderList(cid) {
+  var allDirs = (window._dtAllDirs && window._dtAllDirs[cid]) || [];
+  var gd = getDtGroupData(cid);
+  var groupsOn = dtGroupsActive(cid);
+  var usedIdxs = new Set();
+  var orderItems = [];  // { indices:[] }
+  if (groupsOn) {
+    gd.groups.forEach(function(group) {
+      var valid = group.filter(function(idx) { return allDirs[idx]; });
+      if (valid.length === 0) return;
+      valid.forEach(function(i) { usedIdxs.add(i); });
+      orderItems.push({ indices: valid.slice() });
+    });
+  }
+  allDirs.forEach(function(d, idx) {
+    if (usedIdxs.has(idx)) return;
+    orderItems.push({ indices: [idx] });
+  });
+  gd.orderList = orderItems;
+  return orderItems;
+}
+
+// Liefert die geordneten Einträge eines Display-Typs als Array von { indices:[] }.
+// Nutzt die gespeicherte gd.orderList (inkl. manueller Reihenfolge), baut sie neu
+// falls sie fehlt oder nicht mehr zur aktuellen Gruppen-/Richtungs-Struktur passt.
+function getDtOrderList(cid) {
+  var allDirs = (window._dtAllDirs && window._dtAllDirs[cid]) || [];
+  var gd = getDtGroupData(cid);
+  var valid = Array.isArray(gd.orderList) && gd.orderList.length > 0;
+  if (valid) {
+    // Alle Indizes genau einmal abgedeckt?
+    var covered = new Set();
+    var dup = false;
+    gd.orderList.forEach(function(it) {
+      (it.indices || []).forEach(function(i) { if (covered.has(i)) dup = true; covered.add(i); });
+    });
+    if (dup) valid = false;
+    if (valid) for (var i = 0; i < allDirs.length; i++) { if (!covered.has(i)) { valid = false; break; } }
+    if (valid && covered.size !== allDirs.length) valid = false;
+    // Gruppenstruktur konsistent? (Anzahl Multi-Item-Zeilen = aktive Gruppen)
+    if (valid) {
+      var expectGroups = dtGroupsActive(cid)
+        ? (gd.groups || []).filter(function(g) { return g.filter(function(idx) { return allDirs[idx]; }).length > 1; }).length
+        : 0;
+      var haveGroups = gd.orderList.filter(function(it) { return (it.indices || []).length > 1; }).length;
+      if (expectGroups !== haveGroups) valid = false;
+    }
+  }
+  if (!valid) return rebuildDtOrderList(cid);
+  return gd.orderList;
+}
+
 function renderDtOrderList(cid) {
   var container = document.getElementById('ftOrderList_' + cid);
   if (!container) return;
   var allDirs = (window._dtAllDirs && window._dtAllDirs[cid]) || [];
-  var gd = getDtGroupData(cid);
 
-  // Baue Reihenfolge-Items: Gruppen als eine Zeile, Einzelne als eigene Zeile
-  var usedIdxs = new Set();
-  var orderItems = [];  // { type:'group'|'single', indices:[], label:'', sublabel:'' }
-
-  // Erst Gruppen
-  gd.groups.forEach(function(group, gIdx) {
-    var lines = group.map(function(idx) { return allDirs[idx] ? allDirs[idx].line : '?'; });
-    var towards = group.map(function(idx) { return allDirs[idx] ? allDirs[idx].towards : ''; });
-    // Unique towards
+  // Reihenfolge-Items aus gemeinsamer Datenquelle (inkl. manueller Reihenfolge)
+  var orderList = getDtOrderList(cid);
+  var orderItems = orderList.map(function(it) {
+    var indices = it.indices || [];
+    var isGroup = indices.length > 1;
+    var lines = indices.map(function(idx) { return allDirs[idx] ? allDirs[idx].line : '?'; });
+    var towards = indices.map(function(idx) { return allDirs[idx] ? allDirs[idx].towards : ''; });
     var uniqueTowards = [...new Set(towards.filter(function(t) { return t; }))];
-    orderItems.push({
-      type: 'group',
-      indices: group,
+    return {
+      type: isGroup ? 'group' : 'single',
+      indices: indices,
       label: lines.join('+'),
-      sublabel: uniqueTowards.join(', ') || 'Gruppe ' + (gIdx + 1)
-    });
-    group.forEach(function(i) { usedIdxs.add(i); });
-  });
-
-  // Dann Einzelne (nicht gruppierte)
-  allDirs.forEach(function(d, idx) {
-    if (usedIdxs.has(idx)) return;
-    orderItems.push({
-      type: 'single',
-      indices: [idx],
-      label: d.line,
-      sublabel: d.towards || d.station
-    });
+      sublabel: uniqueTowards.join(', ') || (allDirs[indices[0]] ? (allDirs[indices[0]].station || '') : '')
+    };
   });
 
   // Rendern
@@ -11026,26 +11199,19 @@ function renderDtGroups(cid) {
 }
 
 function moveFtOrderItem(listId, idx, dir) {
-  var list = document.getElementById(listId);
-  if (!list) return;
-  var items = Array.from(list.children);
+  // listId = 'ftOrderList_<cid>' → cid extrahieren
+  var cid = parseInt(listId.replace('ftOrderList_', ''));
+  if (isNaN(cid)) return;
+  var gd = getDtGroupData(cid);
+  var orderList = getDtOrderList(cid);
   var newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= items.length) return;
-  // Tausche DOM-Elemente
-  if (dir === -1) {
-    list.insertBefore(items[idx], items[newIdx]);
-  } else {
-    list.insertBefore(items[newIdx], items[idx]);
-  }
-  // data-order-idx aktualisieren
-  Array.from(list.children).forEach(function(el, i) {
-    el.dataset.orderIdx = i;
-    var btns = el.querySelectorAll('button');
-    if (btns.length >= 2) {
-      btns[0].setAttribute('onclick', "moveFtOrderItem('" + listId + "'," + i + ",-1)");
-      btns[1].setAttribute('onclick', "moveFtOrderItem('" + listId + "'," + i + ",1)");
-    }
-  });
+  if (newIdx < 0 || newIdx >= orderList.length) return;
+  // Im Datenmodell tauschen (persistiert die manuelle Reihenfolge)
+  var moved = orderList.splice(idx, 1)[0];
+  orderList.splice(newIdx, 0, moved);
+  gd.orderList = orderList;
+  // Neu rendern aus dem aktualisierten Modell
+  renderDtOrderList(cid);
 }
 
 function toggleDtSubsections(cid) {
@@ -11502,46 +11668,37 @@ function getRowOrderDestinationString() {
   // NUR für Nicht-Wien-Daten (BODO, Linz, etc.)
   // Format: "Linie:Ziel+Linie:Ziel,..." (Gruppen mit +, Zeilen mit ,)
   // Wien-Daten werden über rowOrder (stopId:Linie) abgedeckt
-
-  if (ftLineGroups.length === 0) {
-    return '';
+  // Gemeinsame Quelle: dtGroupData (via getDtOrderList / serializeDtType).
+  if (Object.keys(dtGroupData).length > 0 || (window._dtAllDirs && Object.keys(window._dtAllDirs).length > 0)) {
+    const allParts = [];
+    const types = getUniqueDisplayTypes();
+    types.forEach(function(dt) {
+      var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
+      if (!f.sorting) return;
+      var parts = serializeDtType(dt.colour, true);  // onlyNonWien
+      parts.forEach(function(p) { allParts.push(p); });
+    });
+    if (allParts.length > 0) return allParts.join(',');
   }
 
+  // Fallback (Legacy): ftLineGroups verwenden
+  if (ftLineGroups.length === 0) return '';
   const items = [];
   ftLineGroups.forEach(group => {
     if (group.directions && group.directions.length > 0) {
-      // Nur Nicht-Wien-Einträge sammeln
       const nonWienDirs = [];
       group.directions.forEach(key => {
         const dirInfo = ftAllDirections.find(d => d.key === key);
         if (!dirInfo) return;
-
-        // Prüfe ob diese Richtung zu einer Wien-Station gehört
-        let isWien = false;
-        stations.forEach(station => {
-          if (station.network === 'WL' && station.directions) {
-            station.directions.forEach(dir => {
-              if (dir.line === dirInfo.line && dir.destination === dirInfo.destination) {
-                isWien = true;
-              }
-            });
-          }
-        });
-
-        // Nur Nicht-Wien hinzufügen
-        if (!isWien) {
-          // richtungsId-basiert: "Linie:richtungsId" statt "Linie:Ziel" (stabil bei Kurzführungen)
+        if (!isWienDirection(dirInfo)) {
           if (dirInfo.richtungsId) {
             nonWienDirs.push(`${dirInfo.line}:${dirInfo.richtungsId}`);
           } else {
-            nonWienDirs.push(key);  // key ist bereits "Linie:Ziel"
+            nonWienDirs.push(key);
           }
         }
       });
-
-      if (nonWienDirs.length > 0) {
-        items.push(nonWienDirs.join('+'));
-      }
+      if (nonWienDirs.length > 0) items.push(nonWienDirs.join('+'));
     }
   });
   return items.join(',');
@@ -12469,68 +12626,72 @@ function updateRowOrderAfterGroupChange() {
 }
 
 
+// Token für eine Richtung: "Linie:richtungsId" (stabil) oder "Linie:Ziel" als Fallback
+function dtDirToken(d) {
+  if (!d) return '';
+  return d.richtungsId ? (d.line + ':' + d.richtungsId) : (d.line + ':' + (d.towards || ''));
+}
+
+// Prüft ob eine Richtung (dirInfo) zu einer Wien-Station gehört.
+function isWienDirection(dirInfo) {
+  if (!dirInfo) return false;
+  if (dirInfo.network === 'WL') return true;
+  var hit = false;
+  stations.forEach(function(station) {
+    if (station.network === 'WL' && station.directions) {
+      station.directions.forEach(function(dir) {
+        if (dir.line === dirInfo.line && dir.destination === dirInfo.destination) hit = true;
+      });
+    }
+  });
+  return hit;
+}
+
+// Serialisiert die geordneten Gruppen eines Display-Typs (cid) zu Token-Parts.
+// Nutzt getDtOrderList (gemeinsame Datenquelle inkl. manueller Reihenfolge + Gruppen).
+// onlyNonWien=true überspringt Wien-Richtungen (für rowOrderDestination).
+function serializeDtType(cid, onlyNonWien) {
+  var allDirs = (window._dtAllDirs && window._dtAllDirs[cid]) || [];
+  if (allDirs.length === 0) return [];
+  var orderList = getDtOrderList(cid);
+  var parts = [];
+  var seen = new Set();
+  orderList.forEach(function(item) {
+    var tokens = [];
+    (item.indices || []).forEach(function(idx) {
+      var d = allDirs[idx];
+      if (!d) return;
+      if (onlyNonWien && isWienDirection(d)) return;
+      var token = dtDirToken(d);
+      if (!token || seen.has(token)) return;
+      seen.add(token);
+      tokens.push(token);
+    });
+    if (tokens.length > 0) parts.push(tokens.join('+'));
+  });
+  return parts;
+}
+
 function collectFtLineGroups() {
   // linegroups Format: "1:Universität+2:Universität,41:Hessenplatz,43:Stadtfriedhof"
   // + für zusammengefasste Richtungen, , für Trennung zwischen Gruppen
-
-  // Bei Multi-Display: dtGroupData der per-Display-Typ Sektionen berücksichtigen
-  if (ftIsMultiDisplay && Object.keys(dtGroupData).length > 0) {
+  // Gemeinsame Quelle: dtGroupData (via getDtOrderList) für Single UND Multi.
+  if (Object.keys(dtGroupData).length > 0 || (window._dtAllDirs && Object.keys(window._dtAllDirs).length > 0)) {
     const allParts = [];
     const types = getUniqueDisplayTypes();
     types.forEach(function(dt) {
-      var gd = dtGroupData[dt.colour];
       var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
       if (!f.sorting) return;  // Zug-Displays: keine Gruppierung
-
-      // allDirs für diesen Display-Typ
-      var allDirs = window._dtAllDirs ? window._dtAllDirs[dt.colour] : [];
-      if (!allDirs || allDirs.length === 0) return;
-
-      // Gruppierungs-Toggle: An oder Aus?
-      var groupVal = getFtToggleVal('ftGroup_' + dt.colour);
-      if (groupVal === 'on' && gd && gd.groups && gd.groups.length > 0) {
-        // Gruppen vorhanden: Zusammengefasste mit +, Rest einzeln
-        var usedIndices = new Set();
-        gd.groups.forEach(function(grp) {
-          var parts = grp.map(function(idx) {
-            usedIndices.add(idx);
-            var d = allDirs[idx];
-            if (!d) return '';
-            // richtungsId bevorzugen (STV: H/R, WB: 1/2)
-            var val = d.richtungsId ? (d.line + ':' + d.richtungsId) : (d.line + ':' + (d.towards || ''));
-            return val;
-          }).filter(function(p) { return p; });
-          if (parts.length > 0) allParts.push(parts.join('+'));
-        });
-        // Ungroupierte Richtungen als Einzeleinträge
-        allDirs.forEach(function(d, idx) {
-          if (!usedIndices.has(idx)) {
-            var val = d.richtungsId ? (d.line + ':' + d.richtungsId) : (d.line + ':' + (d.towards || ''));
-            allParts.push(val);
-          }
-        });
-      } else {
-        // Keine Gruppierung: jede Richtung einzeln
-        allDirs.forEach(function(d) {
-          var val = d.richtungsId ? (d.line + ':' + d.richtungsId) : (d.line + ':' + (d.towards || ''));
-          allParts.push(val);
-        });
-      }
+      var parts = serializeDtType(dt.colour, false);
+      parts.forEach(function(p) { allParts.push(p); });
     });
     if (allParts.length > 0) return allParts.join(',');
   }
 
-  // Single-Display Modus: ftLineGroups verwenden
-  if (ftLineGroups.length === 0) {
-    return '';
-  }
-
+  // Fallback (Legacy): ftLineGroups verwenden
+  if (ftLineGroups.length === 0) return '';
   const validGroups = ftLineGroups.filter(g => g.directions && g.directions.length >= 1);
-  if (validGroups.length === 0) {
-    return '';
-  }
-
-  // Sicherheits-Dedup: gleiche tokens (z.B. "1:R") nicht mehrfach hintereinander
+  if (validGroups.length === 0) return '';
   const seenTokens = new Set();
   const groupParts = [];
   validGroups.forEach(g => {
@@ -13560,6 +13721,9 @@ async function handleConfigMessage(data) {
     if (ftStep && !ftStep.classList.contains('hidden')) {
       initFinetuningStep();
     }
+
+    // Bestehende Config geladen → Auswahl-Menü (Linien ändern / Einstellungen ändern) zeigen
+    maybeShowConfigChoice();
   }
 }
 
