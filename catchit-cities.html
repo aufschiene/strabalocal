@@ -10323,6 +10323,10 @@ let ftIsMultiDisplay = false;
 let ftIsManualAssignment = false;
 let ftCameFromWizard = false;  // true wenn Feintuning aus dem neuen Wizard geoeffnet wurde
 let ftPerStationColour = [];  // Pro Station der Display-Typ
+// Persistenter Zeilen-/Schriftgröße-State pro Display-Typ (colour-id). Überlebt
+// renderDisplayTypeSections()-Re-Render, der sonst die Buttons auf Default zurücksetzt.
+let ftRowsByCid = {};       // cid -> gewählte Zeilenzahl
+let ftFontModeByCid = {};   // cid -> 'big' | 'small'
 
 function setFtCompactSeparate(mode) {
   var btns = document.querySelectorAll('#ftCompactSeparateToggle .toggle-btn');
@@ -10492,9 +10496,11 @@ function renderDisplayTypeSections() {
           if (r <= 2) hidden = ' data-bigtext-mode="big" style="display:none;"';
           else hidden = ' data-bigtext-mode="small"';
         }
-        var defRows = f.defaultRows || (f.bigText ? 3 : 2);
+        // Aktiver Button aus persistentem State (überlebt Re-Render), sonst Default.
+        var defRows = (ftRowsByCid[dt.colour] != null) ? ftRowsByCid[dt.colour]
+                                                       : (f.defaultRows || (f.bigText ? 3 : 2));
         var defaultActive = (r === defRows);
-        html += '<button class="toggle-btn' + (defaultActive ? ' active' : '') + '" data-value="' + r + '"' + hidden + ' onclick="setFtToggleVal(\'ftRows_' + dt.colour + '\',' + r + ')">' + r + '</button>';
+        html += '<button class="toggle-btn' + (defaultActive ? ' active' : '') + '" data-value="' + r + '"' + hidden + ' onclick="setDtRows(' + dt.colour + ',' + r + ')">' + r + '</button>';
       }
       html += '</div></div>';
     }
@@ -10689,6 +10695,20 @@ function renderDisplayTypeSections() {
   types.forEach(function(dt) {
     var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
     if (f.sorting) { renderDtOrderList(dt.colour); toggleDtSubsections(dt.colour); }
+    // Zeilen/Schriftgröße aus persistentem State wiederherstellen, damit ein Re-Render
+    // (Kompakt/Getrennt, Auto/Manuell, Zuordnung, Stadt hinzufügen) die gewählte
+    // Zeilenanzahl nicht auf Default zurücksetzt.
+    if (f.rows && ftRowsByCid[dt.colour] != null) {
+      var savedR = ftRowsByCid[dt.colour];
+      if (f.bigText) {
+        var mode = ftFontModeByCid[dt.colour] || (savedR <= 2 ? 'big' : 'small');
+        setFtFontSize(dt.colour, mode);  // setzt Button-Sichtbarkeit (1-2 vs 3-4)
+      }
+      ftRowsByCid[dt.colour] = savedR;   // setFtFontSize könnte überschrieben haben
+      setFtToggleVal('ftRows_' + dt.colour, savedR);
+    } else if (f.rows && f.bigText && ftFontModeByCid[dt.colour]) {
+      setFtFontSize(dt.colour, ftFontModeByCid[dt.colour]);
+    }
     // Wien-Toggles aus gespeicherter Config restoren (sonst zeigt UI immer Default)
     if (f.textColor) {
       var savedTxt = (recommendedConfig && recommendedConfig.textColor) || 1;
@@ -10707,6 +10727,13 @@ function setFtToggleVal(containerId, val) {
   });
 }
 
+// Zeilen-Button geklickt: Toggle setzen UND im persistenten State merken, damit ein
+// späterer Re-Render (renderDisplayTypeSections) die Auswahl nicht auf Default zurücksetzt.
+function setDtRows(cid, val) {
+  ftRowsByCid[cid] = parseInt(val);
+  setFtToggleVal('ftRows_' + cid, val);
+}
+
 // Wien Hintergrundfarbe: Toggle setzen UND recommendedConfig sofort aktualisieren,
 // damit ein späterer Re-Render (renderDisplayTypeSections) den Wert nicht zurücksetzt.
 function setFtWienBg(cid, val) {
@@ -10723,6 +10750,8 @@ function setFtTextColorVal(cid, val) {
 // Aus gespeicherter Config: Rows-Toggle + Schriftgröße (Graz/Liechtenstein) initialisieren
 function initFtRowsAndFontSize(config) {
   if (!config) return;
+  ftRowsByCid = {};       // frisch seeden (kein Leak aus vorheriger Config)
+  ftFontModeByCid = {};
   var types = getUniqueDisplayTypes();
   // rows kann String "2,3" (multi) oder Number 2 (single) sein
   var rowsList = String(config.rows || '').split(',').map(function(s) { return parseInt(s.trim()); });
@@ -10730,11 +10759,14 @@ function initFtRowsAndFontSize(config) {
     var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
     if (!f.rows) return;
     var savedRows = rowsList[idx] || rowsList[0] || 2;
+    ftRowsByCid[dt.colour] = savedRows;  // persistenter State (überlebt Re-Render)
     if (f.bigText) {
       // Modus aus rows ableiten: 1-2 = big, 3-4 = small
       var mode = (savedRows <= 2) ? 'big' : 'small';
+      ftFontModeByCid[dt.colour] = mode;
       setFtFontSize(dt.colour, mode);
       // setFtFontSize setzt einen Default — danach echten Wert anwenden
+      ftRowsByCid[dt.colour] = savedRows;
       setFtToggleVal('ftRows_' + dt.colour, savedRows);
     } else {
       setFtToggleVal('ftRows_' + dt.colour, savedRows);
@@ -10742,8 +10774,9 @@ function initFtRowsAndFontSize(config) {
   });
 }
 
-// Schriftgröße-Toggle (Graz/Liechtenstein): Groß = 1-2 Zeilen, Klein = 3-4 Zeilen
+// Schriftgröße-Toggle (Graz/Liechtenstein/Orange Matrix): Groß = 1-2 Zeilen, Klein = 3-4 Zeilen
 function setFtFontSize(cid, mode) {
+  ftFontModeByCid[cid] = mode;  // persistieren (überlebt Re-Render)
   var fsContainer = document.getElementById('ftFontSize_' + cid);
   if (fsContainer) {
     fsContainer.querySelectorAll('.toggle-btn').forEach(function(b) {
@@ -10760,9 +10793,10 @@ function setFtFontSize(cid, mode) {
     b.style.display = visible ? '' : 'none';
     if (visible && b.classList.contains('active')) currentActiveValid = true;
   });
-  // Wenn aktueller Wert nicht mehr passt → Default für den Modus setzen
+  // Wenn aktueller Wert nicht mehr passt → Default für den Modus setzen (auch persistieren)
   if (!currentActiveValid) {
     var defaultVal = (mode === 'big') ? 2 : 3;
+    ftRowsByCid[cid] = defaultVal;
     setFtToggleVal('ftRows_' + cid, defaultVal);
   }
 }
@@ -12683,6 +12717,22 @@ function saveFromFinetuning() {
     }
   });
 
+  // Multi-Display / manuelle Zuordnung: Zeilen PRO Display als Komma-Liste — gleiche
+  // Reihenfolge & Länge wie die colour-Liste (Firmware liest sie via GetLinesCountForGroup).
+  // Ohne das überschreibt die obige Schleife rows zu einem Einzelwert → alle Displays
+  // bekommen nur eine Zeile (Bug: lines_count "1" statt "4,2").
+  if (ftIsMultiDisplay || ftIsManualAssignment) {
+    rows = stations.map(function(s, i) {
+      var nc = NETWORK_COLORS[s.network];
+      var cid = ftIsManualAssignment ? (ftPerStationColour[i] || (nc ? nc.id : 1)) : netColourId(s.network);
+      var f = DISPLAY_TYPE_FEATURES[cid] || {};
+      var v = ftRowsByCid[cid];
+      if (v == null) v = parseInt(getFtToggleVal('ftRows_' + cid));
+      if (!v || isNaN(v)) v = (f.defaultRows || 2);
+      return v;
+    }).join(',');
+  }
+
   const displayLight = getFtBrightness();
   const nightMode = isFtToggleActive('ftNightModeToggle');
   const nightStart = parseInt(document.getElementById('ftNightStart').value) || 22;
@@ -13474,7 +13524,10 @@ async function handleConfigMessage(data) {
       recommendedConfig.colour = colVal.indexOf(',') > 0 ? colVal : (parseInt(colVal) || 1);
     }
     if (data.config.lines_count !== undefined) {
-      recommendedConfig.rows = parseInt(data.config.lines_count) || 2;
+      // Multi-Display: Komma-Liste "4,2" als String behalten (sonst macht parseInt
+      // daraus 4 und alle Displays bekommen dieselbe Zeilenzahl). Analog zu colour.
+      var lcVal = String(data.config.lines_count);
+      recommendedConfig.rows = lcVal.indexOf(',') > 0 ? lcVal : (parseInt(lcVal) || 2);
     }
     // displaylight (ESP32 Feldname)
     if (data.config.displaylight !== undefined) {
