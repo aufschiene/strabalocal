@@ -4111,69 +4111,13 @@ const NETWORKS = {
     ]
   },
   DB: {
-    name: 'Deutsche Bahn / ÖBB',
+    name: 'Deutsche Bahn',
     shortName: 'DB',
-    region: 'DE/AT',
-    desc: 'ICE, IC, RJ, REX, RE, S-Bahn',
+    region: 'DE',
+    desc: 'ICE, IC, EC, RE, RB, S-Bahn',
     searchType: 'server_proxy',
-    placeholder: 'z.B. München Hbf, Wien Hbf, Linz Hbf...',
-    isJourneyBased: true,
-    productCategories: {
-      de_fern: {
-        label: 'Deutschland Fernverkehr',
-        collapsed: false,
-        products: [
-          { id: 'ICE', name: 'ICE', desc: 'Intercity-Express' },
-          { id: 'IC', name: 'IC', desc: 'Intercity' },
-          { id: 'EC', name: 'EC', desc: 'Eurocity' }
-        ]
-      },
-      de_regional: {
-        label: 'Deutschland Regionalverkehr',
-        collapsed: true,
-        products: [
-          { id: 'RE', name: 'RE', desc: 'Regional-Express' },
-          { id: 'RB', name: 'RB', desc: 'Regionalbahn' },
-          { id: 'IRE', name: 'IRE', desc: 'Interregio-Express' },
-          { id: 'S', name: 'S', desc: 'S-Bahn' }
-        ]
-      },
-      at_fern: {
-        label: 'Österreich Fernverkehr',
-        collapsed: true,
-        products: [
-          { id: 'RJX', name: 'RJX', desc: 'Railjet Xpress' },
-          { id: 'RJ', name: 'RJ', desc: 'Railjet' },
-          { id: 'ICE', name: 'ICE', desc: 'ICE (DB/ÖBB)' },
-          { id: 'EC', name: 'EC', desc: 'Eurocity' },
-          { id: 'IC', name: 'IC', desc: 'Intercity' },
-          { id: 'D', name: 'D', desc: 'Schnellzug' }
-        ]
-      },
-      at_regional: {
-        label: 'Österreich Regionalverkehr',
-        collapsed: true,
-        products: [
-          { id: 'REX', name: 'REX', desc: 'Regional-Express' },
-          { id: 'R', name: 'R', desc: 'Regionalzug' },
-          { id: 'S', name: 'S', desc: 'S-Bahn (ÖBB)' },
-          { id: 'CJX', name: 'CJX', desc: 'Cityjet Xpress' }
-        ]
-      },
-      international: {
-        label: 'Internationaler Fernverkehr',
-        collapsed: true,
-        products: [
-          { id: 'NJ', name: 'NJ', desc: 'Nightjet (Nachtzug)' },
-          { id: 'EN', name: 'EN', desc: 'EuroNight' },
-          { id: 'TGV', name: 'TGV', desc: 'TGV (Frankreich)' },
-          { id: 'THA', name: 'THA', desc: 'Thalys' },
-          { id: 'EST', name: 'EST', desc: 'Eurostar' },
-          { id: 'FLX', name: 'FLX', desc: 'Flixtrain' },
-          { id: 'WB', name: 'WB', desc: 'Westbahn' }
-        ]
-      }
-    }
+    placeholder: 'z.B. München Hbf, Berlin Hbf, Hamburg Hbf...',
+    isJourneyBased: false
   },
   OEBB: {
     name: 'ÖBB',
@@ -5653,12 +5597,23 @@ function jumpToPresetNetwork(networkId, jumpTo) {
 }
 
 function leaveDisplayPreset() {
-  // User will doch alle Regionen sehen → Preset-Modus verlassen, Hero weg, normale Region-Auswahl
+  // "Andere Region wählen" aus einer Region-Ansicht → EINE Ebene zurück zur
+  // Bundesland-Auswahl des aktuellen Landes (nicht direkt zur Länder-Liste).
   activeDisplayPreset = null;
+  presetAutoJumped = false;
   document.getElementById('stepDisplayPreset')?.classList.add('hidden');
   _hideHero();
-  if (typeof showStep === 'function') showStep('region');
-  else document.getElementById('stepRegion')?.classList.remove('hidden');
+  var country = (typeof detectCountry === 'function' && detectCountry()) ||
+                (typeof DEFAULT_COUNTRY !== 'undefined' ? DEFAULT_COUNTRY : 'AT');
+  var hasBundeslaender = country &&
+    Object.values(DISPLAY_PRESETS).filter(function(p){ return p.parent === country; }).length > 1;
+  if (hasBundeslaender && typeof renderBundeslandChooser === 'function') {
+    renderBundeslandChooser(country);  // Bundesland-Liste (z.B. "Region in Österreich wählen")
+  } else if (typeof showStep === 'function') {
+    showStep('region');                // Land hat keine Bundesländer → Länder-Liste
+  } else {
+    document.getElementById('stepRegion')?.classList.remove('hidden');
+  }
 }
 
 // Wrapper um die existierende goBack: wenn ein Display-Preset aktiv ist,
@@ -7527,39 +7482,45 @@ function renderLines() {
         byCorr.get(slot.corridor).push({ axisKey: axisKey, region: slot.region, termini: slot.termini, platforms: slot.platforms, count: slot.count });
       });
 
+      // Alle Achsen über alle Korridore flach sammeln — OHNE Korridor-Überschriften
+      // (z.B. kein "WESTBAHN"/"BRENNERBAHN"-Titel). Die Richtungs-Labels selbst
+      // ("Richtung Wien", "Richtung Italien — Venezia …") sind selbsterklärend.
+      var allFvAxes = [];
       fvCurrentCorridors.forEach(function(corridor) {
         const axes = byCorr.get(corridor);
         if (!axes || !axes.length) return;
-        fvHtml += '<div class="fv-corridor-title">' + corridor + '</div>';
-        fvHtml += '<div class="line-group"><div class="line-directions">';
-        axes.sort(function(a, b) { return b.count - a.count; }).forEach(function(ax) {
-          const checked = fvCheckedDirs.has(ax.axisKey);
-          const termArr = Array.from(ax.termini).slice(0, 3);
-          const detail = termArr.length ? ' — ' + termArr.join(' / ') : '';
-          // Bahnsteig-Hinweis (ab Server-Deploy v.: ´p2-3´-Cluster verfügbar)
-          const platArr = Array.from(ax.platforms || []).sort(function(a,b) {
-            return (parseInt(a)||0) - (parseInt(b)||0);
-          });
-          // Gleis-Info nicht mehr im Label anzeigen — die richtungsId ist jetzt
-          // korridor-basiert (wbw/wbe/sde/…) und Bahnsteig spielt nur intern eine Rolle.
-          const label = 'Richtung ' + ax.region + detail;
-          const escAxis = ax.axisKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-          fvHtml += '<div class="direction-option ' + (checked ? 'selected' : '') + '" onclick="toggleFvDirCheck(\'' + escAxis + '\')">'
-                 + '<div class="checkbox">' + (checked ? '✓' : '') + '</div>'
-                 + '<div class="direction-text">→ ' + label + '</div>'
-                 + '</div>';
-        });
-        fvHtml += '</div></div>';
+        axes.forEach(function(ax) { allFvAxes.push(ax); });
       });
+      // Dedupe nach axisKey (falls eine Achse über mehrere Korridore auftaucht)
+      var seenAxis = new Set();
+      allFvAxes = allFvAxes.filter(function(ax) {
+        if (seenAxis.has(ax.axisKey)) return false;
+        seenAxis.add(ax.axisKey);
+        return true;
+      });
+      allFvAxes.sort(function(a, b) { return b.count - a.count; });
+
+      fvHtml += '<div class="line-group"><div class="line-directions">';
+      allFvAxes.forEach(function(ax) {
+        const checked = fvCheckedDirs.has(ax.axisKey);
+        const termArr = Array.from(ax.termini).slice(0, 3);
+        const detail = termArr.length ? ' — ' + termArr.join(' / ') : '';
+        const label = 'Richtung ' + ax.region + detail;
+        const escAxis = ax.axisKey.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        fvHtml += '<div class="direction-option ' + (checked ? 'selected' : '') + '" onclick="toggleFvDirCheck(\'' + escAxis + '\')">'
+               + '<div class="checkbox">' + (checked ? '✓' : '') + '</div>'
+               + '<div class="direction-text">→ ' + label + '</div>'
+               + '</div>';
+      });
+      fvHtml += '</div></div>';
     } else {
       // Single-Korridor-Bahnhof — klassisches E/W-Layout mit echtem Korridor-Namen
       // (Westbahn / Südstrecke / …).
       const haveDirs = new Set(availableLines.map(l => l.direction));
-      const fvCorridor = fvCurrentCorridors[0] || fvCorridorName(selectedStop && selectedStop.name, fvTermNames);
       let dirSections = ['E', 'W'].filter(d => haveDirs.has(d)).map(d => [fvDirLabel(d, fvTermNames), d]);
       if (!dirSections.length) dirSections = [['Richtung Wien', 'E'], ['Richtung Westen', 'W']];
 
-      fvHtml += '<div class="fv-corridor-title">' + fvCorridor + '</div>';
+      // Kein Korridor-Titel — nur die Richtungen (ohne "Westbahn"/"Südstrecke"-Beschriftung)
       fvHtml += '<div class="line-group"><div class="line-directions">';
       dirSections.forEach(function(d) {
         const title = d[0], dcode = d[1];
@@ -9032,18 +8993,30 @@ function maybeShowConfigChoice() {
   window.scrollTo(0, 0);
 }
 
-// "Linien ändern" → Overlay weg, Stationen-Übersicht (mit bestehenden Linien) zeigen
+// "Linien ändern" → Overlay weg, Bundesland-Auswahl des aktuellen Landes zeigen
+// (so kann der User neue Stationen hinzufügen; die Stationen-Übersicht bleibt darunter).
 function chooseEditLines() {
   const overlay = document.getElementById('configChoiceOverlay');
   if (overlay) overlay.style.display = 'none';
-  // Alle anderen Cards verstecken, nur Stationen-Übersicht zeigen
-  document.querySelectorAll('.container > .card').forEach(function(c) {
-    if (c.id !== 'stationsCard') c.classList.add('hidden');
-  });
-  const stationsCard = document.getElementById('stationsCard');
-  if (stationsCard) stationsCard.classList.remove('hidden');
   const ft = document.getElementById('stepFinetuning');
   if (ft) ft.classList.add('hidden');
+
+  var country = (typeof detectCountry === 'function' && detectCountry()) ||
+                (typeof DEFAULT_COUNTRY !== 'undefined' ? DEFAULT_COUNTRY : 'AT');
+  var hasBundeslaender = country &&
+    Object.values(DISPLAY_PRESETS).filter(function(p){ return p.parent === country; }).length > 1;
+
+  if (hasBundeslaender && typeof renderBundeslandChooser === 'function') {
+    renderBundeslandChooser(country);  // "Region in <Land> wählen" + Stationen darunter
+  } else if (typeof selectRegion === 'function' && country && REGIONS[country]) {
+    selectRegion(country);             // Land ohne Bundesländer → direkt dessen Netz-Auswahl
+  } else {
+    // Fallback: nur Stationen-Übersicht
+    document.querySelectorAll('.container > .card').forEach(function(c) {
+      if (c.id !== 'stationsCard') c.classList.add('hidden');
+    });
+    document.getElementById('stationsCard')?.classList.remove('hidden');
+  }
   if (typeof updateStationsList === 'function') updateStationsList();
   window.scrollTo(0, 0);
 }
