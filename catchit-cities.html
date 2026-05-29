@@ -10728,10 +10728,18 @@ function renderDisplayTypeSections() {
         // Statisch + Gruppierung An (damit die Gruppen sichtbar bleiben & gespeichert
         // werden). Beim manuellen Gruppieren/Umsortieren schalten confirmDtGroup/
         // moveFtOrderItem zusätzlich live auf Manuell.
+        // "Hat der User gruppiert?" — primär aus dem Seed (seededGroups), zusätzlich
+        // robust direkt am Config-String erkannt: ein '+' in lineGroups/rowOrderDestination
+        // bedeutet mindestens eine Gruppe. So steht Manuell+An auch dann sofort richtig,
+        // wenn die station.directions zum Seed-Zeitpunkt noch nicht vollständig geladen
+        // waren (die Gruppe materialisiert sich dann beim Re-Seed nach initFtGrouping).
+        var cfgHasGroups = ((((recommendedConfig && recommendedConfig.lineGroups) || '').indexOf('+') >= 0) ||
+                            (((recommendedConfig && recommendedConfig.rowOrderDestination) || '').indexOf('+') >= 0));
+        var manualWanted = seededGroups || cfgHasGroups;
         ftSortByCid[cidS]    = String((recommendedConfig && recommendedConfig.sortMode) || 1);
-        ftGroupByCid[cidS]   = seededGroups ? 'on' : 'off';
-        ftAdvModeByCid[cidS] = seededGroups ? 'manual' : 'auto';
-        if (seededGroups) ftSortByCid[cidS] = '1';  // Gruppen brauchen statische Reihenfolge
+        ftGroupByCid[cidS]   = manualWanted ? 'on' : 'off';
+        ftAdvModeByCid[cidS] = manualWanted ? 'manual' : 'auto';
+        if (manualWanted) ftSortByCid[cidS] = '1';  // Gruppen brauchen statische Reihenfolge
       }
       // Persistente Toggle-States anwenden (statischer Default-Aufbau würde sie sonst
       // bei jedem Re-Render auf Auto/Aus zurücksetzen → "kickt die Gruppen").
@@ -13613,9 +13621,11 @@ function dedupeStationsByFullId() {
 // Versucht Stationsnamen von API zu holen
 async function resolveStationName(network, stopId) {
   try {
-    // Für WL können wir die API nicht so einfach nutzen
+    // Für WL: Name kommt NUR aus wienData (andere Datenquelle als die Unified-API).
     if (network === 'WL') {
-      // Versuche aus wienData wenn geladen
+      // wienData ggf. nachladen — bei gemischten Configs (Wien + anderes Netz) wird
+      // es vom Handler nicht automatisch geladen → sonst bleibt der Wien-Name leer.
+      if (!wienData) { try { await loadWienData(); } catch (e) {} }
       if (wienData) {
         for (const line of wienData) {
           if (!Array.isArray(line.lineStation)) continue;
