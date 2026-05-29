@@ -10724,14 +10724,13 @@ function renderDisplayTypeSections() {
       if (!_dtSeededCids.has(cidS)) {
         var seededGroups = seedDtGroupFromConfig(cidS, (window._dtAllDirs && window._dtAllDirs[cidS]) || []);
         _dtSeededCids.add(cidS);
-        // Toggle-States aus Config ableiten:
-        //  - Gruppen ⇒ Manuell + Statisch + Gruppierung An
-        //  - statische Reihenfolge (sortMode 1) ⇒ Manuell (feste Ordnung sichtbar/behalten)
-        //  - zeitlich/dynamisch (sortMode 2) ⇒ Automatisch
-        // Persistiert über Reload, weil sort_mode in der Config gespeichert ist.
+        // Default = Automatisch. NUR wenn Gruppen aus der Config kommen ⇒ Manuell +
+        // Statisch + Gruppierung An (damit die Gruppen sichtbar bleiben & gespeichert
+        // werden). Beim manuellen Gruppieren/Umsortieren schalten confirmDtGroup/
+        // moveFtOrderItem zusätzlich live auf Manuell.
         ftSortByCid[cidS]    = String((recommendedConfig && recommendedConfig.sortMode) || 1);
         ftGroupByCid[cidS]   = seededGroups ? 'on' : 'off';
-        ftAdvModeByCid[cidS] = (seededGroups || ftSortByCid[cidS] === '1') ? 'manual' : 'auto';
+        ftAdvModeByCid[cidS] = seededGroups ? 'manual' : 'auto';
         if (seededGroups) ftSortByCid[cidS] = '1';  // Gruppen brauchen statische Reihenfolge
       }
       // Persistente Toggle-States anwenden (statischer Default-Aufbau würde sie sonst
@@ -10892,18 +10891,19 @@ function getDtGroupData(cid) {
 // Gibt true zurück, wenn mindestens eine Gruppe (≥2) geseedet wurde.
 function seedDtGroupFromConfig(cid, allDirs) {
   var gd = getDtGroupData(cid);
-  var src = (recommendedConfig && (recommendedConfig.lineGroups || recommendedConfig.rowOrderDestination)) || '';
   // Token -> erster Index in DIESEM Display-Typ
   var tokenToIdx = {};
   (allDirs || []).forEach(function(d, idx) {
     var t = dtDirToken(d);
     if (t && tokenToIdx[t] === undefined) tokenToIdx[t] = idx;
   });
-  var usedIdx = new Set();
-  var groups = [];
-  var orderItems = [];
-  if (src) {
-    src.split(',').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(entry) {
+
+  // Verarbeitet einen gespeicherten Gruppierungs-String (linegroups ODER
+  // rowOrderDestination) zu groups+orderItems. Liefert auch matched=Anzahl der
+  // gematchten Richtungen, um zwischen den Quellen die passende zu wählen.
+  function processSrc(src) {
+    var usedIdx = new Set(), groups = [], orderItems = [], matched = 0;
+    (src || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean).forEach(function(entry) {
       var tokens = entry.split('+').map(function(t){ return t.trim(); }).filter(Boolean);
       if (tokens.length === 0) return;
       var found = [];
@@ -10915,6 +10915,7 @@ function seedDtGroupFromConfig(cid, allDirs) {
       if (found.length === 0) return;  // gehört zu einem anderen Display-Typ
       found = found.filter(function(i){ return !usedIdx.has(i); });  // Doppel-Referenzen raus
       if (found.length === 0) return;
+      matched += found.length;
       var isFullGroup = !anyMissing && tokens.length >= 2 && found.length === tokens.length;
       if (isFullGroup) {
         found.forEach(function(i){ usedIdx.add(i); });
@@ -10925,18 +10926,28 @@ function seedDtGroupFromConfig(cid, allDirs) {
         found.forEach(function(i){ usedIdx.add(i); orderItems.push({ indices: [i] }); });
       }
     });
+    return { usedIdx: usedIdx, groups: groups, orderItems: orderItems, matched: matched };
   }
+
+  var lg  = (recommendedConfig && recommendedConfig.lineGroups) || '';
+  var rod = (recommendedConfig && recommendedConfig.rowOrderDestination) || '';
+  // Primär lineGroups (richtungsId-Tokens). Falls dort NICHTS matcht (z.B. weil die
+  // nachgeladenen Richtungen keine/andere richtungsId haben → Token "1:Auwiesen" statt
+  // "1:R"), Fallback auf rowOrderDestination (Ziel-Tokens).
+  var res = processSrc(lg);
+  if (res.matched === 0 && rod && rod !== lg) res = processSrc(rod);
+
   // Nicht abgedeckte (neue) Richtungen als Einzel-Einträge anhängen
   (allDirs || []).forEach(function(d, idx) {
-    if (usedIdx.has(idx)) return;
-    usedIdx.add(idx);
-    orderItems.push({ indices: [idx] });
+    if (res.usedIdx.has(idx)) return;
+    res.usedIdx.add(idx);
+    res.orderItems.push({ indices: [idx] });
   });
-  gd.groups = groups;
-  gd.orderList = orderItems;
+  gd.groups = res.groups;
+  gd.orderList = res.orderItems;
   gd.creating = false;
   gd.selected = [];
-  return groups.length > 0;
+  return res.groups.length > 0;
 }
 
 function startDtGroup(cid) {
@@ -10967,6 +10978,16 @@ function confirmDtGroup(cid) {
   gd.creating = false;
   gd.selected = [];
   gd.orderList = null;  // Reihenfolge neu aufbauen (neue Gruppe einsortieren)
+  // Manuelle Gruppe ⇒ persistent auf Manuell + Statisch + Gruppierung An schalten,
+  // damit es einen Re-Render überlebt und beim Speichern erhalten bleibt.
+  ftAdvModeByCid[cid] = 'manual';
+  ftSortByCid[cid] = '1';
+  ftGroupByCid[cid] = 'on';
+  // Sofort sichtbar umschalten (nicht erst beim nächsten Re-Render)
+  setFtToggleVal('ftAdvMode_' + cid, 'manual');
+  setFtToggleVal('ftSort_' + cid, '1');
+  setFtToggleVal('ftGroup_' + cid, 'on');
+  toggleDtSubsections(cid);
   document.getElementById('ftDtNewGroupPanel_' + cid).style.display = 'none';
   document.getElementById('ftDtNewGroupBtn_' + cid).style.display = '';
   renderDtGroups(cid);
@@ -11178,6 +11199,11 @@ function moveFtOrderItem(listId, idx, dir) {
   var moved = orderList.splice(idx, 1)[0];
   orderList.splice(newIdx, 0, moved);
   gd.orderList = orderList;
+  // Manuelles Umsortieren ⇒ persistent auf Manuell + Statisch schalten (sofort sichtbar).
+  ftAdvModeByCid[cid] = 'manual';
+  ftSortByCid[cid] = '1';
+  setFtToggleVal('ftAdvMode_' + cid, 'manual');
+  setFtToggleVal('ftSort_' + cid, '1');
   // Neu rendern aus dem aktualisierten Modell
   renderDtOrderList(cid);
 }
@@ -11282,6 +11308,13 @@ async function initFinetuningStep() {
   // Gruppierung initialisieren (lädt auch roworderdestination und setzt ftLineGroups)
   // WICHTIG: await weil initFtGrouping async ist!
   await initFtGrouping();
+
+  // Gruppen JETZT erneut aus der Config seeden: erst hier sind die station.directions
+  // (inkl. richtungsId) garantiert vollständig geladen. Beim frühen
+  // renderDisplayTypeSections oben könnten sie noch gefehlt haben → Tokens "1:" statt
+  // "1:H" → Gruppen würden verfehlt und das Gruppierungs-Toggle stünde auf "Aus".
+  _dtSeededCids = new Set();
+  renderDisplayTypeSections();
 
   // Sortierungsmodus initialisieren (NACH initFtGrouping!)
   setFtSortMode(config.sortMode || 1);
