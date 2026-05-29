@@ -1493,170 +1493,6 @@
       border-color: #0055a4;
     }
 
-    /* Journey Mode Styles */
-    .journey-field {
-      margin-bottom: 12px;
-    }
-    .journey-field label {
-      display: block;
-      font-size: 13px;
-      color: #666;
-      margin-bottom: 6px;
-      font-weight: 600;
-    }
-    .journey-arrow {
-      text-align: center;
-      padding: 8px 0;
-    }
-    .journey-arrow::before {
-      content: '';
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-right: 3px solid #ccc;
-      border-bottom: 3px solid #ccc;
-      transform: rotate(45deg);
-    }
-    
-    .journey-selected {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 14px;
-      background: #e8f0f8;
-      border: 2px solid #0055a4;
-      border-radius: 12px;
-      margin-top: 8px;
-    }
-    .journey-selected .station-name {
-      font-weight: 600;
-      color: #333;
-    }
-    .journey-selected .change-btn {
-      background: none;
-      border: none;
-      color: #0055a4;
-      font-size: 13px;
-      cursor: pointer;
-    }
-    .journey-selected .change-btn:hover {
-      text-decoration: underline;
-    }
-    
-    /* Product Selection */
-    .journey-products {
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #e0e0e0;
-    }
-    
-    .product-category {
-      margin-bottom: 12px;
-      border: 1px solid #e0e0e0;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .category-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 16px;
-      background: #f8f9fa;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 14px;
-      color: #333;
-    }
-    .category-header:hover {
-      background: #f0f2f4;
-    }
-    .category-toggle {
-      color: #666;
-      font-size: 12px;
-      transition: transform 0.2s;
-    }
-    .category-content {
-      background: #fff;
-    }
-    .category-content.collapsed {
-      display: none;
-    }
-    
-    .product-option {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 14px 16px;
-      background: #fff;
-      border-bottom: 1px solid #f0f0f0;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .product-option:last-child {
-      border-bottom: none;
-    }
-    .product-option:hover {
-      background: #f8f9fa;
-    }
-    .product-option.selected {
-      background: #f0f5fa;
-    }
-    .product-option .checkbox {
-      width: 24px;
-      height: 24px;
-      border: 2px solid #ccc;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      flex-shrink: 0;
-    }
-    .product-option.selected .checkbox {
-      background: #0055a4;
-      border-color: #0055a4;
-      color: #fff;
-    }
-    .product-option .product-badge {
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-weight: 700;
-      font-size: 14px;
-      min-width: 50px;
-      text-align: center;
-      background: #1a1a1a;
-      color: #fff;
-    }
-    /* DE Fernverkehr */
-    .product-option .product-badge.ice { background: #fff; color: #1a1a1a; border: 2px solid #1a1a1a; }
-    .product-option .product-badge.ic { background: #fff; color: #1a1a1a; border: 2px solid #1a1a1a; }
-    .product-option .product-badge.ec { background: #fff; color: #1a1a1a; border: 2px solid #1a1a1a; }
-    /* DE Regional */
-    .product-option .product-badge.re { background: #1E5A9C; color: #fff; }
-    .product-option .product-badge.rb { background: #1E5A9C; color: #fff; }
-    .product-option .product-badge.ire { background: #1E5A9C; color: #fff; }
-    .product-option .product-badge.s { background: #006e34; color: #fff; }
-    /* AT Fernverkehr */
-    .product-option .product-badge.rjx { background: #E2001A; color: #fff; }
-    .product-option .product-badge.rj { background: #E2001A; color: #fff; }
-    .product-option .product-badge.d { background: #E2001A; color: #fff; }
-    /* AT Regional */
-    .product-option .product-badge.rex { background: #E2001A; color: #fff; }
-    .product-option .product-badge.r { background: #666666; color: #fff; }
-    .product-option .product-badge.cjx { background: #E2001A; color: #fff; }
-    /* International */
-    .product-option .product-badge.nj { background: #1a237e; color: #fff; }
-    .product-option .product-badge.en { background: #1a237e; color: #fff; }
-    .product-option .product-badge.tgv { background: #6E2064; color: #fff; }
-    .product-option .product-badge.tha { background: #6E2064; color: #fff; }
-    .product-option .product-badge.est { background: #6E2064; color: #fff; }
-    .product-option .product-badge.flx { background: #73D700; color: #000; }
-    .product-option .product-badge.wb { background: #007CC3; color: #fff; }
-    .product-option .product-name {
-      font-size: 14px;
-      color: #333;
-    }
-
     /* Success Button */
     .btn-success {
       background: #16a34a !important;
@@ -3004,47 +2840,6 @@
     <div class="search-results" id="searchResults"></div>
   </div>
   
-  <!-- Step 3b: Journey Search (für DB) -->
-  <div class="card hidden" id="stepJourneySearch">
-    <button class="back-btn" onclick="goBack('network')">Zurück</button>
-    <h2>Verbindung wählen</h2>
-    
-    <div class="journey-field">
-      <label>Von:</label>
-      <div class="search-container">
-        <span class="search-icon"></span>
-        <input type="text" class="search-input" id="journeyFromInput" placeholder="Abfahrtsstation..." autocomplete="off">
-        <div class="search-spinner" id="journeyFromSpinner"></div>
-      </div>
-      <div class="search-results" id="journeyFromResults"></div>
-      <div class="journey-selected hidden" id="journeyFromSelected"></div>
-    </div>
-    
-    <div class="journey-arrow"></div>
-    
-    <div class="journey-field">
-      <label>Nach:</label>
-      <div class="search-container">
-        <span class="search-icon"></span>
-        <input type="text" class="search-input" id="journeyToInput" placeholder="Zielstation..." autocomplete="off">
-        <div class="search-spinner" id="journeyToSpinner"></div>
-      </div>
-      <div class="search-results" id="journeyToResults"></div>
-      <div class="journey-selected hidden" id="journeyToSelected"></div>
-    </div>
-    
-    <!-- Zugauswahl erscheint automatisch -->
-    <div class="journey-products hidden" id="journeyProductsSection">
-      <h3 style="color:#0055a4;margin:20px 0 12px;font-size:16px;">Zuggattungen auswählen</h3>
-
-      <!-- Dynamisch generierte Kategorien -->
-      <div id="productCategoriesContainer"></div>
-
-      <button class="btn btn-primary" id="addJourneyBtn" onclick="addJourneyStation()" disabled style="margin-top:16px;width:100%">
-        Verbindung hinzufügen
-      </button>
-    </div>
-  </div>
   
   
   <!-- Step 3c: Wien Line Selection (wie localmainpage) -->
@@ -4696,10 +4491,6 @@ let selectedSubRegion = null;
 let selectedVerkehrsart = null;
 let selectedZugKategorie = null; // 'nah' oder 'fern'
 
-// Journey-Modus (für DB)
-let journeyFromStop = null;
-let journeyToStop = null;
-let selectedProducts = new Set();
 
 // OEBB Von-Nach Modus
 let oebb_toStop = null;              // {id, name} - gewähltes Ziel
@@ -4827,9 +4618,6 @@ function showStep(step) {
 
   // Grouping Step entfernt - jetzt nur im Feintuning
 
-  // Journey-Modus Steps
-  const stepJourneySearch = document.getElementById('stepJourneySearch');
-  if (stepJourneySearch) stepJourneySearch.classList.toggle('hidden', step !== 'journeySearch');
 
   // Wien-Modus Steps
   const stepWienLine = document.getElementById('stepWienLine');
@@ -4905,10 +4693,9 @@ function updateBreadcrumb() {
 
   if (selectedNetwork) {
     html += `<span class="breadcrumb-sep">›</span>`;
-    const isJourney = NETWORKS[selectedNetwork].isJourneyBased;
     const isWien = selectedNetwork === 'WL';
-    const backStep = isWien ? 'wienLine' : (isJourney ? 'journeySearch' : 'search');
-    const isActive = currentStep === 'search' || currentStep === 'journeySearch' || currentStep === 'wienLine';
+    const backStep = isWien ? 'wienLine' : 'search';
+    const isActive = currentStep === 'search' || currentStep === 'wienLine';
     html += `<span class="breadcrumb-item ${isActive ? 'active' : ''}" onclick="goBack('${backStep}')">${NETWORKS[selectedNetwork].name}</span>`;
   }
 
@@ -4938,9 +4725,6 @@ function goBack(step) {
     selectedVerkehrsart = null;
     selectedZugKategorie = null;
     selectedSubRegion = null;
-    journeyFromStop = null;
-    journeyToStop = null;
-    selectedProducts = new Set();
     wienSelectedLine = null;
     wienSelectedStation = null;
     wienSelectedDirections = [];
@@ -4952,16 +4736,10 @@ function goBack(step) {
     selectedSubRegion = null;
     selectedVerkehrsart = null;
     selectedStop = null;
-    journeyFromStop = null;
-    journeyToStop = null;
-    selectedProducts = new Set();
     wienSelectedLine = null;
     wienSelectedStation = null;
     wienSelectedDirections = [];
     wienOtherLines = [];
-    // Hide products section
-    const productsSection = document.getElementById('journeyProductsSection');
-    if (productsSection) productsSection.classList.add('hidden');
     // Grid neu rendern
     renderNetworkGrid();
   } else if (step === 'search') {
@@ -4970,11 +4748,6 @@ function goBack(step) {
     oebb_deselectedGattungen = new Set();
     searchInput.value = '';
     searchResults.classList.remove('show');
-  } else if (step === 'journeySearch') {
-    selectedProducts = new Set();
-    // Hide products section when going back
-    const productsSection = document.getElementById('journeyProductsSection');
-    if (productsSection) productsSection.classList.add('hidden');
   } else if (step === 'wienLine') {
     wienSelectedLine = null;
     wienSelectedStation = null;
@@ -5254,40 +5027,6 @@ function selectNetwork(network) {
     return;
   }
 
-  // Journey-basierte Netzwerke (DB)
-  if (netConfig.isJourneyBased) {
-    journeyFromStop = null;
-    journeyToStop = null;
-    selectedProducts = new Set();
-
-    // Reset form
-    const fromInput = document.getElementById('journeyFromInput');
-    const toInput = document.getElementById('journeyToInput');
-    const fromSelected = document.getElementById('journeyFromSelected');
-    const toSelected = document.getElementById('journeyToSelected');
-    const fromResults = document.getElementById('journeyFromResults');
-    const toResults = document.getElementById('journeyToResults');
-    const productsSection = document.getElementById('journeyProductsSection');
-
-    if (fromInput) {
-      fromInput.value = '';
-      fromInput.placeholder = netConfig.placeholder;
-      fromInput.parentElement.classList.remove('hidden');
-    }
-    if (toInput) {
-      toInput.value = '';
-      toInput.placeholder = netConfig.placeholder;
-      toInput.parentElement.classList.remove('hidden');
-    }
-    if (fromSelected) fromSelected.classList.add('hidden');
-    if (toSelected) toSelected.classList.add('hidden');
-    if (fromResults) fromResults.classList.remove('show');
-    if (toResults) toResults.classList.remove('show');
-    if (productsSection) productsSection.classList.add('hidden');
-
-    showStep('journeySearch');
-    return;
-  }
   
   // Normale Netzwerke
   searchInput.placeholder = netConfig.placeholder;
@@ -13808,259 +13547,6 @@ handleConfigMessage = async function(data) {
 // Starte Retry-Mechanismus nach 1 Sekunde
 setTimeout(checkAndRetryConfig, 1000);
 
-// ==================== JOURNEY MODE (DB) ====================
-let journeyFromTimeout = null;
-let journeyToTimeout = null;
-
-function showJourneyFromSelected() {
-  const input = document.getElementById('journeyFromInput');
-  const results = document.getElementById('journeyFromResults');
-  const selected = document.getElementById('journeyFromSelected');
-  
-  if (journeyFromStop) {
-    input.parentElement.classList.add('hidden');
-    results.classList.remove('show');
-    selected.classList.remove('hidden');
-    selected.innerHTML = `
-      <span class="station-name">${journeyFromStop.name}</span>
-      <button class="change-btn" onclick="clearJourneyFrom()">Ändern</button>
-    `;
-  }
-}
-
-function showJourneyToSelected() {
-  const input = document.getElementById('journeyToInput');
-  const results = document.getElementById('journeyToResults');
-  const selected = document.getElementById('journeyToSelected');
-  
-  if (journeyToStop) {
-    input.parentElement.classList.add('hidden');
-    results.classList.remove('show');
-    selected.classList.remove('hidden');
-    selected.innerHTML = `
-      <span class="station-name">${journeyToStop.name}</span>
-      <button class="change-btn" onclick="clearJourneyTo()">Ändern</button>
-    `;
-  }
-}
-
-function clearJourneyFrom() {
-  journeyFromStop = null;
-  selectedProducts = new Set();
-  const input = document.getElementById('journeyFromInput');
-  const selected = document.getElementById('journeyFromSelected');
-  const productsSection = document.getElementById('journeyProductsSection');
-  
-  input.parentElement.classList.remove('hidden');
-  selected.classList.add('hidden');
-  if (productsSection) productsSection.classList.add('hidden');
-  input.value = '';
-  input.focus();
-}
-
-function clearJourneyTo() {
-  journeyToStop = null;
-  selectedProducts = new Set();
-  const input = document.getElementById('journeyToInput');
-  const selected = document.getElementById('journeyToSelected');
-  const productsSection = document.getElementById('journeyProductsSection');
-  
-  input.parentElement.classList.remove('hidden');
-  selected.classList.add('hidden');
-  if (productsSection) productsSection.classList.add('hidden');
-  input.value = '';
-  input.focus();
-}
-
-async function performJourneyFromSearch(query) {
-  const spinner = document.getElementById('journeyFromSpinner');
-  const results = document.getElementById('journeyFromResults');
-  
-  spinner.classList.add('show');
-  
-  try {
-    const searchResults = await searchViaProxy(selectedNetwork, query);
-    displayJourneyResults(searchResults, 'from');
-  } catch (e) {
-    console.error('Journey search error:', e);
-    results.innerHTML = '<div class="no-results">Fehler bei der Suche</div>';
-    results.classList.add('show');
-  } finally {
-    spinner.classList.remove('show');
-  }
-}
-
-async function performJourneyToSearch(query) {
-  const spinner = document.getElementById('journeyToSpinner');
-  const results = document.getElementById('journeyToResults');
-  
-  spinner.classList.add('show');
-  
-  try {
-    const searchResults = await searchViaProxy(selectedNetwork, query);
-    displayJourneyResults(searchResults, 'to');
-  } catch (e) {
-    console.error('Journey search error:', e);
-    results.innerHTML = '<div class="no-results">Fehler bei der Suche</div>';
-    results.classList.add('show');
-  } finally {
-    spinner.classList.remove('show');
-  }
-}
-
-function displayJourneyResults(results, type) {
-  const container = document.getElementById(type === 'from' ? 'journeyFromResults' : 'journeyToResults');
-  
-  if (results.length === 0) {
-    container.innerHTML = '<div class="no-results">Keine Stationen gefunden</div>';
-  } else {
-    container.innerHTML = results.map(r => `
-      <div class="search-result-item" onclick="selectJourneyStop('${type}', '${r.id}', '${r.name.replace(/'/g, "\\'")}')">
-        <div class="stop-name">${r.name}</div>
-        <div class="stop-info">${r.info || `ID: ${r.id}`}</div>
-      </div>
-    `).join('');
-  }
-  container.classList.add('show');
-}
-
-function selectJourneyStop(type, id, name) {
-  if (type === 'from') {
-    journeyFromStop = { id, name };
-    showJourneyFromSelected();
-    // Focus auf "Nach" Feld
-    if (!journeyToStop) {
-      document.getElementById('journeyToInput').focus();
-    }
-  } else {
-    journeyToStop = { id, name };
-    showJourneyToSelected();
-  }
-  
-  // Wenn beide Stationen gewählt, zeige Züge
-  if (journeyFromStop && journeyToStop) {
-    showProductsInline();
-  }
-}
-
-function showProductsInline() {
-  const section = document.getElementById('journeyProductsSection');
-  section.classList.remove('hidden');
-  
-  selectedProducts = new Set();
-  renderProductCategories();
-}
-
-function renderProductCategories() {
-  const netConfig = NETWORKS[selectedNetwork];
-  const categories = netConfig.productCategories || {};
-  const container = document.getElementById('productCategoriesContainer');
-
-  if (!container) return;
-
-  // Alle Kategorien dynamisch rendern
-  let html = '';
-  Object.entries(categories).forEach(([catId, catData]) => {
-    const products = catData.products || [];
-    if (products.length === 0) return;
-
-    // Collapsed-Status aus Config oder default offen
-    const isCollapsed = catData.collapsed === true;
-    const toggleIcon = isCollapsed ? '▶' : '▼';
-    const collapsedClass = isCollapsed ? 'collapsed' : '';
-
-    html += `
-      <div class="product-category">
-        <div class="category-header" onclick="toggleCategory('${catId}')">
-          <span>${catData.label}</span>
-          <span class="category-toggle" id="${catId}Toggle">${toggleIcon}</span>
-        </div>
-        <div class="category-content ${collapsedClass}" id="${catId}Products">
-          ${products.map(p => renderProductOption(p)).join('')}
-        </div>
-      </div>
-    `;
-  });
-
-  container.innerHTML = html;
-  updateAddJourneyButton();
-}
-
-function renderProductOption(product) {
-  const selected = selectedProducts.has(product.id);
-  return `
-    <div class="product-option ${selected ? 'selected' : ''}" onclick="toggleProduct('${product.id}')">
-      <div class="checkbox">${selected ? '✓' : ''}</div>
-      <div class="product-badge ${product.id.toLowerCase()}">${product.name}</div>
-      <div class="product-name">${product.desc}</div>
-    </div>
-  `;
-}
-
-function toggleCategory(categoryId) {
-  const content = document.getElementById(categoryId + 'Products');
-  const toggle = document.getElementById(categoryId + 'Toggle');
-  
-  if (content.classList.contains('collapsed')) {
-    content.classList.remove('collapsed');
-    toggle.textContent = '▼';
-  } else {
-    content.classList.add('collapsed');
-    toggle.textContent = '▶';
-  }
-}
-
-function toggleProduct(productId) {
-  if (selectedProducts.has(productId)) {
-    selectedProducts.delete(productId);
-  } else {
-    selectedProducts.add(productId);
-  }
-  renderProductCategories();
-}
-
-function updateAddJourneyButton() {
-  const btn = document.getElementById('addJourneyBtn');
-  if (btn) {
-    btn.disabled = selectedProducts.size === 0;
-  }
-}
-
-function addJourneyStation() {
-  if (!journeyFromStop || !journeyToStop || selectedProducts.size === 0) return;
-  
-  const filter = Array.from(selectedProducts).join(',');
-  const fullId = `${selectedNetwork}:${journeyFromStop.id}>${journeyToStop.id}`;
-  
-  // Check duplicate
-  if (stations.some(s => s.fullId === fullId)) {
-    alert('Diese Verbindung ist bereits hinzugefügt!');
-    return;
-  }
-  
-  stations.push({
-    network: selectedNetwork,
-    networkName: NETWORKS[selectedNetwork].name,
-    stopId: `${journeyFromStop.id}>${journeyToStop.id}`,
-    stopName: `${journeyFromStop.name} → ${journeyToStop.name}`,
-    filter: filter,
-    fullId: fullId,
-    isJourney: true,
-    isExisting: false
-  });
-  
-  // Reset
-  journeyFromStop = null;
-  journeyToStop = null;
-  selectedProducts = new Set();
-  
-  // Hide products section
-  document.getElementById('journeyProductsSection').classList.add('hidden');
-  
-  goBack('region');
-  updateStationsList();
-}
-
 // ==================== INIT ====================
 window.addEventListener('DOMContentLoaded', () => {
   if (window.parent && window.parent !== window) {
@@ -14073,51 +13559,8 @@ window.addEventListener('DOMContentLoaded', () => {
       searchResults.classList.remove('show');
     }
     
-    // Close journey search results when clicking outside
-    const fromInput = document.getElementById('journeyFromInput');
-    const fromResults = document.getElementById('journeyFromResults');
-    const toInput = document.getElementById('journeyToInput');
-    const toResults = document.getElementById('journeyToResults');
-    
-    if (fromInput && fromResults && !fromInput.contains(e.target) && !fromResults.contains(e.target)) {
-      fromResults.classList.remove('show');
-    }
-    if (toInput && toResults && !toInput.contains(e.target) && !toResults.contains(e.target)) {
-      toResults.classList.remove('show');
-    }
   });
   
-  // Journey From Input
-  const journeyFromInput = document.getElementById('journeyFromInput');
-  if (journeyFromInput) {
-    journeyFromInput.addEventListener('input', function() {
-      const query = this.value.trim();
-      if (journeyFromTimeout) clearTimeout(journeyFromTimeout);
-      
-      if (query.length < 2) {
-        document.getElementById('journeyFromResults').classList.remove('show');
-        return;
-      }
-      
-      journeyFromTimeout = setTimeout(() => performJourneyFromSearch(query), 300);
-    });
-  }
-  
-  // Journey To Input
-  const journeyToInput = document.getElementById('journeyToInput');
-  if (journeyToInput) {
-    journeyToInput.addEventListener('input', function() {
-      const query = this.value.trim();
-      if (journeyToTimeout) clearTimeout(journeyToTimeout);
-      
-      if (query.length < 2) {
-        document.getElementById('journeyToResults').classList.remove('show');
-        return;
-      }
-      
-      journeyToTimeout = setTimeout(() => performJourneyToSearch(query), 300);
-    });
-  }
 
   // Stationsliste initial rendern → leere "Deine Stationen"-Karte wird ausgeblendet
   updateStationsList();
