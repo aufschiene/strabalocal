@@ -5622,6 +5622,12 @@ function getSavedBvgRowsStyle() {
   try { return localStorage.getItem('catchit_bvg_rows_style') || ''; } catch (e) { return ''; }
 }
 
+// Letztes Wizard-Summary (wird beim Abschluss gespeichert) — enthält u.a. die
+// Gehweg-Werte pro Station (key = fullId). Zum Wiederherstellen im Gehweg-Schritt.
+function getSavedWizardSummary() {
+  try { return JSON.parse(localStorage.getItem('catchit_wizard_summary') || 'null'); } catch (e) { return null; }
+}
+
 function selectBvgRowsStyle(value) {
   // Karten im BVG-Schritt aktivieren/deaktivieren
   var card = document.getElementById('stepWizardBvgRows');
@@ -5708,6 +5714,26 @@ function wizardShowStep(idx) {
   }
   // Gehweg-Schritt: Toggle-Status aus persistentem State wiederherstellen, dann Liste rendern
   if (step.id === 'stepWizardGehweg') {
+    // Werte aus letztem Durchlauf / geladener Config seeden, falls State noch leer
+    // (sonst startet der Gehweg beim Wiederöffnen immer auf 0 — "merkt es sich nicht").
+    if (Object.keys(wizardGehwegState.values).length === 0) {
+      // 1) localStorage-Summary (gleiche fullId-Keys → key-sicher)
+      var savedSum = getSavedWizardSummary();
+      if (savedSum && savedSum.gehwegPerStop && Object.keys(savedSum.gehwegPerStop).length) {
+        wizardGehwegState.values = Object.assign({}, savedSum.gehwegPerStop);
+        if (savedSum.gehwegEnabled) wizardGehwegState.enabled = true;
+      }
+      // 2) sonst aus geladener Geräte-Config (Reihenfolge stations == gehweg-Array)
+      else if (recommendedConfig && Array.isArray(recommendedConfig.gehweg) &&
+               recommendedConfig.gehweg.length === stations.length) {
+        var anyGw = false;
+        stations.forEach(function(s, i) {
+          var v = parseInt(recommendedConfig.gehweg[i] || 0, 10) || 0;
+          if (v > 0) { wizardGehwegState.values[s.fullId || ('idx_' + i)] = v; anyGw = true; }
+        });
+        if (anyGw) wizardGehwegState.enabled = true;
+      }
+    }
     var gwToggle = document.getElementById('wizardGehwegToggle');
     var gwSub = document.getElementById('wizardGehwegSub');
     if (gwToggle) {
