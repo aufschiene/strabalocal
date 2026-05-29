@@ -10724,11 +10724,14 @@ function renderDisplayTypeSections() {
       if (!_dtSeededCids.has(cidS)) {
         var seededGroups = seedDtGroupFromConfig(cidS, (window._dtAllDirs && window._dtAllDirs[cidS]) || []);
         _dtSeededCids.add(cidS);
-        // Toggle-States aus Config ableiten: Gruppen ⇒ Manuell + Statisch + Gruppierung An,
-        // damit die Gruppen sichtbar bleiben UND beim Speichern erhalten werden.
+        // Toggle-States aus Config ableiten:
+        //  - Gruppen ⇒ Manuell + Statisch + Gruppierung An
+        //  - statische Reihenfolge (sortMode 1) ⇒ Manuell (feste Ordnung sichtbar/behalten)
+        //  - zeitlich/dynamisch (sortMode 2) ⇒ Automatisch
+        // Persistiert über Reload, weil sort_mode in der Config gespeichert ist.
         ftSortByCid[cidS]    = String((recommendedConfig && recommendedConfig.sortMode) || 1);
         ftGroupByCid[cidS]   = seededGroups ? 'on' : 'off';
-        ftAdvModeByCid[cidS] = seededGroups ? 'manual' : 'auto';
+        ftAdvModeByCid[cidS] = (seededGroups || ftSortByCid[cidS] === '1') ? 'manual' : 'auto';
         if (seededGroups) ftSortByCid[cidS] = '1';  // Gruppen brauchen statische Reihenfolge
       }
       // Persistente Toggle-States anwenden (statischer Default-Aufbau würde sie sonst
