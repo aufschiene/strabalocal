@@ -9534,6 +9534,14 @@ function goToDisplayConfig() {
     if (previousSettings.sortMode !== undefined) recommendedConfig.sortMode = previousSettings.sortMode;
     if (previousSettings.gehweg) recommendedConfig.gehweg = previousSettings.gehweg;
     if (previousSettings.rows) recommendedConfig.rows = previousSettings.rows;
+    // Gruppierung + Reihenfolge aus der geladenen Config übernehmen, damit Gruppen das
+    // Wiederöffnen überleben (sonst rechnet calculateRecommendedConfig sie als Einzel neu
+    // → "Reihenfolge: Automatisch"). Der Seed (seedDtGroupFromConfig) gleicht sie mit den
+    // aktuellen Richtungen ab (fehlende Tokens raus, Gruppe ggf. aufgelöst), und beim
+    // Speichern wird lineGroups/rowOrder eh frisch aus dtGroupData gebaut — keine stale Daten.
+    if (previousSettings.lineGroups) recommendedConfig.lineGroups = previousSettings.lineGroups;
+    if (previousSettings.rowOrder) recommendedConfig.rowOrder = previousSettings.rowOrder;
+    if (previousSettings.rowOrderDestination) recommendedConfig.rowOrderDestination = previousSettings.rowOrderDestination;
     // colour: Nur single-colour übernehmen, Multi-Display wird neu berechnet
     if (previousSettings.colour !== undefined && !recommendedConfig.multiDisplay) {
       recommendedConfig.colour = previousSettings.colour;
