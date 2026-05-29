@@ -8987,6 +8987,21 @@ let suggestedColor = 1;
 let suggestedRows = 2;
 let recommendedConfig = null;  // Vollständige empfohlene Konfiguration
 
+// Gespeicherte Zeilen pro Display-Typ (colour-id -> Zeilen) aus einer geladenen/
+// gespeicherten Config. Der Wizard berechnet Zeilen sonst immer NEU aus der
+// Richtungsanzahl (4 → 2) und ignoriert die bewusst gesetzte Zeilenzahl.
+let savedRowsByColour = {};
+function seedSavedRowsByColour(colourStr, rowsStr) {
+  savedRowsByColour = {};
+  var cols = String(colourStr == null ? '' : colourStr).split(',').map(function(c){ return c.trim(); });
+  var rws  = String(rowsStr  == null ? '' : rowsStr ).split(',').map(function(r){ return r.trim(); });
+  cols.forEach(function(c, i) {
+    var cid = parseInt(c, 10);
+    var rv  = parseInt(rws[i] != null && rws[i] !== '' ? rws[i] : rws[0], 10);
+    if (!isNaN(cid) && !isNaN(rv) && rv >= 1 && rv <= 4) savedRowsByColour[cid] = rv;
+  });
+}
+
 // ==================== RECOMMENDED CONFIG BERECHNUNG ====================
 function calculateRecommendedConfig() {
   if (stations.length === 0) return null;
@@ -9178,6 +9193,9 @@ function calculateRecommendedConfig() {
       const groupStations = stationsByColour.get(colourVal);
       let dirCount = 0;
       groupStations.forEach(s => { dirCount += countDirections(s); });
+      // Bewusst gesetzte Zeilenzahl (aus geladener/gespeicherter Config) hat Vorrang
+      // vor der Auto-Berechnung — sonst springt z.B. 4 → 2 beim Durchklicken.
+      if (savedRowsByColour[colourVal] != null) return savedRowsByColour[colourVal];
       return getRowsForDisplayType(colourVal, dirCount);
     });
     rows = perGroupRows.join(',');  // z.B. "4,2,3"
@@ -9185,7 +9203,9 @@ function calculateRecommendedConfig() {
     // Single-Display: eine Zahl
     let totalDirections = 0;
     stations.forEach(s => { totalDirections += countDirections(s); });
-    rows = getRowsForDisplayType(displayType, totalDirections);
+    rows = (savedRowsByColour[displayType] != null)
+             ? savedRowsByColour[displayType]
+             : getRowsForDisplayType(displayType, totalDirections);
   }
 
   // Einzigartige Stationen für stationDetails (gruppiert nach Name+Netzwerk)
@@ -12772,6 +12792,9 @@ function saveFromFinetuning() {
   recommendedConfig.colour = colour;  // Kann "14,2,12" (multi) oder "1" (single) sein
   recommendedConfig.multiDisplay = ftIsMultiDisplay;
   recommendedConfig.rows = rows;
+  // Gewählte Zeilen pro Display merken, damit ein erneuter Wizard-Durchlauf sie
+  // nicht wieder wegrechnet (4 → 2).
+  seedSavedRowsByColour(colour, rows);
   recommendedConfig.displayLight = displayLight;
   recommendedConfig.textColor = textColor;  // Wien Schriftfarbe
   recommendedConfig.wienBg = wienBg;          // Wien Hintergrund (1=Grün, 0=Schwarz)
@@ -13529,6 +13552,8 @@ async function handleConfigMessage(data) {
       var lcVal = String(data.config.lines_count);
       recommendedConfig.rows = lcVal.indexOf(',') > 0 ? lcVal : (parseInt(lcVal) || 2);
     }
+    // Bewusst gesetzte Zeilenzahl pro Display merken → Wizard rechnet sie nicht weg.
+    seedSavedRowsByColour(recommendedConfig.colour, recommendedConfig.rows);
     // displaylight (ESP32 Feldname)
     if (data.config.displaylight !== undefined) {
       recommendedConfig.displayLight = parseInt(data.config.displaylight) || 3;
