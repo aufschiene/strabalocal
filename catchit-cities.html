@@ -5884,10 +5884,26 @@ function wizardBuildConfig() {
     return;
   }
 
+  // Gruppierung/Reihenfolge der aktuellen Config sichern, BEVOR calculateRecommendedConfig
+  // sie als Einzel neu berechnet — sonst gehen Gruppen beim erneuten Feintuning-Öffnen
+  // (Zurück → Feintuning läuft über diese Funktion) verloren → "Reihenfolge: Automatisch".
+  var _prevGrouping = recommendedConfig ? {
+    lineGroups: recommendedConfig.lineGroups,
+    rowOrder: recommendedConfig.rowOrder,
+    rowOrderDestination: recommendedConfig.rowOrderDestination
+  } : null;
+
   var cfg = calculateRecommendedConfig();
   if (!cfg) {
     alert('Konfiguration konnte nicht berechnet werden.');
     return;
+  }
+
+  // Gespeicherte Gruppierung wieder übernehmen (Seed gleicht sie mit aktuellen Richtungen ab).
+  if (_prevGrouping) {
+    if (_prevGrouping.lineGroups) cfg.lineGroups = _prevGrouping.lineGroups;
+    if (_prevGrouping.rowOrder) cfg.rowOrder = _prevGrouping.rowOrder;
+    if (_prevGrouping.rowOrderDestination) cfg.rowOrderDestination = _prevGrouping.rowOrderDestination;
   }
 
   // Gehweg pro Station: Map fullId → Minuten in Array über stations-Reihenfolge übersetzen.
@@ -12037,6 +12053,18 @@ function updateFinetuningPreview() {
 }
 
 function backFromFinetuning() {
+  // Aktuelle Gruppierung/Reihenfolge aus dem Feintuning (dtGroupData) in recommendedConfig
+  // sichern — sonst geht sie beim erneuten Öffnen (Zurück → Feintuning) verloren.
+  try {
+    if (recommendedConfig) {
+      var lg = collectFtLineGroups();
+      var ro = getRowOrderString();
+      var rod = getRowOrderDestinationString();
+      if (lg) recommendedConfig.lineGroups = lg;
+      recommendedConfig.rowOrder = ro;
+      recommendedConfig.rowOrderDestination = rod;
+    }
+  } catch (e) {}
   document.getElementById('stepFinetuning').classList.add('hidden');
   var ftBottom = document.getElementById('ftBottomActions');
   if (ftBottom) ftBottom.style.display = 'none';
