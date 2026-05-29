@@ -3622,7 +3622,7 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 7,             // Deutsche Öffi Anzeige (BODO-Stil)
+    defaultColour: 7,             // Blau/Gelb (BODO-Stil)
     defaultBrightness: 3
   },
   AACHEN: {
@@ -3631,7 +3631,7 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 7,             // Deutsche Öffi Anzeige (BODO-Stil)
+    defaultColour: 7,             // Blau/Gelb (BODO-Stil)
     defaultBrightness: 3
   },
   BODO: {
@@ -8930,9 +8930,9 @@ const NETWORK_COLORS = {
   DB_FERN: { id: 6, name: 'DB Fernverkehr', color: '#EC0016' },
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
   BERLIN: { id: 15, name: 'Orange Matrix', color: '#FF8C00' },
-  KOELN: { id: 7, name: 'Deutsche Öffi Anzeige', color: '#005BBB' },
-  AACHEN: { id: 7, name: 'Deutsche Öffi Anzeige', color: '#005BBB' },
-  BODO: { id: 7, name: 'Deutsche Öffi Anzeige', color: '#005BBB' },
+  KOELN: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
+  AACHEN: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
+  BODO: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
   SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
   STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
@@ -9684,11 +9684,11 @@ function updateRealisticPreview(config) {
       highlight: '#EC0016',
       name: 'DB Fernverkehr'
     },
-    7: { // Deutsche Öffi Anzeige (BODO-Stil)
+    7: { // Blau/Gelb (BODO-Stil)
       bg: '#005BBB',
       text: '#ffffff',
       highlight: '#ffffff',
-      name: 'Deutsche Öffi Anzeige'
+      name: 'Blau/Gelb'
     },
     8: { // Salzburg AG
       bg: '#1a1a1a',
@@ -10035,7 +10035,7 @@ function updateQuickPreview() {
   // Settings Tags aktualisieren
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Deutsche Öffi Anzeige',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag (PID)',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag (PID)',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -10122,7 +10122,7 @@ function initializeQuickPreview() {
   const caps = recommendedConfig.capabilities || {};
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Deutsche Öffi Anzeige',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag (PID)',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag (PID)',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -10278,7 +10278,7 @@ const DISPLAY_TYPE_FEATURES = {
   4:  { rows: true, sorting: true, grouping: true, name: 'WLB Badner Bahn', offline: true },
   5:  { rows: false, sorting: false, grouping: false, name: 'DB S-Bahn' },
   6:  { rows: false, sorting: false, grouping: false, name: 'DB Fernverkehr' },
-  7:  { rows: true, sorting: true, grouping: true, name: 'Deutsche Öffi Anzeige' },
+  7:  { rows: true, sorting: true, grouping: true, name: 'Blau/Gelb' },
   8:  { rows: true, sorting: true, grouping: true, name: 'Salzburg AG', offline: true },
   9:  { rows: true, sorting: true, grouping: true, name: 'Paris' },
   10: { rows: true, sorting: true, grouping: true, name: 'Straba', offline: true },
@@ -10355,12 +10355,14 @@ function netColourId(network) {
 }
 
 function getUniqueDisplayTypes() {
-  if (!ftIsMultiDisplay) {
-    // Kompakt: ein Display-Typ
+  // Kompakt OHNE manuelle Zuordnung: ein einheitlicher Display-Typ.
+  // Bei manueller Zuordnung IMMER pro Station gruppieren — damit sich "Displays im
+  // Detail" sofort mitändert, wenn man im Zuordnungs-Dropdown umstellt.
+  if (!ftIsMultiDisplay && !ftIsManualAssignment) {
     var col = parseInt(document.getElementById('ftColorSelect').value) || 1;
     return [{ colour: col, stations: stations.slice() }];
   }
-  // Getrennt: pro unique colour
+  // Getrennt oder manuelle Zuordnung: pro unique colour
   var byColour = {};
   stations.forEach(function(s, i) {
     var col = ftIsManualAssignment ? (ftPerStationColour[i] || netColourId(s.network)) : netColourId(s.network);
@@ -12594,9 +12596,11 @@ function setupFtGroupingEvents() {
 // Event-Listener werden in initFtGrouping() angehaengt
 
 function saveFromFinetuning() {
-  // Multi-Display: colour pro Station sammeln
+  // Multi-Display ODER manuelle Zuordnung: colour pro Station sammeln.
+  // (Manuelle Zuordnung muss auch im Kompakt-Modus greifen, sonst wird der im
+  // Dropdown gewählte Display-Typ beim Speichern ignoriert.)
   let colour;
-  if (ftIsMultiDisplay) {
+  if (ftIsMultiDisplay || ftIsManualAssignment) {
     const perStation = stations.map(function(s, i) {
       var nc = NETWORK_COLORS[s.network];
       return ftIsManualAssignment ? (ftPerStationColour[i] || (nc ? nc.id : 1)) : (nc ? nc.id : 1);
