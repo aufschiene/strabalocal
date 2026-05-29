@@ -10574,8 +10574,8 @@ function renderDisplayTypeSections() {
       // selbst (Details versteckt). Manuell oeffnet Sortierung + Gruppierung + Reihenfolge.
       html += '<div class="form-row"><div><div class="form-label">Reihenfolge</div><div class="form-hint">Automatisch = catch-it ordnet selbst. Manuell = selbst festlegen.</div></div>';
       html += '<div class="toggle-row" id="ftAdvMode_' + cid + '">';
-      html += '<button class="toggle-btn active" data-value="auto" onclick="setFtToggleVal(\'ftAdvMode_' + cid + '\',\'auto\');toggleDtSubsections(' + cid + ')">Automatisch</button>';
-      html += '<button class="toggle-btn" data-value="manual" onclick="setFtToggleVal(\'ftAdvMode_' + cid + '\',\'manual\');toggleDtSubsections(' + cid + ')">Manuell</button>';
+      html += '<button class="toggle-btn active" data-value="auto" onclick="setDtAdvMode(' + cid + ',\'auto\')">Automatisch</button>';
+      html += '<button class="toggle-btn" data-value="manual" onclick="setDtAdvMode(' + cid + ',\'manual\')">Manuell</button>';
       html += '</div></div>';
 
       // === Detail-Panel — nur bei Manuell sichtbar ===
@@ -10584,16 +10584,16 @@ function renderDisplayTypeSections() {
       // Sortierung: Statisch / Zeit
       html += '<div class="form-row"><div><div class="form-label">Sortierung</div><div class="form-hint">Statisch = feste Reihenfolge · Zeit = chronologisch</div></div>';
       html += '<div class="toggle-row" id="ftSort_' + cid + '">';
-      html += '<button class="toggle-btn active" data-value="1" onclick="setFtToggleVal(\'ftSort_' + cid + '\',1);toggleDtSubsections(' + cid + ')">Statisch</button>';
-      html += '<button class="toggle-btn" data-value="2" onclick="setFtToggleVal(\'ftSort_' + cid + '\',2);toggleDtSubsections(' + cid + ')">Zeit</button>';
+      html += '<button class="toggle-btn active" data-value="1" onclick="setDtSort(' + cid + ',1)">Statisch</button>';
+      html += '<button class="toggle-btn" data-value="2" onclick="setDtSort(' + cid + ',2)">Zeit</button>';
       html += '</div></div>';
 
       // Gruppierung (nur bei Statisch)
       html += '<div id="ftGroupRow_' + cid + '">';
       html += '<div class="form-row"><div><div class="form-label">Gruppierung</div><div class="form-hint">Richtungen zusammenfassen die gleiche Strecke fahren</div></div>';
       html += '<div class="toggle-row" id="ftGroup_' + cid + '">';
-      html += '<button class="toggle-btn active" data-value="off" onclick="setFtToggleVal(\'ftGroup_' + cid + '\',\'off\');toggleDtSubsections(' + cid + ')">Aus</button>';
-      html += '<button class="toggle-btn" data-value="on" onclick="setFtToggleVal(\'ftGroup_' + cid + '\',\'on\');toggleDtSubsections(' + cid + ')">An</button>';
+      html += '<button class="toggle-btn active" data-value="off" onclick="setDtGroup(' + cid + ',\'off\')">Aus</button>';
+      html += '<button class="toggle-btn" data-value="on" onclick="setDtGroup(' + cid + ',\'on\')">An</button>';
       html += '</div></div>';
       // Gruppierung Panel — Boxen-System wie index.html
       html += '<div id="ftGroupPanel_' + cid + '" style="display:none;margin-top:8px;">';
@@ -10718,18 +10718,27 @@ function renderDisplayTypeSections() {
   types.forEach(function(dt) {
     var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
     if (f.sorting) {
+      var cidS = dt.colour;
       // Gruppen einmalig aus der gespeicherten Config seeden (überlebt Re-Render
       // dank _dtSeededCids-Guard → manuelle Änderungen werden nicht überschrieben).
-      if (!_dtSeededCids.has(dt.colour)) {
-        var seededGroups = seedDtGroupFromConfig(dt.colour, (window._dtAllDirs && window._dtAllDirs[dt.colour]) || []);
-        _dtSeededCids.add(dt.colour);
-        // Gruppierungs-Toggle einschalten, wenn geseedete Gruppen existieren — sonst
-        // würde getDtOrderList die Gruppen als "inkonsistent" verwerfen.
-        if (seededGroups) setFtToggleVal('ftGroup_' + dt.colour, 'on');
+      if (!_dtSeededCids.has(cidS)) {
+        var seededGroups = seedDtGroupFromConfig(cidS, (window._dtAllDirs && window._dtAllDirs[cidS]) || []);
+        _dtSeededCids.add(cidS);
+        // Toggle-States aus Config ableiten: Gruppen ⇒ Manuell + Statisch + Gruppierung An,
+        // damit die Gruppen sichtbar bleiben UND beim Speichern erhalten werden.
+        ftSortByCid[cidS]    = String((recommendedConfig && recommendedConfig.sortMode) || 1);
+        ftGroupByCid[cidS]   = seededGroups ? 'on' : 'off';
+        ftAdvModeByCid[cidS] = seededGroups ? 'manual' : 'auto';
+        if (seededGroups) ftSortByCid[cidS] = '1';  // Gruppen brauchen statische Reihenfolge
       }
-      renderDtGroups(dt.colour);   // Gruppen-Boxen + Pool-Chips aktualisieren
-      renderDtOrderList(dt.colour);
-      toggleDtSubsections(dt.colour);
+      // Persistente Toggle-States anwenden (statischer Default-Aufbau würde sie sonst
+      // bei jedem Re-Render auf Auto/Aus zurücksetzen → "kickt die Gruppen").
+      if (ftAdvModeByCid[cidS] != null) setFtToggleVal('ftAdvMode_' + cidS, ftAdvModeByCid[cidS]);
+      if (ftSortByCid[cidS]    != null) setFtToggleVal('ftSort_' + cidS, ftSortByCid[cidS]);
+      if (ftGroupByCid[cidS]   != null) setFtToggleVal('ftGroup_' + cidS, ftGroupByCid[cidS]);
+      renderDtGroups(cidS);   // Gruppen-Boxen + Pool-Chips aktualisieren
+      renderDtOrderList(cidS);
+      toggleDtSubsections(cidS);
     }
     // Zeilen/Schriftgröße aus persistentem State wiederherstellen, damit ein Re-Render
     // (Kompakt/Getrennt, Auto/Manuell, Zuordnung, Stadt hinzufügen) die gewählte
@@ -10840,6 +10849,29 @@ function setFtFontSize(cid, mode) {
 // ==================== PER-DISPLAY-TYP GRUPPIERUNG ====================
 var dtGroupData = {};  // cid -> { groups: [[idx,...]], creating: false, selected: [] }
 var _dtSeededCids = new Set();  // welche cids wurden aus der gespeicherten Config geseedet (1× pro Laden)
+// Persistente Toggle-States pro Display (cid). Überleben renderDisplayTypeSections-
+// Re-Render, der die Buttons sonst statisch auf Default (Auto/Statisch/Aus) zurücksetzt
+// → würde aktive Gruppen "kicken".
+var ftAdvModeByCid = {};  // cid -> 'auto' | 'manual'
+var ftSortByCid = {};     // cid -> '1' (statisch) | '2' (zeit)
+var ftGroupByCid = {};    // cid -> 'on' | 'off'
+
+function setDtAdvMode(cid, val) {
+  ftAdvModeByCid[cid] = val;
+  setFtToggleVal('ftAdvMode_' + cid, val);
+  toggleDtSubsections(cid);
+}
+function setDtSort(cid, val) {
+  ftSortByCid[cid] = String(val);
+  setFtToggleVal('ftSort_' + cid, val);
+  toggleDtSubsections(cid);
+}
+function setDtGroup(cid, val) {
+  ftGroupByCid[cid] = val;
+  setFtToggleVal('ftGroup_' + cid, val);
+  toggleDtSubsections(cid);
+  renderDtOrderList(cid);  // Reihenfolge neu, da Gruppen je nach Toggle ein-/ausgeblendet
+}
 
 function getDtGroupData(cid) {
   if (!dtGroupData[cid]) dtGroupData[cid] = { groups: [], creating: false, selected: [] };
@@ -11185,6 +11217,9 @@ async function initFinetuningStep() {
   // linegroups aufbaut (sonst überleben Gruppen das Wiederöffnen nicht).
   dtGroupData = {};
   _dtSeededCids = new Set();
+  ftAdvModeByCid = {};
+  ftSortByCid = {};
+  ftGroupByCid = {};
 
   // Display-Typ für Hidden Select (Kompatibilität)
   var colourForSelect = config.multiDisplay ? (config.colourSingle || config.colour) : config.colour;
