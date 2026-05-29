@@ -10542,7 +10542,9 @@ function renderDisplayTypeSections() {
         if (s.directions && s.directions.length > 0) {
           s.directions.forEach(function(d) {
             var rid = d.richtungsId || '';
-            var stopId = s.stopId || '';
+            // Wien: pro Richtung die eigene Bahnsteig-stopId (rbl) verwenden, sonst die
+            // Stations-stopId. So bleibt der Wien-Token eindeutig (stopId:Linie).
+            var stopId = (d.stopId != null && d.stopId !== '') ? String(d.stopId) : (s.stopId || '');
             // Bei vorhandener richtungsId nach (Linie, richtungsId, stopId) deduplizieren,
             // sonst nach (Linie, Ziel, stopId) — fehlende richtungsId darf nicht mergen.
             var key = rid
@@ -10557,7 +10559,7 @@ function renderDisplayTypeSections() {
               return;
             }
             seenDir[key] = allDirs.length;
-            allDirs.push({ line: d.line, towards: d.towards || '', richtungsId: rid, station: s.stopName || '', stopId: stopId });
+            allDirs.push({ line: d.line, towards: d.towards || '', richtungsId: rid, station: s.stopName || '', stopId: stopId, network: s.network || '' });
           });
         } else if (s.filter) {
           s.filter.split(',').forEach(function(line) {
@@ -10565,7 +10567,7 @@ function renderDisplayTypeSections() {
             var key = line.trim() + '|F|' + (s.stopId || '');
             if (seenDir[key] !== undefined) return;
             seenDir[key] = allDirs.length;
-            allDirs.push({ line: line.trim(), towards: '', richtungsId: '', station: s.stopName || '', stopId: s.stopId || '' });
+            allDirs.push({ line: line.trim(), towards: '', richtungsId: '', station: s.stopName || '', stopId: s.stopId || '', network: s.network || '' });
           });
         }
       });
@@ -11640,6 +11642,20 @@ function getRowOrderString() {
   // die rowOrder + rowOrderDestination kombiniert, die Non-Wien-Zeile doppelt
   // (sichtbar als 2x "S45 -> Wien Huetteldorf" Duplikate).
 
+  // Gemeinsame Quelle: dtGroupData (wie lineGroups/rowOrderDestination). Nur Wien-
+  // Richtungen, Token = stopId:Linie. Sonst stünde die Wien-Reihenfolge/-Gruppierung
+  // nicht im rowOrder (UI gruppiert in dtGroupData, nicht in ftLineGroups).
+  if (Object.keys(dtGroupData).length > 0 || (window._dtAllDirs && Object.keys(window._dtAllDirs).length > 0)) {
+    const dtParts = [];
+    getUniqueDisplayTypes().forEach(function(dt) {
+      var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
+      if (!f.sorting) return;
+      serializeDtType(dt.colour, 'wien').forEach(function(p) { dtParts.push(p); });
+    });
+    if (dtParts.length > 0) return dtParts.join(',');
+  }
+
+  // Fallback (Legacy): ftLineGroups
   const items = [];
 
   ftLineGroups.forEach(group => {
@@ -12667,6 +12683,10 @@ function updateRowOrderAfterGroupChange() {
 // Token für eine Richtung: "Linie:richtungsId" (stabil) oder "Linie:Ziel" als Fallback
 function dtDirToken(d) {
   if (!d) return '';
+  // Wien: Token MUSS stopId:Linie sein (so erwartet die Firmware "RowOrder-Format:
+  // stopId:Linie (Wien)"). "U2:" (Linie + leere richtungsId) wäre mehrdeutig und
+  // nicht gruppierbar — pro Bahnsteig/rbl ein eindeutiger Token.
+  if (d.network === 'WL') return (d.stopId || '') + ':' + d.line;
   return d.richtungsId ? (d.line + ':' + d.richtungsId) : (d.line + ':' + (d.towards || ''));
 }
 
@@ -12687,8 +12707,11 @@ function isWienDirection(dirInfo) {
 
 // Serialisiert die geordneten Gruppen eines Display-Typs (cid) zu Token-Parts.
 // Nutzt getDtOrderList (gemeinsame Datenquelle inkl. manueller Reihenfolge + Gruppen).
-// onlyNonWien=true überspringt Wien-Richtungen (für rowOrderDestination).
-function serializeDtType(cid, onlyNonWien) {
+// filter: 'all' (alle), 'nonwien' (nur Nicht-Wien → rowOrderDestination),
+//         'wien' (nur Wien → rowOrder, stopId:Linie). Backward-compat: true→'nonwien'.
+function serializeDtType(cid, filter) {
+  if (filter === true) filter = 'nonwien';
+  else if (!filter) filter = 'all';
   var allDirs = (window._dtAllDirs && window._dtAllDirs[cid]) || [];
   if (allDirs.length === 0) return [];
   var orderList = getDtOrderList(cid);
@@ -12699,7 +12722,9 @@ function serializeDtType(cid, onlyNonWien) {
     (item.indices || []).forEach(function(idx) {
       var d = allDirs[idx];
       if (!d) return;
-      if (onlyNonWien && isWienDirection(d)) return;
+      var isWien = (d.network === 'WL') || isWienDirection(d);
+      if (filter === 'nonwien' && isWien) return;
+      if (filter === 'wien' && !isWien) return;
       var token = dtDirToken(d);
       if (!token || seen.has(token)) return;
       seen.add(token);
