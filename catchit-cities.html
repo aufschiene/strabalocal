@@ -3613,7 +3613,7 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 18,            // BVG Berlin (Bodo-Style, dunkelgrünes Badge)
+    defaultColour: 15,            // Orange Matrix (LED-Matrix Orange, wie BVG)
     defaultBrightness: 3
   },
   KOELN: {
@@ -3622,7 +3622,7 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 19,            // KVB Köln (Bodo-Style, dunkelgrünes Badge)
+    defaultColour: 7,             // Deutsche Öffi Anzeige (BODO-Stil)
     defaultBrightness: 3
   },
   AACHEN: {
@@ -3631,7 +3631,7 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 20,            // AVV Aachen (Bodo-Style, dunkelgrünes Badge)
+    defaultColour: 7,             // Deutsche Öffi Anzeige (BODO-Stil)
     defaultBrightness: 3
   },
   BODO: {
@@ -5930,8 +5930,8 @@ function wizardBuildConfig() {
       if (dt === 12 || dt === 14) {
         // OEBB / Westbahn: 2..3 (1 Haupt + 1-2 Kompakt)
         newRows = Math.max(Math.min(totalDirs, 3), 2);
-      } else if (dt === 2 || dt === 13) {
-        // Linz / Graz: 1..4
+      } else if (dt === 2 || dt === 13 || dt === 15 || dt === 18) {
+        // Grüne Dot Matrix / Graz / Orange Matrix: 1..4
         newRows = Math.min(Math.max(totalDirs, 1), 4);
       } else {
         // Wien & andere
@@ -5951,12 +5951,12 @@ function wizardBuildConfig() {
   if (bvgRowsStyle) {
     var newBvgRows = (bvgRowsStyle === 'big') ? 2 : 4;
     var colours = String(cfg.colour || '').split(',').map(function(c) { return c.trim(); });
-    if (colours.length === 1 && colours[0] === '18') {
+    if (colours.length === 1 && (colours[0] === '18' || colours[0] === '15')) {
       cfg.rows = newBvgRows;
     } else if (colours.length > 1) {
       var rowsArr = String(cfg.rows || '').split(',').map(function(r) { return r.trim(); });
       colours.forEach(function(c, idx) {
-        if (c === '18' && idx < rowsArr.length) rowsArr[idx] = String(newBvgRows);
+        if ((c === '18' || c === '15') && idx < rowsArr.length) rowsArr[idx] = String(newBvgRows);
       });
       cfg.rows = rowsArr.join(',');
     }
@@ -8929,10 +8929,10 @@ const NETWORK_COLORS = {
   LINZ: { id: 2, name: 'Linz AG', color: '#009640' },
   DB_FERN: { id: 6, name: 'DB Fernverkehr', color: '#EC0016' },
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
-  BERLIN: { id: 18, name: 'BVG Berlin', color: '#1B5E20' },
-  KOELN: { id: 19, name: 'KVB Köln', color: '#1B5E20' },
-  AACHEN: { id: 20, name: 'AVV Aachen', color: '#1B5E20' },
-  BODO: { id: 7, name: 'BODO Bodensee', color: '#005BBB' },
+  BERLIN: { id: 15, name: 'Orange Matrix', color: '#FF8C00' },
+  KOELN: { id: 7, name: 'Deutsche Öffi Anzeige', color: '#005BBB' },
+  AACHEN: { id: 7, name: 'Deutsche Öffi Anzeige', color: '#005BBB' },
+  BODO: { id: 7, name: 'Deutsche Öffi Anzeige', color: '#005BBB' },
   SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
   STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
@@ -9102,8 +9102,8 @@ function calculateRecommendedConfig() {
       // Westbahn: mindestens 2 (1 Haupt + 1 Kompakt), max 3
       return Math.max(Math.min(dirCount, 3), 2);
     }
-    if (colour === 2 || colour === 13 || colour === 18) {
-      // Linz/Graz/BVG: 1-4 Zeilen
+    if (colour === 2 || colour === 13 || colour === 18 || colour === 15) {
+      // Grüne Dot Matrix/Graz/Orange Matrix: 1-4 Zeilen
       return Math.min(Math.max(dirCount, 1), 4);
     }
     // Wien (colour 1) und andere:
@@ -9657,7 +9657,7 @@ function updateRealisticPreview(config) {
       bg: '#001405',           // Dunkelgrün (LED Matrix Hintergrund)
       text: '#c8ff00',         // Gelb-Grün (LED Farbe)
       highlight: '#c8ff00',
-      name: 'Linz AG',
+      name: 'Grüne Dot Matrix',
       isLedMatrix: true        // Flag für spezielles LED-Matrix Rendering
     },
     3: { // VBB Berlin
@@ -9684,11 +9684,11 @@ function updateRealisticPreview(config) {
       highlight: '#EC0016',
       name: 'DB Fernverkehr'
     },
-    7: { // BODO
+    7: { // Deutsche Öffi Anzeige (BODO-Stil)
       bg: '#005BBB',
       text: '#ffffff',
       highlight: '#ffffff',
-      name: 'BODO'
+      name: 'Deutsche Öffi Anzeige'
     },
     8: { // Salzburg AG
       bg: '#1a1a1a',
@@ -9700,7 +9700,7 @@ function updateRealisticPreview(config) {
       bg: '#000000',
       text: '#ffcd00',
       highlight: '#003B80',
-      name: 'RATP Paris'
+      name: 'Paris'
     },
     10: { // Straba Ansicht
       bg: '#1e1e1e',
@@ -9726,11 +9726,19 @@ function updateRealisticPreview(config) {
       highlight: '#78787e',
       name: 'Holding Graz'
     },
-    18: { // BVG Berlin (Bodo-Style, dunkelgrünes Badge)
-      bg: '#1e2328',
-      text: '#ffffff',
-      highlight: '#1B5E20',
-      name: 'BVG Berlin'
+    15: { // Orange Matrix (LED-Matrix Orange, wie BVG)
+      bg: '#0a0500',
+      text: '#ff8c00',
+      highlight: '#ff8c00',
+      name: 'Orange Matrix',
+      isLedMatrix: true
+    },
+    18: { // Orange Matrix (Legacy BVG)
+      bg: '#0a0500',
+      text: '#ff8c00',
+      highlight: '#ff8c00',
+      name: 'Orange Matrix',
+      isLedMatrix: true
     },
     19: { // KVB Köln (Bodo-Style, dunkelgrünes Badge)
       bg: '#1e2328',
@@ -9986,8 +9994,8 @@ function updateQuickPreview() {
   const colour = parseInt(colorSelect.value);
   const rows = parseInt(rowsSelect.value);
 
-  // 4-Zeilen-Option nur bei Linz (2) und Graz (13)
-  const allows4Rows = (colour === 2 || colour === 13);
+  // 4-Zeilen-Option nur bei Grüne Dot Matrix (2), Graz (13), Orange Matrix (15/18)
+  const allows4Rows = (colour === 2 || colour === 13 || colour === 15 || colour === 18);
   const opt4 = rowsSelect.querySelector('option[value="4"]');
   if (opt4) {
     opt4.style.display = allows4Rows ? '' : 'none';
@@ -10008,7 +10016,7 @@ function updateQuickPreview() {
   else if (colour === 2) networkForCapabilities = 'LINZ';
   else if (colour === 4) networkForCapabilities = 'WLB';
   else if (colour === 5 || colour === 6) networkForCapabilities = 'DB';
-  else if (colour === 3 || colour === 18) networkForCapabilities = 'BERLIN';
+  else if (colour === 3 || colour === 18 || colour === 15) networkForCapabilities = 'BERLIN';
   else if (colour === 19) networkForCapabilities = 'KOELN';
   else if (colour === 20) networkForCapabilities = 'AACHEN';
   else if (colour === 7) networkForCapabilities = 'BODO';
@@ -10027,7 +10035,7 @@ function updateQuickPreview() {
   // Settings Tags aktualisieren
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr',16:'Prag (PID)',17:'Brünn (DPMB)',18:'BVG Berlin',19:'KVB Köln',20:'AVV Aachen'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Deutsche Öffi Anzeige',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag (PID)',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -10114,7 +10122,7 @@ function initializeQuickPreview() {
   const caps = recommendedConfig.capabilities || {};
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Linz AG',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'BODO',8:'Salzburg AG',9:'RATP Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Liechtenstein / Schweiz Nahverkehr',16:'Prag (PID)',17:'Brünn (DPMB)',18:'BVG Berlin',19:'KVB Köln',20:'AVV Aachen'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Deutsche Öffi Anzeige',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag (PID)',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -10261,23 +10269,25 @@ function goToFinetuning() {
 }
 
 // ==================== DISPLAY TYPE FEATURES ====================
+// offline:true → Display-Typ wird im Auswahl-Dropdown ausgeblendet (aber Eintrag
+// bleibt erhalten, damit interne Lookups/Auto-Mapping nicht brechen).
 const DISPLAY_TYPE_FEATURES = {
   1:  { rows: true, sorting: true, grouping: true, textColor: true, chopper: true, silberpfeil: true, name: 'Wiener Linien' },
-  2:  { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Linz AG' },
-  3:  { rows: true, sorting: true, grouping: true, name: 'VBB Berlin' },
-  4:  { rows: true, sorting: true, grouping: true, name: 'WLB Badner Bahn' },
+  2:  { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Grüne Dot Matrix' },
+  3:  { rows: true, sorting: true, grouping: true, name: 'VBB Berlin', offline: true },
+  4:  { rows: true, sorting: true, grouping: true, name: 'WLB Badner Bahn', offline: true },
   5:  { rows: false, sorting: false, grouping: false, name: 'DB S-Bahn' },
   6:  { rows: false, sorting: false, grouping: false, name: 'DB Fernverkehr' },
-  7:  { rows: true, sorting: true, grouping: true, name: 'BODO Bodensee' },
-  8:  { rows: true, sorting: true, grouping: true, name: 'Salzburg AG' },
-  9:  { rows: true, sorting: true, grouping: true, name: 'RATP Paris' },
-  10: { rows: true, sorting: true, grouping: true, name: 'Straba' },
-  11: { rows: false, sorting: false, grouping: false, name: 'ÖBB Fernverkehr' },
+  7:  { rows: true, sorting: true, grouping: true, name: 'Deutsche Öffi Anzeige' },
+  8:  { rows: true, sorting: true, grouping: true, name: 'Salzburg AG', offline: true },
+  9:  { rows: true, sorting: true, grouping: true, name: 'Paris' },
+  10: { rows: true, sorting: true, grouping: true, name: 'Straba', offline: true },
+  11: { rows: false, sorting: false, grouping: false, name: 'ÖBB Fernverkehr', offline: true },
   12: { rows: true, minRows: 2, maxRows: 3, defaultRows: 2, sorting: false, grouping: false, delayHighlight: true, name: 'ÖBB S-Bahn' },
-  13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz' },
+  13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz', offline: true },
   14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
-  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, name: 'Liechtenstein / Schweiz Nahverkehr' },
-  18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'BVG Berlin' }
+  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix' },
+  18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true }
 };
 
 // Display-Typen die einen Schriftgrößen-Toggle haben (Graz auch)
@@ -10326,6 +10336,7 @@ function renderStationDisplayList() {
     html += '<select onchange="ftPerStationColour[' + i + ']=parseInt(this.value);renderDisplayTypeSections()" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;">';
     Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
       var f = DISPLAY_TYPE_FEATURES[k];
+      if (f.offline) return;  // ausgeblendete Display-Typen nicht zur Auswahl anbieten
       html += '<option value="' + k + '"' + (parseInt(k) === currentColour ? ' selected' : '') + '>' + f.name + '</option>';
     });
     html += '</select></div>';
@@ -11472,8 +11483,8 @@ function getRowOrderDestinationString() {
 function updateFinetuningPreview() {
   const colour = parseInt(document.getElementById('ftColorSelect').value);
 
-  // 4-Zeilen-Button nur bei Linz (2) und Graz (13) anzeigen
-  const allows4Rows = (colour === 2 || colour === 13);
+  // 4-Zeilen-Button nur bei Grüne Dot Matrix (2), Graz (13), Orange Matrix (15/18)
+  const allows4Rows = (colour === 2 || colour === 13 || colour === 15 || colour === 18);
   const btn4 = document.querySelector('#ftRowsToggle .toggle-btn[data-value="4"]');
   if (btn4) {
     btn4.style.display = allows4Rows ? '' : 'none';
@@ -11630,8 +11641,28 @@ function updateFinetuningPreview() {
         </div>`).join('')}
     </div>`;
   }
-  else if (colour === 18 || colour === 19 || colour === 20) {
-    // Deutsche Städte (BVG/KVB/AVV): Bodo-Style, dunkelgrünes Linien-Badge
+  else if (colour === 15 || colour === 18) {
+    // Orange Matrix: LED-Matrix Orange + weißer Stationsname-Footer (wie am Gerät)
+    const bgColor = '#0a0500';
+    const textColor = '#ff8c00';
+    const gridColor = '#1a0d00';
+    previewEl.style.background = bgColor;
+    previewEl.style.backgroundImage = `radial-gradient(circle, ${gridColor} 1px, transparent 1px)`;
+    previewEl.style.backgroundSize = '4px 4px';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
+      <div style="flex:1;display:flex;flex-direction:column;">
+      ${data.map((dep) => `<div style="flex:1;display:flex;align-items:center;padding:2px 8px;color:${textColor};">
+          <span style="font-weight:bold;font-size:16px;min-width:34px;text-shadow:0 0 8px ${textColor};">${dep.line}</span>
+          <span style="flex:1;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 6px;">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:16px;text-shadow:0 0 8px ${textColor};">${dep.time}</span>
+        </div>`).join('')}
+      </div>
+      <div style="background:#fff;color:#000;font-family:Arial,sans-serif;font-weight:600;font-size:10px;padding:3px 8px;text-align:left;">Alexanderplatz</div>
+    </div>`;
+  }
+  else if (colour === 19 || colour === 20) {
+    // Deutsche Städte (KVB/AVV): Bodo-Style, dunkelgrünes Linien-Badge
     previewEl.style.background = '#1e2328';
     previewEl.style.backgroundImage = 'none';
 
