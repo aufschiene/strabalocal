@@ -8027,6 +8027,12 @@ function toggleOebbGattung(gattung) {
 function renderStammstreckeConfig() {
   const linesList = document.getElementById('linesList');
 
+  // Stammstrecke nutzt IMMER die Richtungswahl, nie den "Alle Abfahrten"-Modus.
+  // Modus hart auf 'lines' zwingen — sonst (a) versteckt setDepartureMode('all') die
+  // Liste (Stift "geht nicht") und (b) speichert showGroupingStep die Station via
+  // addStationAllDepartures (beide Richtungen statt der Auswahl).
+  setDepartureMode('lines');
+
   // Header wie bei normaler Linien-Wahl
   document.querySelector('#linesContainer .lines-header h3').textContent = 'Linien auswählen:';
   document.getElementById('selectAllBtn').style.display = 'none';
@@ -8060,6 +8066,11 @@ function renderStammstreckeConfig() {
   html += `</div></div>`;
 
   linesList.innerHTML = html;
+
+  // saveBtn an die Richtungswahl koppeln (setDepartureMode richtet ihn an selectedLines
+  // aus — die Stammstrecke nutzt aber stamm_selectedRichtungen).
+  const _stammSaveBtn = document.getElementById('saveBtn');
+  if (_stammSaveBtn) _stammSaveBtn.disabled = stamm_selectedRichtungen.size === 0;
 }
 
 function toggleStammRichtung(id) {
@@ -8402,8 +8413,10 @@ function updateAddButton() {
 
 // Gruppierung jetzt nur im Feintuning - alte Funktionen entfernt
 function showGroupingStep() {
-  // Je nach Toggle: Alle Abfahrten oder bestimmte Linien
-  if (departureMode === 'all') {
+  // Je nach Toggle: Alle Abfahrten oder bestimmte Linien.
+  // AUSNAHME Stammstrecke: hat eine eigene Richtungs-/Produktauswahl und darf nie in
+  // den "Alle Abfahrten"-Pfad — sonst wird die Richtungswahl ignoriert (beide Richtungen).
+  if (departureMode === 'all' && selectedNetwork !== 'OEBB_STAMM_SBAHN') {
     addStationAllDepartures();
   } else {
     addStation();
@@ -8726,6 +8739,15 @@ function updateStationsList() {
       });
       const uniqueLabels = [...new Set(directionLabels)];
       filterLabel = uniqueLabels.join(', ');
+    } else if (group.network === 'OEBB_STAMM_SBAHN') {
+      // Stammstrecke: directions/filter sind leer (Gruppierung läuft über richtungsId).
+      // Label aus lineGroups ableiten (1 = Meidling, 2 = Floridsdorf), nicht "Linien: Alle".
+      const st = stations[group.indices[0]];
+      const lg = (st && st.lineGroups) ? st.lineGroups.split(',').map(x => x.trim()) : [];
+      const dirs = [];
+      if (lg.includes(STAMM_RICHTUNG_R1)) dirs.push('Meidling');
+      if (lg.includes(STAMM_RICHTUNG_R2)) dirs.push('Floridsdorf');
+      filterLabel = dirs.length ? ('Richtung ' + dirs.join(' & ')) : 'Alle Richtungen';
     } else {
       // Fallback: nur Liniennummern
       const uniqueFilters = [...new Set(group.filters)];
@@ -11199,11 +11221,13 @@ function renderDtOrderList(cid) {
     var stationsArr = [...new Set(indices.map(function(idx) { return allDirs[idx] ? (allDirs[idx].station || '') : ''; }).filter(function(s) { return s; }))];
     var towardsStr = uniqueTowards.join(', ');
     var stationStr = stationsArr.join(', ');
-    // Konsistent: immer "Fahrtrichtung · Station". Vorher wurde mal die Fahrtrichtung,
-    // mal (als Fallback) die Station gezeigt — je nachdem ob towards vorhanden war.
+    // Fahrtrichtung FETT mit Pfeil "›" davor, dann " · Station" (normal). Fehlt eine
+    // Seite, zeige nur die vorhandene (Richtung mit Pfeil/fett, Station schlicht).
+    var dirHtml = towardsStr ? '<b>&#8250; ' + towardsStr + '</b>' : '';
     var sublabel;
-    if (towardsStr && stationStr && towardsStr !== stationStr) sublabel = towardsStr + ' · ' + stationStr;
-    else sublabel = towardsStr || stationStr;
+    if (towardsStr && stationStr && towardsStr !== stationStr) sublabel = dirHtml + ' · ' + stationStr;
+    else if (towardsStr) sublabel = dirHtml;
+    else sublabel = stationStr;
     return {
       type: isGroup ? 'group' : 'single',
       indices: indices,
@@ -13611,8 +13635,14 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     const part = rblParts[idx];
     let network, stopId;
 
-    if (part.includes(':')) {
-      [network, stopId] = part.split(':');
+    const _ci = part.indexOf(':');
+    if (_ci > 0) {
+      // Netz = vor dem ERSTEN Doppelpunkt, stopId = ALLES danach. Wichtig für Graz/STV
+      // & Trainboard-Netze, deren Stop-IDs selbst Doppelpunkte enthalten (z.B.
+      // "at:46:12345"): sonst wird stopId fälschlich "at", die echte ID geht verloren
+      // und 2 Stationen kollidieren beide auf fullId "STV:at" → eine wird verworfen.
+      network = part.substring(0, _ci);
+      stopId = part.substring(_ci + 1);
     } else {
       network = 'WL';
       stopId = part;
@@ -13955,7 +13985,11 @@ async function handleConfigMessage(data) {
       // Parse "stopId:value|stopId:value" oder "stopId:value,stopId:value"
       const separator = gehwegStr.includes('|') ? '|' : ',';
       gehwegStr.split(separator).forEach(entry => {
-        const [stopId, value] = entry.split(':');
+        // Wert = nach dem LETZTEN Doppelpunkt, stopId = alles davor. So bleiben Graz-
+        // Stop-IDs mit Doppelpunkten ("at:46:12345:0") korrekt (sonst stopId="at").
+        const _gci = entry.lastIndexOf(':');
+        const stopId = _gci > 0 ? entry.substring(0, _gci) : entry;
+        const value = _gci > 0 ? entry.substring(_gci + 1) : undefined;
         if (stopId && value !== undefined) {
           gehwegMap[stopId] = parseInt(value) || 0;
         }
