@@ -11196,11 +11196,19 @@ function renderDtOrderList(cid) {
     var lines = indices.map(function(idx) { return allDirs[idx] ? allDirs[idx].line : '?'; });
     var towards = indices.map(function(idx) { return allDirs[idx] ? allDirs[idx].towards : ''; });
     var uniqueTowards = [...new Set(towards.filter(function(t) { return t; }))];
+    var stationsArr = [...new Set(indices.map(function(idx) { return allDirs[idx] ? (allDirs[idx].station || '') : ''; }).filter(function(s) { return s; }))];
+    var towardsStr = uniqueTowards.join(', ');
+    var stationStr = stationsArr.join(', ');
+    // Konsistent: immer "Fahrtrichtung · Station". Vorher wurde mal die Fahrtrichtung,
+    // mal (als Fallback) die Station gezeigt — je nachdem ob towards vorhanden war.
+    var sublabel;
+    if (towardsStr && stationStr && towardsStr !== stationStr) sublabel = towardsStr + ' · ' + stationStr;
+    else sublabel = towardsStr || stationStr;
     return {
       type: isGroup ? 'group' : 'single',
       indices: indices,
       label: lines.join('+'),
-      sublabel: uniqueTowards.join(', ') || (allDirs[indices[0]] ? (allDirs[indices[0]].station || '') : '')
+      sublabel: sublabel
     };
   });
 
