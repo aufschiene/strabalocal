@@ -13197,8 +13197,16 @@ function sendConfigToDeviceDirect(config) {
         const t = tok.trim();
         if (!t) return;
         const ci = t.indexOf(':');
-        const a = ci >= 0 ? t.slice(0, ci) : t;
-        const b = ci >= 0 ? t.slice(ci + 1) : '';
+        if (ci < 0) {
+          // Nackte Tokens ohne ':' sind richtungsIds / Spezial-Gruppierung
+          // (ÖBB Stammstrecke "1"/"2", Westbahn "1"/"2"). Sie referenzieren KEINE
+          // Linie nach Name → niemals als "fremde Linie" verwerfen, sonst bricht die
+          // Stammstrecke-Gruppierung (Display zeigt dann 0 Abfahrten).
+          toks.push(t);
+          return;
+        }
+        const a = t.slice(0, ci);
+        const b = t.slice(ci + 1);
         if (validLines.has(a) || validLines.has(b)) toks.push(t);
       });
       if (toks.length > 0) groups.push(toks.join('+'));
