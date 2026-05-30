@@ -4234,6 +4234,36 @@ async function fetchDeparturesUnified(fullId) {
   return await r.json();
 }
 
+const STATION_LINES_API = 'https://api.straba.at/api/v1/stops/lines';
+
+// Ergänzt availableLines um die GENERELL verkehrenden Linien (zeitunabhängig).
+// Nötig für Graz/STV: nachts liefern die Departures nichts, der /lines-Endpunkt aber
+// die ganze Linienliste (Trams 1/4/5/7 …) mit Richtungen (richtungsId R/H, passend zu
+// den Departures). Läuft über unseren Server (nie direkt an Trainboard).
+async function augmentLinesFromLinesEndpoint(network, stopId) {
+  if (network !== 'STV') return;  // vorerst nur Graz/Steiermark
+  try {
+    const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(network) + '&stopId=' + encodeURIComponent(stopId));
+    const data = await r.json();
+    const lines = (data && data.lines) || [];
+    if (!lines.length) return;
+    const seen = new Set(availableLines.map(l => l.name + '|' + (l.richtungsId || '')));
+    lines.forEach(ln => {
+      (ln.directions || []).forEach(d => {
+        const key = ln.name + '|' + (d.richtungsId || '');
+        if (seen.has(key)) return;
+        seen.add(key);
+        availableLines.push({ name: ln.name, towards: d.towards || '', type: ln.type || '', richtungsId: d.richtungsId || '', stopovers: [] });
+      });
+    });
+    availableLines.sort((a, b) => {
+      const an = parseInt(a.name) || 999, bn = parseInt(b.name) || 999;
+      if (an !== bn) return an - bn;
+      return String(a.name).localeCompare(String(b.name));
+    });
+  } catch (e) { /* Endpunkt-/Netzfehler ignorieren — Departures-Liste bleibt bestehen */ }
+}
+
 // Netzwerk-Alias für API-Calls (lokale Varianten → existierender Server-Endpoint)
 const API_NETWORK_MAP = {
   'OEBB_STAMM_SBAHN': 'OEBB_SBAHN',
@@ -7023,6 +7053,7 @@ async function selectStop(id, name) {
     }
 
     extractLines(mergedData || {});
+    await augmentLinesFromLinesEndpoint(selectedNetwork, selectedStop.id);
     renderLines();
 
     linesLoading.classList.add('hidden');
@@ -8967,6 +8998,7 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
     const data = await fetchDeparturesUnified(`${selectedNetwork}:${id}`);
 
     extractLines(data);
+    await augmentLinesFromLinesEndpoint(selectedNetwork, id);
 
     // Vorauswahl: Markiere Linien die bereits ausgewählt waren
 
