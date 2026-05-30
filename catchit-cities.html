@@ -4472,6 +4472,21 @@ function fvCorridorName(stationName, termNames) {
 }
 let selectedVias = new Map();     // idx → stopover-name (via-Filter pro Richtung)
 let stations = [];
+
+// Stationsnamen-Cache (localStorage): überlebt Reloads. Wird gebraucht, weil der Name
+// bei DB/Trainboard nur aus den Abfahrten kommt — und die API liefert oft (nachts /
+// bei Rate-Limit) keine Abfahrten → kein Name → "Station <id>". Mit Cache bleibt der
+// echte Name erhalten, sobald er einmal aufgelöst wurde.
+function _stationNameCache() {
+  try { return JSON.parse(localStorage.getItem('catchit_station_names') || '{}'); } catch (e) { return {}; }
+}
+function setCachedStationName(key, name) {
+  if (!key || !name || /^Station\s/.test(name)) return;  // keine Fallback-Namen cachen
+  try { var c = _stationNameCache(); if (c[key] === name) return; c[key] = name; localStorage.setItem('catchit_station_names', JSON.stringify(c)); } catch (e) {}
+}
+function getCachedStationName(key) {
+  try { return _stationNameCache()[key] || null; } catch (e) { return null; }
+}
 let editingStationIndex = null;  // Index der Station die bearbeitet wird (null = neue Station)
 let hasExistingConfig = false;   // True wenn Config vom Gerät geladen wurde
 let directionsChanged = false;   // True wenn Richtungen geändert wurden (Gruppen/Reihenfolge neu berechnen)
@@ -5986,8 +6001,11 @@ function wizardBuildConfig() {
       });
       var dt = parseInt(singleColour, 10) || 1;
       var newRows;
-      if (dt === 12 || dt === 14) {
-        // OEBB / Westbahn: 2..3 (1 Haupt + 1-2 Kompakt)
+      if (dt === 12) {
+        // ÖBB S-Bahn: IMMER 2 (Standard), egal wie viele Linien. 3 nur manuell im Feintuning.
+        newRows = 2;
+      } else if (dt === 14) {
+        // Westbahn: 2..3 (1 Haupt + 1-2 Kompakt)
         newRows = Math.max(Math.min(totalDirs, 3), 2);
       } else if (dt === 2 || dt === 13 || dt === 15 || dt === 18) {
         // Grüne Dot Matrix / Graz / Orange Matrix: 1..4
@@ -8619,6 +8637,8 @@ function updateStationsList() {
   // Gruppiere Stationen nach Name und Netzwerk
   const groupedStations = new Map();
   stations.forEach((s, idx) => {
+    // Echten Stationsnamen cachen (überlebt Reload, falls die API später leer liefert)
+    if (s.fullId && s.stopName) setCachedStationName(s.fullId, s.stopName);
     const key = `${s.network}:${s.stopName}`;
     if (!groupedStations.has(key)) {
       groupedStations.set(key, {
@@ -10859,6 +10879,10 @@ function initFtRowsAndFontSize(config) {
     var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
     if (!f.rows) return;
     var savedRows = rowsList[idx] || rowsList[0] || 2;
+    // Auf den gültigen Bereich des Display-Typs clampen — sonst hat z.B. ÖBB S-Bahn
+    // (nur 2-3) bei einem alten/misalignten rows-Wert (4) KEINEN aktiven Zeilen-Button.
+    var minR = f.minRows || 1, maxR = f.maxRows || 3;
+    savedRows = Math.min(Math.max(savedRows, minR), maxR);
     ftRowsByCid[dt.colour] = savedRows;  // persistenter State (überlebt Re-Render)
     if (f.bigText) {
       // Modus aus rows ableiten: 1-2 = big, 3-4 = small
@@ -13137,6 +13161,43 @@ function sendConfigToDeviceDirect(config) {
     return groups.join(',');
   };
 
+  // Stale-Token-Garbage-Collection (FEST): Wechselt das Netz (z.B. Graz gelöscht,
+  // Wien hinzugefügt), bleiben sonst alte linegroups/roworder(destination)-Tokens
+  // hängen, die Linien referenzieren, die es gar nicht mehr gibt (sichtbar als
+  // "1:R,1:H,4:R,..." in einer reinen Wien-Config). Wahrheitsquelle: die Linien der
+  // AKTUELLEN Stationen. Ein Token "A:B" bleibt nur, wenn eine Seite eine aktuell
+  // existierende Linie ist (Wien: stopId:Linie → Linie=B; Non-Wien: Linie:Ziel → Linie=A).
+  const validLines = new Set();
+  try {
+    (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+      (s.directions || []).forEach(function(d) { if (d && d.line) validLines.add(String(d.line)); });
+      if (s.filter) String(s.filter).split(',').forEach(function(l) { var t = l.trim(); if (t) validLines.add(t); });
+    });
+  } catch (e) {}
+  // Fallback: Linien aus config.filter (falls directions noch nicht geladen sind)
+  (config.filter || '').split('|').forEach(function(sf) {
+    sf.split(',').forEach(function(l) { var t = l.trim(); if (t) validLines.add(t); });
+  });
+
+  const reconcileGroupString = (s) => {
+    if (!s) return '';
+    if (validLines.size === 0) return s;  // nichts Bekanntes → nicht filtern (kein Over-Drop)
+    const groups = [];
+    s.split(',').forEach(grp => {
+      const toks = [];
+      grp.split('+').forEach(tok => {
+        const t = tok.trim();
+        if (!t) return;
+        const ci = t.indexOf(':');
+        const a = ci >= 0 ? t.slice(0, ci) : t;
+        const b = ci >= 0 ? t.slice(ci + 1) : '';
+        if (validLines.has(a) || validLines.has(b)) toks.push(t);
+      });
+      if (toks.length > 0) groups.push(toks.join('+'));
+    });
+    return groups.join(',');
+  };
+
   const configData = {
     type: 'setRBL',
     rbl: config.rbl,
@@ -13160,11 +13221,11 @@ function sendConfigToDeviceDirect(config) {
     stopintervals: config.stopIntervals || '',
     timewindows: config.timeWindows || '',
     gehweg: gehwegString,
-    linegroups: dedupTokenString(config.lineGroups || ''),
+    linegroups: dedupTokenString(reconcileGroupString(config.lineGroups || '')),
     linefilter: config.lineFilter || '',  // Linien-Filter (nur Linienname)
     linefilterdestination: config.lineFilterDestination || '',  // NEU: Linien+Ziel Filter für Linz
-    roworder: config.rowOrder || '',
-    roworderdestination: dedupTokenString(config.rowOrderDestination || '')
+    roworder: reconcileGroupString(config.rowOrder || ''),
+    roworderdestination: dedupTokenString(reconcileGroupString(config.rowOrderDestination || ''))
   };
 
   // Prüfe ob wir im iframe sind
@@ -13554,11 +13615,16 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       const fromName = await resolveStationName(network, fromId) || fromId;
       const toName = await resolveStationName(network, toId) || toId;
       stopName = `${fromName} → ${toName}`;
+      setCachedStationName(fullId, stopName);
     } else {
-      // Try to get name from API
+      // Try to get name from API; bei Erfolg cachen, sonst aus Cache (flaky DB/Trainboard-API)
       const resolvedName = await resolveStationName(network, stopId);
       if (resolvedName) {
         stopName = resolvedName;
+        setCachedStationName(fullId, resolvedName);
+      } else {
+        const cachedName = getCachedStationName(fullId);
+        if (cachedName) stopName = cachedName;
       }
     }
 
