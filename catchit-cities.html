@@ -7070,12 +7070,17 @@ async function selectStop(id, name) {
 // innerhalb jeder Gruppe nach Liniennummer. (Nachtbus = "N" + Ziffer, z.B. N1.)
 function lineTypeRank(line) {
   const t = String(line.type || '').toLowerCase();
-  const name = String(line.name || '').trim();
-  if (t.includes('metro') || /^U\d/i.test(name)) return 0;  // U-Bahn
-  if (t.includes('tram')) return 1;                          // Tram / Straßenbahn
-  if (/^N\d/i.test(name)) return 3;                          // Nachtbus (vor Bus prüfen, da Bus-Typ)
-  if (t.includes('bus')) return 2;                           // Bus
-  return 4;                                                  // Sonstiges (Zug, S-Bahn, …)
+  const n = String(line.name || '').trim();
+  if (t.includes('metro') || /^U\d/i.test(n)) return 0;                      // U-Bahn
+  if (t.includes('tram')) return 1;                                          // Tram / Straßenbahn
+  if (/^S\d/i.test(n) || t.includes('s-bahn') || t === 'pttrains') return 2; // S-Bahn
+  if (/^CJX/i.test(n)) return 3;                                             // CJX
+  if (/^REX/i.test(n)) return 4;                                             // REX
+  if (/^R\d|^R$/i.test(n)) return 5;                                         // R-Züge
+  if (/^IR/i.test(n)) return 6;                                              // IR
+  if (/^N\d/i.test(n)) return 8;                                             // Nachtbus (vor Bus, da Bus-Typ)
+  if (t.includes('bus')) return 7;                                           // Bus
+  return 9;                                                                  // Sonstiges (Zug/FV …)
 }
 function _lineNum(name) { const m = String(name || '').match(/\d+/); return m ? parseInt(m[0]) : 999; }
 function compareLinesForDisplay(a, b) {
@@ -7453,22 +7458,16 @@ function renderLines() {
     }
   }
 
-  // Sortiere Linien: S-Bahn zuerst, dann REX/CJX, dann R/IR
+  // Reihenfolge: U-Bahn → Tram → S-Bahn → CJX → REX → R → IR → Bus → Nachtbus → Sonstiges,
+  // innerhalb jeder Gruppe nach Liniennummer. Typ aus der ersten Richtung der Gruppe.
   const sortedGroups = [...groups.entries()].sort((a, b) => {
-    const typeOrder = (name) => {
-      if (/^S\d/.test(name)) return 0;  // S-Bahn
-      if (/^CJX/.test(name)) return 1;  // CJX (wie S-Bahn)
-      if (/^REX/.test(name)) return 2;  // REX
-      if (/^R\d|^R$/.test(name)) return 3;  // R-Züge
-      if (/^IR/.test(name)) return 4;   // IR
-      return 5;
-    };
-    const orderDiff = typeOrder(a[0]) - typeOrder(b[0]);
-    if (orderDiff !== 0) return orderDiff;
-    // Gleicher Typ: nach Nummer sortieren (S1 < S2 < S45)
-    const numA = parseInt(a[0].replace(/\D/g, '')) || 999;
-    const numB = parseInt(b[0].replace(/\D/g, '')) || 999;
-    return numA - numB;
+    const ra = lineTypeRank({ name: a[0], type: (a[1][0] || {}).type });
+    const rb = lineTypeRank({ name: b[0], type: (b[1][0] || {}).type });
+    if (ra !== rb) return ra - rb;
+    const numA = parseInt(String(a[0]).replace(/\D/g, '')) || 999;
+    const numB = parseInt(String(b[0]).replace(/\D/g, '')) || 999;
+    if (numA !== numB) return numA - numB;
+    return String(a[0]).localeCompare(String(b[0]));
   });
 
   let html = '';
