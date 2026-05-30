@@ -5595,6 +5595,20 @@ var advancedSettings = {
   interval:   '10'
 };
 
+// Seedet advancedSettings (Helligkeit/Textfarbe/Modus/Interval) aus einer geladenen
+// Config. Sonst nimmt wizardBuildConfig immer die Defaults (z.B. Helligkeit "Hell")
+// und überschreibt den gespeicherten Wert → "Helligkeit wird beim Reload nicht gespeichert".
+function seedAdvancedFromConfig(cfg) {
+  if (!cfg) return;
+  var BR = { 1: 'dark', 2: 'mid', 3: 'bright' };
+  var TC = { 1: 'amber', 2: 'white', 3: 'orange' };
+  var MD = { 1: 'mixed', 2: 'slideshow' };
+  if (cfg.displayLight != null && BR[cfg.displayLight]) advancedSettings.brightness = BR[cfg.displayLight];
+  if (cfg.textColor != null && TC[cfg.textColor]) advancedSettings.textcolor = TC[cfg.textColor];
+  if (cfg.displayMode != null && MD[cfg.displayMode]) advancedSettings.mode = MD[cfg.displayMode];
+  if (cfg.stopInterval != null) advancedSettings.interval = String(cfg.stopInterval);
+}
+
 function setAdv(field, value) {
   // Kompakt sperrt Slideshow ab — Mode-Aenderungen werden auf "mixed" geforced.
   if (field === 'mode' && getSavedDisplayStyle() === 'compact' && value !== 'mixed') {
@@ -9572,6 +9586,11 @@ function goToDisplayConfig() {
     if (previousSettings.nightEnd !== undefined) recommendedConfig.nightEnd = previousSettings.nightEnd;
     if (previousSettings.showFunMessages !== undefined) recommendedConfig.showFunMessages = previousSettings.showFunMessages;
   }
+
+  // advancedSettings aus der (wiederhergestellten) Config seeden, damit ein späteres
+  // wizardBuildConfig (Zurück → Feintuning) Helligkeit/Textfarbe/Modus/Interval nicht
+  // auf Default zurücksetzt.
+  seedAdvancedFromConfig(recommendedConfig);
 
   // Flag zurücksetzen
   directionsChanged = false;
@@ -13843,6 +13862,9 @@ async function handleConfigMessage(data) {
     if (data.config.show_fun_messages !== undefined) {
       recommendedConfig.showFunMessages = data.config.show_fun_messages;
     }
+    // advancedSettings (Helligkeit/Textfarbe/Modus/Interval) aus der geladenen Config
+    // seeden → wizardBuildConfig überschreibt die Werte sonst mit Defaults (Reload-Bug).
+    seedAdvancedFromConfig(recommendedConfig);
     // Gehweg aus Config übernehmen (Format: "stopId:value|stopId:value")
     if (data.config.gehweg && recommendedConfig.stationDetails) {
       const gehwegStr = data.config.gehweg;
