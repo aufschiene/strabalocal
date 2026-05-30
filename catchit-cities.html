@@ -4241,26 +4241,28 @@ const STATION_LINES_API = 'https://api.straba.at/api/v1/stops/lines';
 // die ganze Linienliste (Trams 1/4/5/7 …) mit Richtungen (richtungsId R/H, passend zu
 // den Departures). Läuft über unseren Server (nie direkt an Trainboard).
 async function augmentLinesFromLinesEndpoint(network, stopId) {
-  if (network !== 'STV') return;  // vorerst nur Graz/Steiermark
+  // Generell für alle Netze AUSSER Wien (WL hat eigene Regel über wien_json).
+  // Der Server liefert für Nicht-Trainboard-Netze einfach eine leere Liste → No-Op.
+  if (!network || network === 'WL') return;
   try {
     const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(network) + '&stopId=' + encodeURIComponent(stopId));
     const data = await r.json();
     const lines = (data && data.lines) || [];
     if (!lines.length) return;
-    const seen = new Set(availableLines.map(l => l.name + '|' + (l.richtungsId || '')));
+    const norm = s => String(s || '').trim().toLowerCase();
+    // Dedup über Linie+Ziel: bereits aus den (Echtzeit-)Departures vorhandene Richtungen
+    // GEWINNEN (deren richtungsId ist korrekt) — der /lines-Endpunkt füllt nur die Lücken
+    // (z.B. nachts, wenn gerade nichts fährt).
+    const seen = new Set(availableLines.map(l => norm(l.name) + '|' + norm(l.towards)));
     lines.forEach(ln => {
       (ln.directions || []).forEach(d => {
-        const key = ln.name + '|' + (d.richtungsId || '');
+        const key = norm(ln.name) + '|' + norm(d.towards);
         if (seen.has(key)) return;
         seen.add(key);
         availableLines.push({ name: ln.name, towards: d.towards || '', type: ln.type || '', richtungsId: d.richtungsId || '', stopovers: [] });
       });
     });
-    availableLines.sort((a, b) => {
-      const an = parseInt(a.name) || 999, bn = parseInt(b.name) || 999;
-      if (an !== bn) return an - bn;
-      return String(a.name).localeCompare(String(b.name));
-    });
+    availableLines.sort(compareLinesForDisplay);
   } catch (e) { /* Endpunkt-/Netzfehler ignorieren — Departures-Liste bleibt bestehen */ }
 }
 
@@ -7064,6 +7066,26 @@ async function selectStop(id, name) {
   }
 }
 
+// Sortier-Reihenfolge der Linienliste: U-Bahn → Tram → Bus → Nachtbus → Sonstiges,
+// innerhalb jeder Gruppe nach Liniennummer. (Nachtbus = "N" + Ziffer, z.B. N1.)
+function lineTypeRank(line) {
+  const t = String(line.type || '').toLowerCase();
+  const name = String(line.name || '').trim();
+  if (t.includes('metro') || /^U\d/i.test(name)) return 0;  // U-Bahn
+  if (t.includes('tram')) return 1;                          // Tram / Straßenbahn
+  if (/^N\d/i.test(name)) return 3;                          // Nachtbus (vor Bus prüfen, da Bus-Typ)
+  if (t.includes('bus')) return 2;                           // Bus
+  return 4;                                                  // Sonstiges (Zug, S-Bahn, …)
+}
+function _lineNum(name) { const m = String(name || '').match(/\d+/); return m ? parseInt(m[0]) : 999; }
+function compareLinesForDisplay(a, b) {
+  const ra = lineTypeRank(a), rb = lineTypeRank(b);
+  if (ra !== rb) return ra - rb;
+  const an = _lineNum(a.name), bn = _lineNum(b.name);
+  if (an !== bn) return an - bn;
+  return String(a.name).localeCompare(String(b.name));
+}
+
 function extractLines(data) {
   const linesMap = new Map();
 
@@ -7203,12 +7225,7 @@ function extractLines(data) {
 
   availableLines = Array.from(linesMap.values());
 
-  availableLines.sort((a, b) => {
-    const aNum = parseInt(a.name) || 999;
-    const bNum = parseInt(b.name) || 999;
-    if (aNum !== bNum) return aNum - bNum;
-    return a.name.localeCompare(b.name);
-  });
+  availableLines.sort(compareLinesForDisplay);
 
   // ÖBB Regional: Direction-Buchstaben zuweisen (A, B, C, ...)
   // Basierend auf Richtungsgruppierung (gleiche erste Stopovers = gleiche Richtung)
