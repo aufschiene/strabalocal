@@ -3525,7 +3525,7 @@ const REGIONS = {
   },
   DE: {
     name: 'Deutschland',
-    networks: ['DB', 'BERLIN', 'KOELN', 'AACHEN', 'BODO']
+    networks: ['NRW', 'BAYERN', 'DB', 'BERLIN', 'KOELN', 'AACHEN', 'BODO']
   },
   CH: {
     name: 'Schweiz',
@@ -3617,6 +3617,24 @@ const CITY_CAPABILITIES = {
     defaultBrightness: 3
   },
   KOELN: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 7,             // Blau/Gelb (BODO-Stil)
+    defaultBrightness: 3
+  },
+  NRW: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 7,             // Blau/Gelb (BODO-Stil)
+    defaultBrightness: 3
+  },
+  BAYERN: {
     textColorChangeable: false,
     showHighFloor: false,
     showAirCondition: false,
@@ -4027,6 +4045,24 @@ const NETWORKS = {
     desc: 'Stadtbahn, Bus (Kölner Verkehrs-Betriebe)',
     searchType: 'server_proxy',
     placeholder: 'z.B. Neumarkt, Dom/Hbf, Appellhofplatz...',
+    isJourneyBased: false
+  },
+  NRW: {
+    name: 'Nahverkehr NRW',
+    shortName: 'NRW',
+    region: 'DE',
+    desc: 'Bus, Tram, Stadtbahn, U-Bahn (ganz NRW)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Köln Dom, Düsseldorf Hbf, Dortmund, Essen...',
+    isJourneyBased: false
+  },
+  BAYERN: {
+    name: 'Nahverkehr Bayern',
+    shortName: 'BY',
+    region: 'DE',
+    desc: 'U-Bahn, Tram, Bus, S-Bahn (ganz Bayern)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. München Odeonsplatz, Nürnberg, Augsburg...',
     isJourneyBased: false
   },
   AACHEN: {
@@ -5130,6 +5166,8 @@ var NETWORK_BRANDS = {
   LIEMOBIL:      { bg: '#EF7D00', fg: '#fff' }, // LIEmobil Orange
   BERLIN:        { bg: '#F0AB00', fg: '#000' }, // VBB Berlin Gelb
   KOELN:         { bg: '#E2001A', fg: '#fff' }, // KVB Köln Rot
+  NRW:           { bg: '#1d9b50', fg: '#fff' }, // Nahverkehr NRW Grün
+  BAYERN:        { bg: '#0065B1', fg: '#fff' }, // Nahverkehr Bayern Blau (MVG)
   AACHEN:        { bg: '#006AB3', fg: '#fff' }, // AVV Aachen Blau
   BODO:          { bg: '#005BBB', fg: '#fff' }, // BODO Bodensee Blau
   DB:            { bg: '#EC0016', fg: '#fff' }, // DB Regio Rot
@@ -5210,6 +5248,18 @@ DISPLAY_PRESETS.tirol = {
   ]
 };
 
+// Niederösterreich — ÖBB Regional (S-Bahn/REX) + Badner Bahn (WLB)
+DISPLAY_PRESETS.noe = {
+  name: 'Niederösterreich',
+  parent: 'AT',
+  wappen: 'noe',
+  photo: 'Stadt fotos/oebb regio.JPG',
+  networks: [
+    { id: 'OEBB_REG_NOE', label: 'ÖBB',         desc: 'S-Bahn, REX, Regionalzug', jumpTo: { region: 'AT' } },
+    { id: 'WLB',          label: 'Badner Bahn', desc: 'Wien ↔ Baden',             jumpTo: { region: 'AT' } }
+  ]
+};
+
 // Westbahn — eigener Button bei den österreichischen Bundesländern (Wien Westbf ↔ Salzburg)
 DISPLAY_PRESETS.westbahn = {
   name: 'Fernverkehr',
@@ -5247,6 +5297,24 @@ DISPLAY_PRESETS.koeln = {
   networks: [
     { id: 'KOELN', jumpTo: { region: 'DE' } },
     { id: 'DB',    label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
+  ]
+};
+DISPLAY_PRESETS.nrw = {
+  name: 'NRW',
+  parent: 'DE',
+  photo: 'Stadt fotos/NRW .jpg',
+  networks: [
+    { id: 'NRW', label: 'Nahverkehr', desc: 'Bus, Tram, Stadtbahn, U-Bahn', jumpTo: { region: 'DE' } },
+    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',               jumpTo: { region: 'DE' } }
+  ]
+};
+DISPLAY_PRESETS.bayern = {
+  name: 'Bayern',
+  parent: 'DE',
+  photo: 'Stadt fotos/München.jpg',
+  networks: [
+    { id: 'BAYERN', label: 'Nahverkehr', desc: 'U-Bahn, Tram, Bus, S-Bahn', jumpTo: { region: 'DE' } },
+    { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',             jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.aachen = {
@@ -6805,6 +6873,22 @@ async function performSearch(query) {
     // Schweiz Öffis: schweizweiter Endpoint → nur CH-Halte (Grenzhalte DE/FR/IT raus)
     if (selectedNetwork === 'CH_OEFFI') {
       results = results.filter(s => !s.country || s.country === 'CH');
+    }
+
+    // London (TfL): Trainboard hat nur für EINEN TEIL der Halte Echtzeit — viele Tube-/
+    // Rail-/Hub-Halte liefern 0 Abfahrten (manche Tube aber doch, z.B. Kings Cross).
+    // Statt nach ID-Präfix zu raten: pro Treffer die Departures prüfen und nur Halte
+    // mit ≥1 Abfahrt behalten (parallel, auf 12 gedeckelt). So fallen genau die "toten"
+    // Halte raus, egal welcher Typ — und funktionierende Tube bleiben erhalten.
+    if (selectedNetwork === 'LONDON' && results.length) {
+      const checked = await Promise.all(results.slice(0, 12).map(async s => {
+        try {
+          const data = await fetchDeparturesUnified('LONDON:' + s.id);
+          const has = ((data && data.data && data.data.monitors) || []).some(m => (m.lines || []).length > 0);
+          return has ? s : null;
+        } catch (e) { return null; }
+      }));
+      results = checked.filter(Boolean);
     }
 
     // Fernverkehr (WESTBAHN): 1) nur echte Fernverkehrsbahnhöfe (Whitelist),
@@ -9080,6 +9164,8 @@ const NETWORK_COLORS = {
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
   BERLIN: { id: 15, name: 'Orange Matrix', color: '#FF8C00' },
   KOELN: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
+  NRW: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
+  BAYERN: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
   AACHEN: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
   BODO: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
   SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
