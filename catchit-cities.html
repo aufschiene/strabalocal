@@ -3422,6 +3422,8 @@
       <option value="18">BVG Berlin</option>
       <option value="19">KVB Köln</option>
       <option value="20">AVV Aachen</option>
+      <option value="23">Matrix</option>
+      <option value="24">Paper White</option>
     </select>
     <div id="ftWienOptions" style="display:none;"></div>
     <div id="ftGroupingCard" style="display:none;">
@@ -6028,11 +6030,38 @@ function wizardBuildConfig() {
     return;
   }
 
-  // Gespeicherte Gruppierung wieder übernehmen (Seed gleicht sie mit aktuellen Richtungen ab).
+  // Gespeicherte Gruppierung NUR wieder übernehmen, wenn sie noch zu den aktuellen
+  // Stationen passt. Sonst zeigt eine alte rowOrder/lineGroups auf Stops, die nicht
+  // mehr in rbl stehen → im statischen Modus werden diese Linien rausgefiltert
+  // (Symptom: nach Stations-Änderung erscheint nur noch eine Linie).
   if (_prevGrouping) {
-    if (_prevGrouping.lineGroups) cfg.lineGroups = _prevGrouping.lineGroups;
-    if (_prevGrouping.rowOrder) cfg.rowOrder = _prevGrouping.rowOrder;
-    if (_prevGrouping.rowOrderDestination) cfg.rowOrderDestination = _prevGrouping.rowOrderDestination;
+    // numerische Wien-StopIds aus dem aktuellen rbl (Netzwerk-Prefix entfernen)
+    var _rblStops = (cfg.rbl || '').split(',').map(function (x) {
+      x = (x || '').trim();
+      var c = x.indexOf(':');
+      return c >= 0 ? x.substring(c + 1) : x;
+    });
+    var _groupingFits = function (order) {
+      if (!order) return true;
+      var toks = String(order).split(',');
+      for (var i = 0; i < toks.length; i++) {
+        var t = toks[i].trim();
+        if (!t) continue;
+        var c = t.indexOf(':');
+        if (c < 0) continue;
+        var left = t.substring(0, c);
+        // Format "stopId:Linie" (Wien): die StopId muss noch in rbl vorkommen.
+        if (/^\d+$/.test(left) && _rblStops.indexOf(left) < 0) return false;
+      }
+      return true;
+    };
+    if (_groupingFits(_prevGrouping.rowOrder) && _groupingFits(_prevGrouping.lineGroups)) {
+      if (_prevGrouping.lineGroups) cfg.lineGroups = _prevGrouping.lineGroups;
+      if (_prevGrouping.rowOrder) cfg.rowOrder = _prevGrouping.rowOrder;
+      if (_prevGrouping.rowOrderDestination) cfg.rowOrderDestination = _prevGrouping.rowOrderDestination;
+    } else {
+      console.warn('[wizardFinish] vorherige Gruppierung passt nicht mehr zu den Stationen → frisch berechnet (rbl=' + cfg.rbl + ')');
+    }
   }
 
   // Gehweg pro Station: Map fullId → Minuten in Array über stations-Reihenfolge übersetzen.
@@ -9348,12 +9377,16 @@ function calculateRecommendedConfig() {
       // im Feintuning aktivieren (Zeilen-Toggle 2/3).
       return 2;
     }
+    if (colour === 22) {
+      // MVG: immer 3 Zeilen
+      return 3;
+    }
     if (colour === 14) {
       // Westbahn: mindestens 2 (1 Haupt + 1 Kompakt), max 3
       return Math.max(Math.min(dirCount, 3), 2);
     }
-    if (colour === 2 || colour === 13 || colour === 18 || colour === 15) {
-      // Grüne Dot Matrix/Graz/Orange Matrix: 1-4 Zeilen
+    if (colour === 2 || colour === 13 || colour === 18 || colour === 15 || colour === 21) {
+      // Grüne Dot Matrix/Graz/Orange Matrix/SW-Matrix: 1-4 Zeilen
       return Math.min(Math.max(dirCount, 1), 4);
     }
     // Wien (colour 1) und andere:
@@ -10263,7 +10296,7 @@ function updateQuickPreview() {
   const rows = parseInt(rowsSelect.value);
 
   // 4-Zeilen-Option nur bei Grüne Dot Matrix (2), Graz (13), Orange Matrix (15/18)
-  const allows4Rows = (colour === 2 || colour === 13 || colour === 15 || colour === 18);
+  const allows4Rows = (colour === 2 || colour === 13 || colour === 15 || colour === 18 || colour === 21);
   const opt4 = rowsSelect.querySelector('option[value="4"]');
   if (opt4) {
     opt4.style.display = allows4Rows ? '' : 'none';
@@ -10284,7 +10317,8 @@ function updateQuickPreview() {
   else if (colour === 2) networkForCapabilities = 'LINZ';
   else if (colour === 4) networkForCapabilities = 'WLB';
   else if (colour === 5 || colour === 6) networkForCapabilities = 'DB';
-  else if (colour === 3 || colour === 18 || colour === 15) networkForCapabilities = 'BERLIN';
+  else if (colour === 3 || colour === 18 || colour === 15 || colour === 21) networkForCapabilities = 'BERLIN';
+  else if (colour === 22) networkForCapabilities = 'BAYERN';
   else if (colour === 19) networkForCapabilities = 'KOELN';
   else if (colour === 20) networkForCapabilities = 'AACHEN';
   else if (colour === 7) networkForCapabilities = 'BODO';
@@ -10541,7 +10575,7 @@ function goToFinetuning() {
 // bleibt erhalten, damit interne Lookups/Auto-Mapping nicht brechen).
 const DISPLAY_TYPE_FEATURES = {
   1:  { rows: true, sorting: true, grouping: true, textColor: true, chopper: true, silberpfeil: true, name: 'Wiener Linien' },
-  2:  { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Grüne Dot Matrix' },
+  2:  { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Grüne Dot Matrix', offline: true },
   3:  { rows: true, sorting: true, grouping: true, name: 'VBB Berlin', offline: true },
   4:  { rows: true, sorting: true, grouping: true, name: 'WLB Badner Bahn', offline: true },
   5:  { rows: false, sorting: false, grouping: false, name: 'DB S-Bahn' },
@@ -10555,7 +10589,11 @@ const DISPLAY_TYPE_FEATURES = {
   13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz', offline: true },
   14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
   15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix' },
-  18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true }
+  18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
+  21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Schwarz/Weiß Matrix', offline: true },
+  22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, name: 'MVG' },
+  23: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, textColor: true, name: 'Matrix' },
+  24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, name: 'Paper White' }
 };
 
 // Display-Typen die einen Schriftgrößen-Toggle haben (Graz auch)
@@ -10853,21 +10891,37 @@ function renderDisplayTypeSections() {
       window._dtAllDirs[cid] = allDirs;
     }
 
-    // Wien-spezifisch
+    // Farbton/Schriftfarbe (nutzt dasselbe textColor-Setting 1/2/3; Labels je Display-Typ)
     if (f.textColor) {
-      html += '<div class="form-row"><div><div class="form-label">Schriftfarbe</div></div>';
+      // Button-Definitionen [wert, label, bg, fg] je colour
+      var tcLabel = 'Schriftfarbe';
+      var tcBtns;
+      if (dt.colour === 23) {  // Matrix: Weiß / Grün / Orange
+        tcLabel = 'Farbton';
+        tcBtns = [[1,'Weiß','#FFF','#000'],[2,'Grün','#94ce39','#000'],[3,'Orange','#FF8C00','#000']];
+      } else if (dt.colour === 24) {  // Paper White: komplett weiß / weiß-schwarz / weiß-hellgrau
+        tcLabel = 'Farbton';
+        tcBtns = [[1,'Komplett weiß','#FFF','#000'],[2,'Weiß/Schwarz','#000','#FFF'],[3,'Weiß/Hellgrau','#dcdcdc','#000']];
+      } else {  // Wien & Co.: Gelb / Weiß / Orange
+        tcBtns = [[1,'Gelb','#FFD700','#000'],[2,'Weiß','#FFF','#000'],[3,'Orange','#FF8C00','#000']];
+      }
+      html += '<div class="form-row"><div><div class="form-label">' + tcLabel + '</div></div>';
       html += '<div class="toggle-row" id="ftTxtCol_' + dt.colour + '">';
-      html += '<button class="toggle-btn ft-color-btn active" data-value="1" onclick="setFtTextColorVal(' + dt.colour + ',1)" style="background:#FFD700;color:#000">Gelb</button>';
-      html += '<button class="toggle-btn ft-color-btn" data-value="2" onclick="setFtTextColorVal(' + dt.colour + ',2)" style="background:#FFF;color:#000">Weiß</button>';
-      html += '<button class="toggle-btn ft-color-btn" data-value="3" onclick="setFtTextColorVal(' + dt.colour + ',3)" style="background:#FF8C00;color:#000">Orange</button>';
+      for (var ti = 0; ti < tcBtns.length; ti++) {
+        var b = tcBtns[ti];
+        html += '<button class="toggle-btn ft-color-btn' + (ti === 0 ? ' active' : '') + '" data-value="' + b[0] +
+                '" onclick="setFtTextColorVal(' + dt.colour + ',' + b[0] + ')" style="background:' + b[2] + ';color:' + b[3] + '">' + b[1] + '</button>';
+      }
       html += '</div></div>';
 
-      // Hintergrundfarbe: Schwarz (kontrastreich, Default) oder Grün (schlicht/realistisch)
-      html += '<div class="form-row"><div><div class="form-label">Hintergrundfarbe</div><div class="form-hint">Schwarz = kontrastreicher · Grün = schlicht/realistisch</div></div>';
-      html += '<div class="toggle-row" id="ftWienBg_' + dt.colour + '">';
-      html += '<button class="toggle-btn ft-color-btn active" data-value="0" onclick="setFtWienBg(' + dt.colour + ',0)" style="background:#000;color:#FFD700">Schwarz</button>';
-      html += '<button class="toggle-btn ft-color-btn" data-value="1" onclick="setFtWienBg(' + dt.colour + ',1)" style="background:#0a3d1f;color:#FFD700">Grün</button>';
-      html += '</div></div>';
+      // Wien-Hintergrundfarbe nur für Wien (colour 1)
+      if (dt.colour === 1) {
+        html += '<div class="form-row"><div><div class="form-label">Hintergrundfarbe</div><div class="form-hint">Schwarz = kontrastreicher · Grün = schlicht/realistisch</div></div>';
+        html += '<div class="toggle-row" id="ftWienBg_' + dt.colour + '">';
+        html += '<button class="toggle-btn ft-color-btn active" data-value="0" onclick="setFtWienBg(' + dt.colour + ',0)" style="background:#000;color:#FFD700">Schwarz</button>';
+        html += '<button class="toggle-btn ft-color-btn" data-value="1" onclick="setFtWienBg(' + dt.colour + ',1)" style="background:#0a3d1f;color:#FFD700">Grün</button>';
+        html += '</div></div>';
+      }
     }
     if (f.chopper) {
       var chopperActive = (recommendedConfig && recommendedConfig.chopper) ? ' active' : '';
@@ -11975,7 +12029,7 @@ function updateFinetuningPreview() {
   const colour = parseInt(document.getElementById('ftColorSelect').value);
 
   // 4-Zeilen-Button nur bei Grüne Dot Matrix (2), Graz (13), Orange Matrix (15/18)
-  const allows4Rows = (colour === 2 || colour === 13 || colour === 15 || colour === 18);
+  const allows4Rows = (colour === 2 || colour === 13 || colour === 15 || colour === 18 || colour === 21);
   const btn4 = document.querySelector('#ftRowsToggle .toggle-btn[data-value="4"]');
   if (btn4) {
     btn4.style.display = allows4Rows ? '' : 'none';
@@ -12128,6 +12182,45 @@ function updateFinetuningPreview() {
       ${data.map((dep, i) => `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;color:#fff;">
           <span style="font-weight:bold;font-size:14px;min-width:36px;">${dep.line}</span>
           <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
+          <span style="font-weight:bold;font-size:16px;">${dep.time}</span>
+        </div>`).join('')}
+    </div>`;
+  }
+  else if (colour === 22) {
+    // MVG München: helles Blau, U-Bahn-Badges (MVG-Farben), sonst weiße Schrift, "Min"-Header
+    previewEl.style.background = '#126fc8';
+    previewEl.style.backgroundImage = 'none';
+    const uColors = { U1:'#438136', U2:'#c8024c', U3:'#ed6720', U4:'#00a984', U5:'#bc7a00', U6:'#0065ae', U7:'#438136', U8:'#c8024c' };
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Poppins',sans-serif;color:#fff;">
+      <div style="height:13px;display:flex;align-items:center;justify-content:flex-end;padding:0 6px;font-size:8px;border-bottom:2px solid #fff;">Min</div>
+      <div style="flex:1;display:flex;flex-direction:column;">
+      ${data.slice(0,3).map((dep) => {
+        const uc = uColors[String(dep.line || '').toUpperCase()];
+        const badge = uc
+          ? `<span style="background:${uc};color:#fff;border-radius:4px;padding:1px 6px;font-weight:700;font-size:13px;min-width:22px;text-align:center;">${dep.line}</span>`
+          : `<span style="color:#fff;font-weight:700;font-size:14px;min-width:28px;">${dep.line}</span>`;
+        return `<div style="flex:1;display:flex;align-items:center;padding:0 8px;gap:8px;">
+            ${badge}
+            <span style="flex:1;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
+            <span style="font-weight:700;font-size:15px;">${dep.time}</span>
+          </div>`;
+      }).join('')}
+      </div>
+    </div>`;
+  }
+  else if (colour === 21) {
+    // Schwarz/Weiß Matrix: weiße LED-Matrix auf schwarz, Linie+Abfahrt FETT, kein Footer
+    const bgColor = '#000';
+    const textColor = '#fff';
+    const gridColor = '#222';
+    previewEl.style.background = bgColor;
+    previewEl.style.backgroundImage = `radial-gradient(circle, ${gridColor} 1px, transparent 1px)`;
+    previewEl.style.backgroundSize = '4px 4px';
+
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
+      ${data.map((dep) => `<div style="flex:1;display:flex;align-items:center;padding:2px 8px;color:${textColor};">
+          <span style="font-weight:bold;font-size:16px;min-width:34px;">${dep.line}</span>
+          <span style="flex:1;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 6px;">${dep.dest}</span>
           <span style="font-weight:bold;font-size:16px;">${dep.time}</span>
         </div>`).join('')}
     </div>`;
