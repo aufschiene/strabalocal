@@ -2434,6 +2434,20 @@
       border: 2px solid #222 !important;
       box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
     }
+    /* Farbton-Buttons für Varianten-Displays (Matrix/Paper White): echte Farben
+       zeigen (nicht ausgrauen), inaktiv nur leicht gedimmt, mit dezentem Rahmen. */
+    .ft-variant-btn {
+      opacity: 0.6;
+      filter: none;
+      border: 1px solid rgba(0, 0, 0, 0.18) !important;
+      transition: all 0.15s;
+    }
+    .ft-variant-btn.active {
+      opacity: 1;
+      filter: none;
+      border: 2px solid #222 !important;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+    }
 
     /* ==================== Display-Stil Schritt (kompakt vs. spielerisch) ==================== */
     .display-style-grid {
@@ -3597,7 +3611,8 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 2,             // Linz AG
+    defaultColour: 23,            // Matrix (grün)
+    defaultColorVariant: 2,       // Grün
     defaultBrightness: 3
   },
   DB: {
@@ -3615,7 +3630,8 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 15,            // Orange Matrix (LED-Matrix Orange, wie BVG)
+    defaultColour: 23,            // Matrix (orange)
+    defaultColorVariant: 3,       // Orange
     defaultBrightness: 3
   },
   KOELN: {
@@ -3624,7 +3640,8 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 7,             // Blau/Gelb (BODO-Stil)
+    defaultColour: 23,            // Matrix (orange) - NRW
+    defaultColorVariant: 3,       // Orange
     defaultBrightness: 3
   },
   NRW: {
@@ -3633,7 +3650,8 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 7,             // Blau/Gelb (BODO-Stil)
+    defaultColour: 23,            // Matrix (orange) - NRW
+    defaultColorVariant: 3,       // Orange
     defaultBrightness: 3
   },
   BAYERN: {
@@ -3642,7 +3660,8 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 7,             // Blau/Gelb (BODO-Stil)
+    defaultColour: 24,            // Paper White (weiß/grau) - München
+    defaultColorVariant: 3,       // Weiß/Hellgrau
     defaultBrightness: 3
   },
   AACHEN: {
@@ -3651,7 +3670,8 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 7,             // Blau/Gelb (BODO-Stil)
+    defaultColour: 23,            // Matrix (orange) - NRW/Aachen
+    defaultColorVariant: 3,       // Orange
     defaultBrightness: 3
   },
   BODO: {
@@ -3669,7 +3689,8 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 8,             // Salzburg AG
+    defaultColour: 24,            // Paper White (schwarz/weiß)
+    defaultColorVariant: 2,       // Weiß/Schwarz
     defaultBrightness: 3
   },
   PARIS: {
@@ -9188,16 +9209,16 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
 const NETWORK_COLORS = {
   WL: { id: 1, name: 'Wiener Linien', color: '#E20613' },
   WLB: { id: 4, name: 'WLB Badner Bahn', color: '#1E4D8C' },
-  LINZ: { id: 2, name: 'Linz AG', color: '#009640' },
+  LINZ: { id: 23, name: 'Matrix Grün', color: '#94ce39', variant: 2 },
   DB_FERN: { id: 6, name: 'DB Fernverkehr', color: '#EC0016' },
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
-  BERLIN: { id: 15, name: 'Orange Matrix', color: '#FF8C00' },
-  KOELN: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
-  NRW: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
-  BAYERN: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
-  AACHEN: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
+  BERLIN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
+  KOELN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
+  NRW: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
+  BAYERN: { id: 24, name: 'Paper White', color: '#dcdcdc', variant: 3 },
+  AACHEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
   BODO: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
-  SALZBURG: { id: 8, name: 'Salzburg AG', color: '#E3000F' },
+  SALZBURG: { id: 24, name: 'Paper White', color: '#000000', variant: 2 },
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
   STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
   // Alle OEBB-Varianten benützen den gleichen Renderer (colour=12 / DisplayOEBBSBahn).
@@ -9493,6 +9514,9 @@ function calculateRecommendedConfig() {
     rows: rows,
     sortMode: 1,           // Statisch als Default
     displayLight: 3,       // Hell
+    // Farbton/Variante je Netz (Matrix: 2=Grün/3=Orange; Paper White: 2=Weiß-Schwarz/3=Weiß-Hellgrau).
+    // Wird firmwareseitig als colorVariant interpretiert (über das textColor-Setting).
+    textColor: capabilities.defaultColorVariant || 1,
 
     // Barrierefreiheit (Wien: Niederflur-Markierung standardmaessig an, Blinken aus)
     // chopper:    0=aus, 1=Symbol, 2=Symbol+Text
@@ -10593,7 +10617,7 @@ const DISPLAY_TYPE_FEATURES = {
   21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Schwarz/Weiß Matrix', offline: true },
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, name: 'MVG' },
   23: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, textColor: true, name: 'Matrix' },
-  24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, name: 'Paper White' }
+  24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' }
 };
 
 // Display-Typen die einen Schriftgrößen-Toggle haben (Graz auch)
@@ -10898,18 +10922,20 @@ function renderDisplayTypeSections() {
       var tcBtns;
       if (dt.colour === 23) {  // Matrix: Weiß / Grün / Orange
         tcLabel = 'Farbton';
-        tcBtns = [[1,'Weiß','#FFF','#000'],[2,'Grün','#94ce39','#000'],[3,'Orange','#FF8C00','#000']];
+        tcBtns = [[1,'Weiß','#ffffff','#222'],[2,'Grün','#94ce39','#0a2e00'],[3,'Orange','#ff8c00','#3a1d00']];
       } else if (dt.colour === 24) {  // Paper White: komplett weiß / weiß-schwarz / weiß-hellgrau
         tcLabel = 'Farbton';
-        tcBtns = [[1,'Komplett weiß','#FFF','#000'],[2,'Weiß/Schwarz','#000','#FFF'],[3,'Weiß/Hellgrau','#dcdcdc','#000']];
+        tcBtns = [[1,'Komplett weiß','#ffffff','#222'],[2,'Weiß/Schwarz','#1a1a1a','#ffffff'],[3,'Weiß/Hellgrau','#bbbbbb','#222']];
       } else {  // Wien & Co.: Gelb / Weiß / Orange
         tcBtns = [[1,'Gelb','#FFD700','#000'],[2,'Weiß','#FFF','#000'],[3,'Orange','#FF8C00','#000']];
       }
+      // Varianten-Displays (Matrix/Paper White) zeigen die Farben klar (nicht ausgegraut wie Wien).
+      var swatchClass = (dt.colour === 23 || dt.colour === 24) ? 'ft-variant-btn' : 'ft-color-btn';
       html += '<div class="form-row"><div><div class="form-label">' + tcLabel + '</div></div>';
       html += '<div class="toggle-row" id="ftTxtCol_' + dt.colour + '">';
       for (var ti = 0; ti < tcBtns.length; ti++) {
         var b = tcBtns[ti];
-        html += '<button class="toggle-btn ft-color-btn' + (ti === 0 ? ' active' : '') + '" data-value="' + b[0] +
+        html += '<button class="toggle-btn ' + swatchClass + (ti === 0 ? ' active' : '') + '" data-value="' + b[0] +
                 '" onclick="setFtTextColorVal(' + dt.colour + ',' + b[0] + ')" style="background:' + b[2] + ';color:' + b[3] + '">' + b[1] + '</button>';
       }
       html += '</div></div>';
@@ -10922,6 +10948,11 @@ function renderDisplayTypeSections() {
         html += '<button class="toggle-btn ft-color-btn" data-value="1" onclick="setFtWienBg(' + dt.colour + ',1)" style="background:#0a3d1f;color:#FFD700">Grün</button>';
         html += '</div></div>';
       }
+    }
+    if (f.altNext) {
+      var altActive = (recommendedConfig && recommendedConfig.alternateNext === false) ? '' : ' active';
+      html += '<div class="form-row"><div><div class="form-label">Abfahrten</div><div class="form-hint">An = erste &amp; nächste im Wechsel (Wien-Takt) · Aus = nur die nächste</div></div>';
+      html += '<div class="toggle-switch' + altActive + '" id="ftAltNext_' + dt.colour + '" onclick="toggleFtSwitch(\'ftAltNext_' + dt.colour + '\')"></div></div>';
     }
     if (f.chopper) {
       var chopperActive = (recommendedConfig && recommendedConfig.chopper) ? ' active' : '';
@@ -13223,6 +13254,7 @@ function saveFromFinetuning() {
   let silberpfeil = isFtToggleActive('ftSilberpfeilToggle') ? 1 : 0;
   let niederflurBlink = (recommendedConfig && recommendedConfig.niederflurBlink) ? 1 : 0;
   let delayHighlight = (recommendedConfig && recommendedConfig.delayHighlight) ? 1 : 0;
+  let alternateNext = (recommendedConfig && recommendedConfig.alternateNext === false) ? false : true;  // Default: an
 
   // Werte aus per-Display-Typ Sektionen lesen
   types.forEach(function(dt) {
@@ -13254,6 +13286,9 @@ function saveFromFinetuning() {
     }
     if (f.silberpfeil) {
       silberpfeil = isFtToggleActive('ftSilber_' + dt.colour) ? 1 : 0;
+    }
+    if (f.altNext) {
+      alternateNext = isFtToggleActive('ftAltNext_' + dt.colour);
     }
     if (f.delayHighlight) {
       delayHighlight = isFtToggleActive('ftDelayHl_' + dt.colour) ? 1 : 0;
@@ -13323,6 +13358,7 @@ function saveFromFinetuning() {
   recommendedConfig.wienBg = wienBg;          // Wien Hintergrund (1=Grün, 0=Schwarz)
   recommendedConfig.delayHighlight = delayHighlight;
   recommendedConfig.chopper = chopper;
+  recommendedConfig.alternateNext = alternateNext;
   recommendedConfig.silberpfeil = silberpfeil;
   recommendedConfig.niederflurBlink = niederflurBlink;
   recommendedConfig.nightMode = nightMode;
@@ -13475,6 +13511,7 @@ function sendConfigToDeviceDirect(config) {
     silberpfeil: String(config.silberpfeil),
     niederflurblink: String(config.niederflurBlink || 0),
     delayhighlight: String(config.delayHighlight || 0),
+    alternatenext: (config.alternateNext === false ? '0' : '1'),
     colour: String(config.colour),
     displaylight: String(config.displayLight),
     textcolor: String(config.textColor || 1),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
@@ -13553,6 +13590,7 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('anzeige', configData.zeilen);
     formData.append('sortmode', configData.sortmode);
     formData.append('chopper', configData.chopper);
+    formData.append('alternatenext', configData.alternatenext);
     formData.append('silberpfeil', configData.silberpfeil);
     formData.append('niederflurblink', configData.niederflurblink);
     formData.append('delayhighlight', configData.delayhighlight);
@@ -14167,6 +14205,11 @@ async function handleConfigMessage(data) {
     }
     if (data.config.silberpfeil !== undefined) {
       recommendedConfig.silberpfeil = parseInt(data.config.silberpfeil) || 0;
+    }
+    // alternate_next (Paper White Wien-Takt) — Default true wenn nicht gesetzt
+    if (data.config.alternate_next !== undefined) {
+      var an = data.config.alternate_next;
+      recommendedConfig.alternateNext = (an === true || an === 1 || an === '1' || an === 'true');
     }
     // niederflur_blink (Firmware-Feldname mit Underscore, vgl. main.cpp json key)
     if (data.config.niederflur_blink !== undefined) {
