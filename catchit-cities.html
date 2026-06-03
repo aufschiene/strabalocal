@@ -9213,6 +9213,8 @@ const NETWORK_COLORS = {
   DB_FERN: { id: 6, name: 'DB Fernverkehr', color: '#EC0016' },
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
   BERLIN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
+  CH_OEFFI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // Schweiz Öffis → orange Matrix
+  SBB: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },        // Schweiz Zug → orange Matrix
   KOELN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
   NRW: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
   BAYERN: { id: 24, name: 'Paper White', color: '#dcdcdc', variant: 3 },
@@ -10662,12 +10664,10 @@ function renderStationDisplayList() {
   if (!container) return;
   var html = '';
   stations.forEach(function(s, i) {
-    var nc = NETWORK_COLORS[s.network];
-    var defaultColour = nc ? nc.id : 1;
-    var currentColour = ftPerStationColour[i] || defaultColour;
+    var currentColour = stationDisplayColour(s);
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee;">';
     html += '<span style="font-size:14px;font-weight:500;">' + (s.stopName || 'Station ' + (i+1)) + '</span>';
-    html += '<select onchange="ftPerStationColour[' + i + ']=parseInt(this.value);renderDisplayTypeSections()" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;">';
+    html += '<select onchange="stations[' + i + '].colourOverride=parseInt(this.value);renderDisplayTypeSections()" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;">';
     Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
       var f = DISPLAY_TYPE_FEATURES[k];
       if (f.offline) return;  // ausgeblendete Display-Typen nicht zur Auswahl anbieten
@@ -10685,7 +10685,79 @@ function netColourId(network) {
   if (nc) return nc.id;
   if (network && network.indexOf('OEBB') === 0) return 12;  // OEBB-Bahn-Ansicht
   if (network === 'WESTBAHN') return 14;
+  // Sicherheitsnetz: Netz nicht in NETWORK_COLORS, aber mit defaultColour
+  // (z.B. CH/SBB) → dessen defaultColour statt Wien(1).
+  var cap = (typeof CITY_CAPABILITIES !== 'undefined') ? CITY_CAPABILITIES[network] : null;
+  if (cap && cap.defaultColour) return cap.defaultColour;
   return 1;
+}
+
+// Netz-Default-Variante (Farbton) für die colour eines Display-Typs: nimmt die
+// variant der ersten Station dieses Typs (Linz=2 grün, Berlin/Schweiz=3 orange).
+function variantForColour(cid) {
+  cid = parseInt(cid);
+  var v = null;
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    if (v !== null) return;
+    if (stationDisplayColour(s) !== cid) return;
+    var nc = NETWORK_COLORS[s.network];
+    if (nc && nc.variant != null) v = nc.variant;
+  });
+  return v;  // null = keine Netz-Variante definiert
+}
+
+// Display-Typ (colour) EINER Station — single source of truth direkt am Objekt.
+// s.colourOverride = manuelle Zuordnung (nur gesetzt wenn der User im Dropdown
+// umstellt), sonst der Netz-Default. KEIN paralleles Array (ftPerStationColour)
+// mehr, das aus dem Takt mit `stations` laufen könnte (→ vertauschte Farben/Filter).
+function stationDisplayColour(s) {
+  if (!s) return 1;
+  if (s.colourOverride != null && !isNaN(s.colourOverride)) return parseInt(s.colourOverride);
+  return netColourId(s.network);
+}
+
+// AUTO-Zeilenberechnung aus dem Inhalt (Anzahl Richtungen/Linien dieses Display-Typs).
+// Spiegelt die alte getRowsForDisplayType-Logik. Wird als Fallback genutzt, wenn der
+// User keine Zeilen manuell gewählt hat.
+function autoRowsForColour(cid) {
+  cid = parseInt(cid);
+  var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
+  var dirCount = 0;
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    if (stationDisplayColour(s) !== cid) return;
+    if (s.directions && s.directions.length > 0) dirCount += s.directions.length;
+    else if (s.filter) dirCount += String(s.filter).split(',').filter(function(x){ return x.trim(); }).length;
+    else dirCount += 1;
+  });
+  if (dirCount < 1) dirCount = 1;
+  if (cid === 12) return 2;                       // ÖBB S-Bahn: Standard 2 (3 nur manuell)
+  if (cid === 22) return 3;                       // MVG: immer 3
+  if (cid === 14) return Math.max(Math.min(dirCount, 3), 2);  // Westbahn: 2-3
+  // Matrix-Familie (Linz/Graz/Orange/SW/Matrix/Paper White): 1 bis maxRows aus Anzahl.
+  if ((f.maxRows || 0) >= 4) return Math.min(Math.max(dirCount, 1), 4);
+  // Wien & Rest: 1→3, 2→2, 3→3, 4→2, 5+→3 (Single-Mode/Paging-Optik)
+  if (dirCount === 1) return 3;
+  if (dirCount === 2) return 2;
+  if (dirCount === 3) return 3;
+  if (dirCount === 4) return 2;
+  return 3;
+}
+
+// Zeilen (rows) für einen Display-Typ — manuelle Auswahl (ftRowsByCid/Toggle) gewinnt,
+// sonst AUTO aus dem Inhalt. An min/max geklemmt. Geht als r<N> in displaysettings.
+function rowsForColour(cid) {
+  cid = parseInt(cid);
+  var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
+  var v = (typeof ftRowsByCid !== 'undefined') ? ftRowsByCid[cid] : null;
+  // Toggle nur lesen wenn er WIRKLICH existiert (sonst liefert getFtToggleVal einen
+  // Fallback und verhindert die Auto-Berechnung).
+  if (v == null && document.getElementById('ftRows_' + cid)) {
+    try { v = parseInt(getFtToggleVal('ftRows_' + cid)); } catch (e) { v = null; }
+  }
+  if (!v || isNaN(v)) v = autoRowsForColour(cid);  // AUTO aus Inhalt statt statischem Default
+  if (f.minRows && v < f.minRows) v = f.minRows;
+  if (f.maxRows && v > f.maxRows) v = f.maxRows;
+  return v;
 }
 
 function getUniqueDisplayTypes() {
@@ -10696,10 +10768,10 @@ function getUniqueDisplayTypes() {
     var col = parseInt(document.getElementById('ftColorSelect').value) || 1;
     return [{ colour: col, stations: stations.slice() }];
   }
-  // Getrennt oder manuelle Zuordnung: pro unique colour
+  // Getrennt oder manuelle Zuordnung: pro unique colour (colour direkt am Objekt)
   var byColour = {};
   stations.forEach(function(s, i) {
-    var col = ftIsManualAssignment ? (ftPerStationColour[i] || netColourId(s.network)) : netColourId(s.network);
+    var col = stationDisplayColour(s);
     if (!byColour[col]) byColour[col] = { colour: col, stations: [] };
     byColour[col].stations.push(s);
   });
@@ -10947,6 +11019,15 @@ function renderDisplayTypeSections() {
         html += '<button class="toggle-btn ft-color-btn active" data-value="0" onclick="setFtWienBg(' + dt.colour + ',0)" style="background:#000;color:#FFD700">Schwarz</button>';
         html += '<button class="toggle-btn ft-color-btn" data-value="1" onclick="setFtWienBg(' + dt.colour + ',1)" style="background:#0a3d1f;color:#FFD700">Grün</button>';
         html += '</div></div>';
+
+        // Wien U-Bahn-Badges (farbige Linien-Badges wie im echten Wiener-Linien-Stil)
+        var wbVal = (recommendedConfig && recommendedConfig.wienBadges) || 0;
+        html += '<div class="form-row"><div><div class="form-label">U-Bahn Badges</div><div class="form-hint">Farbige U-Bahn-Linien (U1 rot, U2 lila …) wie auf den echten Anzeigen</div></div>';
+        html += '<div class="toggle-row" id="ftWienBadges_' + dt.colour + '">';
+        html += '<button class="toggle-btn' + (wbVal === 0 ? ' active' : '') + '" data-value="0" onclick="setFtWienBadges(' + dt.colour + ',0)">Aus</button>';
+        html += '<button class="toggle-btn' + (wbVal === 1 ? ' active' : '') + '" data-value="1" onclick="setFtWienBadges(' + dt.colour + ',1)">Linie</button>';
+        html += '<button class="toggle-btn' + (wbVal === 2 ? ' active' : '') + '" data-value="2" onclick="setFtWienBadges(' + dt.colour + ',2)">Ganze Zeile</button>';
+        html += '</div></div>';
       }
     }
     if (f.altNext) {
@@ -11070,9 +11151,17 @@ function renderDisplayTypeSections() {
     } else if (f.rows && f.bigText && ftFontModeByCid[dt.colour]) {
       setFtFontSize(dt.colour, ftFontModeByCid[dt.colour]);
     }
-    // Wien-Toggles aus gespeicherter Config restoren (sonst zeigt UI immer Default)
+    // Wien-Toggles aus gespeicherter Config restoren (sonst zeigt UI immer Default).
+    // Matrix/Paper-White (23/24): Default = Netz-Variante (Linz grün, Berlin/Schweiz
+    // orange) statt der globalen Wien-Schriftfarbe.
     if (f.textColor) {
-      var savedTxt = (recommendedConfig && recommendedConfig.textColor) || 1;
+      var savedTxt;
+      if (dt.colour === 23 || dt.colour === 24) {
+        var nvSeed = variantForColour(dt.colour);
+        savedTxt = (nvSeed != null) ? nvSeed : 1;
+      } else {
+        savedTxt = (recommendedConfig && recommendedConfig.textColor) || 1;
+      }
       setFtToggleVal('ftTxtCol_' + dt.colour, savedTxt);
       var savedBg = (recommendedConfig && recommendedConfig.wienBg !== undefined) ? recommendedConfig.wienBg : 0;
       setFtToggleVal('ftWienBg_' + dt.colour, savedBg);
@@ -11100,6 +11189,12 @@ function setDtRows(cid, val) {
 function setFtWienBg(cid, val) {
   setFtToggleVal('ftWienBg_' + cid, val);
   if (recommendedConfig) recommendedConfig.wienBg = parseInt(val);
+}
+
+// Wien U-Bahn-Badges: 0=Aus, 1=Linie, 2=Ganze Zeile
+function setFtWienBadges(cid, val) {
+  setFtToggleVal('ftWienBadges_' + cid, val);
+  if (recommendedConfig) recommendedConfig.wienBadges = parseInt(val);
 }
 
 // Wien Schriftfarbe: analog persistieren (gleiches Re-Render-Reset-Problem)
@@ -13104,6 +13199,166 @@ function serializeDtType(cid, filter) {
   return parts;
 }
 
+// ==================== MASTERROW / TIMEROW GENERATOR ====================
+// Single source of truth. Baut zwei Strings:
+//   masterrow (line-based, statisch):  "NETZ:stopId|Linie>richtungsId|c<colour>|g<gehweg>;..."
+//   timerow   (zeitbasiert, ÖBB/DB):   gleiches Format, im Gerät nach Zeit sortiert
+// Linien-Token: "Linie>richtungsId" (IMMER zuerst richtungsId, nur sonst Zieltext), '+' = Merge.
+// Reihenfolge der ;-Tokens = Anzeige-Reihenfolge (respektiert die Reihenfolge-UI).
+// Ein Eintrag pro RBL → keine parallelen Listen mehr → kein Drift.
+var MASTERROW_TIME_COLOURS = [11, 12, 14];  // ÖBB FV / ÖBB S-Bahn / Westbahn = zeitbasiert
+
+function _mrDirRef(d) {
+  // immer zuerst richtungsId, nur wenn keine vorhanden → Zieltext (towards)
+  if (d && d.richtungsId) return String(d.richtungsId).trim();
+  if (d && d.towards) return String(d.towards).trim();
+  return '';
+}
+function _mrLinePart(d) {
+  var ln = String((d && d.line) || '').trim();
+  if (!ln) return '';
+  var ref = _mrDirRef(d);
+  return ref ? (ln + '>' + ref) : ln;
+}
+function _mrRbl(d) {
+  var net = String((d && d.network) || 'WL').trim() || 'WL';
+  var sid = String((d && d.stopId) || '').trim();
+  return net + ':' + sid;
+}
+
+function buildMasterAndTimeRows(gehwegByStopId) {
+  gehwegByStopId = gehwegByStopId || {};
+  var master = [];
+  var time = [];
+
+  // STATIONS-PRIMÄR: alles (rbl, colour, lines, gehweg) kommt aus DEMSELBEN
+  // station-Objekt — keine parallelen Arrays (_dtAllDirs/ftPerStationColour), die
+  // aus dem Takt laufen und Farben/Filter vertauschen könnten. Reihenfolge =
+  // Stationsreihenfolge, innerhalb einer Station die Richtungsreihenfolge.
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    var colour = stationDisplayColour(s);
+    var bucket = (MASTERROW_TIME_COLOURS.indexOf(colour) >= 0) ? time : master;
+    var net = s.network || 'WL';
+    var dirs = (s.directions || []);
+
+    // rbl → { lineParts:[], bareId }, Reihenfolge des ersten Auftauchens.
+    var rblOrder = [];
+    var rblData = {};
+    function ensure(rbl, bareId) {
+      if (!rblData[rbl]) { rblData[rbl] = { lineParts: [], bareId: bareId }; rblOrder.push(rbl); }
+      return rblData[rbl];
+    }
+    function bareOf(rbl) { var c = rbl.indexOf(':'); return c > 0 ? rbl.substring(c + 1) : rbl; }
+
+    if (dirs.length > 0) {
+      dirs.forEach(function(d) {
+        var sid;
+        if (net === 'WL') {
+          // Wien: pro Bahnsteig die eigene stopId (Richtung steckt in der RBL)
+          sid = String(d.stopId || '').trim();
+          if (!sid) sid = String(s.fullId || '').split(',')[0].replace(/^WL:/i, '').trim();
+        } else {
+          // Non-Wien: eine stopId pro Station (aus fullId, ohne Netz-Prefix)
+          var fid = String(s.fullId || (net + ':' + (s.stopId || ''))).split(',')[0];
+          sid = fid.indexOf(':') > 0 ? fid.substring(fid.indexOf(':') + 1) : fid;
+        }
+        if (!sid) return;
+        var rbl = net + ':' + sid;
+        var lp = _mrLinePart({ line: d.line, towards: d.towards, richtungsId: d.richtungsId });
+        if (!lp) return;
+        ensure(rbl, sid).lineParts.push(lp);
+      });
+    }
+    if (rblOrder.length === 0) {
+      // keine Richtungen → fullId + filter (alle Linien)
+      String(s.fullId || (net + ':' + (s.stopId || ''))).split(',').forEach(function(fid) {
+        fid = fid.trim(); if (!fid) return;
+        var rbl = fid.indexOf(':') > 0 ? fid : (net + ':' + fid);
+        var lines = s.filter ? s.filter.split(',').map(function(x){return x.trim();}).filter(Boolean).join('+') : '*';
+        ensure(rbl, bareOf(rbl)).lineParts.push(lines || '*');
+      });
+    }
+
+    rblOrder.forEach(function(rbl) {
+      var data = rblData[rbl];
+      var lines = data.lineParts.length ? data.lineParts.join(',') : '*';
+      var g = gehwegByStopId[data.bareId] || 0;
+      // Eintrag pro Station: rbl|lines|c<colour>|g<gehweg>. Per-Display-Settings
+      // (rows/interval/…) liegen separat in displaysettings (gekeyt nach colour).
+      bucket.push(rbl + '|' + lines + '|c' + colour + '|g' + g);
+    });
+  });
+
+  return { masterrow: master.join(';'), timerow: time.join(';') };
+}
+
+// ===== DISPLAYSETTINGS (pro Display-TYP/colour) =====
+// Baut "c<colour>|r<rows>|i<interval>|s<sort>|t<textcolor>|b<bg>|w<von-bis>|
+//       h<chopper>|n<niederflurblink>|k<silberpfeil>|a<altnext>|d<delayhl>;..."
+// EIN Block pro eindeutiger colour (mehrere Stationen mit gleichem Typ teilen ihn).
+function buildDisplaySettings() {
+  // Über stationDisplayColour iterieren (DIESELBE Quelle wie die masterrow) →
+  // deckt exakt die colours der masterrow ab, egal ob multi/single/manual.
+  var segs = [];
+  var seen = {};
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    var cid = stationDisplayColour(s);
+    if (isNaN(cid) || seen[cid]) return;
+    seen[cid] = true;
+    var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
+    var parts = ['c' + cid];
+    // Zeilen
+    parts.push('r' + rowsForColour(cid));
+    // Anzeigedauer (Slideshow-Intervall) — nur wenn der Toggle existiert, sonst
+    // weglassen (Firmware default = 10s). Verhindert falsche Fallback-Werte.
+    if (document.getElementById('ftInterval_' + cid)) {
+      var iv = parseInt(getFtToggleVal('ftInterval_' + cid));
+      if (iv && !isNaN(iv)) parts.push('i' + iv);
+    }
+    // Sortierung (nur Stadt-Displays mit f.sorting; Zug-Displays sind via colour zeitbasiert)
+    if (f.sorting) {
+      var sv = parseInt(getFtToggleVal('ftSort_' + cid));
+      if (!sv || isNaN(sv)) sv = 1;
+      parts.push('s' + sv);
+    }
+    // Schriftfarbe / Farbton-Variante + Wien-Hintergrund.
+    // Default = Netz-Variante (Linz=2 grün, Berlin/Schweiz=3 orange) wenn der User
+    // den Toggle nicht angefasst hat; manuelle Auswahl gewinnt.
+    if (f.textColor) {
+      var tcEl = document.getElementById('ftTxtCol_' + cid);
+      var tc = tcEl ? parseInt(getFtToggleVal('ftTxtCol_' + cid)) : NaN;
+      if (!tc || isNaN(tc)) { var nv = variantForColour(cid); tc = (nv != null) ? nv : 1; }
+      parts.push('t' + tc);
+      if (document.getElementById('ftWienBg_' + cid)) {
+        var bgv = getFtToggleVal('ftWienBg_' + cid);
+        if (bgv !== null && bgv !== undefined && bgv !== '') parts.push('b' + (parseInt(bgv) || 0));
+      }
+    }
+    // Wien U-Bahn-Badges (nur Wien colour 1): u0=Aus, u1=Linie, u2=Ganze Zeile
+    if (document.getElementById('ftWienBadges_' + cid)) {
+      var ub = parseInt(getFtToggleVal('ftWienBadges_' + cid));
+      if (!isNaN(ub)) parts.push('u' + ub);
+    }
+    // Zeitfenster
+    var twToggle = document.getElementById('ftTimeWindow_' + cid);
+    if (twToggle && twToggle.classList.contains('active')) {
+      var from = document.getElementById('ftTimeFrom_' + cid);
+      var to = document.getElementById('ftTimeTo_' + cid);
+      parts.push('w' + ((from ? from.value : '6') + '-' + (to ? to.value : '22')));
+    }
+    // Hochflurer / Niederflur-Blinken / Klima / Wien-Takt / Verspätung
+    if (f.chopper) {
+      parts.push('h' + (isFtToggleActive('ftChopper_' + cid) ? 1 : 0));
+      if (document.getElementById('ftNfBlink_' + cid)) parts.push('n' + (isFtToggleActive('ftNfBlink_' + cid) ? 1 : 0));
+    }
+    if (f.silberpfeil) parts.push('k' + (isFtToggleActive('ftSilber_' + cid) ? 1 : 0));
+    if (f.altNext) parts.push('a' + (isFtToggleActive('ftAltNext_' + cid) ? 1 : 0));
+    if (f.delayHighlight) parts.push('d' + (isFtToggleActive('ftDelayHl_' + cid) ? 1 : 0));
+    segs.push(parts.join('|'));
+  });
+  return segs.join(';');
+}
+
 function collectFtLineGroups() {
   // linegroups Format: "1:Universität+2:Universität,41:Hessenplatz,43:Stadtfriedhof"
   // + für zusammengefasste Richtungen, , für Trennung zwischen Gruppen
@@ -13235,10 +13490,9 @@ function saveFromFinetuning() {
   // Dropdown gewählte Display-Typ beim Speichern ignoriert.)
   let colour;
   if (ftIsMultiDisplay || ftIsManualAssignment) {
-    const perStation = stations.map(function(s, i) {
-      var nc = NETWORK_COLORS[s.network];
-      return ftIsManualAssignment ? (ftPerStationColour[i] || (nc ? nc.id : 1)) : (nc ? nc.id : 1);
-    });
+    // colour pro Station DIREKT vom Objekt (stationDisplayColour) → exakt index-gleich
+    // mit rbl/filter/gehweg, kein paralleles Array das verrutschen kann.
+    const perStation = stations.map(function(s) { return stationDisplayColour(s); });
     colour = perStation.join(',');
   } else {
     colour = parseInt(document.getElementById('ftColorSelect').value);
@@ -13301,8 +13555,7 @@ function saveFromFinetuning() {
   // bekommen nur eine Zeile (Bug: lines_count "1" statt "4,2").
   if (ftIsMultiDisplay || ftIsManualAssignment) {
     rows = stations.map(function(s, i) {
-      var nc = NETWORK_COLORS[s.network];
-      var cid = ftIsManualAssignment ? (ftPerStationColour[i] || (nc ? nc.id : 1)) : netColourId(s.network);
+      var cid = stationDisplayColour(s);
       var f = DISPLAY_TYPE_FEATURES[cid] || {};
       var v = ftRowsByCid[cid];
       if (v == null) v = parseInt(getFtToggleVal('ftRows_' + cid));
@@ -13343,7 +13596,20 @@ function saveFromFinetuning() {
     seenIds.add(s.fullId);
     return true;
   });
-  recommendedConfig.rbl = stations.map(s => s.fullId).join(',');
+  // Wien IMMER mit WL:-Prefix senden (auch nackte numerische IDs wie "4131" →
+  // "WL:4131"). So ist rbl konsistent mit masterrow und das Gerät erkennt Wien
+  // eindeutig am Netz-Prefix statt am numerischen Format.
+  recommendedConfig.rbl = stations.map(s => {
+    var fid = String(s.fullId || '');
+    if (s.network === 'WL') {
+      return fid.split(',').map(function(id) {
+        id = id.trim();
+        if (!id) return '';
+        return id.indexOf(':') < 0 ? ('WL:' + id) : id;
+      }).filter(Boolean).join(',');
+    }
+    return fid;
+  }).join(',');
   recommendedConfig.filter = stations.map(s => s.filter || '').join('|');
 
   // Update recommendedConfig
@@ -13373,6 +13639,27 @@ function saveFromFinetuning() {
   recommendedConfig.rowOrderDestination = rowOrderDestination;
   recommendedConfig.displayMode = ftDisplayMode;
   recommendedConfig.stopInterval = ftStopInterval;
+
+  // ===== MASTERROW / TIMEROW (single source of truth) =====
+  // Gehweg-Werte nach (bare) stopId indexieren — für die Wertzuordnung pro RBL.
+  var _gehwegByStopId = {};
+  (recommendedConfig.stationDetails || []).forEach(function(st, i) {
+    String(st.id || '').split(',').forEach(function(sub) {
+      sub = sub.trim();
+      if (sub) _gehwegByStopId[sub] = (gehweg[i] || 0);
+    });
+  });
+  try {
+    var _rows = buildMasterAndTimeRows(_gehwegByStopId);
+    recommendedConfig.masterRow = _rows.masterrow;
+    recommendedConfig.timeRow = _rows.timerow;
+    console.log('[MASTERROW]', _rows.masterrow);
+    console.log('[TIMEROW]', _rows.timerow);
+  } catch (e) {
+    console.error('[MASTERROW] Build-Fehler:', e);
+    recommendedConfig.masterRow = '';
+    recommendedConfig.timeRow = '';
+  }
 
   // Pro-Display Intervalle berechnen (nur bei Multi-Display)
   // 'types' already declared above as const
@@ -13419,19 +13706,67 @@ const MAX_SAVE_RETRIES = 3;
 
 function sendConfigToDeviceDirect(config) {
   // Baue die Gehweg-String im neuen Format: "stopId:value|stopId:value"
+  // WICHTIG: Struktur IMMER aus config.rbl ableiten (= die echte, an das Gerät
+  // gesendete Stationsliste), NICHT aus stationDetails. stationDetails kann von
+  // rbl abweichen (Race/Edit) → dann wäre der gehweg-String kürzer als rbl und
+  // das Gerät verliert die überzähligen Stationen (sie werden nie abgefragt,
+  // keine Echtzeit). Ein Eintrag pro rbl-Station, gleiche Reihenfolge.
   let gehwegString = '0';
-  if (config.stationDetails && config.gehweg) {
-    const entries = [];
-    config.stationDetails.forEach((station, i) => {
-      const value = config.gehweg[i] || 0;
-      const stopId = station.id || '';
-      if (stopId) {
-        entries.push(`${stopId}:${value}`);
-      }
-    });
+  if (config.rbl) {
+    // Gehweg-Werte nach (bare) stopId indexieren — für die Wertzuordnung.
+    const valueByStopId = {};
+    if (config.stationDetails && config.gehweg) {
+      config.stationDetails.forEach((station, i) => {
+        const sid = String(station.id || '');
+        if (sid) valueByStopId[sid] = config.gehweg[i] || 0;
+      });
+    }
+    const entries = config.rbl.split(',').map(part => {
+      part = (part || '').trim();
+      if (!part) return null;
+      // Netzwerk-Prefix entfernen → bare stopId. Erster ':' trennt Prefix ab;
+      // Graz/STV-IDs (at:46:4172) behalten ihre internen Doppelpunkte.
+      const ci = part.indexOf(':');
+      const stopId = (ci > 0) ? part.substring(ci + 1) : part;
+      const value = valueByStopId[stopId] || 0;
+      return stopId + ':' + value;
+    }).filter(Boolean);
     if (entries.length > 0) {
       gehwegString = entries.join('|');
     }
+  }
+
+  // ===== MASTERROW / TIMEROW (single source of truth) =====
+  // HIER bauen — deckt JEDEN Save-Pfad ab (Wizard, Schnellspeichern, Feintuning).
+  // Frisch aus den AKTUELLEN Stationen (global `stations`), damit colour/Linie/rbl/
+  // gehweg garantiert zusammenpassen. Firmware nutzt masterrow als Wahrheit und
+  // regeneriert die alten Felder daraus → egal ob config.rbl/colour stale sind.
+  try {
+    if (typeof stations !== 'undefined' && stations.length > 0 && typeof buildMasterAndTimeRows === 'function') {
+      var _gwById = {};
+      gehwegString.split('|').forEach(function(seg) {
+        var c = seg.lastIndexOf(':');
+        if (c > 0) _gwById[seg.substring(0, c)] = parseInt(seg.substring(c + 1)) || 0;
+      });
+      var _mr = buildMasterAndTimeRows(_gwById);
+      config.masterRow = _mr.masterrow;
+      config.timeRow = _mr.timerow;
+      console.log('[MASTERROW] master=', _mr.masterrow);
+      console.log('[TIMEROW]  time=', _mr.timerow);
+    }
+  } catch (e) {
+    console.error('[MASTERROW] Build-Fehler in sendConfigToDeviceDirect:', e);
+  }
+
+  // displaysettings (pro Display-Typ) — nur bauen wenn die Feintuning-Toggles im
+  // DOM sind (sonst alten Wert behalten, Firmware ignoriert leeren String).
+  try {
+    if (typeof buildDisplaySettings === 'function' && document.getElementById('ftDisplayTypeSections')) {
+      var _ds = buildDisplaySettings();
+      if (_ds) { config.displaySettings = _ds; console.log('[DISPLAYSETTINGS]', _ds); }
+    }
+  } catch (e) {
+    console.error('[DISPLAYSETTINGS] Build-Fehler:', e);
   }
 
   // Config-Daten für ESP32
@@ -13529,7 +13864,10 @@ function sendConfigToDeviceDirect(config) {
     linefilter: config.lineFilter || '',  // Linien-Filter (nur Linienname)
     linefilterdestination: config.lineFilterDestination || '',  // NEU: Linien+Ziel Filter für Linz
     roworder: reconcileGroupString(config.rowOrder || ''),
-    roworderdestination: dedupTokenString(reconcileGroupString(config.rowOrderDestination || ''))
+    roworderdestination: dedupTokenString(reconcileGroupString(config.rowOrderDestination || '')),
+    masterrow: config.masterRow || '',  // single source of truth (line-based)
+    timerow: config.timeRow || '',      // single source of truth (zeitbasiert)
+    displaysettings: config.displaySettings || ''  // Settings pro Display-Typ
   };
 
   // Prüfe ob wir im iframe sind
@@ -13612,6 +13950,9 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('linefilterdestination', configData.linefilterdestination);
     formData.append('roworder', configData.roworder);
     formData.append('roworderdestination', configData.roworderdestination);
+    formData.append('masterrow', configData.masterrow);
+    formData.append('timerow', configData.timerow);
+    formData.append('displaysettings', configData.displaysettings);
 
     updateSavingOverlay('Speichere Einstellungen...');
 
@@ -14118,8 +14459,10 @@ async function resolveStationName(network, stopId) {
 async function handleConfigMessage(data) {
 
   if (data.type === 'loadExistingConfig') {
-    // Load Wien data first if any WL stations
-    if (data.rbl && !data.rbl.includes(':')) {
+    // Load Wien data first if any WL stations.
+    // Wien wird jetzt mit WL:-Prefix gesendet → erkenne Wien an "WL:" ODER (Alt-Config)
+    // an nackten numerischen IDs. Nicht mehr "kein Doppelpunkt = Wien" annehmen.
+    if (data.rbl && data.rbl.split(',').some(function(p){ p=(p||'').trim(); return p.indexOf('WL:')===0 || /^\d/.test(p); })) {
       await loadWienData();
     }
     await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '', data.linegroups || '');
@@ -14141,8 +14484,8 @@ async function handleConfigMessage(data) {
     const lineFilterDest = data.config.linefilterdestination || '';
     const rowOrderDest = data.config.roworderdestination || '';
 
-    // Load Wien data first if any WL stations
-    if (rblId && !rblId.includes(':')) {
+    // Load Wien data first if any WL stations (WL:-Prefix ODER nackte numerische Alt-IDs).
+    if (rblId && rblId.split(',').some(function(p){ p=(p||'').trim(); return p.indexOf('WL:')===0 || /^\d/.test(p); })) {
       await loadWienData();
     }
     const lineGroupsStr = data.config.linegroups || '';
