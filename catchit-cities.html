@@ -500,11 +500,16 @@
       background: #0055a4;
       color: #fff;
     }
-    /* U-Bahn - Schwarz mit weißer Schrift */
+    /* U-Bahn - Fallback Schwarz; einzelne Linien in ihren offiziellen Farben */
     .line-badge.type-metro {
       background: #1a1a1a;
       color: #fff;
     }
+    .line-badge.type-u1 { background: #c6052e; color: #fff; } /* U1 rot */
+    .line-badge.type-u2 { background: #a82e8e; color: #fff; } /* U2 violett */
+    .line-badge.type-u3 { background: #ee7d00; color: #fff; } /* U3 orange */
+    .line-badge.type-u4 { background: #009a3d; color: #fff; } /* U4 grün */
+    .line-badge.type-u6 { background: #a96b2e; color: #fff; } /* U6 braun */
     /* S-Bahn - Grün */
     .line-badge.type-suburban {
       background: #0055A4;
@@ -6387,7 +6392,7 @@ function showWienLineDropdown(query) {
   } else {
     resultsList.innerHTML = filtered.map(line => {
       const endpoints = getWienLineEndpoints(line);
-      const lineType = line.lineName.startsWith('U') ? 'type-metro' : (line.lineName.startsWith('N') ? 'type-bus' : (/^\d+$/.test(line.lineName) || /^\d+[A-Z]$/.test(line.lineName) ? 'type-tram' : 'type-bus'));
+      const lineType = wienBadgeClass(line.lineName);
 
       return `
         <div class="search-result-item" onclick="selectWienLine(${line.lineID})">
@@ -6521,6 +6526,20 @@ function getWienDirectionName(line, patternID) {
 }
 
 // Station auswählen
+// Badge-Klasse für Wien-Linien: U-Bahn in Linienfarben, Tram rot, Bus blau.
+// Bus = Nightline (N…) oder Endung A/B (11A, 48B). Alles andere (Ziffern, D, O, E4) = Tram.
+function wienBadgeClass(name) {
+  var n = String(name || '').trim().toUpperCase();
+  if (/^U\d/.test(n)) {
+    var u = n.substring(0, 2);
+    if (u === 'U1' || u === 'U2' || u === 'U3' || u === 'U4' || u === 'U6') return 'type-' + u.toLowerCase();
+    return 'type-metro';
+  }
+  if (n.charAt(0) === 'N') return 'type-bus';   // Nightline
+  if (/[AB]$/.test(n)) return 'type-bus';        // 11A, 13A, 48B → Bus
+  return 'type-tram';                            // Ziffern, D, O, E4 … → Tram (rot)
+}
+
 function selectWienStation(station) {
   wienSelectedStation = station;
   document.getElementById('wienStationInput').value = station.name;
@@ -6528,6 +6547,14 @@ function selectWienStation(station) {
 
   wienSelectedDirections = [];
   wienOtherLines = [];
+
+  // Stale "Andere Linien an dieser Station"-Vorschläge der VORHERIGEN Station sofort
+  // ausblenden + leeren. Sonst bleiben sie hängen, bis man hier eine Richtung klickt
+  // (showWienOtherLines wird sonst erst bei toggleWienDirection aufgerufen).
+  const _otherSec = document.getElementById('wienOtherLinesSection');
+  const _otherList = document.getElementById('wienOtherLinesList');
+  if (_otherSec) _otherSec.style.display = 'none';
+  if (_otherList) _otherList.innerHTML = '';
 
   // Titel aktualisieren
   document.getElementById('wienDirectionTitle').innerHTML = `📍 ${station.name}`;
@@ -6543,7 +6570,7 @@ function selectWienStation(station) {
     dirList.innerHTML = `
       <div class="line-group">
         <div class="line-group-header" style="background:#e8f5e9;">
-          <span class="line-badge type-metro" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
+          <span class="line-badge ${wienBadgeClass(wienSelectedLine.lineName)}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
           <span class="line-name">→ ${uniqueDirections[0].towards}</span>
           <span style="margin-left:auto;color:#4caf50;font-weight:600;">✓ Ausgewählt</span>
         </div>
@@ -6557,7 +6584,7 @@ function selectWienStation(station) {
       <div class="line-group" id="wienDir_${idx}">
         <div class="line-group-header" onclick="toggleWienDirection(${idx}, ${dir.patternID}, ${dir.stopId}, '${dir.towards.replace(/'/g, "\\'")}')">
           <input type="checkbox" id="wienDirCheck_${idx}" style="width:18px;height:18px;">
-          <span class="line-badge type-metro" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
+          <span class="line-badge ${wienBadgeClass(wienSelectedLine.lineName)}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
           <span class="line-name">→ ${dir.towards}</span>
         </div>
       </div>
@@ -6642,7 +6669,7 @@ function showWienOtherLines() {
   });
 
   list.innerHTML = otherLines.map((ol, idx) => {
-    const lineType = ol.lineName.startsWith('U') ? 'type-metro' : (/^\d+$/.test(ol.lineName) || /^\d+[A-Z]$/.test(ol.lineName) ? 'type-tram' : 'type-bus');
+    const lineType = wienBadgeClass(ol.lineName);
     return `
       <div class="line-group" id="wienOther_${idx}" style="margin-bottom:8px;">
         <div class="line-group-header" onclick="toggleWienOtherLine(${idx}, ${ol.lineID}, '${ol.lineName}', ${ol.patternID}, ${ol.stopId}, '${ol.towards.replace(/'/g, "\\'")}')">
@@ -13359,6 +13386,51 @@ function buildDisplaySettings() {
   return segs.join(';');
 }
 
+// Parst displaysettings ("c1|r2|i10|s1|t1|b0|u0|w6-22|h1|n0|k0|a1|d0;c14|...")
+// zurück in eine Map { colour: { r,i,s,t,b,u,w,h,n,k,a,d } }. Gegenstück zu buildDisplaySettings().
+function parseDisplaySettings(str) {
+  var byColour = {};
+  if (!str) return byColour;
+  String(str).split(';').forEach(function(seg) {
+    seg = seg.trim();
+    if (!seg) return;
+    var colour = null;
+    var o = {};
+    seg.split('|').forEach(function(t) {
+      t = t.trim();
+      if (!t) return;
+      var key = t.charAt(0);
+      var val = t.substring(1);
+      if (key === 'c') colour = parseInt(val);
+      else o[key] = val;
+    });
+    if (colour != null && !isNaN(colour)) byColour[colour] = o;
+  });
+  return byColour;
+}
+
+// Stellt die Look-Einstellungen aus displaysettings (autoritative Per-Display-Quelle)
+// in recommendedConfig wieder her. Wird beim Laden aufgerufen, NACH den Top-Level-Feldern.
+function applyDisplaySettingsToConfig(str) {
+  var dsMap = parseDisplaySettings(str);
+  var colours = Object.keys(dsMap);
+  if (colours.length === 0 || !recommendedConfig) return;
+  // Globale Felder aus dem ersten (dominanten) Segment — die Feintuning-Toggles lesen
+  // diese Werte beim Restore (renderDisplayTypeSections).
+  var o = dsMap[colours[0]];
+  var num = function(v, d) { var n = parseInt(v); return isNaN(n) ? d : n; };
+  if (o.t !== undefined) recommendedConfig.textColor = num(o.t, 1);
+  if (o.b !== undefined) recommendedConfig.wienBg = num(o.b, 0);
+  if (o.u !== undefined) recommendedConfig.wienBadges = num(o.u, 0);
+  if (o.h !== undefined) recommendedConfig.chopper = num(o.h, 0);
+  if (o.n !== undefined) recommendedConfig.niederflurBlink = num(o.n, 0);
+  if (o.k !== undefined) recommendedConfig.silberpfeil = num(o.k, 0);
+  if (o.d !== undefined) recommendedConfig.delayHighlight = num(o.d, 0);
+  if (o.a !== undefined) recommendedConfig.alternateNext = (num(o.a, 1) === 1);
+  if (o.s !== undefined) recommendedConfig.sortMode = num(o.s, 1);
+  if (o.i !== undefined) recommendedConfig.stopInterval = num(o.i, 10);
+}
+
 function collectFtLineGroups() {
   // linegroups Format: "1:Universität+2:Universität,41:Hessenplatz,43:Stadtfriedhof"
   // + für zusammengefasste Richtungen, , für Trennung zwischen Gruppen
@@ -14575,6 +14647,10 @@ async function handleConfigMessage(data) {
     if (data.config.wien_bg !== undefined && data.config.wien_bg !== null && data.config.wien_bg !== '') {
       recommendedConfig.wienBg = parseInt(data.config.wien_bg);
     }
+    // Wien U-Bahn-Badges (0=Aus, 1=Linie, 2=Ganze Zeile) — wurde bisher nicht restauriert
+    if (data.config.wien_badges !== undefined && data.config.wien_badges !== null && data.config.wien_badges !== '') {
+      recommendedConfig.wienBadges = parseInt(data.config.wien_badges) || 0;
+    }
     if (data.config.night_mode_enabled !== undefined) {
       recommendedConfig.nightMode = data.config.night_mode_enabled;
     }
@@ -14586,6 +14662,12 @@ async function handleConfigMessage(data) {
     }
     if (data.config.show_fun_messages !== undefined) {
       recommendedConfig.showFunMessages = data.config.show_fun_messages;
+    }
+    // Per-Display-Look aus displaysettings (autoritative Quelle) wiederherstellen —
+    // überschreibt die Top-Level-Felder, damit Schrift/Sortierung/Farbton/Klima/
+    // Hochflurer/Verspätung/Anzeigezeit beim erneuten Öffnen NICHT verloren gehen.
+    if (data.config.displaysettings) {
+      applyDisplaySettingsToConfig(data.config.displaysettings);
     }
     // advancedSettings (Helligkeit/Textfarbe/Modus/Interval) aus der geladenen Config
     // seeden → wizardBuildConfig überschreibt die Werte sonst mit Defaults (Reload-Bug).
