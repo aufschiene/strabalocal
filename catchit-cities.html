@@ -4383,7 +4383,9 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
 
 // Netzwerk-Alias für API-Calls (lokale Varianten → existierender Server-Endpoint)
 const API_NETWORK_MAP = {
-  'OEBB_STAMM_SBAHN': 'OEBB_SBAHN',
+  // OEBB_STAMM_SBAHN NICHT mehr auf OEBB_SBAHN aliasen: der Server hat ein echtes
+  // OEBB_STAMM_SBAHN-Endpoint (Bahnsteig-Logik, richtungsId 1/2). Sonst holte der Picker
+  // Regional-IDs (d<terminus>), die das Geraet (fragt OEBB_STAMM_SBAHN) nie matcht.
   'OEBB_REGIONAL': 'OEBBREG',
   'OEBB_SBAHN': 'OEBBREG',
   'OEBB_REG_NOE': 'OEBBREG',
@@ -14822,11 +14824,14 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           });
         });
       }
-    } else if (network === 'OEBB_STAMM_SBAHN') {
-      // Stammstrecke: Keine Directions (keine Linienfilterung)
-      // Gruppierung läuft über lineGroups mit richtungsId (1=R1/Meidling, 2=R2/Floridsdorf)
+    } else if (network === 'OEBB_STAMM_SBAHN' && filterLines.length === 0) {
+      // Stammstrecke "Nach Richtung" (KEIN Linienfilter): keine Directions, nur die
+      // 1/2-Gruppierung (1=R1/Meidling, 2=R2/Floridsdorf).
       station.lineGroups = `${STAMM_RICHTUNG_R1},${STAMM_RICHTUNG_R2}`;
     } else {
+      // Stammstrecke MIT Linienfilter (z.B. "REX 1") fällt hier rein und lädt die
+      // Directions inkl. richtungsId (1/2) aus der API — sonst ginge die Richtung beim
+      // Reload verloren (directions=[] → masterrow nur "REX 1" ohne rid → beide Richtungen).
       // Andere Netze: Directions aus API laden (gefiltert)
       try {
         const data = await fetchDeparturesUnified(`${network}:${stopId}`);
