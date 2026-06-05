@@ -9957,9 +9957,12 @@ function hasStableRichtungsId(network) {
   // OEBB* seit 2026-05-22: Server clustert pro Fahrtrichtung aus tripId-Endpunkten
   //   (richtungsId = "d<terminusId>", stabil) → mehrere Ziele einer Richtung teilen
   //   eine ID. Ersetzt den frueheren instabilen HAFAS-Hash.
+  // HAMBURG seit 2026-06: Server mappt Ziele per GTFS-Bahnsteig-Lookup auf stabile
+  //   2-Richtungs-IDs ("hh<bahnsteig>") → verzweigte Linien (U1 Norderstedt vs.
+  //   Großhansdorf) kollabieren im Picker zu 2 Karten statt 5+.
   return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO',
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
-          'OEBB_REG_NOE', 'OEBB_REG_OOE'].includes(network);
+          'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG'].includes(network);
 }
 
 // Baut die geordneten lineGroups-Tokens EINER Station unter Berücksichtigung der
@@ -13692,7 +13695,11 @@ function buildMasterAndTimeRows(gehwegByStopId) {
           lp = _mrLinePart({ line: d.line, towards: d.towards, richtungsId: d.richtungsId });
         }
         if (!lp) return;
-        ensure(rbl, sid).lineParts.push(lp);
+        // Dedup: eine gruppierte Richtungskarte (z.B. Ochsenzoll + Norderstedt = eine
+        // richtungsId hh119005) liefert mehrere d's mit IDENTISCHem "Linie>richtungsId".
+        // Nur einmal aufnehmen, sonst doppelte masterrow-Eintraege → doppelte Zeilen.
+        var _lparts = ensure(rbl, sid).lineParts;
+        if (_lparts.indexOf(lp) < 0) _lparts.push(lp);
       });
     }
     if (rblOrder.length === 0) {
@@ -14068,7 +14075,13 @@ function saveFromFinetuning() {
   const lineGroupsStr = collectFtLineGroups();
 
   // Linz Linien+Ziel Filter sammeln (linefilterdestination)
-  const lineFilterDestStr = collectFtLineFilter();
+  // Fallback für ÖBB-Zug-Displays (colour 12): dort ist die Feintuning-Gruppierung
+  // aus (f.sorting=false), daher liefert collectFtLineFilter() LEER — die Richtung
+  // steckt dann nur in der masterrow (LINIE>richtungsId). Damit der Reload
+  // (loadExistingConfig liest roworderdestination/linefilterdestination, NICHT die
+  // masterrow) die Richtung rekonstruieren kann, hier aus den Stations ableiten.
+  let lineFilterDestStr = collectFtLineFilter();
+  if (!lineFilterDestStr) lineFilterDestStr = buildLineFilterDestination(stations);
 
   // WICHTIG: rbl und filter IMMER frisch aus stations berechnen (nicht stale Werte verwenden!)
   // Dedupliziere stations zuerst (Sicherheitsnetz gegen Race Conditions)
@@ -14834,9 +14847,20 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
                   shouldInclude = lineDestinations.some(ld => {
                     if (ld.line !== lineName) return false;
                     if (!ld.towards || !towards) return true;  // Ohne Richtung: nur Linie matchen
-                    // STV/Graz: richtungsId-basiert (H oder R)
-                    if ((ld.towards === 'H' || ld.towards === 'R') && line.richtungsId) {
-                      return ld.towards === line.richtungsId;
+                    // richtungsId-Match: das Config-Token kann eine richtungsId sein
+                    // (STV/Graz "H"/"R" ODER ÖBB stabile "d<terminusId>", z.B. "d8100360").
+                    // Exakt oder hierarchischer Prefix — wie die Firmware
+                    // (isLineDestinationAllowed). Pipe-getrennte IDs ("d1|d2") mit abdecken.
+                    if (line.richtungsId) {
+                      const rid = String(line.richtungsId);
+                      const wanted = ld.towards.split('|').map(s => s.trim()).filter(Boolean);
+                      if (wanted.some(w => rid === w || (w.length >= 3 && rid.startsWith(w)))) return true;
+                      // Token ist eine richtungsId (ÖBB "d8100360", numerisch "1"/"2",
+                      // Graz/STV "H"/"R") aber matcht NICHT → diese Richtung gehört nicht
+                      // dazu. NICHT gegen Zieltext fuzzy-matchen (sonst falsche Treffer).
+                      // Echte Ziel-Texte (mit Buchstaben/Leerzeichen) fallen durch zum Textmatch.
+                      const looksLikeRichtungsId = wanted.every(w => /^d\d/.test(w) || /^\d+$/.test(w) || w === 'H' || w === 'R');
+                      if (looksLikeRichtungsId) return false;
                     }
                     // Exakter Match
                     if (ld.towards === towards) return true;
@@ -14944,6 +14968,35 @@ async function resolveStationName(network, stopId) {
   }
 }
 
+// Extrahiert Richtungs-Tokens "LINIE:richtungsId" aus masterrow/timerow
+// (Format "RBL|L1>r1,L2>r2|c..|g..;..."). Für ÖBB-Zug-Displays ist das die einzige
+// Stelle, wo die Richtung gespeichert ist. Wien (WL:/numerische RBL) wird übersprungen
+// (nutzt rowOrder stopId:Linie; der ">"-Wert ist dort nur ein Label).
+function extractDestTokensFromRows(masterrow, timerow) {
+  const tokens = [];
+  const seen = new Set();
+  [masterrow, timerow].forEach(function(row) {
+    if (!row || typeof row !== 'string') return;
+    row.split(';').forEach(function(entry) {
+      const parts = entry.split('|');
+      if (parts.length < 2) return;
+      const rbl = (parts[0] || '').trim();
+      if (rbl.indexOf('WL:') === 0 || /^\d/.test(rbl)) return;  // Wien überspringen
+      parts[1].split(/[,+]/).forEach(function(lt) {
+        lt = lt.trim();
+        const gt = lt.indexOf('>');
+        if (gt <= 0) return;
+        const line = lt.substring(0, gt).trim();
+        const rid = lt.substring(gt + 1).trim();
+        if (!line || !rid) return;
+        const tok = line + ':' + rid;
+        if (!seen.has(tok)) { seen.add(tok); tokens.push(tok); }
+      });
+    });
+  });
+  return tokens.join(',');
+}
+
 // ==================== ESP32 COMMUNICATION ====================
 async function handleConfigMessage(data) {
 
@@ -14971,7 +15024,17 @@ async function handleConfigMessage(data) {
     const rblId = data.config.rbl_id || data.config.rbl || '';
     const linesFilter = data.config.lines_filter || data.config.filter || '';
     const lineFilterDest = data.config.linefilterdestination || '';
-    const rowOrderDest = data.config.roworderdestination || '';
+    let rowOrderDest = data.config.roworderdestination || '';
+
+    // ÖBB-Zug-Displays (colour 12) speichern die Richtung NUR in der masterrow/timerow
+    // (Token "LINIE>richtungsId"), die alten Felder sind leer. loadExistingConfig liest
+    // aber nur die alten Felder → Richtung ginge beim Sync verloren (Gerät zeigt dann
+    // wieder ALLE Richtungen). Daher hier die Richtungs-Tokens aus master/timerow
+    // extrahieren und als roworderdestination-Fallback durchreichen.
+    if (!rowOrderDest && !lineFilterDest) {
+      const fromRows = extractDestTokensFromRows(data.config.masterrow, data.config.timerow);
+      if (fromRows) rowOrderDest = fromRows;
+    }
 
     // Load Wien data first if any WL stations (WL:-Prefix ODER nackte numerische Alt-IDs).
     if (rblId && rblId.split(',').some(function(p){ p=(p||'').trim(); return p.indexOf('WL:')===0 || /^\d/.test(p); })) {
