@@ -361,6 +361,7 @@
     .wappen-badge.sbg { background: linear-gradient(180deg, #ED2939 50%, #fff 50%); color: #fff; }
     .wappen-badge.oebb { background: #E2001A; color: #fff; }
     .wappen-badge.stmk { background: linear-gradient(180deg, #fff 50%, #009640 50%); color: #009640; }
+    .wappen-badge.kaernten { background: linear-gradient(180deg, #ED2939 50%, #fff 50%); color: #ED2939; }
 
     .selection-btn.disabled {
       opacity: 0.4;
@@ -3534,7 +3535,7 @@ window.addEventListener('message', function(event) {
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'INNSBRUCK', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
+    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'INNSBRUCK', 'VOR', 'OOEVV', 'KAERNTEN', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
     // Verkehrsart → dann Bundesland oder direkt Netzwerk
     verkehrsarten: {
       stadt: {
@@ -3543,8 +3544,10 @@ const REGIONS = {
         desc: 'U-Bahn, Straßenbahn, Bus',
         subRegions: {
           AT_W: { name: 'Wien', wappen: 'wien', desc: 'U-Bahn, Tram, Bus, Badner Bahn', networks: ['WL', 'WLB'] },
-          AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus', networks: ['LINZ'] },
+          AT_NOE: { name: 'Niederösterreich & Burgenland', wappen: 'noe', desc: 'Bus, Tram (VOR)', networks: ['VOR'] },
+          AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus', networks: ['LINZ', 'OOEVV'] },
           AT_STMK: { name: 'Steiermark', wappen: 'stmk', desc: 'Straßenbahn, Bus', networks: ['STV'] },
+          AT_K: { name: 'Kärnten', wappen: 'kaernten', desc: 'Bus (Kärntner Linien)', networks: ['KAERNTEN'] },
           AT_SBG: { name: 'Salzburg', wappen: 'sbg', desc: 'Obus, Lokalbahn', networks: ['SALZBURG'] },
           AT_T: { name: 'Tirol & Vorarlberg', wappen: 'tirol', desc: 'Bus, Tram, Obus', networks: ['INNSBRUCK'] }
         }
@@ -3589,6 +3592,7 @@ const REGIONS = {
   // ===== NEU: weitere Länder (Trainboard) =====
   GB:  { name: 'Großbritannien', networks: ['LONDON', 'UKRAIL'] },
   HU:  { name: 'Ungarn',         networks: ['BUDAPEST'] },
+  GE:  { name: 'Georgien',       networks: ['TBILISI'] },
   SI:  { name: 'Slowenien',      networks: ['LJUBLJANA'] },
   IT:  { name: 'Italien',        networks: ['TRENITALIA'] },
   NO:  { name: 'Norwegen',       networks: ['VY'] },
@@ -3883,9 +3887,13 @@ const CITY_CAPABILITIES = {
   // Schweiz -> colour 15 (DisplayLiechtenstein / SBB-Renderer).
   LONDON:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   BUDAPEST:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  TBILISI:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   CH_OEFFI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 15, defaultBrightness: 3 },
   HELSINKI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   INNSBRUCK:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  VOR:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  OOEVV:      { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  KAERNTEN:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   LJUBLJANA:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   SBB:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 15, defaultBrightness: 3 },
   NS:         { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
@@ -4305,9 +4313,13 @@ const NETWORKS = {
   // Stadtnetze:
   LONDON:     { name: 'Transport for London', shortName: 'TfL',  region: 'GB', desc: 'Tube, Overground, DLR, Bus', searchType: 'trainboard', trainboard: { path: '/gb/london' },    placeholder: 'z.B. Oxford Circus, Victoria...',  isJourneyBased: false },
   BUDAPEST:   { name: 'BKK Budapest',          shortName: 'BKK',  region: 'HU', desc: 'Metró, Villamos, Busz',       searchType: 'trainboard', trainboard: { path: '/hu/budapest' },   placeholder: 'z.B. Deák tér, Keleti...',         isJourneyBased: false },
+  TBILISI:    { name: 'TTC Tbilisi',           shortName: 'TTC',  region: 'GE', desc: 'Metro, Bus, Tram',           searchType: 'trainboard', trainboard: { path: '/ge/tbilisi' },    placeholder: 'z.B. Rustaveli, Liberty Square...', isJourneyBased: false },
   CH_OEFFI:   { name: 'Öffis (Bus, Tram)',     shortName: 'Öffi', region: 'CH', desc: 'Bus, Tram, Obus – ganze Schweiz', searchType: 'trainboard', trainboard: { path: '/ch/zuerich' }, placeholder: 'z.B. Zürich, Bern, Basel, Luzern...', isJourneyBased: false },
   HELSINKI:   { name: 'HSL Helsinki',          shortName: 'HSL',  region: 'FI', desc: 'Metro, Tram, Bus, Zug',       searchType: 'trainboard', trainboard: { path: '/fi/helsinki' },   placeholder: 'z.B. Rautatientori, Kamppi...',    isJourneyBased: false },
   INNSBRUCK:  { name: 'Tirol & Vorarlberg',     shortName: 'VVT',  region: 'AT', desc: 'Bus, Tram, Obus (ganz Tirol & Vorarlberg)', searchType: 'trainboard', trainboard: { path: '/at/innsbruck' },  placeholder: 'z.B. Innsbruck, Kufstein, Bregenz, Dornbirn...', isJourneyBased: false },
+  VOR:        { name: 'Niederösterreich & Burgenland', shortName: 'VOR', region: 'AT', desc: 'Bus, Tram (VOR, ganze Ostregion)', searchType: 'trainboard', trainboard: { path: '/at/vor' }, placeholder: 'z.B. St. Pölten, Wr. Neustadt, Eisenstadt...', isJourneyBased: false },
+  OOEVV:      { name: 'Oberösterreich (OÖVV)',  shortName: 'OÖVV', region: 'AT', desc: 'Bus, Tram, Lokalbahn (ganz Oberösterreich)', searchType: 'trainboard', trainboard: { path: '/at/ooevv' }, placeholder: 'z.B. Gmunden, Wels, Steyr, Vöcklabruck...', isJourneyBased: false },
+  KAERNTEN:   { name: 'Kärnten',                shortName: 'KÄR',  region: 'AT', desc: 'Bus (Kärntner Linien, ganz Kärnten)', searchType: 'trainboard', trainboard: { path: '/at/kaernten' }, placeholder: 'z.B. Klagenfurt, Villach, Wolfsberg...', isJourneyBased: false },
   LJUBLJANA:  { name: 'LPP Ljubljana',         shortName: 'LPP',  region: 'SI', desc: 'Bus',                         searchType: 'trainboard', trainboard: { path: '/si/ljubljana' },  placeholder: 'z.B. Bavarski dvor...',            isJourneyBased: false },
   // Nationale Bahn-Netze:
   SBB:        { name: 'Zug (SBB)',             shortName: 'SBB',  region: 'CH', desc: 'IC, IR, RE, S-Bahn – ganze Schweiz', searchType: 'trainboard', trainboard: { path: '/ch' },           placeholder: 'z.B. Zürich HB, Bern, Basel...',   isJourneyBased: false },
@@ -4961,6 +4973,7 @@ const WAPPEN = {
   stmk: 'ST',
   sbg: 'S',
   tirol: 'T',
+  kaernten: 'K',
   oebb: 'ÖBB'
 };
 
@@ -5252,6 +5265,10 @@ var NETWORK_BRANDS = {
   STV:           { bg: '#009640', fg: '#fff' }, // STMK Grün
   SALZBURG:      { bg: '#E3000F', fg: '#fff' }, // Salzburg Rot
   INNSBRUCK:     { bg: '#C8102E', fg: '#fff' }, // Tirol/IVB Rot
+  VOR:           { bg: '#00569D', fg: '#fff' }, // VOR Blau
+  OOEVV:         { bg: '#E2001A', fg: '#fff' }, // OÖVV Rot
+  KAERNTEN:      { bg: '#E2001A', fg: '#fff' }, // Kärntner Linien Rot
+  TBILISI:       { bg: '#DA251D', fg: '#fff' }, // TTC Tbilisi Rot
   CH_OEFFI:      { bg: '#D52B1E', fg: '#fff' }, // Schweiz Öffis Rot
   SBB:           { bg: '#EB0000', fg: '#fff' }, // SBB Rot
   LIEMOBIL:      { bg: '#EF7D00', fg: '#fff' }, // LIEmobil Orange
@@ -5293,6 +5310,7 @@ var DISPLAY_PRESETS = {
     photo: 'Stadt fotos/Oberösterreich.jpg',
     networks: [
       { id: 'LINZ',          jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
+      { id: 'OOEVV',         label: 'OÖVV', desc: 'Bus, Tram, Lokalbahn', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
       { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
       { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
     ]
@@ -5346,8 +5364,21 @@ DISPLAY_PRESETS.noe = {
   wappen: 'noe',
   photo: 'Stadt fotos/oebb regio.JPG',
   networks: [
+    { id: 'VOR',          label: 'Bus & Tram',  desc: 'St. Pölten, Wr. Neustadt, Eisenstadt …', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_NOE' } },
     { id: 'OEBB_REG_NOE', label: 'ÖBB',         desc: 'S-Bahn, REX, Regionalzug', jumpTo: { region: 'AT' } },
     { id: 'WLB',          label: 'Badner Bahn', desc: 'Wien ↔ Baden',             jumpTo: { region: 'AT' } }
+  ]
+};
+
+// Kärnten — Kärntner Linien (Bus, Klagenfurt/Villach) über VOR-Schwesternetz (Trainboard /at/kaernten)
+DISPLAY_PRESETS.kaernten = {
+  name: 'Kärnten',
+  parent: 'AT',
+  wappen: 'kaernten',
+  photo: 'Stadt fotos/oebb regio.JPG',
+  networks: [
+    { id: 'KAERNTEN',     label: 'Kärntner Linien', desc: 'Bus (Klagenfurt, Villach …)', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_K' } },
+    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } }
   ]
 };
 
@@ -5723,8 +5754,8 @@ function detectDisplayPreset() {
 // direkt in die Bundesland-/Netz-Auswahl dieses Landes. Nur wenn KEIN Land
 // bekannt ist (?country=none / window.deviceCountry===''), fragt der Dropdown nach.
 const DEFAULT_COUNTRY = 'AT';
-const COUNTRY_ORDER = ['AT','DE','CH','LI','CZ','FR','NL','BE','LU','IT','GB','HU','SI','DK','NO','SE','FI','EE','IE','INT'];
-const COUNTRY_FLAGS = {AT:'🇦🇹',DE:'🇩🇪',CH:'🇨🇭',LI:'🇱🇮',CZ:'🇨🇿',FR:'🇫🇷',NL:'🇳🇱',BE:'🇧🇪',LU:'🇱🇺',IT:'🇮🇹',GB:'🇬🇧',HU:'🇭🇺',SI:'🇸🇮',DK:'🇩🇰',NO:'🇳🇴',SE:'🇸🇪',FI:'🇫🇮',EE:'🇪🇪',IE:'🇮🇪',INT:'🌍'};
+const COUNTRY_ORDER = ['AT','DE','CH','LI','CZ','FR','NL','BE','LU','IT','GB','HU','SI','DK','NO','SE','FI','EE','IE','GE','INT'];
+const COUNTRY_FLAGS = {AT:'🇦🇹',DE:'🇩🇪',CH:'🇨🇭',LI:'🇱🇮',CZ:'🇨🇿',FR:'🇫🇷',NL:'🇳🇱',BE:'🇧🇪',LU:'🇱🇺',IT:'🇮🇹',GB:'🇬🇧',HU:'🇭🇺',SI:'🇸🇮',DK:'🇩🇰',NO:'🇳🇴',SE:'🇸🇪',FI:'🇫🇮',EE:'🇪🇪',IE:'🇮🇪',GE:'🇬🇪',INT:'🌍'};
 
 function populateCountrySelect() {
   var sel = document.getElementById('countrySelect');
@@ -9528,6 +9559,10 @@ const NETWORK_COLORS = {
   NRW: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
   BAYERN: { id: 24, name: 'Paper White', color: '#dcdcdc', variant: 3 },
   AACHEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
+  VOR: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // NÖ/Bgld → orange Matrix
+  OOEVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },     // OÖVV → orange Matrix
+  KAERNTEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // Kärnten → orange Matrix
+  TBILISI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Tbilisi → orange Matrix
   BODO: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
   SALZBURG: { id: 24, name: 'Paper White', color: '#000000', variant: 2 },
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
@@ -11161,6 +11196,21 @@ function colourIdToColor(colourId) {
   return COLOUR_HEX[colourId] || '#666';
 }
 
+// Per-Display-Look aus der zuletzt geladenen displaysettings (autoritative Quelle PRO
+// colour). Gefüllt von applyDisplaySettingsToConfig, gelesen von renderDisplayTypeSections,
+// damit JEDER Display-Typ seine eigenen Werte zurückbekommt — nicht nur das erste Segment
+// (sonst springen Schriftfarbe/Hochflurer/… beim Wiederöffnen auf Default zurück).
+var dsByCid = {};
+
+// Gespeicherter displaysettings-Wert für (cid, key) als int, sonst undefined (= kein
+// Wert gespeichert → Aufrufer nutzt seinen Default/Netz-Variante).
+function dsVal(cid, key) {
+  var o = dsByCid[cid];
+  if (!o || o[key] === undefined) return undefined;
+  var n = parseInt(o[key]);
+  return isNaN(n) ? undefined : n;
+}
+
 function renderDisplayTypeSections() {
   var container = document.getElementById('ftDisplayTypeSections');
   if (!container) return;
@@ -11372,7 +11422,8 @@ function renderDisplayTypeSections() {
         html += '</div></div>';
 
         // Wien U-Bahn-Badges (farbige Linien-Badges wie im echten Wiener-Linien-Stil)
-        var wbVal = (recommendedConfig && recommendedConfig.wienBadges) || 0;
+        var wbVal = dsVal(dt.colour, 'u');
+        if (wbVal === undefined) wbVal = (recommendedConfig && recommendedConfig.wienBadges) || 0;
         html += '<div class="form-row"><div><div class="form-label">U-Bahn Badges</div><div class="form-hint">Farbige U-Bahn-Linien (U1 rot, U2 lila …) wie auf den echten Anzeigen</div></div>';
         html += '<div class="toggle-row" id="ftWienBadges_' + dt.colour + '">';
         html += '<button class="toggle-btn' + (wbVal === 0 ? ' active' : '') + '" data-value="0" onclick="setFtWienBadges(' + dt.colour + ',0)">Aus</button>';
@@ -11382,26 +11433,36 @@ function renderDisplayTypeSections() {
       }
     }
     if (f.altNext) {
-      var altActive = (recommendedConfig && recommendedConfig.alternateNext === false) ? '' : ' active';
+      var aDs = dsVal(dt.colour, 'a');
+      var altOn = (aDs !== undefined) ? (aDs === 1) : !(recommendedConfig && recommendedConfig.alternateNext === false);
+      var altActive = altOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Abfahrten</div><div class="form-hint">An = erste &amp; nächste im Wechsel (Wien-Takt) · Aus = nur die nächste</div></div>';
       html += '<div class="toggle-switch' + altActive + '" id="ftAltNext_' + dt.colour + '" onclick="toggleFtSwitch(\'ftAltNext_' + dt.colour + '\')"></div></div>';
     }
     if (f.chopper) {
-      var chopperActive = (recommendedConfig && recommendedConfig.chopper) ? ' active' : '';
+      var hDs = dsVal(dt.colour, 'h');
+      var chopperOn = (hDs !== undefined) ? (hDs === 1) : !!(recommendedConfig && recommendedConfig.chopper);
+      var chopperActive = chopperOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Hochflurer markieren</div></div>';
       html += '<div class="toggle-switch' + chopperActive + '" id="ftChopper_' + dt.colour + '" onclick="toggleFtSwitch(\'ftChopper_' + dt.colour + '\')"></div></div>';
       // Niederflur-Blink: pulsiert das Icon wenn das folgende Fahrzeug Niederflur ist
-      var nfBlinkActive = (recommendedConfig && recommendedConfig.niederflurBlink) ? ' active' : '';
+      var nDs = dsVal(dt.colour, 'n');
+      var nfBlinkOn = (nDs !== undefined) ? (nDs === 1) : !!(recommendedConfig && recommendedConfig.niederflurBlink);
+      var nfBlinkActive = nfBlinkOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Niederflur-Hinweis blinken</div><div class="form-hint">Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht</div></div>';
       html += '<div class="toggle-switch' + nfBlinkActive + '" id="ftNfBlink_' + dt.colour + '" onclick="toggleFtSwitch(\'ftNfBlink_' + dt.colour + '\')"></div></div>';
     }
     if (f.silberpfeil) {
-      var silberActive = (recommendedConfig && recommendedConfig.silberpfeil) ? ' active' : '';
+      var kDs = dsVal(dt.colour, 'k');
+      var silberOn = (kDs !== undefined) ? (kDs === 1) : !!(recommendedConfig && recommendedConfig.silberpfeil);
+      var silberActive = silberOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Klimaanlage anzeigen</div></div>';
       html += '<div class="toggle-switch' + silberActive + '" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
     }
     if (f.delayHighlight) {
-      var dhActive = (recommendedConfig && recommendedConfig.delayHighlight) ? ' active' : '';
+      var dDs = dsVal(dt.colour, 'd');
+      var dhOn = (dDs !== undefined) ? (dDs === 1) : !!(recommendedConfig && recommendedConfig.delayHighlight);
+      var dhActive = dhOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Verspätung herausstechend</div><div class="form-hint">Zeigt "+X" farbig (orange/rot) und färbt die Abfahrtszeit</div></div>';
       html += '<div class="toggle-switch' + dhActive + '" id="ftDelayHl_' + dt.colour + '" onclick="toggleFtSwitch(\'ftDelayHl_' + dt.colour + '\')"></div></div>';
     }
@@ -11413,32 +11474,41 @@ function renderDisplayTypeSections() {
 
     // Anzeigedauer (nur bei Multi-Display)
     if (types.length > 1) {
+      var iDs = dsVal(dt.colour, 'i');
+      var iSel = (iDs !== undefined) ? iDs : 10;   // gespeicherte Dauer, sonst Default 10s
       html += '<div class="form-row"><div><div class="form-label">Anzeigedauer</div><div class="form-hint">Wie lange diese Ansicht angezeigt wird</div></div>';
       html += '<div class="toggle-row" id="ftInterval_' + dt.colour + '">';
       [5, 10, 15, 20].forEach(function(sec) {
-        html += '<button class="toggle-btn' + (sec === 10 ? ' active' : '') + '" data-value="' + sec + '" onclick="setFtToggleVal(\'ftInterval_' + dt.colour + '\',' + sec + ')">' + sec + 's</button>';
+        html += '<button class="toggle-btn' + (sec === iSel ? ' active' : '') + '" data-value="' + sec + '" onclick="setFtToggleVal(\'ftInterval_' + dt.colour + '\',' + sec + ')">' + sec + 's</button>';
       });
       html += '</div></div>';
     }
 
     // Zeitfenster (nur bei Multi-Display)
     if (types.length > 1) {
+      // Gespeichertes Zeitfenster ("6-22") pro Display restaurieren: Toggle an + Panel
+      // offen + Von/Bis vorausgewählt. Ohne gespeicherten Wert: aus, Default 6-22.
+      var wDs = (dsByCid[dt.colour] && dsByCid[dt.colour].w != null) ? String(dsByCid[dt.colour].w) : '';
+      var wActive = wDs !== '';
+      var wParts = wDs.split('-');
+      var wFrom = wActive ? (parseInt(wParts[0]) || 6) : 6;
+      var wTo = wActive ? (parseInt(wParts[1]) || 22) : 22;
       html += '<div class="form-row"><div><div class="form-label">Zeitfenster</div><div class="form-hint">Nur in bestimmten Stunden anzeigen</div></div>';
-      html += '<div class="toggle-switch" id="ftTimeWindow_' + dt.colour + '" onclick="toggleFtSwitch(\'ftTimeWindow_' + dt.colour + '\');toggleTimeWindow(' + dt.colour + ')"></div></div>';
-      html += '<div id="ftTimeWindowPanel_' + dt.colour + '" style="display:none;margin-top:4px;padding:12px;background:#f8f9fa;border-radius:10px;">';
+      html += '<div class="toggle-switch' + (wActive ? ' active' : '') + '" id="ftTimeWindow_' + dt.colour + '" onclick="toggleFtSwitch(\'ftTimeWindow_' + dt.colour + '\');toggleTimeWindow(' + dt.colour + ')"></div></div>';
+      html += '<div id="ftTimeWindowPanel_' + dt.colour + '" style="display:' + (wActive ? 'block' : 'none') + ';margin-top:4px;padding:12px;background:#f8f9fa;border-radius:10px;">';
       html += '<div style="display:flex;align-items:center;gap:10px;">';
       html += '<span style="font-size:13px;">Von</span>';
       html += '<select id="ftTimeFrom_' + dt.colour + '" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;font-size:14px;">';
       for (var h = 0; h < 24; h++) {
         var hh = (h < 10 ? '0' : '') + h;
-        html += '<option value="' + h + '"' + (h === 6 ? ' selected' : '') + '>' + hh + ':00</option>';
+        html += '<option value="' + h + '"' + (h === wFrom ? ' selected' : '') + '>' + hh + ':00</option>';
       }
       html += '</select>';
       html += '<span style="font-size:13px;">Bis</span>';
       html += '<select id="ftTimeTo_' + dt.colour + '" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;font-size:14px;">';
       for (var h = 0; h < 24; h++) {
         var hh = (h < 10 ? '0' : '') + h;
-        html += '<option value="' + h + '"' + (h === 22 ? ' selected' : '') + '>' + hh + ':00</option>';
+        html += '<option value="' + h + '"' + (h === wTo ? ' selected' : '') + '>' + hh + ':00</option>';
       }
       html += '</select>';
       html += '</div>';
@@ -11474,7 +11544,8 @@ function renderDisplayTypeSections() {
         var cfgHasGroups = ((((recommendedConfig && recommendedConfig.lineGroups) || '').indexOf('+') >= 0) ||
                             (((recommendedConfig && recommendedConfig.rowOrderDestination) || '').indexOf('+') >= 0));
         var manualWanted = seededGroups || cfgHasGroups;
-        ftSortByCid[cidS]    = String((recommendedConfig && recommendedConfig.sortMode) || 1);
+        var sDs = dsVal(cidS, 's');   // gespeicherte Sortierung pro Display gewinnt
+        ftSortByCid[cidS]    = String(sDs !== undefined ? sDs : ((recommendedConfig && recommendedConfig.sortMode) || 1));
         ftGroupByCid[cidS]   = manualWanted ? 'on' : 'off';
         ftAdvModeByCid[cidS] = manualWanted ? 'manual' : 'auto';
         if (manualWanted) ftSortByCid[cidS] = '1';  // Gruppen brauchen statische Reihenfolge
@@ -11506,15 +11577,20 @@ function renderDisplayTypeSections() {
     // Matrix/Paper-White (23/24): Default = Netz-Variante (Linz grün, Berlin/Schweiz
     // orange) statt der globalen Wien-Schriftfarbe.
     if (f.textColor) {
-      var savedTxt;
-      if (dt.colour === 23 || dt.colour === 24) {
-        var nvSeed = variantForColour(dt.colour);
-        savedTxt = (nvSeed != null) ? nvSeed : 1;
-      } else {
-        savedTxt = (recommendedConfig && recommendedConfig.textColor) || 1;
+      // Gespeicherter Wert pro Display gewinnt IMMER (auch bei Matrix/Paper White 23/24 —
+      // sonst überschrieb die Netz-Variante die manuelle Schriftfarbe bei jedem Reload).
+      var savedTxt = dsVal(dt.colour, 't');
+      if (savedTxt === undefined) {
+        if (dt.colour === 23 || dt.colour === 24) {
+          var nvSeed = variantForColour(dt.colour);
+          savedTxt = (nvSeed != null) ? nvSeed : 1;
+        } else {
+          savedTxt = (recommendedConfig && recommendedConfig.textColor) || 1;
+        }
       }
       setFtToggleVal('ftTxtCol_' + dt.colour, savedTxt);
-      var savedBg = (recommendedConfig && recommendedConfig.wienBg !== undefined) ? recommendedConfig.wienBg : 0;
+      var savedBg = dsVal(dt.colour, 'b');
+      if (savedBg === undefined) savedBg = (recommendedConfig && recommendedConfig.wienBg !== undefined) ? recommendedConfig.wienBg : 0;
       setFtToggleVal('ftWienBg_' + dt.colour, savedBg);
     }
   });
@@ -13660,7 +13736,10 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     var colour = stationDisplayColour(s);
     var bucket = (MASTERROW_TIME_COLOURS.indexOf(colour) >= 0) ? time : master;
     var net = s.network || 'WL';
-    var dirs = (s.directions || []);
+    // "Alle Abfahrten": IMMER als Wildcard schreiben (rbl|*), nie die gerade gesehenen
+    // Züge einbacken. Sonst stünde ein Snapshot der aktuellen Abfahrten in der masterrow
+    // statt eines generischen "alle Linien"-Markers → Gerät zeigte nur diese Momentaufnahme.
+    var dirs = s.allDepartures ? [] : (s.directions || []);
 
     // rbl → { lineParts:[], bareId }, Reihenfolge des ersten Auftauchens.
     var rblOrder = [];
@@ -13709,7 +13788,7 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       String(s.fullId || (net + ':' + (s.stopId || ''))).split(',').forEach(function(fid) {
         fid = fid.trim(); if (!fid) return;
         var rbl = fid.indexOf(':') > 0 ? fid : (net + ':' + fid);
-        var lines = s.filter ? s.filter.split(',').map(function(x){return x.trim();}).filter(Boolean).join('+') : '*';
+        var lines = (!s.allDepartures && s.filter) ? s.filter.split(',').map(function(x){return x.trim();}).filter(Boolean).join('+') : '*';
         ensure(rbl, bareOf(rbl)).lineParts.push(lines || '*');
       });
     }
@@ -13832,6 +13911,7 @@ function parseDisplaySettings(str) {
 // in recommendedConfig wieder her. Wird beim Laden aufgerufen, NACH den Top-Level-Feldern.
 function applyDisplaySettingsToConfig(str) {
   var dsMap = parseDisplaySettings(str);
+  dsByCid = dsMap;   // per-colour Quelle für renderDisplayTypeSections (Restore pro Display)
   var colours = Object.keys(dsMap);
   if (colours.length === 0 || !recommendedConfig) return;
   // Globale Felder aus dem ersten (dominanten) Segment — die Feintuning-Toggles lesen
@@ -14677,7 +14757,7 @@ function saveConfig() {
 // linefilterdestination: Linz-Format "1:Auwiesen,2:solarCity,27:Chemiepark" mit Line:Destination
 // roworderdestination: Wien-Format "4A:Karlsplatz U,4A:Wittelsbachstraße,59A:Bhf. Meidling S U" mit Line:Destination
 let _loadExistingConfigPromise = null;
-async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination, linegroups) {
+async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr) {
   if (!rbl || rbl.trim() === '') return;
 
   // Serialisierung: Warte auf vorherigen Aufruf bevor neuer startet
@@ -14686,15 +14766,38 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
     console.log('[loadExistingConfig] Warte auf vorherigen Aufruf...');
     await _loadExistingConfigPromise;
   }
-  _loadExistingConfigPromise = _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups);
+  _loadExistingConfigPromise = _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr);
   await _loadExistingConfigPromise;
   _loadExistingConfigPromise = null;
 }
 
-async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups) {
+// Stop-IDs (bare, ohne Netz-Prefix), deren masterrow/timerow-Linienfeld "*" ist = "Alle
+// Abfahrten". Der "*"-Marker überlebt den Round-Trip in masterrow (die Firmware regeneriert
+// den filter-String daraus als LEER), daher ist die masterrow die einzige verlässliche
+// Quelle um beim Reload eine "Alle Abfahrten"-Station von einer normalen zu unterscheiden.
+function allDeparturesStopIdsFromRows(masterRowStr) {
+  var set = {};
+  if (!masterRowStr) return set;
+  String(masterRowStr).split(';').forEach(function(seg) {
+    seg = seg.trim();
+    if (!seg) return;
+    var fields = seg.split('|');
+    if (fields.length < 2) return;
+    var rbl = (fields[0] || '').trim();           // NET:stopId
+    var lineField = (fields[1] || '').trim();      // "*" = alle Linien
+    if (lineField !== '*') return;
+    var ci = rbl.indexOf(':');
+    var sid = ci > 0 ? rbl.substring(ci + 1) : rbl;
+    if (sid) set[sid] = true;
+  });
+  return set;
+}
+
+async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr) {
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
   const filterParts = filter ? filter.split('|') : [];
+  const allDepStopIds = allDeparturesStopIdsFromRows(masterRowStr);
 
   // Parse linefilterdestination ODER roworderdestination (beide haben gleiches Format)
   // roworderdestination hat Priorität für Wien (enthält die Richtungen)
@@ -14787,19 +14890,34 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // Filter für diese Station: Liniennamen aus filterParts oder aus lineDestinations
     const stationFilter = filterParts[idx] || '';
     const filterLines = stationFilter ? stationFilter.split(',').map(f => f.trim()) : [];
+    const bareStopId = isJourney ? stopId.split('>')[0] : stopId;
+    // "Alle Abfahrten"-Station? Primär am "*"-Marker der masterrow erkennen; Fallback:
+    // gar kein Filter UND keine Richtungs-Filter irgendwo (reine alle-Abfahrten-Config).
+    const isAllDep = !!allDepStopIds[bareStopId]
+      || (!isJourney && filterLines.length === 0 && lineDestinations.length === 0
+          && network !== 'OEBB' && network !== 'OEBB_STAMM_SBAHN');
 
     // Station erstellen
     const station = {
       network,
       networkName: NETWORKS[network]?.name || network,
-      stopId: isJourney ? stopId.split('>')[0] : stopId,
+      stopId: bareStopId,
       stopName,
       filter: stationFilter,
       fullId,
       isJourney,
       isExisting: true,
-      directions: []  // Wird unten befüllt
+      allDepartures: isAllDep,
+      directions: []  // Wird unten befüllt (außer bei "Alle Abfahrten" → bleibt leer)
     };
+
+    // "Alle Abfahrten": KEINE Richtungen einbacken — die Station ist ein generischer
+    // "alle Linien"-Marker (rbl|*). Würde man hier die aktuell sichtbaren Abfahrten von
+    // der API laden, stünde beim Re-Save ein Snapshot statt "*" in der masterrow.
+    if (isAllDep) {
+      stations.push(station);
+      continue;
+    }
 
     // OEBB Fernverkehr (Von-Nach): Directions direkt aus Filter + Zielname aufbauen
     // Die API gibt Zugnamen wie "RJX 161" zurück, aber der Filter enthält nur Gattungen "RJX"
@@ -15012,7 +15130,7 @@ async function handleConfigMessage(data) {
     if (data.rbl && data.rbl.split(',').some(function(p){ p=(p||'').trim(); return p.indexOf('WL:')===0 || /^\d/.test(p); })) {
       await loadWienData();
     }
-    await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '', data.linegroups || '');
+    await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '', data.linegroups || '', (data.masterrow || '') + ';' + (data.timerow || ''));
     return;
   }
 
@@ -15046,7 +15164,7 @@ async function handleConfigMessage(data) {
       await loadWienData();
     }
     const lineGroupsStr = data.config.linegroups || '';
-    await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest, lineGroupsStr);
+    await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest, lineGroupsStr, (data.config.masterrow || '') + ';' + (data.config.timerow || ''));
 
     // Initialisiere recommendedConfig falls noch nicht vorhanden
     if (!recommendedConfig) {
@@ -15151,6 +15269,7 @@ async function handleConfigMessage(data) {
     // Per-Display-Look aus displaysettings (autoritative Quelle) wiederherstellen —
     // überschreibt die Top-Level-Felder, damit Schrift/Sortierung/Farbton/Klima/
     // Hochflurer/Verspätung/Anzeigezeit beim erneuten Öffnen NICHT verloren gehen.
+    dsByCid = {};   // frisch: keine per-Display-Werte aus einer vorher geladenen Config
     if (data.config.displaysettings) {
       applyDisplaySettingsToConfig(data.config.displaysettings);
     }
