@@ -11543,7 +11543,18 @@ function renderDisplayTypeSections() {
         // waren (die Gruppe materialisiert sich dann beim Re-Seed nach initFtGrouping).
         var cfgHasGroups = ((((recommendedConfig && recommendedConfig.lineGroups) || '').indexOf('+') >= 0) ||
                             (((recommendedConfig && recommendedConfig.rowOrderDestination) || '').indexOf('+') >= 0));
-        var manualWanted = seededGroups || cfgHasGroups;
+        // Manuelle Reihenfolge OHNE Gruppen: weicht die geseedete Reihenfolge von der
+        // natürlichen (aufsteigenden) allDirs-Folge ab, hat der User umsortiert → Manuell.
+        // Sonst stünde eine gespeicherte Reihenfolge beim Reload auf "Automatisch" und das
+        // Reihenfolge-Panel bliebe versteckt.
+        var _gd = getDtGroupData(cidS);
+        var orderIsCustom = false;
+        if (_gd && Array.isArray(_gd.orderList)) {
+          var _flat = [];
+          _gd.orderList.forEach(function(it) { (it.indices || []).forEach(function(i) { _flat.push(i); }); });
+          for (var _k = 1; _k < _flat.length; _k++) { if (_flat[_k] < _flat[_k - 1]) { orderIsCustom = true; break; } }
+        }
+        var manualWanted = seededGroups || cfgHasGroups || orderIsCustom;
         var sDs = dsVal(cidS, 's');   // gespeicherte Sortierung pro Display gewinnt
         ftSortByCid[cidS]    = String(sDs !== undefined ? sDs : ((recommendedConfig && recommendedConfig.sortMode) || 1));
         ftGroupByCid[cidS]   = manualWanted ? 'on' : 'off';
@@ -13722,6 +13733,59 @@ function _mrRbl(d) {
   return net + ':' + sid;
 }
 
+// Schlüssel zum Matchen einer Richtung zwischen _dtAllDirs (Feintuning-Reihenfolge)
+// und station.directions. Muss identisch zu beiden Quellen gebildet werden: Linie +
+// (richtungsId, sonst Ziel) + aufgelöste Bahnsteig-stopId.
+function _dirRankKey(line, ref, stopId) {
+  return String(line || '').trim() + '|' + String(ref || '').trim() + '|' + String(stopId || '').trim();
+}
+
+// Wendet die im Feintuning gewählte Reihenfolge (getDtOrderList pro colour) auf die
+// directions-Reihenfolge JEDER Station an. buildMasterAndTimeRows emittiert die masterrow
+// in directions-Reihenfolge → ohne diesen Schritt landet nur die rohe (API-)Reihenfolge
+// am Gerät, die manuelle Zeilen-Reihenfolge ginge verloren (Gerät regeneriert rowOrder/
+// lineGroups deterministisch aus der masterrow). Muss VOR buildMasterAndTimeRows laufen.
+function applyFinetuningOrderToStations() {
+  if (typeof stations === 'undefined' || !stations.length) return;
+  if (typeof getUniqueDisplayTypes !== 'function' || typeof getDtOrderList !== 'function') return;
+  getUniqueDisplayTypes().forEach(function(dt) {
+    var cid = dt.colour;
+    var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
+    if (!f.sorting) return;  // Zug-Displays: zeitbasiert, keine manuelle Reihenfolge
+    var allDirs = (window._dtAllDirs && window._dtAllDirs[cid]) || [];
+    if (allDirs.length === 0) return;
+    var orderList = getDtOrderList(cid);
+    if (!orderList || orderList.length === 0) return;
+    // Rang pro Richtungs-Key aus der flachen Reihenfolge (Gruppen-Mitglieder benachbart).
+    var rank = {};
+    var pos = 0;
+    orderList.forEach(function(it) {
+      (it.indices || []).forEach(function(idx) {
+        var e = allDirs[idx];
+        if (!e) return;
+        var key = _dirRankKey(e.line, e.richtungsId || e.towards, e.stopId);
+        if (rank[key] === undefined) rank[key] = pos++;
+      });
+    });
+    // directions jeder Station dieses Display-Typs STABIL nach Rang sortieren.
+    stations.forEach(function(s) {
+      if (stationDisplayColour(s) !== cid) return;
+      if (!s.directions || s.directions.length < 2) return;
+      s.directions = s.directions
+        .map(function(d, i) { return { d: d, i: i }; })
+        .sort(function(a, b) {
+          var ka = _dirRankKey(a.d.line, a.d.richtungsId || a.d.towards, a.d.stopId || s.stopId);
+          var kb = _dirRankKey(b.d.line, b.d.richtungsId || b.d.towards, b.d.stopId || s.stopId);
+          var ra = (rank[ka] !== undefined) ? rank[ka] : (1e9 + a.i);  // Unbekannte ans Ende, stabil
+          var rb = (rank[kb] !== undefined) ? rank[kb] : (1e9 + b.i);
+          if (ra !== rb) return ra - rb;
+          return a.i - b.i;
+        })
+        .map(function(x) { return x.d; });
+    });
+  });
+}
+
 function buildMasterAndTimeRows(gehwegByStopId) {
   gehwegByStopId = gehwegByStopId || {};
   var master = [];
@@ -14320,6 +14384,9 @@ function sendConfigToDeviceDirect(config) {
   // regeneriert die alten Felder daraus → egal ob config.rbl/colour stale sind.
   try {
     if (typeof stations !== 'undefined' && stations.length > 0 && typeof buildMasterAndTimeRows === 'function') {
+      // Manuelle Feintuning-Reihenfolge auf die directions anwenden, BEVOR die masterrow
+      // gebaut wird — sonst kommt nur die rohe Reihenfolge am Gerät an.
+      if (typeof applyFinetuningOrderToStations === 'function') applyFinetuningOrderToStations();
       var _gwById = {};
       gehwegString.split('|').forEach(function(seg) {
         var c = seg.lastIndexOf(':');
