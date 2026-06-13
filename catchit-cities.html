@@ -779,7 +779,10 @@
        Optik wie die übrigen Sektionen (weiße Karte, dezenter Rand) — kein Sonder-Stil. */
     /* Retro-Ticket-Look (wie .card/.btn): kräftige schwarze Ränder + harte Offset-Schatten. */
     .vn-flow { display: flex; flex-direction: column; }
-    .vn-step { background: #fff; border: 3px solid var(--ink); border-radius: 8px; padding: 14px 16px; box-shadow: 4px 4px 0 var(--ink); }
+    .vn-step { background: #fff; border: 2px solid #2b2b2b; border-radius: 10px; padding: 14px 16px; box-shadow: 2px 2px 0 rgba(0,0,0,0.10); }
+    /* dezente Trennlinie innerhalb der kombinierten Von+Nach-Box */
+    .vn-divider { border-top: 1px solid #e8e2d4; margin: 13px 0 12px; }
+    .vn-next-hint { font-size: 13px; color: #9a9384; font-weight: 600; }
     .vn-step.vn-upcoming { border-color: #c9c1b0; box-shadow: 2px 2px 0 #c9c1b0; background: var(--card); }
     .vn-label { font-size: 12px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; color: var(--ink); margin-bottom: 11px; display: flex; align-items: center; gap: 7px; }
     .vn-step.vn-upcoming .vn-label { color: #9a9384; }
@@ -790,8 +793,8 @@
     .vn-change { font-size: 12px; color: var(--red); cursor: pointer; text-decoration: underline; font-weight: 700; flex: 0 0 auto; }
     /* Such-Step (Von) bekommt für Regio/Fern denselben Retro-Look (helles Feld, schwarzer Rand). */
     #stepSearch .vn-step .search-container { margin: 0; }
-    #stepSearch .vn-step .search-input { background: #fff; color: var(--ink); border: 3px solid var(--ink); border-radius: 8px; }
-    #stepSearch .vn-step .search-input:focus { border-color: var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+    #stepSearch .vn-step .search-input { background: #fff; color: var(--ink); border: 2px solid #2b2b2b; border-radius: 8px; }
+    #stepSearch .vn-step .search-input:focus { border-color: var(--ink); box-shadow: 2px 2px 0 rgba(0,0,0,0.10); }
     .oebb-dest-item {
       padding: 13px 14px;
       cursor: pointer;
@@ -2922,12 +2925,11 @@
         <div class="search-spinner" id="searchSpinner"></div>
       </div>
       <div class="search-results" id="searchResults"></div>
-    </div>
-    <div class="hidden" id="vonNachPreview">
-      <div class="vn-arrow">&darr;</div>
-      <div class="vn-step vn-upcoming"><div class="vn-label">Nach</div><div class="vn-hint">Zuerst die Start-Station oben wählen.</div></div>
-      <div class="vn-arrow">&darr;</div>
-      <div class="vn-step vn-upcoming"><div class="vn-label">Linien</div><div class="vn-hint">Erscheinen, sobald das Ziel feststeht.</div></div>
+      <!-- Vorschau der naechsten Schritte INNERHALB derselben Box (statt zwei grauer Boxen) -->
+      <div class="hidden" id="vonNachPreview">
+        <div class="vn-divider"></div>
+        <div class="vn-next-hint">Danach: <strong>Ziel</strong> &amp; <strong>Linien</strong> wählen.</div>
+      </div>
     </div>
   </div>
   
@@ -4841,43 +4843,43 @@ const breadcrumb = document.getElementById('breadcrumb');
 // ===== Region-Titelfoto (Hero) — bleibt sichtbar von Region → Netzwerk → Stationssuche =====
 // Foto pro Land (gleiche Bilder wie im Region-Picker). Ohne Foto -> Brand-Farbe.
 const REGION_HERO = {
-  AT:  { photo: 'Stadt fotos/Wiener Linien.jpg' },
-  DE:  { photo: 'Stadt fotos/berlin.jpg' },
-  LI:  { photo: 'Stadt fotos/Lichtenstein.jpg', pos: 'center bottom' },
-  FR:  { photo: 'Stadt fotos/Paris.jpg' },
-  CZ:  { photo: 'Stadt fotos/Prag.jpg' },
-  HU:  { photo: 'Stadt fotos/budapest.jpg' },
-  FI:  { photo: 'Stadt fotos/helsinki-nahverkehr.jpg' },
-  CH:  { photo: 'Stadt fotos/schweiz tram.jpg' }, NL: { photo: 'Stadt fotos/netherlands.jpg' },
-  GB:  { photo: 'Stadt fotos/UKK.avif' },
-  IT:  { color: '#008c45' }, BE: { photo: 'Stadt fotos/belgien.jpg' }, LU: { photo: 'Stadt fotos/luxenburg.jpg' },
-  DK:  { color: '#c8102e' }, NO: { photo: 'Stadt fotos/norway.jpg' }, SE: { color: '#006aa7' },
-  EE:  { photo: 'Stadt fotos/estland.webp' }, IE: { photo: 'Stadt fotos/IRLAND.png' }, SI: { color: '#005da4' },
+  AT:  { photo: 'fotos/Wiener Linien.jpg' },
+  DE:  { photo: 'fotos/berlin.jpg' },
+  LI:  { photo: 'fotos/Lichtenstein.jpg', pos: 'center bottom' },
+  FR:  { photo: 'fotos/Paris.jpg' },
+  CZ:  { photo: 'fotos/Prag.jpg' },
+  HU:  { photo: 'fotos/budapest.jpg' },
+  FI:  { photo: 'fotos/helsinki-nahverkehr.jpg' },
+  CH:  { photo: 'fotos/schweiz tram.jpg' }, NL: { photo: 'fotos/netherlands.jpg' },
+  GB:  { photo: 'fotos/UKK.avif' },
+  IT:  { color: '#008c45' }, BE: { photo: 'fotos/belgien.jpg' }, LU: { photo: 'fotos/luxenburg.jpg' },
+  DK:  { color: '#c8102e' }, NO: { photo: 'fotos/norway.jpg' }, SE: { color: '#006aa7' },
+  EE:  { photo: 'fotos/estland.webp' }, IE: { photo: 'fotos/IRLAND.jpg' }, SI: { color: '#005da4' },
   INT: { color: '#3a6073' }
 };
 // Netz-spezifischer Hero (überschreibt Land/Bundesland, wenn dieses Netz gewählt ist)
 const NETWORK_HERO = {
-  LONDON: { photo: 'Stadt fotos/LONDON .jpg', title: 'London' },
-  VBN:    { photo: 'Stadt fotos/Bremen.jpg',      title: 'Bremen & Niedersachsen' },
-  VRN:    { photo: 'Stadt fotos/Rhein-Nekar.jpg', title: 'Rhein-Neckar' },
-  VOS:    { photo: 'Stadt fotos/Osnabrück.webp',  title: 'Osnabrück' },
-  NAHSH:  { photo: 'Stadt fotos/Schleswig.png',   title: 'Schleswig-Holstein' },
-  VSN:    { photo: 'Stadt fotos/Göttingen.jpg',   title: 'Süd-Niedersachsen' },
-  INSA:   { photo: 'Stadt fotos/INSA.jpg',        title: 'Sachsen-Anhalt' },
-  NVV:    { photo: 'Stadt fotos/NVV.jpg',          title: 'Nordhessen' },
-  VMT:    { photo: 'Stadt fotos/VMT.jpg',          title: 'Mittelthüringen' },
-  SAARVV: { photo: 'Stadt fotos/SAARLAND.webp',    title: 'Saarland' }
+  LONDON: { photo: 'fotos/LONDON .jpg', title: 'London' },
+  VBN:    { photo: 'fotos/Bremen.jpg',      title: 'Bremen & Niedersachsen' },
+  VRN:    { photo: 'fotos/Rhein-Nekar.jpg', title: 'Rhein-Neckar' },
+  VOS:    { photo: 'fotos/Osnabrück.webp',  title: 'Osnabrück' },
+  NAHSH:  { photo: 'fotos/Schleswig.jpg',   title: 'Schleswig-Holstein' },
+  VSN:    { photo: 'fotos/Göttingen.jpg',   title: 'Süd-Niedersachsen' },
+  INSA:   { photo: 'fotos/INSA.jpg',        title: 'Sachsen-Anhalt' },
+  NVV:    { photo: 'fotos/NVV.jpg',          title: 'Nordhessen' },
+  VMT:    { photo: 'fotos/VMT.jpg',          title: 'Mittelthüringen' },
+  SAARVV: { photo: 'fotos/SAARLAND.webp',    title: 'Saarland' }
 };
 // Foto pro Bundesland/Sub-Region (überschreibt das Landesfoto, wenn gewählt)
 const SUBREGION_HERO = {
-  AT_W:    { photo: 'Stadt fotos/Wiener Linien.jpg' },
-  AT_OOE:  { photo: 'Stadt fotos/Oberösterreich.jpg' },
-  AT_STMK: { photo: 'Stadt fotos/GRAZ.jpg' },
-  AT_SBG:  { photo: 'Stadt fotos/Salzburg.jpg' },
-  AT_NOE:  { photo: 'Stadt fotos/nö VOR.jpg' },
-  AT_BGLD: { photo: 'Stadt fotos/Burgenland.jpg' },
-  AT_K:    { photo: 'Stadt fotos/Kaerten.jpg' },
-  AT_T:    { photo: 'Stadt fotos/tirol.jpg' }
+  AT_W:    { photo: 'fotos/Wiener Linien.jpg' },
+  AT_OOE:  { photo: 'fotos/Oberösterreich.jpg' },
+  AT_STMK: { photo: 'fotos/GRAZ.jpg' },
+  AT_SBG:  { photo: 'fotos/Salzburg.jpg' },
+  AT_NOE:  { photo: 'fotos/nö VOR.jpg' },
+  AT_BGLD: { photo: 'fotos/Burgenland.jpg' },
+  AT_K:    { photo: 'fotos/Kaerten.jpg' },
+  AT_T:    { photo: 'fotos/tirol.jpg' }
 };
 
 function updateRegionHero() {
@@ -5422,7 +5424,7 @@ var NETWORK_BRANDS = {
 var DISPLAY_PRESETS = {
   wien: {
     name: 'Wien',
-    photo: 'Stadt fotos/Wiener Linien.jpg',
+    photo: 'fotos/Wiener Linien.jpg',
     networks: [
       { id: 'WL',            jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_W' } },
       { id: 'WLB',           jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_W' } },
@@ -5433,7 +5435,7 @@ var DISPLAY_PRESETS = {
   },
   lichtenstein: {
     name: 'Liechtenstein',
-    photo: 'Stadt fotos/Lichtenstein.jpg',
+    photo: 'fotos/Lichtenstein.jpg',
     photoPos: 'center bottom', // Bus ist im unteren Teil des Fotos
     networks: [
       { id: 'LIEMOBIL', jumpTo: { region: 'LI' } }
@@ -5443,7 +5445,7 @@ var DISPLAY_PRESETS = {
     name: 'Oberösterreich',
     parent: 'AT',
     wappen: 'ooe',
-    photo: 'Stadt fotos/Oberösterreich.jpg',
+    photo: 'fotos/Oberösterreich.jpg',
     networks: [
       { id: 'LINZ',          jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
       { id: 'OOEVV',         label: 'OÖVV', desc: 'Bus, Tram, Lokalbahn', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
@@ -5455,7 +5457,7 @@ var DISPLAY_PRESETS = {
     name: 'Steiermark',
     parent: 'AT',
     wappen: 'stmk',
-    photo: 'Stadt fotos/GRAZ.jpg',
+    photo: 'fotos/GRAZ.jpg',
     networks: [
       { id: 'STV',           jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_STMK' } },
       { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
@@ -5466,7 +5468,7 @@ var DISPLAY_PRESETS = {
     name: 'Salzburg',
     parent: 'AT',
     wappen: 'sbg',
-    photo: 'Stadt fotos/Salzburg.jpg',
+    photo: 'fotos/Salzburg.jpg',
     networks: [
       { id: 'SALZBURG',      jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_SBG' } },
       { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
@@ -5485,7 +5487,7 @@ DISPLAY_PRESETS.tirol = {
   name: 'Tirol & Vorarlberg',
   parent: 'AT',
   wappen: 'tirol',
-  photo: 'Stadt fotos/tirol.jpg',
+  photo: 'fotos/tirol.jpg',
   networks: [
     { id: 'VVT',           label: 'Tirol (VVT)',      desc: 'Bus, Tram, Bahn (Innsbruck, Kufstein …)',   jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_T' } },
     { id: 'VVV',           label: 'Vorarlberg (VVV)', desc: 'Bus, Bahn (Bregenz, Dornbirn, Feldkirch …)', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_T' } },
@@ -5499,11 +5501,12 @@ DISPLAY_PRESETS.noe = {
   name: 'Niederösterreich',
   parent: 'AT',
   wappen: 'noe',
-  photo: 'Stadt fotos/oebb regio.JPG',
+  photo: 'fotos/oebb regio.JPG',
   networks: [
     { id: 'VOR',          label: 'Bus & Tram',  desc: 'St. Pölten, Wr. Neustadt, Mödling …', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_NOE' } },
     { id: 'OEBB_REG_NOE', label: 'ÖBB',         desc: 'S-Bahn, REX, Regionalzug', jumpTo: { region: 'AT' } },
-    { id: 'WLB',          label: 'Badner Bahn', desc: 'Wien ↔ Baden',             jumpTo: { region: 'AT' } }
+    { id: 'WLB',          label: 'Badner Bahn', desc: 'Wien ↔ Baden',             jumpTo: { region: 'AT' } },
+    { id: 'WESTBAHN',     jumpTo: { region: 'AT' } }
   ]
 };
 
@@ -5512,10 +5515,11 @@ DISPLAY_PRESETS.burgenland = {
   name: 'Burgenland',
   parent: 'AT',
   wappen: 'burgenland',
-  photo: 'Stadt fotos/Burgenland.jpg',
+  photo: 'fotos/Burgenland.jpg',
   networks: [
     { id: 'VOR',           label: 'Bus & Tram', desc: 'Eisenstadt, Neusiedl, Oberwart …', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_BGLD' } },
-    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } }
+    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
+    { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
   ]
 };
 
@@ -5524,10 +5528,11 @@ DISPLAY_PRESETS.kaernten = {
   name: 'Kärnten',
   parent: 'AT',
   wappen: 'kaernten',
-  photo: 'Stadt fotos/Kaerten.jpg',
+  photo: 'fotos/Kaerten.jpg',
   networks: [
     { id: 'KAERNTEN',     label: 'Kärntner Linien', desc: 'Bus (Klagenfurt, Villach …)', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_K' } },
-    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } }
+    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
+    { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
   ]
 };
 
@@ -5535,7 +5540,7 @@ DISPLAY_PRESETS.kaernten = {
 DISPLAY_PRESETS.westbahn = {
   name: 'Fernverkehr',
   parent: 'AT',
-  photo: 'Stadt fotos/westbahn.png',
+  photo: 'fotos/westbahn.jpg',
   networks: [
     { id: 'WESTBAHN', jumpTo: { region: 'AT' } }
   ]
@@ -5545,7 +5550,7 @@ DISPLAY_PRESETS.westbahn = {
 DISPLAY_PRESETS.berlin = {
   name: 'Berlin',
   parent: 'DE',
-  photo: 'Stadt fotos/berlin.jpg',
+  photo: 'fotos/berlin.jpg',
   networks: [
     { id: 'BERLIN', jumpTo: { region: 'DE' } },
     { id: 'DB',     label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
@@ -5554,7 +5559,7 @@ DISPLAY_PRESETS.berlin = {
 DISPLAY_PRESETS.bw = {
   name: 'Baden-Württemberg',
   parent: 'DE',
-  photo: 'Stadt fotos/baden württemberg.jpg',
+  photo: 'fotos/baden württemberg.jpg',
   photoPos: 'center top', // Foto-Inhalt soll oben gezeigt werden
   networks: [
     { id: 'BODO', jumpTo: { region: 'DE' } },
@@ -5564,7 +5569,7 @@ DISPLAY_PRESETS.bw = {
 DISPLAY_PRESETS.koeln = {
   name: 'Köln',
   parent: 'DE',
-  photo: 'Stadt fotos/koeln.jpg',
+  photo: 'fotos/koeln.jpg',
   networks: [
     { id: 'KOELN', jumpTo: { region: 'DE' } },
     { id: 'DB',    label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
@@ -5573,7 +5578,7 @@ DISPLAY_PRESETS.koeln = {
 DISPLAY_PRESETS.nrw = {
   name: 'NRW',
   parent: 'DE',
-  photo: 'Stadt fotos/NRW .jpg',
+  photo: 'fotos/NRW .jpg',
   networks: [
     { id: 'NRW', label: 'Nahverkehr', desc: 'Bus, Tram, Stadtbahn, U-Bahn', jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',               jumpTo: { region: 'DE' } }
@@ -5582,7 +5587,7 @@ DISPLAY_PRESETS.nrw = {
 DISPLAY_PRESETS.bayern = {
   name: 'Bayern',
   parent: 'DE',
-  photo: 'Stadt fotos/München.jpg',
+  photo: 'fotos/München.jpg',
   networks: [
     { id: 'BAYERN', label: 'Nahverkehr', desc: 'U-Bahn, Tram, Bus, S-Bahn', jumpTo: { region: 'DE' } },
     { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',             jumpTo: { region: 'DE' } }
@@ -5591,7 +5596,7 @@ DISPLAY_PRESETS.bayern = {
 DISPLAY_PRESETS.hamburg = {
   name: 'Hamburg',
   parent: 'DE',
-  photo: 'Stadt fotos/hamburg.webp',
+  photo: 'fotos/hamburg.webp',
   networks: [
     { id: 'HAMBURG', label: 'Nahverkehr', desc: 'U-Bahn, S-Bahn, Bus, Fähre', jumpTo: { region: 'DE' } },
     { id: 'DB',      label: 'DB Regio',  desc: 'RE, RB, S-Bahn',              jumpTo: { region: 'DE' } }
@@ -5600,7 +5605,7 @@ DISPLAY_PRESETS.hamburg = {
 DISPLAY_PRESETS.rmv = {
   name: 'Rhein-Main (RMV)',
   parent: 'DE',
-  photo: 'Stadt fotos/DB.jpg',
+  photo: 'fotos/DB.jpg',
   networks: [
     { id: 'RMV', label: 'Nahverkehr', desc: 'S-Bahn, U-Bahn, Tram, Bus', jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',             jumpTo: { region: 'DE' } }
@@ -5609,7 +5614,7 @@ DISPLAY_PRESETS.rmv = {
 DISPLAY_PRESETS.vvo = {
   name: 'Dresden (VVO)',
   parent: 'DE',
-  photo: 'Stadt fotos/dresden foto.jpg',
+  photo: 'fotos/dresden foto.jpg',
   networks: [
     { id: 'VVO', label: 'Nahverkehr', desc: 'S-Bahn, Tram, Bus', jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',     jumpTo: { region: 'DE' } }
@@ -5618,7 +5623,7 @@ DISPLAY_PRESETS.vvo = {
 DISPLAY_PRESETS.aachen = {
   name: 'Aachen',
   parent: 'DE',
-  photo: 'Stadt fotos/aaachen.jpg',
+  photo: 'fotos/aaachen.jpg',
   networks: [
     { id: 'AACHEN', jumpTo: { region: 'DE' } },
     { id: 'DB',     label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
@@ -5628,7 +5633,7 @@ DISPLAY_PRESETS.aachen = {
 DISPLAY_PRESETS.vbn = {
   name: 'Bremen & Nds. (VBN)',
   parent: 'DE',
-  photo: 'Stadt fotos/Bremen.jpg',
+  photo: 'fotos/Bremen.jpg',
   networks: [
     { id: 'VBN', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn', jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',   jumpTo: { region: 'DE' } }
@@ -5637,7 +5642,7 @@ DISPLAY_PRESETS.vbn = {
 DISPLAY_PRESETS.vrn = {
   name: 'Rhein-Neckar (VRN)',
   parent: 'DE',
-  photo: 'Stadt fotos/Rhein-Nekar.jpg',
+  photo: 'fotos/Rhein-Nekar.jpg',
   networks: [
     { id: 'VRN', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn', jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',   jumpTo: { region: 'DE' } }
@@ -5646,7 +5651,7 @@ DISPLAY_PRESETS.vrn = {
 DISPLAY_PRESETS.vos = {
   name: 'Osnabrück (VOS)',
   parent: 'DE',
-  photo: 'Stadt fotos/Osnabrück.webp',
+  photo: 'fotos/Osnabrück.webp',
   networks: [
     { id: 'VOS', label: 'Nahverkehr', desc: 'Bus, Bahn',      jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',  jumpTo: { region: 'DE' } }
@@ -5655,7 +5660,7 @@ DISPLAY_PRESETS.vos = {
 DISPLAY_PRESETS.nahsh = {
   name: 'Schleswig-Holstein (NAH.SH)',
   parent: 'DE',
-  photo: 'Stadt fotos/Schleswig.png',
+  photo: 'fotos/Schleswig.jpg',
   networks: [
     { id: 'NAHSH', label: 'Nahverkehr', desc: 'Bus, Bahn',     jumpTo: { region: 'DE' } },
     { id: 'DB',    label: 'DB Regio',  desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
@@ -5664,7 +5669,7 @@ DISPLAY_PRESETS.nahsh = {
 DISPLAY_PRESETS.vsn = {
   name: 'Süd-Niedersachsen (VSN)',
   parent: 'DE',
-  photo: 'Stadt fotos/Göttingen.jpg',
+  photo: 'fotos/Göttingen.jpg',
   networks: [
     { id: 'VSN', label: 'Nahverkehr', desc: 'Bus, Bahn',      jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',  jumpTo: { region: 'DE' } }
@@ -5673,7 +5678,7 @@ DISPLAY_PRESETS.vsn = {
 DISPLAY_PRESETS.insa = {
   name: 'Sachsen-Anhalt (INSA)',
   parent: 'DE',
-  photo: 'Stadt fotos/INSA.jpg',
+  photo: 'fotos/INSA.jpg',
   networks: [
     { id: 'INSA', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn', jumpTo: { region: 'DE' } },
     { id: 'DB',   label: 'DB Regio',  desc: 'RE, RB, S-Bahn',   jumpTo: { region: 'DE' } }
@@ -5682,7 +5687,7 @@ DISPLAY_PRESETS.insa = {
 DISPLAY_PRESETS.nvv = {
   name: 'Nordhessen (NVV)',
   parent: 'DE',
-  photo: 'Stadt fotos/NVV.jpg',
+  photo: 'fotos/NVV.jpg',
   networks: [
     { id: 'NVV', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Kassel …)', jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',              jumpTo: { region: 'DE' } }
@@ -5691,7 +5696,7 @@ DISPLAY_PRESETS.nvv = {
 DISPLAY_PRESETS.vmt = {
   name: 'Mittelthüringen (VMT)',
   parent: 'DE',
-  photo: 'Stadt fotos/VMT.jpg',
+  photo: 'fotos/VMT.jpg',
   networks: [
     { id: 'VMT', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Erfurt, Weimar, Jena …)', jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                              jumpTo: { region: 'DE' } }
@@ -5700,7 +5705,7 @@ DISPLAY_PRESETS.vmt = {
 DISPLAY_PRESETS.saarvv = {
   name: 'Saarland (SaarVV)',
   parent: 'DE',
-  photo: 'Stadt fotos/SAARLAND.webp',
+  photo: 'fotos/SAARLAND.webp',
   networks: [
     { id: 'SAARVV', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Saarbrücken …)', jumpTo: { region: 'DE' } },
     { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                    jumpTo: { region: 'DE' } }
@@ -5711,7 +5716,7 @@ DISPLAY_PRESETS.saarvv = {
 DISPLAY_PRESETS.paris = {
   name: 'Paris',
   parent: 'FR',
-  photo: 'Stadt fotos/Paris.jpg',
+  photo: 'fotos/Paris.jpg',
   networks: [
     { id: 'PARIS', jumpTo: { region: 'FR' } }
   ]
@@ -5719,7 +5724,7 @@ DISPLAY_PRESETS.paris = {
 DISPLAY_PRESETS.prag = {
   name: 'Prag',
   parent: 'CZ',
-  photo: 'Stadt fotos/Prag.jpg',
+  photo: 'fotos/Prag.jpg',
   networks: [
     { id: 'PID', jumpTo: { region: 'CZ' } }
   ]
@@ -5883,7 +5888,9 @@ function leaveDisplayPreset() {
 
 function renderBundeslandChooser(parentRegion) {
   parentRegion = parentRegion || 'AT';
-  var presets = Object.entries(DISPLAY_PRESETS).filter(function(e) { return e[1].parent === parentRegion; });
+  // 'westbahn' (Fernverkehr-Kachel) NICHT als eigene Region zeigen — Fernverkehr ist kein
+  // Bundesland. Stattdessen hat jedes Bundesland einen eigenen „Fernverkehr"-Button (WESTBAHN).
+  var presets = Object.entries(DISPLAY_PRESETS).filter(function(e) { return e[1].parent === parentRegion && e[0] !== 'westbahn'; });
 
   // Title + Subtitle: lokales Wording je nach Land
   var title = document.getElementById('bundeslandTitle');
@@ -6057,12 +6064,13 @@ var WIZARD_STEPS = [
     // automatisch kompakt). Schritt wird einfach uebersprungen.
     isAvailable: function() {
       if (!Array.isArray(stations) || stations.length < 2) return false;
-      var nets = {};
+      // Nur sinnvoll bei 2+ verschiedenen DISPLAY-TYPEN (colours), nicht Netzen:
+      // ÖBB Regio + ÖBB FV sind 2 Netze, aber dieselbe ÖBB-Optik (colour 12) → keine Wahl nötig.
+      var cols = {};
       for (var i = 0; i < stations.length; i++) {
-        var n = stations[i].network;
-        if (n) nets[n] = true;
+        cols[(typeof stationDisplayColour === 'function') ? stationDisplayColour(stations[i]) : (stations[i].network || '')] = true;
       }
-      return Object.keys(nets).length >= 2;
+      return Object.keys(cols).length >= 2;
     },
     validate: function() { return !!getSavedDisplayStyle(); }
   },
@@ -7803,6 +7811,10 @@ function extractLines(data) {
           regDests = ids.map((id, i) => ({ id: id, name: savedNames[i] || id, lines: [] }));
         } else if (_es.fullId) {
           regAll = true;
+          // „Alle Abfahrten" wählt nach TYP → gespeicherte Liniennamen zu Typen zurückrechnen.
+          const types = new Set();
+          (_es.filter || '').split(',').map(s => s.trim()).filter(Boolean).forEach(function(ln) { const t = regLineType(ln); if (t) types.add(t); });
+          regLines = types;
         }
       }
     }
@@ -7872,6 +7884,12 @@ function extractLines(data) {
     if (!fvCheckedDirs.size) {
       fvCheckedDirs = new Set(availableLines.map(l => fvLineAxis(l)));
     }
+    // Keine aktuellen Abfahrten (z.B. kleiner FV-Bahnhof, IC fährt erst später): automatisch
+    // „Alle Abfahrten" → der User kann trotzdem die Zugtypen wählen, damit ein späterer Zug erscheint.
+    if (!fvVonNach && editingStationIndex === null && availableLines.length === 0) {
+      fvAll = true;
+      recomputeFvCats();
+    }
     recomputeFvSelection();
   }
 }
@@ -7889,7 +7907,10 @@ function isRegionalOebbNetwork() {
 }
 
 function renderLines() {
-  if (availableLines.length === 0) {
+  // von→nach-Netze (FV/Regional) NICHT in die Sackgasse schicken, wenn gerade keine Abfahrt da
+  // ist: Ziele kommen aus /lines (unabhängig von Live-Abfahrten) und der User soll trotzdem
+  // „Alle Abfahrten" + Zugtypen wählen können, damit ein späterer Zug (z.B. 1x/Tag IC) angezeigt wird.
+  if (availableLines.length === 0 && !isVonNachNetwork()) {
     // Bei OEBB-Stations: oft sind das HAFAS-Subknoten ohne echte Bahn-Abfahrten
     // (Tram-/Bus-Halte im Bahn-Index). Zur Haupt-Station zurueck-routen.
     const isOebbCtx = (selectedNetwork || '').startsWith('OEBB');
@@ -7919,9 +7940,7 @@ function renderLines() {
     // Vertikaler Stepper: Von ↓ Nach ↓ Zugtypen (wie Regional).
     const fvShowCats = (fvAll || fvDests.length);
     let fvHtml = '<div class="vn-flow reg-fade-in">';
-    fvHtml += vnVonStep();
-    fvHtml += vnArrow();
-    fvHtml += vnNachStep(fvDestPickerHtml(), fvShowCats);
+    fvHtml += vnVonNachStep(fvDestPickerHtml(), fvShowCats);
 
     // Alte Richtungslisten (multiCorridor/E-W) durch Ziel-Picker ERSETZT → deaktiviert
     // (Code bleibt vorerst stehen, beide Zweige via `false` aus).
@@ -8011,6 +8030,9 @@ function renderLines() {
       (FV_CORRIDOR_CATS[c] || FV_CATS).forEach(function(x) { allowedCats.add(x); });
     });
     let chipCats = FV_CATS.filter(c => allowedCats.has(c));
+    // Keine Korridor-Info (z.B. gerade keine Abfahrten an einem kleinen FV-Bahnhof) → ALLE Zugtypen
+    // anbieten, damit der User trotzdem konfigurieren kann (Railjet/ICE/IC/NJ/IR…).
+    if (!chipCats.length) chipCats = FV_CATS.slice();
 
     // Zugtypen erst NACH Zielwahl, und nur die, die die gewählte Verbindung bedienen (Union).
     if (fvShowCats) {
@@ -8050,14 +8072,10 @@ function renderLines() {
     groups.get(line.name).push({ ...line, idx });
   });
 
-  // Für Regional-ÖBB: nur S-Bahn und REX anzeigen (keine Busse, Metro, Fernverkehr)
+  // Für Regional-ÖBB: NUR S/REX/CJX/R/IR (keine Busse, Tram, Metro, Fernverkehr).
   if (isRegional) {
-    const fernverkehr = new Set(['IC', 'ICE', 'EC', 'EN', 'NJ', 'RJ', 'RJX', 'IR', 'D', 'WB']);
-    for (const [name, dirs] of groups) {
-      const type = (dirs[0]?.type || '').toLowerCase();
-      if (type.includes('bus') || type.includes('metro') || type.includes('tram') || fernverkehr.has(name)) {
-        groups.delete(name);
-      }
+    for (const [name] of groups) {
+      if (!isRegionalLineName(name)) groups.delete(name);
     }
   }
 
@@ -8878,6 +8896,19 @@ function vnVonStep() {
 function vnNachStep(bodyHtml, done) {
   return '<div class="vn-step ' + (done ? 'vn-done' : 'vn-active') + '"><div class="vn-label">' + (done ? '✓ ' : '') + 'Nach</div>' + bodyHtml + '</div>';
 }
+// Von + Nach in EINER Box (kompakter, eine Karte statt zwei mit Pfeil dazwischen):
+// oben die gewählte Start-Station mit „ändern", darunter (dezente Trennlinie) der Ziel-Picker.
+function vnVonNachStep(nachBody, nachDone) {
+  const fromName = (selectedStop && selectedStop.name) || '';
+  return '<div class="vn-step ' + (nachDone ? 'vn-done' : 'vn-active') + '">'
+    + '<div class="vn-label">✓ Von</div>'
+    + '<div class="vn-von"><span class="vn-von-name">' + fromName + '</span>'
+    +   '<span class="vn-change" onclick="changeVonStation()">ändern</span></div>'
+    + '<div class="vn-divider"></div>'
+    + '<div class="vn-label">' + (nachDone ? '✓ ' : '') + 'Nach</div>'
+    + nachBody
+    + '</div>';
+}
 function vnLinienStep(label, bodyHtml) {
   return '<div class="vn-step vn-active"><div class="vn-label">' + label + '</div>' + bodyHtml + '</div>';
 }
@@ -9042,17 +9073,22 @@ function clearFvDest() {
 // von→nach-Station speichern → rbl "OEBB:<von>><to1~to2>" (mehrere Ziele '~'-getrennt;
 // Server filtert per Route (Union) + FV-Gattung).
 function addFvDestStation() {
-  if (!selectedStop || !fvDests.length) return;
+  if (!selectedStop || (!fvDests.length && !fvAll)) return;
   const fv = buildFvSave();                                // gewählte Zugtypen → Gattungs-Filter
   const apiNetwork = mapNetworkForApi(selectedNetwork);    // WESTBAHN → OEBB
-  const fullId = apiNetwork + ':' + selectedStop.id + '>' + fvDests.map(function(d) { return d.id; }).join('~');
+  // „Alle Abfahrten" (kein Ziel) → rbl ohne '>' = alle FV-Abfahrten der gewählten Zugtypen.
+  const fullId = fvDests.length
+    ? (apiNetwork + ':' + selectedStop.id + '>' + fvDests.map(function(d) { return d.id; }).join('~'))
+    : (apiNetwork + ':' + selectedStop.id);
   const filter = fv.filter;
   // WICHTIG: KEINE directions mit towards=Ziel setzen! Das Ziel ist ein ZWISCHENHALT,
   // kein Terminus — der Server filtert schon nach Route. Würde das Gerät zusätzlich auf
   // "Endziel == Zielbahnhof" filtern, fände es nichts (Züge enden in Linz/Salzburg/…).
   // Leere directions → Config-Bau erzeugt reinen Gattungs-Filter (rbl|RJX+RJ), genau richtig.
   const directions = [];
-  const stopName = selectedStop.name + ' → ' + fvDests.map(function(d) { return d.name; }).join(', ');
+  const stopName = fvDests.length
+    ? (selectedStop.name + ' → ' + fvDests.map(function(d) { return d.name; }).join(', '))
+    : selectedStop.name;
   const fd = fvDests.map(function(d) { return { id: d.id, name: d.name }; });
   if (editingStationIndex !== null) {
     const ex = stations[editingStationIndex];
@@ -9075,7 +9111,7 @@ function addFvDestStation() {
     });
   }
   selectedStop = null; selectedLines = new Set(); selectedVias = new Map();
-  fvDests = []; fvMode = 'all';
+  fvDests = []; fvAll = false; fvMode = 'all';
   goBack('region');
   updateStationsList();
 }
@@ -9084,13 +9120,20 @@ function addFvDestStation() {
 // Ablauf: Route-Leiste (Von → Nach) + Ziel-Picker (mehrere Ziele) ZUERST, danach erscheinen
 // nur die Linien, die diese Verbindung bedienen (dest.lines vom Server, Vereinigung).
 function normLineName(n) { return String(n || '').replace(/\s+/g, '').toUpperCase(); }
-// Regional-Liniennamen wie die Chips (Bus/Metro/Tram/FV raus — spiegelt den renderLines-Filter).
+// Regionalverkehr-Whitelist: NUR Schnellbahn (S), REX, CJX, Regionalzug (R) und InterRegio (IR).
+// Alles andere (Bus, Tram, Metro, Fernverkehr IC/ICE/EC/EN/NJ/RJ/RJX/WB/D) fällt raus.
+// RJ/RJX fangen sonst beim R-Match → Fernverkehr-Präfixe zuerst explizit ausschließen.
+function isRegionalLineName(name) {
+  const n = String(name || '').trim().toUpperCase();
+  if (!n) return false;
+  if (/^(IC|ICE|EC|EN|NJ|RJX|RJ|WB|D)\b/.test(n)) return false;  // Fernverkehr raus
+  return /^(S|REX|CJX|R|IR)(\b|\d)/.test(n);                      // Regional rein
+}
+// Regional-Liniennamen wie die Chips (nur S/REX/CJX/R/IR — spiegelt den renderLines-Filter).
 function regionalLineNames() {
-  const fern = new Set(['IC', 'ICE', 'EC', 'EN', 'NJ', 'RJ', 'RJX', 'IR', 'D', 'WB']);
   const names = [], seen = new Set();
   availableLines.forEach(function(l) {
-    const t = (l.type || '').toLowerCase();
-    if (t.includes('bus') || t.includes('metro') || t.includes('tram') || fern.has(l.name)) return;
+    if (!isRegionalLineName(l.name)) return;
     if (!seen.has(l.name)) { seen.add(l.name); names.push(l.name); }
   });
   return names;
@@ -9101,31 +9144,56 @@ function regServingSet() {
   regDests.forEach(function(d) { (d.lines || []).forEach(function(ln) { s.add(normLineName(ln)); }); });
   return s;
 }
-// regLines nach Zielwahl neu berechnen: bedienende Linien vorwählen (Fallback: alle, wenn keine Info).
+// Verkehrsmittel-Typ einer Regional-Linie: S(-Bahn), REX, CJX, R, IR. null = kein Regional.
+function regLineType(name) {
+  const n = String(name || '').trim().toUpperCase();
+  if (/^REX/.test(n)) return 'REX';
+  if (/^CJX/.test(n)) return 'CJX';
+  if (/^IR/.test(n)) return 'IR';
+  if (/^S(\d|$|\s|-)/.test(n)) return 'S';
+  if (/^R/.test(n)) return 'R';
+  return null;
+}
+const REG_TYPE_ORDER = ['S', 'REX', 'CJX', 'R', 'IR'];
+const REG_TYPE_LABEL = { S: 'S-Bahn', REX: 'REX', CJX: 'CJX', R: 'R (Regio)', IR: 'IR' };
+// Vorhandene Regional-Typen an der Station (für die „Alle Abfahrten"-Typ-Auswahl).
+function regionalTypesPresent() {
+  const s = new Set();
+  regionalLineNames().forEach(function(n) { const t = regLineType(n); if (t) s.add(t); });
+  const present = REG_TYPE_ORDER.filter(function(t) { return s.has(t); });
+  // Keine aktuellen Abfahrten → trotzdem alle Typen anbieten (Konfig für später möglich).
+  return present.length ? present : REG_TYPE_ORDER.slice();
+}
+// regLines neu berechnen. „Alle Abfahrten" → nach TYP (S/REX/R/IR), sonst nach bedienender Linie.
 function recomputeRegLines() {
-  const avail = regionalLineNames();
-  if (regAll) { regLines = new Set(avail); return; }
+  if (regAll) { regLines = new Set(regionalTypesPresent()); return; }   // Typen statt Einzellinien
   if (!regDests.length) { regLines = new Set(); return; }
+  const avail = regionalLineNames();
   const serving = regServingSet();
   const sel = avail.filter(function(n) { return serving.has(normLineName(n)); });
   regLines = new Set(sel.length ? sel : avail);
 }
-// Linien-Chips für die gewählte Verbindung (gefiltert auf bedienende Linien, Fallback alle).
+// Chips. „Alle Abfahrten" → Typ-Chips (S-Bahn/REX/…); mit Ziel → einzelne bedienende Linien.
 function regLinesChipsBody(lines) {
-  let chip = lines;
-  if (!regAll && regDests.length) {
-    const serving = regServingSet();
-    const filtered = lines.filter(function(l) { return serving.has(normLineName(l.name)); });
-    if (filtered.length) chip = filtered;
-  }
-  let h = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
-  chip.forEach(function(l) {
-    const on = regLines.has(l.name);
-    const esc = String(l.name).replace(/'/g, "\\'");
-    h += '<button onclick="toggleRegLine(\'' + esc + '\')" style="border-radius:6px;padding:7px 14px;font-size:14px;cursor:pointer;border:2px solid #1b1b1b;'
+  const chipBtn = function(val, label) {
+    const on = regLines.has(val);
+    const esc = String(val).replace(/'/g, "\\'");
+    return '<button onclick="toggleRegLine(\'' + esc + '\')" style="border-radius:6px;padding:7px 14px;font-size:14px;cursor:pointer;border:2px solid #1b1b1b;'
       + (on ? 'background:#eb3924;color:#fff;font-weight:700;' : 'background:#fff;color:#1b1b1b;font-weight:600;') + '">'
-      + (on ? '✓ ' : '+ ') + l.name + '</button>';
-  });
+      + (on ? '✓ ' : '+ ') + label + '</button>';
+  };
+  let h = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+  if (regAll) {
+    regionalTypesPresent().forEach(function(t) { h += chipBtn(t, REG_TYPE_LABEL[t] || t); });
+  } else {
+    let chip = lines;
+    if (regDests.length) {
+      const serving = regServingSet();
+      const filtered = lines.filter(function(l) { return serving.has(normLineName(l.name)); });
+      if (filtered.length) chip = filtered;
+    }
+    chip.forEach(function(l) { h += chipBtn(l.name, l.name); });
+  }
   h += '</div>';
   return h;
 }
@@ -9133,12 +9201,10 @@ function regionalVonNachHtml(lines) {
   const hasDest = regDests.length || regAll;
   // Vertikaler Stepper: Von ↓ Nach ↓ Linien
   let h = '<div class="vn-flow reg-fade-in">';
-  h += vnVonStep();
-  h += vnArrow();
-  h += vnNachStep(regDestPickerHtml(), hasDest);
+  h += vnVonNachStep(regDestPickerHtml(), hasDest);
   if (hasDest) {
     h += vnArrow();
-    h += vnLinienStep(regAll ? 'Linien' : 'Linien auf dieser Verbindung', regLinesChipsBody(lines));
+    h += vnLinienStep(regAll ? 'Zugtypen' : 'Linien auf dieser Verbindung', regLinesChipsBody(lines));
   }
   h += '</div>';
   return h;
@@ -9260,7 +9326,11 @@ function addRegDestStation() {
   const fullId = regDests.length
     ? (apiNetwork + ':' + selectedStop.id + '>' + regDests.map(function(d) { return d.id; }).join('~'))
     : (apiNetwork + ':' + selectedStop.id);
-  const filter = Array.from(regLines).join(',');
+  // „Alle Abfahrten" speichert TYPEN (S/REX/R/IR) → zu konkreten Liniennamen expandieren,
+  // weil der Firmware-Simple-Filter exakt matcht (kein Gattungs-Match). Sonst: gewählte Linien.
+  const filter = regAll
+    ? regionalLineNames().filter(function(n) { return regLines.has(regLineType(n)); }).join(',')
+    : Array.from(regLines).join(',');
   const directions = [];  // keine rid → Server filtert per Route, Gerät per Linie
   const stopName = regDests.length
     ? (selectedStop.name + ' → ' + regDests.map(function(d) { return d.name; }).join(', '))
@@ -9794,8 +9864,9 @@ function addStation() {
     return addStationFromOebb();
   }
 
-  // Fernverkehr: Ziel(e) gewählt → von→nach; sonst (leer) → alle FV-Abfahrten (normaler Pfad).
-  if (selectedNetwork === 'WESTBAHN' && fvDests.length) {
+  // Fernverkehr: Ziel(e) gewählt → von→nach; „Alle Abfahrten" → reiner Gattungs-Filter ohne
+  // directions (funktioniert auch an Bahnhöfen ohne aktuelle Abfahrt, IC kommt erst später).
+  if (selectedNetwork === 'WESTBAHN' && (fvDests.length || fvAll)) {
     return addFvDestStation();
   }
 
@@ -11739,10 +11810,9 @@ function setQuickDisplayMode(mode) {
     btnCompact.classList.remove('active');
     // Multi-Display: komma-separierte colour-Werte
     if (recommendedConfig) {
-      // Per-Station colour neu berechnen
+      // Per-Station colour neu berechnen (stationDisplayColour = single source of truth, FV-aware)
       var perStationColours = stations.map(function(s) {
-        var nc = NETWORK_COLORS[s.network];
-        return nc ? nc.id : (recommendedConfig.colourSingle || 1);
+        return stationDisplayColour(s) || (recommendedConfig.colourSingle || 1);
       });
       recommendedConfig.colour = perStationColours.join(',');
       recommendedConfig.multiDisplay = true;
@@ -11924,6 +11994,13 @@ function variantForColour(cid) {
 function stationDisplayColour(s) {
   if (!s) return 1;
   if (s.colourOverride != null && !isNaN(s.colourOverride)) return parseInt(s.colourOverride);
+  // Fernverkehr (WESTBAHN): ÖBB-Ansicht (12) als Default; Westbahn-Ansicht (14) NUR, wenn
+  // ausschließlich WB-Züge gewählt sind (sonst zeigt ein IC/RJ-Display fälschlich Westbahn-Optik).
+  if (s.network === 'WESTBAHN') {
+    var codes = (s.filter || '').split(',').map(function(c) { return c.trim().toUpperCase(); }).filter(Boolean);
+    var onlyWB = codes.length > 0 && codes.every(function(c) { return c === 'WB'; });
+    return onlyWB ? 14 : 12;
+  }
   return netColourId(s.network);
 }
 
@@ -12958,12 +13035,16 @@ async function initFinetuningStep() {
   var colourForSelect = config.multiDisplay ? (config.colourSingle || config.colour) : config.colour;
   document.getElementById('ftColorSelect').value = colourForSelect;
 
-  // Kompakt/Getrennt Toggle initialisieren
-  var uniqueNetworks = [...new Set(stations.map(function(s) { return s.network; }))];
-  var hasMultipleNetworks = uniqueNetworks.length > 1;
+  // Kompakt/Spielerisch nur bei 2+ verschiedenen DISPLAY-TYPEN (colours) sinnvoll, NICHT Netzen:
+  // ÖBB Regio + ÖBB FV sind 2 Netze, aber dieselbe ÖBB-Optik (colour 12) → keine Stil-Wahl nötig.
+  // Erst ein anderer Typ (z.B. Westbahn = colour 14) macht „Kompakt vs. Spielerisch" relevant.
+  var uniqueDisplayCols = [...new Set(stations.map(function(s) { return stationDisplayColour(s); }))];
+  var hasMultipleNetworks = uniqueDisplayCols.length > 1;
+  // Ganze „Anzeige-Stil"-Karte aus-/einblenden (sonst bliebe nur die Überschrift stehen).
+  var styleCard = document.getElementById('ftDisplayStyleCard');
+  if (styleCard) styleCard.style.display = hasMultipleNetworks ? '' : 'none';
   var compactRow = document.getElementById('ftCompactSeparateRow');
   if (compactRow) compactRow.style.display = hasMultipleNetworks ? '' : 'none';
-  // Stil-Karten (Kompakt/Spielerisch) nur bei mehreren Netzen sinnvoll
   var styleGrid = document.getElementById('ftStyleGrid');
   if (styleGrid) styleGrid.style.display = hasMultipleNetworks ? '' : 'none';
 
