@@ -3430,7 +3430,13 @@
           </div>
         </button>
       </div>
-      <div class="form-row">
+      <!-- Kompakt: EIN Display-Typ für alles (statt per-Station-Zuordnung) -->
+      <div class="form-row" id="ftKompaktDisplayRow" style="display:none;">
+        <div><div class="form-label">Display</div><div class="form-hint">In welchem Stil alles angezeigt wird</div></div>
+        <select id="ftKompaktDisplay" onchange="ftSetKompaktDisplay(this.value)" style="padding:6px 10px;border-radius:8px;border:1px solid #ddd;font-size:14px;"></select>
+      </div>
+      <!-- Zuordnung (nur Spielerisch): Automatisch oder pro Station -->
+      <div class="form-row" id="ftZuordnungRow">
         <div>
           <div class="form-label">Zuordnung</div>
         </div>
@@ -11934,7 +11940,50 @@ function setFtCompactSeparate(mode) {
   var btns = document.querySelectorAll('#ftCompactSeparateToggle .toggle-btn');
   btns.forEach(function(b) { b.classList.toggle('active', b.dataset.value === mode); });
   ftIsMultiDisplay = (mode === 'separate');
+  // Kompakt = EIN Display: keine per-Station-Zuordnung (Automatisch/Manuell), stattdessen
+  // ein einzelner Display-Wähler.
+  if (!ftIsMultiDisplay) ftIsManualAssignment = false;
+  updateStyleAssignmentUI();
   renderDisplayTypeSections();
+}
+
+// Kompakt-Einzelwähler füllen (verfügbare Display-Typen) + aktuellen Wert markieren.
+function populateKompaktDisplay() {
+  var sel = document.getElementById('ftKompaktDisplay');
+  var colSel = document.getElementById('ftColorSelect');
+  if (!sel || !colSel) return;
+  // Aktueller Stil = ftColorSelect-Wert, sonst der Display-Typ der ersten Station.
+  var cur = colSel.value;
+  if ((!cur || cur === '') && typeof stations !== 'undefined' && stations[0]) {
+    cur = String(stationDisplayColour(stations[0]));
+  }
+  var html = '';
+  Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
+    var f = DISPLAY_TYPE_FEATURES[k];
+    if (f.offline) return;
+    html += '<option value="' + k + '"' + (String(k) === String(cur) ? ' selected' : '') + '>' + f.name + '</option>';
+  });
+  sel.innerHTML = html;
+  if (colSel.value !== sel.value) colSel.value = sel.value;  // ftColorSelect synchron halten
+}
+
+// Kompakt-Wähler geändert → den einen Display-Typ (ftColorSelect) setzen.
+function ftSetKompaktDisplay(val) {
+  var colSel = document.getElementById('ftColorSelect');
+  if (colSel) colSel.value = val;
+  renderDisplayTypeSections();
+}
+
+// Sichtbarkeit von Zuordnung (Spielerisch) vs. Einzel-Display-Wähler (Kompakt).
+function updateStyleAssignmentUI() {
+  var kompakt = !ftIsMultiDisplay;
+  var zRow = document.getElementById('ftZuordnungRow');
+  var mAssign = document.getElementById('ftManualAssignment');
+  var kRow = document.getElementById('ftKompaktDisplayRow');
+  if (zRow) zRow.style.display = kompakt ? 'none' : '';
+  if (kompakt && mAssign) mAssign.style.display = 'none';
+  if (kRow) kRow.style.display = kompakt ? '' : 'none';
+  if (kompakt) populateKompaktDisplay();
 }
 
 // Feintuning: Klick auf eine Stil-Karte (Kompakt/Spielerisch) setzt direkt die
@@ -12259,11 +12308,12 @@ function renderDisplayTypeSections() {
       // === Detail-Panel — nur bei Manuell sichtbar ===
       html += '<div id="ftAdvPanel_' + cid + '" style="display:none;">';
 
-      // Sortierung: Statisch / Zeit
-      html += '<div class="form-row"><div><div class="form-label">Sortierung</div><div class="form-hint">Statisch = feste Reihenfolge · Zeit = chronologisch</div></div>';
+      // Sortierung: Statisch / ZeitGruppe / Zeit — Hint zeigt nur die Erklärung des gewählten Modus
+      html += '<div class="form-row"><div><div class="form-label">Sortierung</div><div class="form-hint" id="ftSortHint_' + cid + '">' + sortHintText(ftSortByCid[cid] || 1) + '</div></div>';
       html += '<div class="toggle-row" id="ftSort_' + cid + '">';
       html += '<button class="toggle-btn active" data-value="1" onclick="setDtSort(' + cid + ',1)">Statisch</button>';
-      html += '<button class="toggle-btn" data-value="2" onclick="setDtSort(' + cid + ',2)">Zeit</button>';
+      html += '<button class="toggle-btn" data-value="2" onclick="setDtSort(' + cid + ',2)">ZeitGruppe</button>';
+      html += '<button class="toggle-btn" data-value="3" onclick="setDtSort(' + cid + ',3)">Zeit</button>';
       html += '</div></div>';
 
       // Gruppierung (nur bei Statisch)
@@ -12487,6 +12537,7 @@ function renderDisplayTypeSections() {
       // bei jedem Re-Render auf Auto/Aus zurücksetzen → "kickt die Gruppen").
       if (ftAdvModeByCid[cidS] != null) setFtToggleVal('ftAdvMode_' + cidS, ftAdvModeByCid[cidS]);
       if (ftSortByCid[cidS]    != null) setFtToggleVal('ftSort_' + cidS, ftSortByCid[cidS]);
+      updateSortHint(cidS);
       if (ftGroupByCid[cidS]   != null) setFtToggleVal('ftGroup_' + cidS, ftGroupByCid[cidS]);
       renderDtGroups(cidS);   // Gruppen-Boxen + Pool-Chips aktualisieren
       renderDtOrderList(cidS);
@@ -12649,9 +12700,21 @@ function setDtAdvMode(cid, val) {
   setFtToggleVal('ftAdvMode_' + cid, val);
   toggleDtSubsections(cid);
 }
+// Erklärungstext für den GEWÄHLTEN Sortier-Modus (nur dieser, nicht alle drei).
+function sortHintText(v) {
+  v = String(v);
+  if (v === '2') return 'ZeitGruppe: Linien gruppiert, geordnet nach der frühesten Abfahrt.';
+  if (v === '3') return 'Zeit: einfach die nächsten Abfahrten, chronologisch.';
+  return 'Statisch: feste, selbst gewählte Reihenfolge.';
+}
+function updateSortHint(cid) {
+  var el = document.getElementById('ftSortHint_' + cid);
+  if (el) el.textContent = sortHintText(getFtToggleVal('ftSort_' + cid));
+}
 function setDtSort(cid, val) {
   ftSortByCid[cid] = String(val);
   setFtToggleVal('ftSort_' + cid, val);
+  updateSortHint(cid);
   toggleDtSubsections(cid);
 }
 function setDtGroup(cid, val) {
@@ -13077,7 +13140,11 @@ async function initFinetuningStep() {
     setFtCompactSeparate(ftIsMultiDisplay ? 'separate' : 'compact');
   } else {
     ftIsMultiDisplay = false;
+    ftIsManualAssignment = false;
   }
+  // Zuordnung (Spielerisch) vs. Einzel-Display-Wähler (Kompakt) ein-/ausblenden — auch
+  // für single-type (wo setFtCompactSeparate oben nicht läuft).
+  updateStyleAssignmentUI();
 
   // Display-Typ Sektionen rendern
   renderDisplayTypeSections();
@@ -14731,9 +14798,37 @@ function applyFinetuningOrderToStations() {
         .map(function(x) { return x.d; });
     });
   });
-  // (2) Stationen innerhalb ihres Display-Typs umsortieren — OHNE die Slot-Positionen der
-  //     cid-Gruppen zu verändern (kein Regruppieren). Nur Permutation innerhalb der Slots
-  //     desselben Display-Typs, damit Multi-Display-Verschachtelung erhalten bleibt.
+  // (2) Stationen umsortieren. ZWEI Fälle:
+  //   Kompakt (ein einheitliches Display für ALLE Stationen): GLOBALE Reihenfolge über alle
+  //   Stationen, egal welches Netz — sonst sitzt z.B. eine eingemischte ÖBB-S45 (nativer cid 12)
+  //   in ihrem eigenen Slot und kann nie zwischen die Wien-U1-Stationen (cid 1) wandern, obwohl
+  //   die Reihenfolge-Liste sie verschachtelt zeigt. Der Rang kommt aus dem einen Display-Typ
+  //   (ftColorSelect), dessen Richtungs-Liste alle Stationen enthält.
+  var kompaktUnified = (typeof ftIsMultiDisplay !== 'undefined' && !ftIsMultiDisplay
+                        && typeof ftIsManualAssignment !== 'undefined' && !ftIsManualAssignment);
+  if (kompaktUnified) {
+    var uCidEl = document.getElementById('ftColorSelect');
+    var uCid = (uCidEl && parseInt(uCidEl.value)) || 1;
+    var urank = rankByCid[uCid];
+    if (urank) {
+      var sortedAll = stations
+        .map(function(s, k) { return { s: s, k: k }; })
+        .sort(function(a, b) {
+          var ra = _stationRankOf(urank, a.s), rb = _stationRankOf(urank, b.s);
+          if (ra !== rb) return ra - rb;
+          return a.k - b.k;  // stabil
+        })
+        .map(function(x) { return x.s; });
+      for (var si = 0; si < sortedAll.length; si++) stations[si] = sortedAll[si];
+      try {
+        console.log('[FT-ORDER] Kompakt global sortiert (cid ' + uCid + '): ' +
+          stations.map(function(s){ return (s.network||'') + ':' + (s.stopId||''); }).join(' , '));
+      } catch (e) {}
+    }
+    return;
+  }
+  // Getrennt/manuell: Stationen NUR innerhalb ihres Display-Typs umsortieren — OHNE die
+  // Slot-Positionen der cid-Gruppen zu verändern, damit Multi-Display-Verschachtelung bleibt.
   var slotsByCid = {};
   stations.forEach(function(s, i) {
     var cid = stationDisplayColour(s);
@@ -14810,12 +14905,46 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     });
   }
 
+  // Rang pro Richtung aus der manuellen Reihenfolge (dt-orderList), gekeyt wie groupIdByDirKey.
+  // Damit lassen sich im Kompakt-Modus die masterrow-ZEILEN (pro rbl) GLOBAL umsortieren —
+  // eine eingemischte S-Bahn kann so zwischen die zwei Bahnsteige EINER Wien-Station rutschen
+  // (Stations-Sort allein kann das nicht, weil eine Station beide Bahnsteige als Block emittiert).
+  var rankByDirKey = {};
+  if (typeof getUniqueDisplayTypes === 'function' && typeof getDtOrderList === 'function') {
+    var _rpos = 0;
+    getUniqueDisplayTypes().forEach(function(dt) {
+      var cid = dt.colour;
+      var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
+      if (!f.sorting) return;
+      var allDirs = (window._dtAllDirs && window._dtAllDirs[cid]) || [];
+      if (!allDirs.length) return;
+      getDtOrderList(cid).forEach(function(it) {
+        (it.indices || []).forEach(function(idx) {
+          var e = allDirs[idx];
+          if (!e) return;
+          var k = _dirRankKey(e.line, e.richtungsId || e.towards, e.stopId);
+          if (rankByDirKey[k] === undefined) rankByDirKey[k] = _rpos++;
+        });
+      });
+    });
+  }
+  // Kompakt = ein einheitliches Display über alle Stationen → masterrow-Zeilen global nach Rang.
+  var kompaktUnified = (typeof ftIsMultiDisplay !== 'undefined' && !ftIsMultiDisplay
+                        && typeof ftIsManualAssignment !== 'undefined' && !ftIsManualAssignment);
+  var entries = [];  // { str, rank, isTime } — erst sammeln, dann (Kompakt) global sortieren
+
   // STATIONS-PRIMÄR: alles (rbl, colour, lines, gehweg) kommt aus DEMSELBEN
   // station-Objekt — keine parallelen Arrays (_dtAllDirs/ftPerStationColour), die
   // aus dem Takt laufen und Farben/Filter vertauschen könnten. Reihenfolge =
   // Stationsreihenfolge, innerhalb einer Station die Richtungsreihenfolge.
+  // Kompakt = EIN Display-Stil für ALLE Stationen: das globale colour-Feld ist dann ein
+  // Einzelwert (kein Komma). In dem Fall ALLE Stops auf dieses eine colour-Token setzen —
+  // sonst leitet die Firmware aus den per-Stop c-Tokens (c1,c12,…) Multi-Display ab und
+  // schaltet um, obwohl Kompakt gewählt ist. Multi/Manuell → Feld hat Komma → per Station.
+  var _gc = String((typeof recommendedConfig !== 'undefined' && recommendedConfig && recommendedConfig.colour) || '');
+  var _unifiedColour = (_gc && _gc.indexOf(',') < 0 && !isNaN(parseInt(_gc))) ? parseInt(_gc) : null;
   (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
-    var colour = stationDisplayColour(s);
+    var colour = (_unifiedColour != null) ? _unifiedColour : stationDisplayColour(s);
     var bucket = (MASTERROW_TIME_COLOURS.indexOf(colour) >= 0) ? time : master;
     var net = s.network || 'WL';
     // "Alle Abfahrten": IMMER als Wildcard schreiben (rbl|*), nie die gerade gesehenen
@@ -14828,10 +14957,15 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     var rblOrder = [];
     var rblData = {};
     function ensure(rbl, bareId) {
-      if (!rblData[rbl]) { rblData[rbl] = { lineParts: [], gids: [], bareId: bareId }; rblOrder.push(rbl); }
+      if (!rblData[rbl]) { rblData[rbl] = { lineParts: [], gids: [], bareId: bareId, rank: undefined }; rblOrder.push(rbl); }
       return rblData[rbl];
     }
     function bareOf(rbl) { var c = rbl.indexOf(':'); return c > 0 ? rbl.substring(c + 1) : rbl; }
+    // Niedrigsten dt-Rang einer Richtung in diesen rbl-Eintrag übernehmen (für Kompakt-Sort).
+    function trackRank(rd, key) {
+      var r = rankByDirKey[key];
+      if (r !== undefined && (rd.rank === undefined || r < rd.rank)) rd.rank = r;
+    }
 
     if (dirs.length > 0) {
       dirs.forEach(function(d) {
@@ -14872,6 +15006,7 @@ function buildMasterAndTimeRows(gehwegByStopId) {
         // Nur einmal aufnehmen, sonst doppelte masterrow-Eintraege → doppelte Zeilen.
         var _rd = ensure(rbl, sid);
         if (_rd.lineParts.indexOf(lp) < 0) { _rd.lineParts.push(lp); _rd.gids.push(_gid); }
+        trackRank(_rd, _dirRankKey(d.line, d.richtungsId || d.towards, d.stopId || s.stopId));
       });
     }
     if (rblOrder.length === 0) {
@@ -14883,6 +15018,13 @@ function buildMasterAndTimeRows(gehwegByStopId) {
         var _rd2 = ensure(rbl, bareOf(rbl));
         _rd2.lineParts.push(lines || '*');
         _rd2.gids.push(0);
+        // Rang aus den Filter-Linien (Station ohne directions, z.B. eingemischte S-Bahn).
+        if (!s.allDepartures && s.filter) {
+          s.filter.split(',').forEach(function(ln) {
+            ln = ln.trim(); if (!ln) return;
+            trackRank(_rd2, _dirRankKey(ln, '', s.stopId));
+          });
+        }
       });
     }
 
@@ -14907,9 +15049,22 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       (data.gids || []).forEach(function(g, i) { if (g) mParts.push(i + ':' + g); });
       // Eintrag pro Station: rbl|lines|c<colour>|g<gehweg>[|m...]. Per-Display-Settings
       // (rows/interval/…) liegen separat in displaysettings (gekeyt nach colour).
-      bucket.push(rbl + '|' + lines + '|c' + colour + '|g' + stationGehweg + (mParts.length ? '|m' + mParts.join(',') : ''));
+      var str = rbl + '|' + lines + '|c' + colour + '|g' + stationGehweg + (mParts.length ? '|m' + mParts.join(',') : '');
+      // Erst sammeln (mit Rang + Ziel-Bucket), Reihenfolge entscheidet sich nach der Schleife.
+      entries.push({ str: str, rank: (data.rank !== undefined ? data.rank : 1e9), isTime: (bucket === time) });
     });
   });
+
+  // Kompakt (ein Display für alle): ZEILEN global nach dt-Rang sortieren — so kann eine
+  // eingemischte S-Bahn zwischen die zwei Bahnsteige einer Wien-Station rutschen. Sonst
+  // (Multi/Manuell) bleibt die Einfüge-Reihenfolge (= Stations-/Slot-Reihenfolge) erhalten.
+  if (kompaktUnified) {
+    entries = entries
+      .map(function(e, i) { return { e: e, i: i }; })
+      .sort(function(a, b) { return (a.e.rank - b.e.rank) || (a.i - b.i); })  // stabil bei Gleichstand
+      .map(function(x) { return x.e; });
+  }
+  entries.forEach(function(e) { (e.isTime ? time : master).push(e.str); });
 
   return { masterrow: master.join(';'), timerow: time.join(';') };
 }
@@ -14921,10 +15076,16 @@ function buildMasterAndTimeRows(gehwegByStopId) {
 function buildDisplaySettings() {
   // Über stationDisplayColour iterieren (DIESELBE Quelle wie die masterrow) →
   // deckt exakt die colours der masterrow ab, egal ob multi/single/manual.
+  // ABER: bei Kompakt/Single mit GEWÄHLTEM Display-Typ ist die masterrow-colour das
+  // einheitliche colour-Feld (recommendedConfig.colour, einzelner Wert) — NICHT das native
+  // Netz-colour der Station. Dann hier dieselbe _unifiedColour verwenden, sonst landet z.B.
+  // r3 unter dem nativen c6, das Display läuft aber als c7 → findet kein r → Default 2 Zeilen.
+  var _gc = String((typeof recommendedConfig !== 'undefined' && recommendedConfig && recommendedConfig.colour) || '');
+  var _unifiedColour = (_gc && _gc.indexOf(',') < 0 && !isNaN(parseInt(_gc))) ? parseInt(_gc) : null;
   var segs = [];
   var seen = {};
   (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
-    var cid = stationDisplayColour(s);
+    var cid = (_unifiedColour != null) ? _unifiedColour : stationDisplayColour(s);
     if (isNaN(cid) || seen[cid]) return;
     seen[cid] = true;
     var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
