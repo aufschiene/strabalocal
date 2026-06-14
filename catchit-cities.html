@@ -13055,9 +13055,12 @@ async function initFinetuningStep() {
   // Erst ein anderer Typ (z.B. Westbahn = colour 14) macht „Kompakt vs. Spielerisch" relevant.
   var uniqueDisplayCols = [...new Set(stations.map(function(s) { return stationDisplayColour(s); }))];
   var hasMultipleNetworks = uniqueDisplayCols.length > 1;
-  // Ganze „Anzeige-Stil"-Karte aus-/einblenden (sonst bliebe nur die Überschrift stehen).
+  // Karte IMMER zeigen — die manuelle Display-Zuordnung (Automatisch/Manuell + Pro-Station-
+  // Dropdown) soll auch bei nur EINEM Display-Typ verfügbar sein, damit man das Display
+  // manuell ändern kann. Nur die Kompakt/Spielerisch-Wahl + den Getrennt/Kompakt-Toggle
+  // ausblenden — die sind erst bei 2+ verschiedenen Display-Typen sinnvoll.
   var styleCard = document.getElementById('ftDisplayStyleCard');
-  if (styleCard) styleCard.style.display = hasMultipleNetworks ? '' : 'none';
+  if (styleCard) styleCard.style.display = '';
   var compactRow = document.getElementById('ftCompactSeparateRow');
   if (compactRow) compactRow.style.display = hasMultipleNetworks ? '' : 'none';
   var styleGrid = document.getElementById('ftStyleGrid');
@@ -15968,27 +15971,27 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     const isJourney = stopId.includes('>');
     let stopName = `Station ${stopId}`;
 
-    // Namensauflösung: ZUERST aus dem Cache (= der vom User beim Hinzufügen gewählte
-    // Name, stabil). Die API-Auflösung über monitors[0].title ist bei Stationen mit
-    // mehreren Bahnsteigen NICHT deterministisch — sie liefert mal "Gmunden", mal
-    // "Gmunden Franz-Josef-Platz". Daher nur als Fallback, wenn kein Cache da ist
-    // (z.B. Config in fremdem Browser geladen).
-    const cachedName = getCachedStationName(fullId)
-      || (!isJourney ? getCachedStationName('#' + stopId) : null);
-    if (cachedName) {
-      stopName = cachedName;
-    } else if (isJourney) {
+    // Namensauflösung: ZUERST per Search-API (kanonischer Name wie bei der Auswahl, z.B.
+    // "Gmunden" — deterministisch und abfahrtsunabhängig, funktioniert auch nachts mit 0
+    // Abfahrten). Das HEILT auch einen evtl. alten, falsch gecachten Namen. Nur bei
+    // Fehler/offline aus dem Cache (fullId oder netz-unabhängig per #stopId).
+    let resolvedName = null;
+    if (isJourney) {
       const [fromId, toId] = stopId.split('>');
-      const fromName = await resolveStationName(network, fromId) || fromId;
-      const toName = await resolveStationName(network, toId) || toId;
-      stopName = `${fromName} → ${toName}`;
-      setCachedStationName(fullId, stopName);
+      const fromName = await resolveStationName(network, fromId);
+      const toName = await resolveStationName(network, toId);
+      if (fromName && toName) resolvedName = `${fromName} → ${toName}`;
     } else {
-      const resolvedName = await resolveStationName(network, stopId);
-      if (resolvedName) {
-        stopName = resolvedName;
-        setCachedStationName(fullId, resolvedName);
-      }
+      resolvedName = await resolveStationName(network, stopId);
+    }
+    if (resolvedName) {
+      stopName = resolvedName;
+      setCachedStationName(fullId, resolvedName);
+      if (!isJourney) setCachedStationName('#' + stopId, resolvedName);
+    } else {
+      const cachedName = getCachedStationName(fullId)
+        || (!isJourney ? getCachedStationName('#' + stopId) : null);
+      if (cachedName) stopName = cachedName;
     }
 
     // Filter für diese Station: Liniennamen aus filterParts oder aus lineDestinations
