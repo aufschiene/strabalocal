@@ -3034,26 +3034,39 @@
     </button>
   </div>
 
-  <!-- Auswahl-Menü bei bestehender Config: Linien ändern oder Einstellungen ändern -->
-  <div id="configChoiceOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:#0c0c0c;overflow:auto;">
+  <!-- Auswahl-Menü bei bestehender Config: Linien ändern oder Einstellungen ändern (catch-it Retro-Look) -->
+  <div id="configChoiceOverlay" style="display:none;position:fixed;inset:0;z-index:10000;overflow:auto;background-color:var(--paper);background-image:linear-gradient(rgba(27,27,27,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(27,27,27,.045) 1px,transparent 1px);background-size:24px 24px;">
     <div style="max-width:440px;margin:0 auto;padding:56px 20px 40px;font-family:var(--font-main);display:flex;flex-direction:column;align-items:center;">
-      <h1 style="color:#fff;font-size:24px;text-align:center;margin:0 0 8px;font-weight:800;">Was möchtest du ändern?</h1>
-      <p style="color:#9a948a;font-size:14px;text-align:center;margin:0 0 32px;max-width:340px;">Dein catch-it ist schon eingerichtet. Wähle, was du anpassen willst.</p>
+      <h1 style="color:var(--ink);font-size:24px;text-align:center;margin:0 0 8px;font-weight:800;">Was möchtest du ändern?</h1>
+      <p style="color:#6b6258;font-size:14px;text-align:center;margin:0 0 32px;max-width:340px;">Dein catch-it ist schon eingerichtet. Wähle, was du anpassen willst.</p>
 
-      <button onclick="chooseEditLines()" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:#161616;border:2px solid #2c2c2c;border-radius:12px;padding:24px 20px;margin-bottom:16px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='#f5b301'" onmouseout="this.style.borderColor='#2c2c2c'">
+      <button onclick="chooseEditLines()" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:var(--card);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:14px;padding:24px 20px;margin-bottom:20px;cursor:pointer;transition:all 0.12s;" onmouseover="this.style.borderColor='var(--red)';this.style.boxShadow='6px 6px 0 var(--red)'" onmouseout="this.style.borderColor='var(--ink)';this.style.boxShadow='6px 6px 0 var(--ink)'">
         <span style="font-size:34px;line-height:1;margin-bottom:10px;">🚏</span>
-        <div style="color:#fff;font-weight:700;font-size:17px;margin-bottom:5px;">Linien ändern</div>
-        <div style="color:#9a948a;font-size:13px;line-height:1.45;max-width:280px;">Haltestellen und Linien hinzufügen, entfernen oder bearbeiten.</div>
+        <div style="color:var(--ink);font-weight:700;font-size:17px;margin-bottom:5px;">Linien ändern</div>
+        <div style="color:#6b6258;font-size:13px;line-height:1.45;max-width:280px;">Haltestellen und Linien hinzufügen, entfernen oder bearbeiten.</div>
       </button>
 
-      <button onclick="chooseEditSettings()" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:#161616;border:2px solid #2c2c2c;border-radius:12px;padding:24px 20px;margin-bottom:26px;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.borderColor='#f5b301'" onmouseout="this.style.borderColor='#2c2c2c'">
+      <button onclick="chooseEditSettings()" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:var(--card);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:14px;padding:24px 20px;margin-bottom:26px;cursor:pointer;transition:all 0.12s;" onmouseover="this.style.borderColor='var(--red)';this.style.boxShadow='6px 6px 0 var(--red)'" onmouseout="this.style.borderColor='var(--ink)';this.style.boxShadow='6px 6px 0 var(--ink)'">
         <span style="font-size:34px;line-height:1;margin-bottom:10px;">⚙️</span>
-        <div style="color:#fff;font-weight:700;font-size:17px;margin-bottom:5px;">Einstellungen ändern</div>
-        <div style="color:#9a948a;font-size:13px;line-height:1.45;max-width:280px;">Design, Reihenfolge, Helligkeit, Gehweg und mehr im Feintuning.</div>
+        <div style="color:var(--ink);font-weight:700;font-size:17px;margin-bottom:5px;">Einstellungen ändern</div>
+        <div style="color:#6b6258;font-size:13px;line-height:1.45;max-width:280px;">Design, Reihenfolge, Helligkeit, Gehweg und mehr im Feintuning.</div>
       </button>
 
-      <span id="configChoiceStations" style="color:#6b665d;font-size:12px;text-align:center;"></span>
+      <span id="configChoiceStations" style="color:#8a8276;font-size:12px;text-align:center;"></span>
     </div>
+  </div>
+
+  <!-- Start-Lade-Overlay: deckt alles ab bis die Config-Abfrage entschieden ist (catch-it Retro-Look) -->
+  <div id="startupLoading" style="position:fixed;inset:0;z-index:11000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-main);background-color:var(--paper);background-image:linear-gradient(rgba(27,27,27,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(27,27,27,.045) 1px,transparent 1px);background-size:24px 24px;">
+    <div class="train-loading">
+      <div class="train-track"></div>
+      <div class="train-body">
+        <div class="train-wheel w1"></div>
+        <div class="train-wheel w2"></div>
+        <div class="train-door"></div>
+      </div>
+    </div>
+    <div style="margin-top:18px;color:var(--ink);font-weight:700;font-size:15px;">Lade Konfiguration …</div>
   </div>
 
   <!-- Step: Schnellansicht nach Station-Auswahl -->
@@ -15950,22 +15963,25 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     const isJourney = stopId.includes('>');
     let stopName = `Station ${stopId}`;
 
-    if (isJourney) {
+    // Namensauflösung: ZUERST aus dem Cache (= der vom User beim Hinzufügen gewählte
+    // Name, stabil). Die API-Auflösung über monitors[0].title ist bei Stationen mit
+    // mehreren Bahnsteigen NICHT deterministisch — sie liefert mal "Gmunden", mal
+    // "Gmunden Franz-Josef-Platz". Daher nur als Fallback, wenn kein Cache da ist
+    // (z.B. Config in fremdem Browser geladen).
+    const cachedName = getCachedStationName(fullId);
+    if (cachedName) {
+      stopName = cachedName;
+    } else if (isJourney) {
       const [fromId, toId] = stopId.split('>');
-      // Try to get names from API
       const fromName = await resolveStationName(network, fromId) || fromId;
       const toName = await resolveStationName(network, toId) || toId;
       stopName = `${fromName} → ${toName}`;
       setCachedStationName(fullId, stopName);
     } else {
-      // Try to get name from API; bei Erfolg cachen, sonst aus Cache (flaky DB/Trainboard-API)
       const resolvedName = await resolveStationName(network, stopId);
       if (resolvedName) {
         stopName = resolvedName;
         setCachedStationName(fullId, resolvedName);
-      } else {
-        const cachedName = getCachedStationName(fullId);
-        if (cachedName) stopName = cachedName;
       }
     }
 
@@ -16213,6 +16229,7 @@ async function handleConfigMessage(data) {
       await loadWienData();
     }
     await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '', data.linegroups || '', (data.masterrow || '') + ';' + (data.timerow || ''));
+    if (Array.isArray(stations) && stations.length > 0) resolveStartup();
     return;
   }
 
@@ -16392,8 +16409,29 @@ async function handleConfigMessage(data) {
 
     // Bestehende Config geladen → Auswahl-Menü (Linien ändern / Einstellungen ändern) zeigen
     maybeShowConfigChoice();
+    resolveStartup();
   }
 }
+
+// ==================== STARTUP-GATING ====================
+// Beim Laden zeigt #startupLoading (Zug-Animation) ALLES verdeckt. Sobald die Config-
+// Abfrage entschieden ist: bei vorhandener Config → Auswahl-Screen, sonst → direkt zur
+// Stations-/Linienauswahl (Region). Idempotent.
+let _startupResolved = false;
+function resolveStartup() {
+  if (_startupResolved) return;
+  _startupResolved = true;
+  const sl = document.getElementById('startupLoading');
+  if (sl) sl.style.display = 'none';
+  if (Array.isArray(stations) && stations.length > 0) {
+    hasExistingConfig = true;  // Stationen geladen ⇒ es gibt eine Config
+    maybeShowConfigChoice();   // bestehende Config → Linie/Feintuning
+  } else {
+    showStep('region');        // nichts geladen → direkt zur Auswahl
+  }
+}
+// Fallback: spätestens nach 8s entscheiden (kein Parent / keine Antwort → Auswahl).
+setTimeout(resolveStartup, 8000);
 
 // Event-Listener der die Funktion aufruft
 window.addEventListener('message', async function(event) {
