@@ -16177,17 +16177,18 @@ async function resolveStationName(network, stopId) {
       return null;
     }
     
-    // Für externe Netze - Departure API nutzen (via unified-Fetch)
-    const data = await fetchDeparturesUnified(`${network}:${stopId}`);
-
-    if (data.data?.monitors?.[0]?.locationStop?.properties?.title) {
-      return data.data.monitors[0].locationStop.properties.title;
-    }
-    // Trainboard nutzt 'name' statt 'title'
-    if (data.data?.monitors?.[0]?.locationStop?.properties?.name) {
-      return data.data.monitors[0].locationStop.properties.name;
-    }
-    
+    // Externe Netze: Name über die SEARCH-API per ID auflösen — das liefert den KANONISCHEN
+    // Stationsnamen wie bei der Auswahl (z.B. "Gmunden"). Die Departures-API liefert für
+    // dieselbe ID abweichende Titel ("Gmunden Rathausplatz (Kammerhofgasse)") und hängt von
+    // aktuellen Abfahrten ab → war die Ursache des sporadischen Umbenennens (auch nachts mit
+    // 0 Monitoren). Search-API ist deterministisch und abfahrtsunabhängig.
+    const apiNet = mapNetworkForApi(network);
+    const r = await fetch(`${SEARCH_API}?q=${encodeURIComponent(stopId)}&network=${encodeURIComponent(apiNet)}`);
+    const d = await r.json();
+    const stops = (d && Array.isArray(d.stops)) ? d.stops : [];
+    const exact = stops.find(s => String(s.id) === String(stopId));
+    if (exact && exact.name) return exact.name;
+    if (stops.length && stops[0] && stops[0].name) return stops[0].name;
     return null;
   } catch (e) {
     console.warn(`Could not resolve name for ${network}:${stopId}`);
