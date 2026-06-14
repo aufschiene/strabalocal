@@ -4486,9 +4486,10 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
 
 // Netzwerk-Alias für API-Calls (lokale Varianten → existierender Server-Endpoint)
 const API_NETWORK_MAP = {
-  // OEBB_STAMM_SBAHN NICHT mehr auf OEBB_SBAHN aliasen: der Server hat ein echtes
-  // OEBB_STAMM_SBAHN-Endpoint (Bahnsteig-Logik, richtungsId 1/2). Sonst holte der Picker
-  // Regional-IDs (d<terminus>), die das Geraet (fragt OEBB_STAMM_SBAHN) nie matcht.
+  // Stammstrecke läuft jetzt über den route-basierten von→nach (wie Regional): Ziel = Floridsdorf
+  // oder Meidling. Darum auf den OEBBREG-Endpoint (route-/zielbasiert), nicht mehr die alte
+  // Bahnsteig-/richtungsId-Logik (1/2). Floridsdorf/Meidling kommen als Ziel-Vorschläge.
+  'OEBB_STAMM_SBAHN': 'OEBBREG',
   'OEBB_REGIONAL': 'OEBBREG',
   'OEBB_SBAHN': 'OEBBREG',
   'OEBB_REG_NOE': 'OEBBREG',
@@ -4566,7 +4567,8 @@ let regReachable = [];           // erreichbare Ziele/Richtungen ab Bahnhof (aus
 let regReachableFor = null;      // stopId für den regReachable geladen wurde
 let regReachableLoading = false; // true während Ziele geladen werden (Prozess-Spinner)
 let regDestQuery = '';           // Filter-Text im Ziel-Picker
-let regLines = new Set();        // gewählte Linien-Namen (z.B. "S45")
+let regLines = new Set();        // gewählte Werte: Typen (S/REX/…) im Typ-Modus, Liniennamen im Linien-Modus
+let regLineMode = 'type';        // 'type' = nach Verkehrsmittel (S-Bahn/REX/…), 'line' = einzelne Linien
 
 // ==================== FERNVERKEHR: Korridor- & Terminus-Labels ====================
 // Aus den geladenen FV-Linien (`availableLines`) ableitbar:
@@ -4956,7 +4958,7 @@ function showStep(step) {
       saveBtn.disabled = !oebb_toStop;
     } else if (selectedNetwork === 'WESTBAHN') {
       saveBtn.disabled = !(fvActiveCats.size > 0 && (fvDests.length > 0 || fvAll));
-    } else if (isRegionalOebbNetwork() && selectedNetwork !== 'OEBB_STAMM_SBAHN') {
+    } else if (isRegionalOebbNetwork()) {
       saveBtn.disabled = !(regLines.size > 0 && (regDests.length > 0 || regAll));
     } else {
       saveBtn.disabled = selectedLines.size === 0;
@@ -7532,32 +7534,9 @@ async function selectStop(id, name) {
     return;
   }
 
-  // OEBB Stammstrecke: Richtung + Produktfilter (kein Departures-Call nötig).
-  // Kickt auch im normalen OEBB-Flow auto-magisch ein, wenn der User eine
-  // Stammstrecken-Station (Floridsdorf, Praterstern, Wien Mitte, …) wählt.
-  const isOebbContext = (selectedNetwork || '').startsWith('OEBB');
-  const isStammStation = isOebbContext && isStammstreckeStation(selectedStop?.name || name);
-  if (selectedNetwork === 'OEBB_STAMM_SBAHN' || isStammStation) {
-    // Bei Auto-Detection: Netzwerk fuer den weiteren Flow auf STAMM_SBAHN umschalten,
-    // damit Save-Logik (richtungsId R1/R2) + Server-Routing (Platform-Logik) greifen.
-    if (isStammStation && selectedNetwork !== 'OEBB_STAMM_SBAHN') {
-      selectedNetwork = 'OEBB_STAMM_SBAHN';
-    }
-    showStammModeToggle(true);
-    if (stammMode === 'richtung') {
-      stamm_selectedRichtungen = new Set();
-      stamm_deselectedProdukte = new Set();
-      showStep('lines');
-      linesLoading.classList.add('hidden');
-      linesContainer.classList.remove('hidden');
-      renderStammstreckeConfig();
-      return;
-    }
-    // stammMode === 'linien': normalen Departures-Linien-Flow weiterlaufen lassen
-    // (einzelne Linien REX1/REX2/S3/S4 × Richtungen, wie bei OEBB S-Bahn).
-  } else {
-    showStammModeToggle(false);
-  }
+  // Stammstrecken-Sonderlogik (Richtungs-Picker) entfernt: Stammstrecke läuft jetzt über den
+  // normalen Regional-von→nach-Flow (Ziel = Floridsdorf/Meidling als Vorschläge, siehe Picker).
+  showStammModeToggle(false);
 
   showStep('lines');
 
@@ -7795,12 +7774,12 @@ function extractLines(data) {
     // von→nach Reset: Linien werden ERST nach Zielwahl angeboten (recomputeRegLines).
     regDests = []; regAll = false; regDestQuery = '';
     regLines = new Set();
+    regLineMode = 'type';
     departureMode = 'lines';
     // Bearbeiten: bestehende von→nach-Station wiederherstellen (mehrere Ziele möglich, '~'-getrennt).
     if (editingStationIndex !== null) {
       const _es = stations[editingStationIndex];
       if (_es) {
-        if (_es.filter) regLines = new Set(_es.filter.split(',').map(s => s.trim()).filter(Boolean));
         if (_es.fullId && _es.fullId.indexOf('>') > 0) {
           const toPart = (_es.fullId.split('>')[1] || '');
           const ids = toPart.split('~').map(s => s.trim()).filter(Boolean);
@@ -7811,7 +7790,13 @@ function extractLines(data) {
           regDests = ids.map((id, i) => ({ id: id, name: savedNames[i] || id, lines: [] }));
         } else if (_es.fullId) {
           regAll = true;
-          // „Alle Abfahrten" wählt nach TYP → gespeicherte Liniennamen zu Typen zurückrechnen.
+        }
+        // „Alle Abfahrten" (* = leerer Filter): alle angebotenen Typen als gewählt markieren,
+        // damit Re-Save wieder „*" ergibt. Sonst: gespeicherte Liniennamen/Gattungen zu
+        // Verkehrsmittel-Typen zurückrechnen.
+        if (_es.allDepartures) {
+          regLines = new Set(REG_OFFER_TYPES);
+        } else {
           const types = new Set();
           (_es.filter || '').split(',').map(s => s.trim()).filter(Boolean).forEach(function(ln) { const t = regLineType(ln); if (t) types.add(t); });
           regLines = types;
@@ -8093,7 +8078,7 @@ function renderLines() {
 
   // === ÖBB REGIONAL: von→nach (Linie + Ziel, route-basiert über Server) statt rid-Richtung ===
   // OEBB_STAMM_SBAHN ausgenommen (eigener Stammstrecken-Flow).
-  if (isRegional && selectedNetwork !== 'OEBB_STAMM_SBAHN') {
+  if (isRegional) {
     const _depT = document.getElementById('departureModeToggle'); if (_depT) _depT.style.display = 'none';
     const _lh = document.getElementById('linesHeader'); if (_lh) _lh.style.display = 'none';
     linesList.innerHTML = regionalVonNachHtml(sortedGroups.map(g => ({ name: g[0], type: (g[1][0] || {}).type })));
@@ -8878,7 +8863,7 @@ function recomputeFvCats() {
 // Regio + FV teilen denselben vertikalen Aufbau: Von ↓ Nach ↓ Linien, mit Pfeil + hervorgehobenem
 // aktivem Schritt. Beginnt schon beim Such-Step (Von) → kein Bruch zwischen „alt" und „neu".
 function isVonNachNetwork() {
-  return selectedNetwork === 'WESTBAHN' || (isRegionalOebbNetwork() && selectedNetwork !== 'OEBB_STAMM_SBAHN');
+  return selectedNetwork === 'WESTBAHN' || (isRegionalOebbNetwork());
 }
 function vnArrow() { return '<div class="vn-arrow">↓</div>'; }
 // Route-Bestätigung (wie im Entwurf): erklärt, dass nur passende Abfahrten gezeigt werden.
@@ -9156,6 +9141,9 @@ function regLineType(name) {
 }
 const REG_TYPE_ORDER = ['S', 'REX', 'CJX', 'R', 'IR'];
 const REG_TYPE_LABEL = { S: 'S-Bahn', REX: 'REX', CJX: 'CJX', R: 'R (Regio)', IR: 'IR' };
+// Immer angebotene Regional-Typen als Chips (wie FV immer seine Kategorien zeigt) — auch
+// wenn die Verbindung sie gerade nicht bedient, damit der User REX/R/CJX wählen kann.
+const REG_OFFER_TYPES = ['S', 'REX', 'CJX', 'R'];
 // Vorhandene Regional-Typen an der Station (für die „Alle Abfahrten"-Typ-Auswahl).
 function regionalTypesPresent() {
   const s = new Set();
@@ -9164,16 +9152,36 @@ function regionalTypesPresent() {
   // Keine aktuellen Abfahrten → trotzdem alle Typen anbieten (Konfig für später möglich).
   return present.length ? present : REG_TYPE_ORDER.slice();
 }
-// regLines neu berechnen. „Alle Abfahrten" → nach TYP (S/REX/R/IR), sonst nach bedienender Linie.
-function recomputeRegLines() {
-  if (regAll) { regLines = new Set(regionalTypesPresent()); return; }   // Typen statt Einzellinien
-  if (!regDests.length) { regLines = new Set(); return; }
+// Die für die gewählte Verbindung konkret in Frage kommenden Linien-Namen (bedienend, Fallback alle).
+function regConnectionLineNames() {
   const avail = regionalLineNames();
+  if (regAll) return avail;
   const serving = regServingSet();
   const sel = avail.filter(function(n) { return serving.has(normLineName(n)); });
-  regLines = new Set(sel.length ? sel : avail);
+  return sel.length ? sel : avail;
 }
-// Chips. „Alle Abfahrten" → Typ-Chips (S-Bahn/REX/…); mit Ziel → einzelne bedienende Linien.
+// Vorhandene Typen auf der Verbindung (S/REX/CJX/R/IR).
+function regConnectionTypes() {
+  const s = new Set();
+  regConnectionLineNames().forEach(function(n) { const t = regLineType(n); if (t) s.add(t); });
+  const present = REG_TYPE_ORDER.filter(function(t) { return s.has(t); });
+  return present.length ? present : (regAll ? REG_TYPE_ORDER.slice() : []);
+}
+// regLines neu berechnen — im Typ-Modus die Verkehrsmittel-Typen, im Linien-Modus die Einzellinien.
+function recomputeRegLines() {
+  if (!regDests.length && !regAll) { regLines = new Set(); return; }
+  if (regLineMode === 'line') { regLines = new Set(regConnectionLineNames()); return; }
+  // Typ-Modus Vorauswahl: regAll → alle angebotenen Typen ("Alle Abfahrten", → *).
+  // von→nach → die auf der Route tatsächlich vorhandenen Typen (Rest bleibt wählbar).
+  regLines = regAll ? new Set(REG_OFFER_TYPES) : new Set(regConnectionTypes());
+}
+// Zwischen Typ-Auswahl (S-Bahn/REX/…) und Einzellinien (S7/REX 1/…) umschalten.
+function toggleRegLineMode() {
+  regLineMode = (regLineMode === 'line') ? 'type' : 'line';
+  recomputeRegLines();
+  renderLines(); updateAddButton();
+}
+// Chips: Standard = Typen (S-Bahn/REX/…), Option „nach Linie filtern" = einzelne Linien.
 function regLinesChipsBody(lines) {
   const chipBtn = function(val, label) {
     const on = regLines.has(val);
@@ -9183,33 +9191,57 @@ function regLinesChipsBody(lines) {
       + (on ? '✓ ' : '+ ') + label + '</button>';
   };
   let h = '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
-  if (regAll) {
-    regionalTypesPresent().forEach(function(t) { h += chipBtn(t, REG_TYPE_LABEL[t] || t); });
+  if (regLineMode === 'line') {
+    regConnectionLineNames().forEach(function(n) { h += chipBtn(n, n); });
   } else {
-    let chip = lines;
-    if (regDests.length) {
-      const serving = regServingSet();
-      const filtered = lines.filter(function(l) { return serving.has(normLineName(l.name)); });
-      if (filtered.length) chip = filtered;
-    }
-    chip.forEach(function(l) { h += chipBtn(l.name, l.name); });
+    // Immer alle Standard-Regional-Typen als Option anbieten (wie FV), nicht nur die
+    // gerade erkannten. Vorausgewählt sind die tatsächlich vorhandenen (recomputeRegLines).
+    REG_OFFER_TYPES.forEach(function(t) { h += chipBtn(t, REG_TYPE_LABEL[t] || t); });
   }
   h += '</div>';
+  // Umschalt-Link
+  h += '<div style="margin-top:11px;"><span onclick="toggleRegLineMode()" style="font-size:13px;color:var(--red);font-weight:700;cursor:pointer;text-decoration:underline;">'
+    + (regLineMode === 'line' ? 'Nach Verkehrsmittel filtern' : 'Nach Linie filtern') + '</span></div>';
   return h;
 }
 function regionalVonNachHtml(lines) {
   const hasDest = regDests.length || regAll;
-  // Vertikaler Stepper: Von ↓ Nach ↓ Linien
-  let h = '<div class="vn-flow reg-fade-in">';
-  h += vnVonNachStep(regDestPickerHtml(), hasDest);
+  // Alles in EINER Box: Von → Nach → Linien (Linien direkt unter dem Ziel, nicht in zweiter Box).
+  let nachBody = regDestPickerHtml();
   if (hasDest) {
-    h += vnArrow();
-    h += vnLinienStep(regAll ? 'Zugtypen' : 'Linien auf dieser Verbindung', regLinesChipsBody(lines));
+    nachBody += '<div class="vn-divider"></div>'
+      + '<div class="vn-label">' + (regAll ? 'Was anzeigen?' : 'Linien auf dieser Verbindung') + '</div>'
+      + regLinesChipsBody(lines);
   }
+  let h = '<div class="vn-flow reg-fade-in">';
+  h += vnVonNachStep(nachBody, hasDest);
   h += '</div>';
   return h;
 }
 
+// Stammstrecke: Floridsdorf + Meidling als rosa Vorschlags-ZEILEN im Dropdown unter dem Eingabefeld.
+// Poppen ohne Tippen auf; sobald der User ≥2 Zeichen tippt, ersetzen die Suchergebnisse sie.
+// Für JEDE Stammstrecken-Haltestelle (Praterstern, Wien Mitte, Rennweg …), egal über welches Netz.
+function stammSuggestionsHtml() {
+  const isStamm = (selectedNetwork === 'OEBB_STAMM_SBAHN')
+    || (selectedStop && typeof isStammstreckeStation === 'function' && isStammstreckeStation(selectedStop.name));
+  if (!isStamm) return '';
+  const chosen = new Set(regDests.map(function(d) { return d.id; }));
+  const wanted = [/floridsdorf/i, /meidling/i];
+  const found = [];
+  wanted.forEach(function(re) {
+    const m = regReachable.find(function(x) { return re.test(x.name) && !chosen.has(x.id); });
+    if (m && !found.some(function(f) { return f.id === m.id; })) found.push(m);
+  });
+  if (!found.length) return '';
+  return found.map(function(m) {
+    const esc = String(m.id).replace(/'/g, "\\'");
+    const nm = String(m.name).replace(/'/g, "\\'");
+    return '<div class="oebb-dest-item" onclick="selectRegDest(\'' + esc + '\',\'' + nm + '\')" style="background:#fde7ef;">'
+      + '<span class="oebb-dest-item-name" style="color:#c50057;font-weight:700;">&rarr; ' + m.name + '</span>'
+      + '<span class="oebb-dest-item-arrow" style="color:#c50057;">&rarr;</span></div>';
+  }).join('');
+}
 function regDestPickerHtml() {
   if (regAll) {
     return '<div class="oebb-dest-section"><div class="oebb-dest-chosen">Modus: <strong>Alle Abfahrten</strong>'
@@ -9250,7 +9282,8 @@ function regDestPickerHtml() {
 
 function regDestResultsHtml() {
   const q = (regDestQuery || '').trim().toLowerCase();
-  if (q.length < 2) return '';
+  // Ohne Tippen: bei Stammstrecke poppen Floridsdorf/Meidling als Vorschläge im Dropdown auf.
+  if (q.length < 2) return stammSuggestionsHtml();
   if (!regReachable.length) return '<div class="oebb-dest-no-result">Richtungen werden geladen...</div>';
   const chosen = new Set(regDests.map(function(d) { return d.id; }));
   let list = regReachable.filter(function(x) { return !chosen.has(x.id) && x.name.toLowerCase().includes(q); }).slice(0, 12);
@@ -9326,11 +9359,19 @@ function addRegDestStation() {
   const fullId = regDests.length
     ? (apiNetwork + ':' + selectedStop.id + '>' + regDests.map(function(d) { return d.id; }).join('~'))
     : (apiNetwork + ':' + selectedStop.id);
-  // „Alle Abfahrten" speichert TYPEN (S/REX/R/IR) → zu konkreten Liniennamen expandieren,
-  // weil der Firmware-Simple-Filter exakt matcht (kein Gattungs-Match). Sonst: gewählte Linien.
-  const filter = regAll
-    ? regionalLineNames().filter(function(n) { return regLines.has(regLineType(n)); }).join(',')
-    : Array.from(regLines).join(',');
+  // „Alle verfügbaren Gattungen gewählt" (nur bei der reinen „Alle Abfahrten"-Station regAll):
+  // als echte Alle-Abfahrten speichern (leerer Filter → „*"-Marker + allDepartures), damit auch
+  // außerplanmäßige/andere Zugtypen durchkommen.
+  const allTypesSelected = regLineMode === 'type' && regAll
+    && REG_OFFER_TYPES.every(function(t) { return regLines.has(t); });
+  // Filter bauen.
+  //  - Linien-Modus: gewählte Einzellinien exakt (regLines = Liniennamen).
+  //  - Typ-Modus: die Typ-Buchstaben (S/REX/CJX/R) als GATTUNG speichern (regLines = Typen).
+  //    Die Firmware gattung-matcht reine Buchstaben (lineGattungMatches) und deckt damit
+  //    ALLE Linien des Typs ab — auch eine REX/CJX die gerade nicht fährt. NICHT zu den
+  //    aktuell sichtbaren Linien expandieren (sonst gingen nicht-fahrende Typen verloren).
+  //  - regAll + alle Typen gewählt → '' → wird als „*" (alle Abfahrten) gespeichert.
+  const filter = allTypesSelected ? '' : Array.from(regLines).join(',');
   const directions = [];  // keine rid → Server filtert per Route, Gerät per Linie
   const stopName = regDests.length
     ? (selectedStop.name + ' → ' + regDests.map(function(d) { return d.name; }).join(', '))
@@ -9338,7 +9379,7 @@ function addRegDestStation() {
   const rd = regDests.map(function(d) { return { id: d.id, name: d.name }; });
   if (editingStationIndex !== null) {
     const ex = stations[editingStationIndex];
-    ex.filter = filter; ex.directions = directions; ex.allDepartures = false;
+    ex.filter = filter; ex.directions = directions; ex.allDepartures = allTypesSelected;
     ex.fullId = fullId; ex.stopName = stopName; ex.regDests = rd;
     ex.regDestId = rd[0] && rd[0].id; ex.regDestName = rd.map(function(d) { return d.name; }).join(', ');
     stations = stations.filter(function(s, i) { return i === editingStationIndex || s.fullId !== fullId; });
@@ -9349,7 +9390,7 @@ function addRegDestStation() {
     stations.push({
       network: selectedNetwork, networkName: NETWORKS[selectedNetwork].name,
       stopId: selectedStop.id, stopName: stopName, filter: filter, fullId: fullId,
-      isExisting: false, directions: directions, regDests: rd,
+      isExisting: false, directions: directions, regDests: rd, allDepartures: allTypesSelected,
       regDestId: rd[0] && rd[0].id, regDestName: rd.map(function(d) { return d.name; }).join(', ')
     });
   }
@@ -9765,8 +9806,7 @@ function updateAddButton() {
   let enabled;
   if (isP2P) enabled = !!oebb_toStop;
   else if (selectedNetwork === 'WESTBAHN') enabled = (fvActiveCats.size > 0 && (fvDests.length > 0 || fvAll));
-  else if (selectedNetwork === 'OEBB_STAMM_SBAHN' && stammMode === 'richtung') enabled = (stamm_selectedRichtungen.size > 0);
-  else if (isRegionalOebbNetwork() && selectedNetwork !== 'OEBB_STAMM_SBAHN') enabled = (regLines.size > 0 && (regDests.length > 0 || regAll));
+  else if (isRegionalOebbNetwork()) enabled = (regLines.size > 0 && (regDests.length > 0 || regAll));
   else enabled = selectedLines.size > 0;
   addStationBtn.disabled = !enabled;
   // Auch den fixierten bottom-bar Button updaten wenn im Lines-Step
@@ -9780,7 +9820,7 @@ function showGroupingStep() {
   // Je nach Toggle: Alle Abfahrten oder bestimmte Linien.
   // AUSNAHME Stammstrecke: hat eine eigene Richtungs-/Produktauswahl und darf nie in
   // den "Alle Abfahrten"-Pfad — sonst wird die Richtungswahl ignoriert (beide Richtungen).
-  if (departureMode === 'all' && selectedNetwork !== 'OEBB_STAMM_SBAHN') {
+  if (departureMode === 'all') {
     addStationAllDepartures();
   } else {
     addStation();
@@ -9870,16 +9910,10 @@ function addStation() {
     return addFvDestStation();
   }
 
-  // ÖBB Regional von→nach (Linie + Ziel, route-basiert)
-  if (isRegionalOebbNetwork() && selectedNetwork !== 'OEBB_STAMM_SBAHN' && regLines.size > 0 && (regDests.length > 0 || regAll)) {
+  // ÖBB Regional von→nach (Linie + Ziel, route-basiert) — inkl. Stammstrecke (Ziel Floridsdorf/Meidling)
+  if (isRegionalOebbNetwork() && regLines.size > 0 && (regDests.length > 0 || regAll)) {
     return addRegDestStation();
   }
-
-  // OEBB Stammstrecke Modus
-  if (selectedNetwork === 'OEBB_STAMM_SBAHN' && stammMode === 'richtung') {
-    return addStationFromStamm();
-  }
-  // stammMode === 'linien' fällt durch → normaler Linien-Save (Filter aus selectedLines)
 
   if (!selectedNetwork || !selectedStop) return;
   // Fernverkehr (WESTBAHN) nutzt Richtungen×Zugtypen statt selectedLines — gleiche
@@ -10141,9 +10175,11 @@ function updateStationsList() {
       if (lg.includes(STAMM_RICHTUNG_R2)) dirs.push('Floridsdorf');
       filterLabel = dirs.length ? ('Richtung ' + dirs.join(' & ')) : 'Alle Richtungen';
     } else {
-      // Fallback: nur Liniennummern
-      const uniqueFilters = [...new Set(group.filters)];
-      filterLabel = `Linien: ${uniqueFilters.join(', ') || 'Alle'}`;
+      // Fallback: Liniennummern bzw. Verkehrsmittel-Typen. Typ-Buchstaben (S/REX/CJX/…)
+      // hübsch ausschreiben (S → S-Bahn), echte Liniennummern unverändert lassen.
+      const uniqueFilters = [...new Set(group.filters.join(',').split(',').map(x => x.trim()).filter(Boolean))];
+      const pretty = uniqueFilters.map(f => (typeof REG_TYPE_LABEL !== 'undefined' && REG_TYPE_LABEL[f]) ? REG_TYPE_LABEL[f] : f);
+      filterLabel = `Linien: ${pretty.join(', ') || 'Alle'}`;
     }
     const badgeClass = group.network.toLowerCase();
     const firstIdx = group.indices[0];
@@ -10320,40 +10356,7 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
   showStep('lines');
 
   // OEBB: Normaler Departures-Flow (unified — zeigt S-Bahn, REX, EC, IC etc.)
-
-  // OEBB Stammstrecke: Richtung + Produktfilter
-  if (selectedNetwork === 'OEBB_STAMM_SBAHN') {
-    stamm_selectedRichtungen = new Set();
-    stamm_deselectedProdukte = new Set();
-
-    // Richtungen aus lineGroups rekonstruieren
-    const station = stations[editingStationIndex];
-    if (station && station.lineGroups) {
-      const groups = station.lineGroups.split(',');
-      stamm_selectedRichtungen = new Set();
-      if (groups.includes(STAMM_RICHTUNG_R1)) stamm_selectedRichtungen.add('meidling');
-      if (groups.includes(STAMM_RICHTUNG_R2)) stamm_selectedRichtungen.add('floridsdorf');
-    }
-
-    // Produktfilter aus fullId rekonstruieren: "OEBB_STAMM_SBAHN:1290201~S~REX"
-    if (station && station.fullId && station.fullId.indexOf('~') > 0) {
-      const tildeIdx = station.fullId.indexOf('~');
-      const productCodes = station.fullId.substring(tildeIdx + 1).split('~');
-      const CODE_TO_PRODUKT = { 'S': 'S-Bahn', 'REX': 'REX', 'R': 'R', 'CJX': 'CJX' };
-      const selectedProducts = new Set(productCodes.map(c => CODE_TO_PRODUKT[c.toUpperCase()]).filter(Boolean));
-      // Alle nicht-ausgewählten als deselected markieren
-      stamm_deselectedProdukte = new Set();
-      STAMM_PRODUKTE.forEach(p => {
-        if (!selectedProducts.has(p)) stamm_deselectedProdukte.add(p);
-      });
-    }
-
-    linesLoading.classList.add('hidden');
-    linesContainer.classList.remove('hidden');
-    renderStammstreckeConfig();
-    addStationBtn.textContent = 'Aktualisieren';
-    return;
-  }
+  // Stammstrecke nutzt jetzt den Regional-von→nach-Restore (kein Sonder-Picker mehr).
 
   // Load departures to get available lines
   linesLoading.classList.remove('hidden');
