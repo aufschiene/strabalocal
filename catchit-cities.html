@@ -6962,7 +6962,7 @@ function selectWienStation(station) {
     dirList.innerHTML = uniqueDirections.map((dir, idx) => `
       <div class="line-group" id="wienDir_${idx}">
         <div class="line-group-header" onclick="toggleWienDirection(${idx}, ${dir.patternID}, ${dir.stopId}, '${dir.towards.replace(/'/g, "\\'")}')">
-          <input type="checkbox" id="wienDirCheck_${idx}" style="width:18px;height:18px;">
+          <input type="checkbox" id="wienDirCheck_${idx}" style="width:18px;height:18px;pointer-events:none;">
           <span class="line-badge ${wienBadgeClass(wienSelectedLine.lineName)}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
           <span class="line-name">→ ${dir.towards}</span>
         </div>
@@ -7052,7 +7052,7 @@ function showWienOtherLines() {
     return `
       <div class="line-group" id="wienOther_${idx}" style="margin-bottom:8px;">
         <div class="line-group-header" onclick="toggleWienOtherLine(${idx}, ${ol.lineID}, '${ol.lineName}', ${ol.patternID}, ${ol.stopId}, '${ol.towards.replace(/'/g, "\\'")}')">
-          <input type="checkbox" id="wienOtherCheck_${idx}" style="width:18px;height:18px;">
+          <input type="checkbox" id="wienOtherCheck_${idx}" style="width:18px;height:18px;pointer-events:none;">
           <span class="line-badge ${lineType}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${ol.lineName}</span>
           <span class="line-name">→ ${ol.towards}</span>
         </div>
@@ -10085,6 +10085,11 @@ function updateStationsList() {
   stations.forEach((s, idx) => {
     // Echten Stationsnamen cachen (überlebt Reload, falls die API später leer liefert)
     if (s.fullId && s.stopName) setCachedStationName(s.fullId, s.stopName);
+    // Zusätzlich netz-unabhängig per blanker stopId (Nicht-Journey): findet den Namen
+    // beim Reload auch wenn sich das Netz-Prefix unterscheidet (FV OEBB vs WESTBAHN) →
+    // sonst greift resolveStationName mit dem abweichenden Departures-API-Titel
+    // (z.B. "Gmunden Rathausplatz" statt "Gmunden").
+    if (s.stopId && s.stopName && !(s.fullId || '').includes('>')) setCachedStationName('#' + s.stopId, s.stopName);
     const key = `${s.network}:${s.stopName}`;
     if (!groupedStations.has(key)) {
       groupedStations.set(key, {
@@ -15968,7 +15973,8 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // mehreren Bahnsteigen NICHT deterministisch — sie liefert mal "Gmunden", mal
     // "Gmunden Franz-Josef-Platz". Daher nur als Fallback, wenn kein Cache da ist
     // (z.B. Config in fremdem Browser geladen).
-    const cachedName = getCachedStationName(fullId);
+    const cachedName = getCachedStationName(fullId)
+      || (!isJourney ? getCachedStationName('#' + stopId) : null);
     if (cachedName) {
       stopName = cachedName;
     } else if (isJourney) {
