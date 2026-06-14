@@ -9359,19 +9359,13 @@ function addRegDestStation() {
   const fullId = regDests.length
     ? (apiNetwork + ':' + selectedStop.id + '>' + regDests.map(function(d) { return d.id; }).join('~'))
     : (apiNetwork + ':' + selectedStop.id);
-  // „Alle verfügbaren Gattungen gewählt" (nur bei der reinen „Alle Abfahrten"-Station regAll):
-  // als echte Alle-Abfahrten speichern (leerer Filter → „*"-Marker + allDepartures), damit auch
-  // außerplanmäßige/andere Zugtypen durchkommen.
-  const allTypesSelected = regLineMode === 'type' && regAll
-    && REG_OFFER_TYPES.every(function(t) { return regLines.has(t); });
-  // Filter bauen.
+  // Filter bauen — IMMER auf die gewählten Klassen filtern (nie „*"/Alle-Abfahrten),
+  // sonst rutschen bei manchen Stationen Trams/Busse rein.
   //  - Linien-Modus: gewählte Einzellinien exakt (regLines = Liniennamen).
-  //  - Typ-Modus: die Typ-Buchstaben (S/REX/CJX/R) als GATTUNG speichern (regLines = Typen).
-  //    Die Firmware gattung-matcht reine Buchstaben (lineGattungMatches) und deckt damit
-  //    ALLE Linien des Typs ab — auch eine REX/CJX die gerade nicht fährt. NICHT zu den
-  //    aktuell sichtbaren Linien expandieren (sonst gingen nicht-fahrende Typen verloren).
-  //  - regAll + alle Typen gewählt → '' → wird als „*" (alle Abfahrten) gespeichert.
-  const filter = allTypesSelected ? '' : Array.from(regLines).join(',');
+  //  - Typ-Modus: die Typ-Buchstaben (S/REX/CJX/R) als GATTUNG (regLines = Typen). Die Firmware
+  //    gattung-matcht reine Buchstaben (lineGattungMatches) und deckt ALLE Linien des Typs ab —
+  //    auch eine REX/CJX die gerade nicht fährt — schließt aber Tram/Bus aus.
+  const filter = Array.from(regLines).join(',');
   const directions = [];  // keine rid → Server filtert per Route, Gerät per Linie
   const stopName = regDests.length
     ? (selectedStop.name + ' → ' + regDests.map(function(d) { return d.name; }).join(', '))
@@ -9379,7 +9373,7 @@ function addRegDestStation() {
   const rd = regDests.map(function(d) { return { id: d.id, name: d.name }; });
   if (editingStationIndex !== null) {
     const ex = stations[editingStationIndex];
-    ex.filter = filter; ex.directions = directions; ex.allDepartures = allTypesSelected;
+    ex.filter = filter; ex.directions = directions; ex.allDepartures = false;
     ex.fullId = fullId; ex.stopName = stopName; ex.regDests = rd;
     ex.regDestId = rd[0] && rd[0].id; ex.regDestName = rd.map(function(d) { return d.name; }).join(', ');
     stations = stations.filter(function(s, i) { return i === editingStationIndex || s.fullId !== fullId; });
@@ -9390,7 +9384,7 @@ function addRegDestStation() {
     stations.push({
       network: selectedNetwork, networkName: NETWORKS[selectedNetwork].name,
       stopId: selectedStop.id, stopName: stopName, filter: filter, fullId: fullId,
-      isExisting: false, directions: directions, regDests: rd, allDepartures: allTypesSelected,
+      isExisting: false, directions: directions, regDests: rd, allDepartures: false,
       regDestId: rd[0] && rd[0].id, regDestName: rd.map(function(d) { return d.name; }).join(', ')
     });
   }
