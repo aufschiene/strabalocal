@@ -12637,7 +12637,11 @@ function initFtRowsAndFontSize(config) {
   types.forEach(function(dt, idx) {
     var f = DISPLAY_TYPE_FEATURES[dt.colour] || {};
     if (!f.rows) return;
-    var savedRows = rowsList[idx] || rowsList[0] || 2;
+    // Maßgeblich ist das per-colour 'r'-Token aus displaysettings (das speichern wir auch);
+    // config.rows (altes globales Feld) nur als Fallback. Sonst sprang beim Wiederöffnen die
+    // Zeilenzahl (und die daraus abgeleitete Schriftgröße groß/klein) auf den Default zurück.
+    var dsRows = (typeof dsVal === 'function') ? dsVal(dt.colour, 'r') : undefined;
+    var savedRows = (dsRows != null) ? dsRows : (rowsList[idx] || rowsList[0] || 2);
     // Auf den gültigen Bereich des Display-Typs clampen — sonst hat z.B. ÖBB S-Bahn
     // (nur 2-3) bei einem alten/misalignten rows-Wert (4) KEINEN aktiven Zeilen-Button.
     var minR = f.minRows || 1, maxR = f.maxRows || 3;
@@ -14933,6 +14937,24 @@ function buildMasterAndTimeRows(gehwegByStopId) {
                         && typeof ftIsManualAssignment !== 'undefined' && !ftIsManualAssignment);
   var entries = [];  // { str, rank, isTime } — erst sammeln, dann (Kompakt) global sortieren
 
+  // Gehweg pro PHYSISCHEM Halt (stopName): eine Wien-U-Bahn-Station liegt als ZWEI Station-
+  // Objekte vor (je Richtung = eigener Bahnsteig). Der User setzt den Gehweg auf einem; er
+  // soll für ALLE Bahnsteige desselben Halts gelten. Daher Max über alle gleichnamigen
+  // Stationen → kein "g4 auf einem Bahnsteig, g0 auf dem anderen" mehr. Verschiedene Halts
+  // (z.B. zwei Nightbus-Stops) haben verschiedene Namen → bleiben unabhängig.
+  var gehwegByName = {};
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    var nm = String(s.stopName || s.stopId || '');
+    var g = 0;
+    String(s.fullId || (s.network ? (s.network + ':' + (s.stopId || '')) : (s.stopId || ''))).split(',').forEach(function(fid) {
+      fid = fid.trim(); if (!fid) return;
+      var bid = (fid.indexOf(':') > 0) ? fid.substring(fid.indexOf(':') + 1) : fid;
+      var v = gehwegByStopId[bid.trim()] || 0;
+      if (v > g) g = v;
+    });
+    if (g > (gehwegByName[nm] || 0)) gehwegByName[nm] = g;
+  });
+
   // STATIONS-PRIMÄR: alles (rbl, colour, lines, gehweg) kommt aus DEMSELBEN
   // station-Objekt — keine parallelen Arrays (_dtAllDirs/ftPerStationColour), die
   // aus dem Takt laufen und Farben/Filter vertauschen könnten. Reihenfolge =
@@ -15028,11 +15050,10 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       });
     }
 
-    // EIN Gehweg pro Station: der User setzt ihn einmal pro Station, eine Wien-Station
-    // hat aber mehrere Bahnsteig-Stop-IDs (z.B. U1 4108 + 4121). Daher den Wert über
-    // ALLE Stop-IDs der Station bestimmen (höchster gesetzter) und auf alle anwenden,
-    // statt ihn nur bei der zufällig getroffenen Stop-ID zu haben.
-    var stationGehweg = 0;
+    // EIN Gehweg pro physischem Halt: Basis = Max über alle gleichnamigen Stationen
+    // (gehwegByName, deckt die zwei Bahnsteige einer Wien-U-Bahn-Station ab), zusätzlich
+    // Max über die eigenen Bahnsteig-Stop-IDs (Fallback falls stopName fehlt/abweicht).
+    var stationGehweg = gehwegByName[String(s.stopName || s.stopId || '')] || 0;
     rblOrder.forEach(function(rbl) {
       var v = gehwegByStopId[rblData[rbl].bareId] || 0;
       if (v > stationGehweg) stationGehweg = v;
@@ -15558,8 +15579,13 @@ function sendConfigToDeviceDirect(config) {
     const valueByStopId = {};
     if (config.stationDetails && config.gehweg) {
       config.stationDetails.forEach((station, i) => {
-        const sid = String(station.id || '');
-        if (sid) valueByStopId[sid] = config.gehweg[i] || 0;
+        // station.id kann MEHRERE Bahnsteig-Stop-IDs enthalten ("4104,4125" = Wien-Station
+        // mit zwei Bahnsteigen). Den Gehweg-Wert auf JEDE einzelne stopId legen, sonst findet
+        // der Lookup pro Bahnsteig ("4104") den Kombi-Key nicht → fälschlich 0.
+        String(station.id || '').split(',').forEach(function(sub) {
+          sub = sub.trim();
+          if (sub) valueByStopId[sub] = config.gehweg[i] || 0;
+        });
       });
     }
     const entries = config.rbl.split(',').map(part => {
@@ -15705,14 +15731,12 @@ function sendConfigToDeviceDirect(config) {
     showfunmessages: config.showFunMessages ? '1' : '0',
     displaymode: String(config.displayMode),
     stopinterval: String(config.stopInterval),
-    stopintervals: config.stopIntervals || '',
-    timewindows: config.timeWindows || '',
-    gehweg: gehwegString,
-    linegroups: dedupTokenString(reconcileGroupString(config.lineGroups || '')),
-    linefilter: config.lineFilter || '',  // Linien-Filter (nur Linienname)
-    linefilterdestination: config.lineFilterDestination || '',  // NEU: Linien+Ziel Filter für Linz
-    roworder: reconcileGroupString(config.rowOrder || ''),
-    roworderdestination: dedupTokenString(reconcileGroupString(config.rowOrderDestination || '')),
+    // masterrow = single source of truth. Die Firmware regeneriert beim Speichern
+    // (ExpandRowsToFields) gehweg/linegroups/roworder/roworderdestination/linefilter*/
+    // lines_filter/colour/stop_intervals/time_windows DETERMINISTISCH aus masterrow+
+    // displaysettings → diese Felder hier NICHT mehr senden (waren reiner Müll, wurden
+    // ohnehin überschrieben). rbl+filter bleiben als Fallback, falls der masterrow-Bau
+    // scheitert (dann greift MigrateFieldsToRows aus rbl+filter).
     masterrow: config.masterRow || '',  // single source of truth (line-based)
     timerow: config.timeRow || '',      // single source of truth (zeitbasiert)
     displaysettings: config.displaySettings || ''  // Settings pro Display-Typ
@@ -15790,14 +15814,8 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('showfunmessages', configData.showfunmessages);
     formData.append('displaymode', configData.displaymode);
     formData.append('stopinterval', configData.stopinterval);
-    formData.append('stopintervals', configData.stopintervals);
-    formData.append('timewindows', configData.timewindows);
-    formData.append('gehweg', configData.gehweg);
-    formData.append('linegroups', configData.linegroups);
-    formData.append('linefilter', configData.linefilter);
-    formData.append('linefilterdestination', configData.linefilterdestination);
-    formData.append('roworder', configData.roworder);
-    formData.append('roworderdestination', configData.roworderdestination);
+    // gehweg/linegroups/roworder/roworderdestination/linefilter*/stopintervals/timewindows
+    // NICHT mehr senden — die Firmware regeneriert sie aus masterrow+displaysettings.
     formData.append('masterrow', configData.masterrow);
     formData.append('timerow', configData.timerow);
     formData.append('displaysettings', configData.displaysettings);
