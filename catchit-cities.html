@@ -3540,6 +3540,8 @@
       <option value="18">BVG Berlin</option>
       <option value="19">KVB Köln</option>
       <option value="20">AVV Aachen</option>
+      <option value="21">Schwarz/Weiß Matrix</option>
+      <option value="22">MVG</option>
       <option value="23">Matrix</option>
       <option value="24">Paper White</option>
     </select>
@@ -11381,6 +11383,32 @@ function updateRealisticPreview(config) {
       text: '#ffffff',
       highlight: '#1B5E20',
       name: 'AVV Aachen'
+    },
+    21: { // Schwarz/Weiß Dot Matrix
+      bg: '#000000',
+      text: '#ffffff',
+      highlight: '#ffffff',
+      name: 'Schwarz/Weiß Matrix',
+      isLedMatrix: true
+    },
+    22: { // MVG München - helles Blau, weiße Schrift
+      bg: '#126fc8',
+      text: '#ffffff',
+      highlight: '#ffffff',
+      name: 'MVG'
+    },
+    23: { // Matrix (Variante orange als Default-Vorschau)
+      bg: '#0f0500',
+      text: '#ff8c00',
+      highlight: '#ff8c00',
+      name: 'Matrix',
+      isLedMatrix: true
+    },
+    24: { // Paper White - weiß, dunkle Schrift
+      bg: '#ffffff',
+      text: '#222222',
+      highlight: '#888888',
+      name: 'Paper White'
     }
   };
 
