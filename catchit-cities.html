@@ -3000,6 +3000,12 @@
         <button class="toggle-btn" id="btnAllDepartures" onclick="setDepartureMode('all')" style="flex:1;">Alle Abfahrten</button>
         <button class="toggle-btn active" id="btnSelectLines" onclick="setDepartureMode('lines')" style="flex:1;">Linien wählen</button>
       </div>
+      <!-- ÖBB "Alle Abfahrten": Gattung (nur sichtbar bei Alle Abfahrten + ÖBB) -->
+      <div style="display:none;background:#f0f0f0;border-radius:10px;padding:4px;margin-bottom:12px;" id="oebbAllCatToggle">
+        <button class="toggle-btn active" id="btnCatAll" onclick="setAllDepCat('all')" style="flex:1;">Alle</button>
+        <button class="toggle-btn" id="btnCatReg" onclick="setAllDepCat('reg')" style="flex:1;">Nur Regional</button>
+        <button class="toggle-btn" id="btnCatFern" onclick="setAllDepCat('fern')" style="flex:1;">Nur Fernverkehr</button>
+      </div>
       <!-- Stammstrecke: Nach Richtung (alle Linien der Stammstrecke) vs einzelne Linien wählen -->
       <div style="display:none;background:#f0f0f0;border-radius:10px;padding:4px;margin-bottom:12px;" id="stammModeToggle">
         <button class="toggle-btn active" id="btnStammRichtung" onclick="setStammMode('richtung')" style="flex:1;">Nach Richtung</button>
@@ -9844,6 +9850,23 @@ function showGroupingStep() {
 
 // ==================== DEPARTURE MODE TOGGLE ====================
 let departureMode = 'lines';  // 'all' oder 'lines' — Standard: Linien wählen
+let allDepCat = 'all';        // ÖBB "Alle Abfahrten" Gattung: 'all' | 'reg' | 'fern'
+
+// 3-Wege-Gattungsschalter (Alle/Regional/Fernverkehr) nur bei "Alle Abfahrten" + ÖBB.
+function updateOebbAllCatToggle() {
+  const t = document.getElementById('oebbAllCatToggle');
+  if (!t) return;
+  const show = (departureMode === 'all') && /^OEBB/.test(selectedNetwork || '');
+  t.style.display = show ? 'flex' : 'none';
+}
+
+function setAllDepCat(cat) {
+  allDepCat = cat;
+  [['btnCatAll', 'all'], ['btnCatReg', 'reg'], ['btnCatFern', 'fern']].forEach(function(p) {
+    const b = document.getElementById(p[0]);
+    if (b) b.classList.toggle('active', cat === p[1]);
+  });
+}
 
 function setDepartureMode(mode) {
   departureMode = mode;
@@ -9867,6 +9890,7 @@ function setDepartureMode(mode) {
     // saveBtn disabled bis Linien gewählt
     saveBtn.disabled = selectedLines.size === 0;
   }
+  updateOebbAllCatToggle();
 }
 
 // ==================== ADD STATION ====================
@@ -9885,6 +9909,7 @@ function addStationAllDepartures() {
     existingStation.filter = '';
     existingStation.directions = [];
     existingStation.allDepartures = true;
+    existingStation.allDepCat = /^OEBB/.test(selectedNetwork) ? allDepCat : 'all';
     stations = stations.filter((s, idx) => idx === editingStationIndex || s.fullId !== existingStation.fullId);
     editingStationIndex = null;
     resetFinetuningData();
@@ -9902,7 +9927,8 @@ function addStationAllDepartures() {
       fullId: fullId,
       isExisting: false,
       directions: [],
-      allDepartures: true
+      allDepartures: true,
+      allDepCat: /^OEBB/.test(selectedNetwork) ? allDepCat : 'all'
     });
   }
 
@@ -10371,6 +10397,8 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
   const editingStation = editingStationIndex !== null ? stations[editingStationIndex] : null;
   const isAllDeps = editingStation && editingStation.allDepartures;
   setDepartureMode(isAllDeps ? 'all' : 'lines');
+  // ÖBB-Gattungsschalter (Alle/Regional/Fernverkehr) auf den gespeicherten Wert vorbelegen.
+  setAllDepCat((editingStation && editingStation.allDepCat) || 'all');
 
   searchResults.classList.remove('show');
   showStep('lines');
@@ -15064,9 +15092,14 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       String(s.fullId || (net + ':' + (s.stopId || ''))).split(',').forEach(function(fid) {
         fid = fid.trim(); if (!fid) return;
         var rbl = fid.indexOf(':') > 0 ? fid : (net + ':' + fid);
-        // "Alle Abfahrten" bei ÖBB → Prefix OEBBALL: der Server liefert dann ein flaches
-        // 10er-Abfahrtsbrett (kein Linien-Grouping, RAM-schonend an Großbahnhöfen wie Wien Hbf).
-        if (s.allDepartures && /^OEBB/.test(net)) rbl = 'OEBBALL:' + bareOf(rbl);
+        // "Alle Abfahrten" bei ÖBB → flaches 10er-Abfahrtsbrett (kein Linien-Grouping,
+        // RAM-schonend an Großbahnhöfen wie Wien Hbf). Gattung über den Prefix:
+        // all=OEBBALL (gemischt), reg=OEBBREGALL (nur Regional), fern=OEBBFERNALL (nur FV).
+        if (s.allDepartures && /^OEBB/.test(net)) {
+          var _adCat = s.allDepCat || 'all';
+          var _adPfx = _adCat === 'reg' ? 'OEBBREGALL' : (_adCat === 'fern' ? 'OEBBFERNALL' : 'OEBBALL');
+          rbl = _adPfx + ':' + bareOf(rbl);
+        }
         var lines = (!s.allDepartures && s.filter) ? s.filter.split(',').map(function(x){return x.trim();}).filter(Boolean).join('+') : '*';
         var _rd2 = ensure(rbl, bareOf(rbl));
         _rd2.lineParts.push(lines || '*');
@@ -16166,6 +16199,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   for (let idx = 0; idx < rblParts.length; idx++) {
     const part = rblParts[idx];
     let network, stopId;
+    let reloadAllCat = 'all';   // ÖBB "Alle Abfahrten"-Gattung aus dem Prefix (all/reg/fern)
 
     const _ci = part.indexOf(':');
     if (_ci > 0) {
@@ -16175,10 +16209,12 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       // und 2 Stationen kollidieren beide auf fullId "STV:at" → eine wird verworfen.
       network = part.substring(0, _ci);
       stopId = part.substring(_ci + 1);
-      // OEBBALL ist nur ein Server-Marker ("Alle Abfahrten" = flaches 10er-Brett).
-      // Beim Reload wieder als normales ÖBB behandeln — das "Alle Abfahrten" selbst
-      // kommt ohnehin aus dem "*"-Linienfeld (isAllDep), nicht aus dem Prefix.
-      if (network === 'OEBBALL') network = 'OEBB';
+      // OEBB*ALL ist ein Server-Marker ("Alle Abfahrten" = flaches 10er-Brett). Beim
+      // Reload wieder als ÖBB behandeln + Gattung merken; das "Alle Abfahrten" selbst
+      // kommt aus dem "*"-Linienfeld (isAllDep), nicht aus dem Prefix.
+      if (network === 'OEBBALL') { network = 'OEBB'; reloadAllCat = 'all'; }
+      else if (network === 'OEBBREGALL') { network = 'OEBB'; reloadAllCat = 'reg'; }
+      else if (network === 'OEBBFERNALL') { network = 'OEBB'; reloadAllCat = 'fern'; }
     } else {
       network = 'WL';
       stopId = part;
@@ -16235,6 +16271,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       isJourney,
       isExisting: true,
       allDepartures: isAllDep,
+      allDepCat: reloadAllCat,   // ÖBB "Alle Abfahrten"-Gattung (all/reg/fern), aus dem Prefix
       directions: []  // Wird unten befüllt (außer bei "Alle Abfahrten" → bleibt leer)
     };
 
