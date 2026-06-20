@@ -15584,6 +15584,9 @@ function sendConfigToDeviceDirect(config) {
         // der Lookup pro Bahnsteig ("4104") den Kombi-Key nicht → fälschlich 0.
         String(station.id || '').split(',').forEach(function(sub) {
           sub = sub.trim();
+          // ÖBB/Regional: ">Ziel"-Endung weg → nackte Bahnsteig-Nummer als Key (der Lookup
+          // unten sucht ebenfalls mit nackter Nummer, sonst 0 weil rbl ">Ziel" trägt).
+          var gt = sub.indexOf('>'); if (gt > 0) sub = sub.substring(0, gt);
           if (sub) valueByStopId[sub] = config.gehweg[i] || 0;
         });
       });
@@ -15595,7 +15598,10 @@ function sendConfigToDeviceDirect(config) {
       // Graz/STV-IDs (at:46:4172) behalten ihre internen Doppelpunkte.
       const ci = part.indexOf(':');
       const stopId = (ci > 0) ? part.substring(ci + 1) : part;
-      const value = valueByStopId[stopId] || 0;
+      // Lookup mit nackter Nummer (ÖBB-stopId trägt ">Ziel", der Gehweg-Key aber nicht).
+      // Der gehwegString-KEY bleibt aber der VOLLE stopId, damit er zur rbl/masterrow passt.
+      var lookupId = stopId; var gt2 = lookupId.indexOf('>'); if (gt2 > 0) lookupId = lookupId.substring(0, gt2);
+      const value = valueByStopId[lookupId] || 0;
       return stopId + ':' + value;
     }).filter(Boolean);
     if (entries.length > 0) {
