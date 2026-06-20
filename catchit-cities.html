@@ -15064,6 +15064,9 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       String(s.fullId || (net + ':' + (s.stopId || ''))).split(',').forEach(function(fid) {
         fid = fid.trim(); if (!fid) return;
         var rbl = fid.indexOf(':') > 0 ? fid : (net + ':' + fid);
+        // "Alle Abfahrten" bei ÖBB → Prefix OEBBALL: der Server liefert dann ein flaches
+        // 10er-Abfahrtsbrett (kein Linien-Grouping, RAM-schonend an Großbahnhöfen wie Wien Hbf).
+        if (s.allDepartures && /^OEBB/.test(net)) rbl = 'OEBBALL:' + bareOf(rbl);
         var lines = (!s.allDepartures && s.filter) ? s.filter.split(',').map(function(x){return x.trim();}).filter(Boolean).join('+') : '*';
         var _rd2 = ensure(rbl, bareOf(rbl));
         _rd2.lineParts.push(lines || '*');
@@ -16172,6 +16175,10 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       // und 2 Stationen kollidieren beide auf fullId "STV:at" → eine wird verworfen.
       network = part.substring(0, _ci);
       stopId = part.substring(_ci + 1);
+      // OEBBALL ist nur ein Server-Marker ("Alle Abfahrten" = flaches 10er-Brett).
+      // Beim Reload wieder als normales ÖBB behandeln — das "Alle Abfahrten" selbst
+      // kommt ohnehin aus dem "*"-Linienfeld (isAllDep), nicht aus dem Prefix.
+      if (network === 'OEBBALL') network = 'OEBB';
     } else {
       network = 'WL';
       stopId = part;
