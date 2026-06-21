@@ -299,7 +299,7 @@
     .network-badge {
       display: inline-block;
       padding: 8px 16px;
-      border-radius: 8px;
+      border-radius: 2px;
       font-weight: 700;
       font-size: 14px;
       letter-spacing: 0.5px;
@@ -320,6 +320,7 @@
     .network-badge.oebb_reg_noe { background: #0055A4; color: #fff; }
     .network-badge.oebb_reg_ooe { background: #0055A4; color: #fff; }
     .network-badge.oebb_regional { background: #0055A4; color: #fff; }
+    .network-badge.innsbruck { background: #9b1c1c; color: #fff; }
 
     /* Region badges */
     .region-badge {
@@ -995,7 +996,7 @@
     }
     .station-chip .network-badge {
       padding: 4px 10px;
-      border-radius: 8px;
+      border-radius: 2px;
       font-weight: 700;
       font-size: 12px;
       flex-shrink: 0;
@@ -1015,6 +1016,7 @@
     .station-chip .network-badge.oebb_stamm_sbahn { background: #009640; color: #fff; }
     .station-chip .network-badge.oebb_reg_noe { background: #0055A4; color: #fff; }
     .station-chip .network-badge.oebb_reg_ooe { background: #0055A4; color: #fff; }
+    .station-chip .network-badge.innsbruck { background: #9b1c1c; color: #fff; }
     .station-chip .info { flex: 1; min-width: 0; }
     .station-chip .stop-name {
       font-weight: 600;
@@ -3035,6 +3037,9 @@
         <p>Noch keine Stationen hinzugefügt</p>
       </div>
     </div>
+    <button class="btn hidden" id="addMoreStationsBtn" onclick="addMoreStations()" style="margin-top: 12px; width: 100%;">
+      + Weitere Station hinzufügen
+    </button>
     <button class="btn btn-primary hidden" id="openFinetuningBtn" onclick="handleStationsNextStep()" style="margin-top: 12px; width: 100%;">
       Weiter
     </button>
@@ -4971,8 +4976,11 @@ function showStep(step) {
   const bottomBar = document.querySelector('.bottom-bar');
   const openFinetuningBtn = document.getElementById('openFinetuningBtn');
 
-  // openFinetuningBtn im stationsCard immer verstecken — alles über bottom-bar
+  // openFinetuningBtn im stationsCard immer verstecken — alles über bottom-bar.
+  // (Auf der "Hinzugefügte Stationen"-Zwischenseite werden beide explizit wieder gezeigt.)
   if (openFinetuningBtn) openFinetuningBtn.classList.add('hidden');
+  const addMoreBtn = document.getElementById('addMoreStationsBtn');
+  if (addMoreBtn) addMoreBtn.classList.add('hidden');
 
   if (isEditingLines) {
     // Im Linien-Step: saveBtn → "Station hinzufügen"/"Aktualisieren"
@@ -7153,8 +7161,7 @@ function addWienStation() {
   wienSelectedDirections = [];
   wienOtherLines = [];
 
-  goBack('region');
-  updateStationsList();
+  showAddedStationsStep();
 }
 
 // ==================== SEARCH ====================
@@ -9124,8 +9131,7 @@ function addFvDestStation() {
   }
   selectedStop = null; selectedLines = new Set(); selectedVias = new Map();
   fvDests = []; fvAll = false; fvMode = 'all';
-  goBack('region');
-  updateStationsList();
+  showAddedStationsStep();
 }
 
 // ==================== ÖBB REGIONAL VON→NACH (Linie + Ziel, route-basiert) ====================
@@ -9417,7 +9423,7 @@ function addRegDestStation() {
   }
   selectedStop = null; selectedLines = new Set(); selectedVias = new Map();
   regDests = []; regAll = false; regLines = new Set();
-  goBack('region'); updateStationsList();
+  showAddedStationsStep();
 }
 
 // ==================== STAMMSTRECKE CONFIG ====================
@@ -9602,8 +9608,7 @@ function addStationFromStamm() {
   stamm_deselectedProdukte = new Set();
   selectedLines = new Set();
   selectedVias = new Map();
-  goBack('region');
-  updateStationsList();
+  showAddedStationsStep();
 }
 
 // ==================== POINT-TO-POINT CONFIG (ÖBB Fernverkehr) ====================
@@ -9802,8 +9807,7 @@ function addStationFromOebb() {
   oebb_deselectedGattungen = new Set();
   selectedLines = new Set();
   selectedVias = new Map();
-  goBack('region');
-  updateStationsList();
+  showAddedStationsStep();
 }
 
 function toggleSelectAll() {
@@ -9935,8 +9939,7 @@ function addStationAllDepartures() {
   selectedStop = null;
   selectedLines = new Set();
   selectedVias = new Map();
-  goBack('region');
-  updateStationsList();
+  showAddedStationsStep();
 }
 
 function addStation() {
@@ -10069,8 +10072,7 @@ function addStation() {
   selectedLines = new Set();
   selectedVias = new Map();
   regionalLinks = {}; regionalLinkModeLine = null; regionalLinkSel = [];
-  goBack('region');
-  updateStationsList();
+  showAddedStationsStep();
 }
 
 function removeStation(idx) {
@@ -10344,7 +10346,44 @@ function chooseEditSettings() {
 }
 
 // Nächster Schritt nach Stationen-Auswahl
+// Zwischenseite "Hinzugefügte Stationen": wird nach jedem Station-Hinzufügen gezeigt.
+// Zeigt nur die Stationsliste (stationsCard) + zwei Buttons: "Weitere Station hinzufügen"
+// (zurück zur Bundesland-/Provider-Ansicht, wie davor) oder "Weiter" (zur Display-Config).
+function showAddedStationsStep() {
+  currentStep = 'added';
+  updateStationsList();  // Liste aktuell halten
+  // Alle Wizard-Steps + bottom-bar ausblenden → nur die Stationsliste bleibt sichtbar.
+  ['stepRegion','stepNetwork','stepSearch','stepLines','stepBundesland','stepDisplayPreset',
+   'stepWienLine','stepWienStation','stepWienDirection','stepDisplayConfig'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.classList.add('hidden');
+  });
+  var bb = document.querySelector('.bottom-bar'); if (bb) bb.style.display = 'none';
+  // stationsCard sichtbar + die zwei Aktions-Buttons zeigen.
+  var sc = document.getElementById('stationsCard'); if (sc) sc.classList.remove('hidden');
+  var addMore = document.getElementById('addMoreStationsBtn');
+  var weiter  = document.getElementById('openFinetuningBtn');
+  if (addMore) addMore.classList.remove('hidden');
+  if (weiter)  weiter.classList.remove('hidden');
+  if (typeof updateBreadcrumb === 'function') updateBreadcrumb();
+  window.scrollTo(0, 0);
+}
+
+// "Weitere Station hinzufügen" → zurück zur Bundesland-/Provider-Ansicht (wie bisher).
+function addMoreStations() {
+  var addMore = document.getElementById('addMoreStationsBtn');
+  var weiter  = document.getElementById('openFinetuningBtn');
+  if (addMore) addMore.classList.add('hidden');
+  if (weiter)  weiter.classList.add('hidden');
+  goBack('region');
+  updateStationsList();
+}
+
 function handleStationsNextStep() {
+  // Aktions-Buttons der Zwischenseite ausblenden bevor es weitergeht.
+  var addMore = document.getElementById('addMoreStationsBtn');
+  var weiter  = document.getElementById('openFinetuningBtn');
+  if (addMore) addMore.classList.add('hidden');
+  if (weiter)  weiter.classList.add('hidden');
   if (hasExistingConfig) {
     // Bestehende Config vom Gerät: Direkt zum Feintuning
     goToDisplayConfig();  // Erst Config berechnen
@@ -15143,6 +15182,39 @@ function buildMasterAndTimeRows(gehwegByStopId) {
   // Kompakt (ein Display für alle): ZEILEN global nach dt-Rang sortieren — so kann eine
   // eingemischte S-Bahn zwischen die zwei Bahnsteige einer Wien-Station rutschen. Sonst
   // (Multi/Manuell) bleibt die Einfüge-Reihenfolge (= Stations-/Slot-Reihenfolge) erhalten.
+  // ÖBB "Alle Abfahrten" REG + FV derselben Station = alles → EINE OEBBALL-Anfrage
+  // statt zwei (OEBBREG:X + OEBBFERN:X). Greift nur wenn BEIDE ohne Ziel (kein '>')
+  // auf DEMSELBEN Display (colour, Zeile-Typ) liegen — getrennte Displays bleiben getrennt.
+  (function collapseOebbRegFernAll() {
+    function info(str) {
+      var f = str.split('|'); var rbl = f[0] || ''; var ci = rbl.indexOf(':');
+      var cm = str.match(/\|c(\d+)/); var gm = str.match(/\|g(\d+)/);
+      return {
+        prefix: ci > 0 ? rbl.substring(0, ci) : '',
+        bare: ci > 0 ? rbl.substring(ci + 1) : rbl,
+        hasDest: rbl.indexOf('>') >= 0,
+        colour: cm ? cm[1] : '',
+        gehweg: gm ? parseInt(gm[1], 10) : 0
+      };
+    }
+    for (var i = 0; i < entries.length; i++) {
+      var a = info(entries[i].str);
+      if ((a.prefix !== 'OEBBREG' && a.prefix !== 'OEBBFERN') || a.hasDest) continue;
+      for (var j = i + 1; j < entries.length; j++) {
+        if (entries[j].isTime !== entries[i].isTime) continue;
+        var b = info(entries[j].str);
+        if (b.hasDest || b.bare !== a.bare || b.colour !== a.colour) continue;
+        var isPair = (a.prefix === 'OEBBFERN' && b.prefix === 'OEBBREG') ||
+                     (a.prefix === 'OEBBREG' && b.prefix === 'OEBBFERN');
+        if (!isPair) continue;
+        // Treffer → an Position i durch OEBBALL ersetzen, Partner j entfernen.
+        entries[i].str = 'OEBBALL:' + a.bare + '|*|c' + a.colour + '|g' + Math.max(a.gehweg, b.gehweg);
+        entries.splice(j, 1);
+        break;
+      }
+    }
+  })();
+
   if (kompaktUnified) {
     entries = entries
       .map(function(e, i) { return { e: e, i: i }; })
@@ -15202,10 +15274,21 @@ function buildDisplaySettings() {
         if (bgv !== null && bgv !== undefined && bgv !== '') parts.push('b' + (parseInt(bgv) || 0));
       }
     }
-    // Wien U-Bahn-Badges (nur Wien colour 1): u0=Aus, u1=Linie, u2=Ganze Zeile
-    if (document.getElementById('ftWienBadges_' + cid)) {
-      var ub = parseInt(getFtToggleVal('ftWienBadges_' + cid));
-      if (!isNaN(ub)) parts.push('u' + ub);
+    // Wien U-Bahn-Badges (nur Wien colour 1): u0=Aus, u1=Linie, u2=Ganze Zeile.
+    if (cid === 1) {
+      if (document.getElementById('ftWienBadges_' + cid)) {
+        // Feintuning offen → exakte User-Wahl übernehmen (auch "Aus").
+        var ub = parseInt(getFtToggleVal('ftWienBadges_' + cid));
+        if (!isNaN(ub)) parts.push('u' + ub);
+      } else {
+        // Quick-Save (Feintuning nie geöffnet): NICHT standardmäßig setzen. Nur erhalten,
+        // wenn Badges AN sind (aus geladener Config bzw. vorheriger Auswahl) — sonst ging
+        // eine eingeschaltete Badge-Einstellung beim Quick-Save verloren. Aus/Default → kein Token.
+        var su = dsVal(cid, 'u');
+        if (su === undefined && recommendedConfig && recommendedConfig.wienBadges != null)
+          su = parseInt(recommendedConfig.wienBadges);
+        if (su !== undefined && !isNaN(su) && su > 0) parts.push('u' + su);
+      }
     }
     // Zeitfenster
     var twToggle = document.getElementById('ftTimeWindow_' + cid);
