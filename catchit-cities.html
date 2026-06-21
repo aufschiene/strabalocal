@@ -6175,28 +6175,40 @@ var wizardGehwegState = { enabled: false, values: {} };  // values: stationKey -
 // haben pro Richtung/Bahnsteig einen eigenen Wert (Bahnsteige liegen an verschiedenen Orten).
 var gehwegByStopIdState = {};  // bare stopId -> Minuten
 
-// Liefert die Gehweg-Eingabe-Gruppen einer Station: U-Bahn-Bahnsteige zusammengefasst,
-// jede Tram/Bus-Richtung einzeln. { label, stopIds:[...] } pro Gruppe.
+// Kanonischer Gehweg-Key: Netz-Prefix weg, ">Ziel"-Endung BLEIBT.
+// Muss EXAKT zu data.bareId im Build (= rbl ohne Prefix, mit ">") und zum
+// Firmware-Gehweg-Key ("1191701>8101947:0") passen, sonst greift der Lookup nicht
+// und der Wert fällt auf 0 zurück (genau der ÖBB-g0-Bug).
+function gehwegKey(id) {
+  id = String(id || '').trim();
+  var ci = id.indexOf(':');
+  if (ci > 0) id = id.substring(ci + 1);  // Prefix (WL:/OEBBREG:/…) abtrennen, ">Ziel" behalten
+  return id;
+}
+
+// Liefert die Gehweg-Eingabe einer Station: GENAU EINE Gruppe pro Station (ein Wert,
+// alle Linien drin) — der Wert wird auf ALLE Bahnsteig-Stop-IDs der Station geschrieben.
+// { label, lines:[...], stopIds:[...] }.
 function gehwegGroupsForStation(s) {
   var dirs = (s && Array.isArray(s.directions)) ? s.directions : [];
-  if (!dirs.length) {
-    var ids = String((s && (s.fullId || s.stopId)) || '').split(',')
-      .map(function(x){ return x.trim(); }).filter(Boolean);
-    return ids.map(function(id){ return { label: (s && s.stopName) || 'Haltestelle', stopIds: [id] }; });
+  var stopIds = [], lines = [];
+  if (dirs.length) {
+    dirs.forEach(function(d) {
+      var sid = gehwegKey(d.stopId);
+      if (sid && stopIds.indexOf(sid) < 0) stopIds.push(sid);
+      var lbl = d.line + (d.towards ? ' → ' + d.towards : '');
+      if (lbl && lines.indexOf(lbl) < 0) lines.push(lbl);
+    });
+  } else {
+    // Keine Richtungen (z. B. ÖBB von→nach): Stop-IDs aus fullId/stopId, Prefix weg.
+    String((s && (s.fullId || s.stopId)) || '').split(',').forEach(function(x){
+      var sid = gehwegKey(x);
+      if (sid && stopIds.indexOf(sid) < 0) stopIds.push(sid);
+    });
+    if (s && s.stopName) lines.push(s.stopName);
   }
-  // STRENG nach Bahnsteig (bare stopId / rbl) gruppieren: mehrere Linien am SELBEN Bahnsteig
-  // teilen sich EINEN Gehweg-Wert (gleicher Ort). Keine U-Bahn-Sonderlogik (type ist bei der
-  // Primärlinie immer 'metro' → wäre unzuverlässig).
-  var byStop = {}, order = [];
-  dirs.forEach(function(d) {
-    var sid = String(d.stopId || '').trim();
-    var gt = sid.indexOf('>'); if (gt > 0) sid = sid.substring(0, gt);  // ÖBB ">Ziel"-Endung weg
-    if (!sid) return;
-    if (!byStop[sid]) { byStop[sid] = []; order.push(sid); }
-    var lbl = d.line + (d.towards ? ' → ' + d.towards : '');
-    if (byStop[sid].indexOf(lbl) < 0) byStop[sid].push(lbl);
-  });
-  return order.map(function(sid){ return { label: byStop[sid].join(', '), stopIds: [sid] }; });
+  if (!stopIds.length) return [];
+  return [ { label: lines.join(', '), lines: lines, stopIds: stopIds } ];
 }
 
 // Repräsentativer Gehweg-Wert einer Gruppe (Max über ihre Stop-IDs).
@@ -6420,7 +6432,7 @@ function renderWizardGehwegList() {
       stopIds: [ String(s.stopId || '').split(',')[0] || ('idx_' + idx) ] }];
     var rows = groups.map(function(g) {
       return '<div class="wizard-gehweg-sub" style="display:flex;align-items:center;gap:10px;margin-top:6px;">' +
-        '<span style="flex:1;color:#555;font-size:13px;">' + escapeHtml(g.label) + '</span>' +
+        '<span style="flex:1;color:#555;font-size:13px;line-height:1.5;">' + (g.lines || [g.label]).map(escapeHtml).join('<br>') + '</span>' +
         '<input type="number" class="wizard-num-input" data-stopids="' + escapeHtml(g.stopIds.join(',')) + '" min="0" max="15" value="' + escapeHtml(String(gehwegGroupValue(g))) + '" ' +
           'onchange="setGehwegGroupValue(this.dataset.stopids, this.value)">' +
       '<span class="wizard-unit">min</span>' +
@@ -12092,7 +12104,7 @@ function populateGehwegQuickList() {
     // Wert aus dem pro-Stop-ID-State (Max über die Bahnsteige) — Quick-Liste ist pro Station.
     var value = 0;
     String(station.id || '').split(',').forEach(function(sub) {
-      sub = sub.trim(); var gt = sub.indexOf('>'); if (gt > 0) sub = sub.substring(0, gt);
+      sub = gehwegKey(sub);
       var v = gehwegByStopIdState[sub] || 0; if (v > value) value = v;
     });
     return `
@@ -12113,7 +12125,7 @@ function updateGehwegValue(index, value) {
   // In den pro-Stop-ID-State auf ALLE Bahnsteige der Station schreiben (Build nutzt diesen).
   var st = recommendedConfig.stationDetails && recommendedConfig.stationDetails[index];
   if (st) String(st.id || '').split(',').forEach(function(sub) {
-    sub = sub.trim(); var gt = sub.indexOf('>'); if (gt > 0) sub = sub.substring(0, gt);
+    sub = gehwegKey(sub);
     if (sub) gehwegByStopIdState[sub] = val;
   });
 }
@@ -13654,7 +13666,7 @@ function populateFtGehwegList() {
     groups.forEach(function(g) {
       var item = document.createElement('div');
       item.className = 'gehweg-item';
-      var lbl = document.createElement('span'); lbl.className = 'station-name'; lbl.textContent = g.label;
+      var lbl = document.createElement('span'); lbl.className = 'station-name'; lbl.style.whiteSpace = 'pre-line'; lbl.textContent = (g.lines || [g.label]).join('\n');
       var inp = document.createElement('input');
       inp.type = 'number'; inp.min = '0'; inp.max = '15';
       inp.value = gehwegGroupValue(g); inp.dataset.stopids = g.stopIds.join(',');
@@ -15900,7 +15912,7 @@ function saveFromFinetuning() {
     recommendedConfig.stationDetails.forEach((st) => {
       var mx = 0;
       String(st.id || '').split(',').forEach(function(sub) {
-        sub = sub.trim(); var gt = sub.indexOf('>'); if (gt > 0) sub = sub.substring(0, gt);
+        sub = gehwegKey(sub);
         var v = gehwegByStopIdState[sub] || 0; if (v > mx) mx = v;
       });
       gehweg.push(mx);
@@ -15976,7 +15988,7 @@ function saveFromFinetuning() {
   var _gehwegByStopId = {};
   (recommendedConfig.stationDetails || []).forEach(function(st, i) {
     String(st.id || '').split(',').forEach(function(sub) {
-      sub = sub.trim();
+      sub = gehwegKey(sub);
       if (sub) _gehwegByStopId[sub] = (gehweg[i] || 0);
     });
   });
@@ -16054,10 +16066,9 @@ function sendConfigToDeviceDirect(config) {
         // mit zwei Bahnsteigen). Den Gehweg-Wert auf JEDE einzelne stopId legen, sonst findet
         // der Lookup pro Bahnsteig ("4104") den Kombi-Key nicht → fälschlich 0.
         String(station.id || '').split(',').forEach(function(sub) {
-          sub = sub.trim();
-          // ÖBB/Regional: ">Ziel"-Endung weg → nackte Bahnsteig-Nummer als Key (der Lookup
-          // unten sucht ebenfalls mit nackter Nummer, sonst 0 weil rbl ">Ziel" trägt).
-          var gt = sub.indexOf('>'); if (gt > 0) sub = sub.substring(0, gt);
+          // Kanonischer Key: Netz-Prefix weg, ">Ziel" BLEIBT (matcht stopId aus rbl unten
+          // und data.bareId im Build). Sonst findet der Lookup pro Bahnsteig nichts → 0.
+          sub = gehwegKey(sub);
           if (sub) valueByStopId[sub] = config.gehweg[i] || 0;
         });
       });
@@ -16069,10 +16080,9 @@ function sendConfigToDeviceDirect(config) {
       // Graz/STV-IDs (at:46:4172) behalten ihre internen Doppelpunkte.
       const ci = part.indexOf(':');
       const stopId = (ci > 0) ? part.substring(ci + 1) : part;
-      // Lookup mit nackter Nummer (ÖBB-stopId trägt ">Ziel", der Gehweg-Key aber nicht).
-      // Der gehwegString-KEY bleibt aber der VOLLE stopId, damit er zur rbl/masterrow passt.
-      var lookupId = stopId; var gt2 = lookupId.indexOf('>'); if (gt2 > 0) lookupId = lookupId.substring(0, gt2);
-      const value = valueByStopId[lookupId] || 0;
+      // Key = voller stopId inkl. ">Ziel" (= gehwegKey, da Prefix schon weg) — matcht
+      // valueByStopId oben und die rbl/masterrow. Der gehwegString-Eintrag trägt den vollen stopId.
+      const value = valueByStopId[gehwegKey(stopId)] || 0;
       return stopId + ':' + value;
     }).filter(Boolean);
     if (entries.length > 0) {
@@ -16560,11 +16570,9 @@ function gehwegByStopIdFromRows(masterRowStr) {
   String(masterRowStr).split(';').forEach(function(seg) {
     seg = seg.trim(); if (!seg) return;
     var rbl = (seg.split('|')[0] || '').trim();
-    var ci = rbl.indexOf(':');
-    var sid = ci > 0 ? rbl.substring(ci + 1) : rbl;
-    var gt = sid.indexOf('>'); if (gt > 0) sid = sid.substring(0, gt);  // ">Ziel"-Endung weg
+    var sid = gehwegKey(rbl);  // Prefix weg, ">Ziel" BLEIBT (= Build-/Firmware-Key)
     var gm = seg.match(/\|g(\d+)/);
-    if (sid && gm) map[sid.trim()] = parseInt(gm[1], 10) || 0;
+    if (sid && gm) map[sid] = parseInt(gm[1], 10) || 0;
   });
   return map;
 }
