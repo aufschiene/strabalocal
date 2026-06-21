@@ -15258,7 +15258,16 @@ function applyFinetuningOrderToStations() {
 }
 
 function buildMasterAndTimeRows(gehwegByStopId) {
-  gehwegByStopId = gehwegByStopId || {};
+  // Noch nicht per onchange übernommene Gehweg-Eingaben aus dem DOM nachziehen (Wizard + Feintuning
+  // haben data-stopids) — sonst ging der Gehweg beim "Weiter"-Klick verloren, wenn onchange nicht feuerte.
+  try {
+    document.querySelectorAll('input[data-stopids]').forEach(function(inp) {
+      if (typeof setGehwegGroupValue === 'function') setGehwegGroupValue(inp.dataset.stopids, inp.value);
+    });
+  } catch (e) {}
+  // Der globale pro-Stop-ID-Gehweg-State gewinnt IMMER (egal welcher Caller / Pfad) — sonst
+  // ging der Gehweg beim Wizard-Save verloren (masterrow |g0 trotz gesetzter Werte).
+  gehwegByStopId = Object.assign({}, gehwegByStopId || {}, (typeof gehwegByStopIdState !== 'undefined' ? gehwegByStopIdState : {}));
   var master = [];
   var time = [];
   var _emittedRbls = {};  // Dedup: gleiche Station (rbl) nur einmal → kein Gehweg-Artefakt
