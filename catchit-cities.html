@@ -10341,6 +10341,13 @@ function chooseEditLines() {
     document.getElementById('stationsCard')?.classList.remove('hidden');
   }
   if (typeof updateStationsList === 'function') updateStationsList();
+  // Bestehende Config: direkt die Übersicht der bereits hinzugefügten Stationen zeigen
+  // ("Hinzugefügte Stationen" mit Weiter / Weitere Station hinzufügen), statt mit der
+  // Netz-Auswahl zu starten. Die Netz-Auswahl-Vorbereitung oben setzt den Kontext, damit
+  // "Weitere Station hinzufügen" sauber zurück zur Bundesland-/Provider-Ansicht führt.
+  if (typeof stations !== 'undefined' && stations.length > 0 && typeof showAddedStationsStep === 'function') {
+    showAddedStationsStep();
+  }
   window.scrollTo(0, 0);
 }
 
