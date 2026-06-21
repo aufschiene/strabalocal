@@ -6070,16 +6070,38 @@ function detectCountry() {
   return (REGIONS[DEFAULT_COUNTRY]) ? DEFAULT_COUNTRY : null;
 }
 
+// Wie detectCountry, aber OHNE DEFAULT_COUNTRY-Fallback: nur ein EXPLIZITES Länder-Signal
+// (?country=, deviceCountry, ?display-Parent) zählt, sonst null. Für den Erst-Konfig-Start:
+// ohne Signal soll die LÄNDERWAHL stehen bleiben, nicht automatisch nach Österreich springen.
+function detectCountryExplicit() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var c = (params.get('country') || params.get('land') || '').toUpperCase();
+    if (c === 'NONE' || c === 'ASK') return null;
+    if (c && REGIONS[c]) return c;
+  } catch (e) {}
+  if (typeof window.deviceCountry === 'string') {
+    var dc = window.deviceCountry.toUpperCase();
+    if (dc === '') return null;
+    if (REGIONS[dc]) return dc;
+  }
+  var dp = detectDisplayPreset();
+  if (dp && DISPLAY_PRESETS[dp] && REGIONS[DISPLAY_PRESETS[dp].parent]) return DISPLAY_PRESETS[dp].parent;
+  return null;
+}
+
 (function() {
   function tryAutoJump() {
     populateCountrySelect();
     // 1) Konkretes Display-Preset (?display=) hat Vorrang
     var d = detectDisplayPreset();
     if (d) { renderDisplayPreset(d); return; }
-    // 2) Land des Geräts → direkt in dessen Bundesland-/Netz-Auswahl
-    var c = detectCountry();
+    // 2) NUR bei EXPLIZITEM Länder-Signal (?country=, deviceCountry, ?display-Parent) direkt
+    //    in dessen Bundesland-/Netz-Auswahl springen. Ohne Signal (Erst-Konfig) bleibt die
+    //    LÄNDERWAHL stehen — kein Auto-Sprung nach Österreich (DEFAULT_COUNTRY).
+    var c = detectCountryExplicit();
     if (c && REGIONS[c]) { selectRegion(c); return; }
-    // 3) Kein Land bekannt → Dropdown (stepRegion) bleibt sichtbar und fragt nach
+    // 3) Kein explizites Land → Dropdown (stepRegion) bleibt sichtbar und fragt nach
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', tryAutoJump);
@@ -10383,12 +10405,58 @@ function showAddedStationsStep() {
 }
 
 // "Weitere Station hinzufügen" → zurück zur Bundesland-/Provider-Ansicht (wie bisher).
+// Bundesland-Preset (DISPLAY_PRESETS-Key) für ein Netz finden — nur die BUNDESLAND-
+// definierenden Netze zählen (haben jumpTo.subRegion, z.B. WL→wien, LINZ→ooe). Die
+// pan-österreichischen Netze (OEBB_REGIONAL/OEBB_FERN/WESTBAHN) haben keine subRegion →
+// zählen NICHT für die Bundesland-Erkennung (sonst wäre jede Station mehrdeutig).
+function presetForNetwork(net) {
+  for (var key in DISPLAY_PRESETS) {
+    var p = DISPLAY_PRESETS[key];
+    if (!p || !Array.isArray(p.networks)) continue;
+    var entry = p.networks.find(function(n){ return n.id === net; });
+    if (entry && entry.jumpTo && entry.jumpTo.subRegion) return key;
+  }
+  return null;
+}
+
+// Bundesland aus den vorhandenen Stationen per MEHRHEIT bestimmen.
+//  - klare Mehrheit  → { preset } (direkt ins Bundesland)
+//  - Gleichstand     → { preset:null, country } (Bundesland-Auswahl des Landes)
+//  - nichts erkannt  → { preset:null, country:null }
+function pickBundeslandFromStations() {
+  var counts = {}, parents = {};
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s){
+    var k = presetForNetwork(s.network);
+    if (!k) return;
+    counts[k] = (counts[k] || 0) + 1;
+    var par = DISPLAY_PRESETS[k] && DISPLAY_PRESETS[k].parent;
+    if (par) parents[par] = (parents[par] || 0) + 1;
+  });
+  var keys = Object.keys(counts);
+  if (!keys.length) return { preset: null, country: null };
+  var max = Math.max.apply(null, keys.map(function(k){ return counts[k]; }));
+  var top = keys.filter(function(k){ return counts[k] === max; });
+  var country = Object.keys(parents).sort(function(a,b){ return parents[b]-parents[a]; })[0] || null;
+  if (top.length === 1) return { preset: top[0], country: country };
+  return { preset: null, country: country };  // Gleichstand → Land/Region
+}
+
+// "Weitere Station hinzufügen": NICHT erneut nach dem Land fragen, sondern das Bundesland
+// aus den vorhandenen Stationen per Mehrheit erkennen (Gleichstand → Bundesland-Auswahl
+// des Landes, z.B. 2×Wien+2×Linz → "Region in Österreich"; 3×Wien+1×Linz → direkt Wien).
 function addMoreStations() {
   var addMore = document.getElementById('addMoreStationsBtn');
   var weiter  = document.getElementById('openFinetuningBtn');
   if (addMore) addMore.classList.add('hidden');
   if (weiter)  weiter.classList.add('hidden');
-  goBack('region');
+  var b = pickBundeslandFromStations();
+  if (b.preset && typeof renderDisplayPreset === 'function') {
+    renderDisplayPreset(b.preset);          // klare Mehrheit → direkt ins Bundesland
+  } else if (b.country && typeof renderBundeslandChooser === 'function') {
+    renderBundeslandChooser(b.country);     // Gleichstand → Bundesland-Auswahl des Landes
+  } else {
+    goBack('region');                       // kein Bundesland erkennbar → Länderwahl
+  }
   updateStationsList();
 }
 
