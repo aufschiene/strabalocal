@@ -7104,6 +7104,13 @@ function toggleWienOtherLine(idx, lineID, lineName, patternID, stopId, towards) 
 function addWienStation() {
   if (!wienSelectedLine || !wienSelectedStation || wienSelectedDirections.length === 0) return;
 
+  // Edit-Modus: die bearbeitete Station ZUERST entfernen — sonst legt der push() unten ein
+  // Duplikat an bzw. der "bereits hinzugefügt"-Check würde fälschlich blocken.
+  if (typeof editingStationIndex !== 'undefined' && editingStationIndex !== null && stations[editingStationIndex]) {
+    stations.splice(editingStationIndex, 1);
+    editingStationIndex = null;
+  }
+
   // Sammle alle Stop-IDs
   const stopIds = wienSelectedDirections.map(d => d.stopId);
   wienOtherLines.forEach(ol => {
@@ -10405,10 +10412,10 @@ async function editStation(idx) {
   selectedNetwork = station.network;
 
   if (station.network === 'WL') {
-    // Wien: Lade Wien-Daten und gehe zur Linienauswahl
-    editingStationIndex = null;  // Wien hat eigenen Flow
-    await loadWienData();
-    showStep('wienLine');
+    // Wien: Linie + Station + Richtungen aus der gespeicherten Station wiederherstellen,
+    // statt mit leerer Liniensuche zu starten. editingStationIndex BLEIBT = idx → Speichern
+    // AKTUALISIERT die Station (sonst entstand ein Duplikat bzw. "bereits hinzugefügt").
+    await restoreWienStationEdit(idx);
   } else {
     // Andere Netzwerke: Direkt zur Linienauswahl
     // Bei OEBB Fernverkehr: stopName ist "Wien Meidling → Linz Hbf" - nur den Von-Teil verwenden
@@ -10416,6 +10423,92 @@ async function editStation(idx) {
     selectedStop = { id: station.stopId, name: displayName };
     await selectStopForEdit(station.stopId, displayName, station.directions || [], station.filter || '');
   }
+}
+
+// Rekonstruiert das Wien-Stations-Objekt (Form wie showWienStationDropdown liefert:
+// {name, stopIds:Set, directions:[{patternID,stopId,towards}]}) für die gespeicherte Station.
+// Match primär über die gespeicherten Bahnsteig-IDs, sonst über den normalisierten Namen.
+function findWienStationObjForEdit(station, lineObj) {
+  if (!lineObj || !Array.isArray(lineObj.lineStation)) return null;
+  var savedIds = String(station.stopId || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+  var wantName = normalizeStationName(station.stopName || '');
+  var byName = {};
+  lineObj.lineStation.forEach(function(item){
+    var st = item.station;
+    if (!st || !st.stationName || !st.stationID) return;
+    var nn = normalizeStationName(st.stationName);
+    if (!byName[nn]) byName[nn] = { name: st.stationName, stopIds: new Set(), directions: [] };
+    var e = byName[nn];
+    e.stopIds.add(st.stationID);
+    var towards = getWienDirectionName(lineObj, item.patternID);
+    if (!e.directions.some(function(d){ return d.towards === towards; }))
+      e.directions.push({ patternID: item.patternID, stopId: st.stationID, towards: towards });
+  });
+  var match = null;
+  Object.keys(byName).forEach(function(nn){
+    if (match) return;
+    var ids = Array.from(byName[nn].stopIds).map(String);
+    if (savedIds.some(function(id){ return ids.indexOf(id) >= 0; })) match = byName[nn];
+  });
+  if (!match && byName[wantName]) match = byName[wantName];
+  return match;
+}
+
+// Bearbeiten einer Wien-Station: Linie → Station → Richtungen vorbelegen.
+async function restoreWienStationEdit(idx) {
+  var station = stations[idx];
+  if (!station) return;
+  await loadWienData();
+  var dirs = station.directions || [];
+  var primaryLine = (dirs.find(function(d){ return d && d.line; }) || {}).line
+    || String(station.filter || '').split(',')[0];
+  var lineObj = (typeof wienData !== 'undefined' && Array.isArray(wienData))
+    ? wienData.find(function(l){ return l.lineName === primaryLine; }) : null;
+  if (!lineObj) { editingStationIndex = idx; showStep('wienLine'); return; }  // Fallback: leere Suche
+
+  selectWienLine(lineObj.lineID);  // setzt wienSelectedLine, zeigt Station-Step
+  var stationObj = findWienStationObjForEdit(station, lineObj);
+  if (!stationObj) { editingStationIndex = idx; return; }  // Station-Step bleibt → User wählt selbst
+
+  selectWienStation(stationObj);   // setzt wienSelectedStation, zeigt Richtungs-Step
+  var norm = function(t){ return String(t || '').trim().toLowerCase(); };
+
+  // Primär-Richtungen anhaken (bei nur 1 Richtung hat selectWienStation sie schon gewählt).
+  var savedPrimary = dirs.filter(function(d){ return d.line === primaryLine; });
+  if (stationObj.directions.length > 1) {
+    savedPrimary.forEach(function(sd){
+      var di = stationObj.directions.findIndex(function(d){
+        return norm(d.towards) === norm(sd.towards) || String(d.stopId) === String(sd.stopId);
+      });
+      var cb = (di >= 0) ? document.getElementById('wienDirCheck_' + di) : null;
+      if (cb && !cb.checked) {
+        var d = stationObj.directions[di];
+        toggleWienDirection(di, d.patternID, d.stopId, d.towards);
+      }
+    });
+  }
+
+  // Andere Linien (Tram/Bus an denselben Bahnsteigen) für korrektes Speichern wiederherstellen.
+  var others = dirs.filter(function(d){ return d.line !== primaryLine; });
+  if (others.length) {
+    wienOtherLines = others.map(function(d){
+      var lo = wienData.find(function(l){ return l.lineName === d.line; });
+      return { lineID: lo ? lo.lineID : null, lineName: d.line, patternID: null,
+               stopId: String(d.stopId || ''), towards: d.towards || '' };
+    });
+    // passende Checkboxen in der "Andere Linien"-Liste anhaken (kosmetisch, falls gerendert).
+    document.querySelectorAll('#wienOtherLinesList .line-group').forEach(function(el){
+      var lbl = el.querySelector('.line-name'), badge = el.querySelector('.line-badge');
+      var t = lbl ? norm(lbl.textContent.replace('→','')) : '';
+      var ln = badge ? badge.textContent.trim() : '';
+      if (others.some(function(d){ return d.line === ln && norm(d.towards) === t; })) {
+        var cb = el.querySelector('input[type=checkbox]');
+        if (cb) cb.checked = true;
+      }
+    });
+  }
+
+  editingStationIndex = idx;  // BLEIBT → Speichern aktualisiert statt dupliziert
 }
 
 // Spezielle Version von selectStop für das Bearbeiten (mit Vorauswahl)
