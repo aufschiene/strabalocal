@@ -10635,6 +10635,9 @@ async function restoreWienStationEdit(idx) {
       return { lineID: lo ? lo.lineID : null, lineName: d.line, patternID: null,
                stopId: String(d.stopId || ''), towards: d.towards || '' };
     });
+    // Sicherstellen, dass die "Andere Linien"-Liste gerendert ist, bevor wir ankreuzen
+    // (bei mehreren Primär-Richtungen rendert sie erst beim ersten toggleWienDirection).
+    if (wienSelectedDirections.length > 0) showWienOtherLines();
     // passende Checkboxen in der "Andere Linien"-Liste anhaken (kosmetisch, falls gerendert).
     // Neue Struktur: pro Linie EINE Bubble (.line-group) mit Badge oben + Richtungs-Zeilen
     // (.wien-dir-row) darunter → über die Zeilen iterieren, Linie aus dem Karten-Badge lesen.
