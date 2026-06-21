@@ -4982,31 +4982,52 @@ function showStep(step) {
   const addMoreBtn = document.getElementById('addMoreStationsBtn');
   if (addMoreBtn) addMoreBtn.classList.add('hidden');
 
+  const _addStBtn = document.getElementById('addStationBtn');
   if (isEditingLines) {
-    // Im Linien-Step: saveBtn → "Station hinzufügen"/"Aktualisieren"
-    if (bottomBar) bottomBar.style.display = '';
-    saveBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
-    saveBtn.onclick = function() { showGroupingStep(); };
-    // P2P: oebb_toStop; Fernverkehr: Richtungen×Zugtypen; sonst selectedLines
-    const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
-    if (isP2P) {
-      saveBtn.disabled = !oebb_toStop;
-    } else if (selectedNetwork === 'WESTBAHN') {
-      saveBtn.disabled = !(fvActiveCats.size > 0 && (fvDests.length > 0 || fvAll));
-    } else if (isRegionalOebbNetwork()) {
-      saveBtn.disabled = !(regLines.size > 0 && (regDests.length > 0 || regAll));
-    } else {
-      saveBtn.disabled = selectedLines.size === 0;
+    // Bottom-Bar während Linien-/Stationswahl AUSBLENDEN → mehr Platz. Das Hinzufügen läuft
+    // über den In-Card-Button (addStationBtn im Lines-Step bzw. wienAddStationBtn bei Wien).
+    if (bottomBar) bottomBar.style.display = 'none';
+    if (_addStBtn) {
+      if (step === 'lines') {
+        _addStBtn.classList.remove('hidden');
+        _addStBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
+        _addStBtn.onclick = function() { showGroupingStep(); };
+        // Enable-Logik wie zuvor beim saveBtn (updateAddStationButton hält es danach in Sync).
+        const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
+        if (isP2P) {
+          _addStBtn.disabled = !oebb_toStop;
+        } else if (selectedNetwork === 'WESTBAHN') {
+          _addStBtn.disabled = !(fvActiveCats.size > 0 && (fvDests.length > 0 || fvAll));
+        } else if (isRegionalOebbNetwork()) {
+          _addStBtn.disabled = !(regLines.size > 0 && (regDests.length > 0 || regAll));
+        } else {
+          _addStBtn.disabled = selectedLines.size === 0;
+        }
+      } else {
+        _addStBtn.classList.add('hidden');  // search/Wien: kein generischer Add-Button
+      }
     }
   } else if (stations.length > 0) {
-    // Stationen vorhanden: "Weiter"
+    // Stationen vorhanden: "Weiter" (bottom-bar)
     if (bottomBar) bottomBar.style.display = '';
     saveBtn.textContent = 'Weiter';
     saveBtn.onclick = function() { handleStationsNextStep(); };
     saveBtn.disabled = false;
+    if (_addStBtn) _addStBtn.classList.add('hidden');
   } else {
     // Keine Stationen, kein Lines-Step: bottom-bar verstecken
     if (bottomBar) bottomBar.style.display = 'none';
+    if (_addStBtn) _addStBtn.classList.add('hidden');
+  }
+
+  // Beim Linien-Auswahl-Schritt automatisch zum Dropdown / zur Linien-Karte scrollen (am
+  // Foto/Hero vorbei), damit der User die Auswahl sofort sieht.
+  if (step === 'wienLine' || step === 'lines') {
+    var _lineCard = document.getElementById(step === 'wienLine' ? 'stepWienLine' : 'stepLines');
+    if (_lineCard) setTimeout(function() {
+      try { _lineCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      catch (e) { _lineCard.scrollIntoView(); }
+    }, 60);
   }
 
   updateRegionHero();
@@ -7002,16 +7023,21 @@ function selectWienStation(station) {
     document.getElementById('wienAddStationBtn').disabled = false;
     showWienOtherLines();
   } else {
-    // Mehrere Richtungen - Checkboxen
-    dirList.innerHTML = uniqueDirections.map((dir, idx) => `
-      <div class="line-group" id="wienDir_${idx}">
-        <div class="line-group-header" onclick="toggleWienDirection(${idx}, ${dir.patternID}, ${dir.stopId}, '${dir.towards.replace(/'/g, "\\'")}')">
-          <input type="checkbox" id="wienDirCheck_${idx}" style="width:18px;height:18px;pointer-events:none;">
+    // Mehrere Richtungen - EINE Bubble pro Linie, beide Richtungen drin (je eigene Checkbox).
+    dirList.innerHTML = `
+      <div class="line-group" style="padding:0;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;">
           <span class="line-badge ${wienBadgeClass(wienSelectedLine.lineName)}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
-          <span class="line-name">→ ${dir.towards}</span>
+          <span style="color:#888;font-size:13px;">Richtung(en) wählen</span>
         </div>
+        ${uniqueDirections.map((dir, idx) => `
+          <div class="wien-dir-row" id="wienDir_${idx}" onclick="toggleWienDirection(${idx}, ${dir.patternID}, ${dir.stopId}, '${dir.towards.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;border-top:1px solid #eee;">
+            <input type="checkbox" id="wienDirCheck_${idx}" style="width:18px;height:18px;pointer-events:none;">
+            <span class="line-name">→ ${dir.towards}</span>
+          </div>
+        `).join('')}
       </div>
-    `).join('');
+    `;
     document.getElementById('wienAddStationBtn').disabled = true;
   }
 
@@ -7025,10 +7051,10 @@ function toggleWienDirection(idx, patternID, stopId, towards) {
   checkbox.checked = !checkbox.checked;
 
   if (checkbox.checked) {
-    container.querySelector('.line-group-header').style.background = '#e8f5e9';
+    if (container) container.style.background = '#e8f5e9';
     wienSelectedDirections.push({ patternID, stopId, towards });
   } else {
-    container.querySelector('.line-group-header').style.background = '#f8f8f8';
+    if (container) container.style.background = '';
     wienSelectedDirections = wienSelectedDirections.filter(d => d.patternID !== patternID);
   }
 
@@ -7046,10 +7072,11 @@ function toggleWienDirection(idx, patternID, stopId, towards) {
 function showWienOtherLines() {
   if (!wienSelectedStation || wienSelectedDirections.length === 0) return;
 
-  const stopIds = wienSelectedStation.stopIds;
+  const stopIds = wienSelectedStation.stopIds || [];
+  const stationName = normalizeStationName(wienSelectedStation.name || '');
   const currentLineName = wienSelectedLine.lineName;
 
-  // Finde andere Linien die an diesen StopIds halten
+  // Finde andere Linien die an DIESER STATION halten.
   const otherLines = [];
 
   wienData.forEach(line => {
@@ -7057,7 +7084,15 @@ function showWienOtherLines() {
 
     if (Array.isArray(line.lineStation)) {
       line.lineStation.forEach(item => {
-        if (stopIds.includes(item.station?.stationID)) {
+        var st = item.station;
+        // Match über den STATIONSNAMEN, nicht nur die Bahnsteig-IDs der Primärlinie — sonst
+        // fehlt die zweite Richtung anderer Linien, die an einem ANDEREN Bahnsteig derselben
+        // Station hält (z.B. Linie 9 an Sommaruggagasse: war nur 1 Richtung sichtbar, obwohl
+        // beide existieren — direkt über die Liniensuche sah man beide).
+        if (st && st.stationID && (
+              (Array.isArray(stopIds) && stopIds.includes(st.stationID)) ||
+              (st.stationName && normalizeStationName(st.stationName) === stationName)
+            )) {
           const towards = getWienDirectionName(line, item.patternID);
           const alreadyExists = otherLines.some(ol =>
             ol.lineName === line.lineName && ol.towards === towards
@@ -7084,25 +7119,50 @@ function showWienOtherLines() {
     return;
   }
 
-  // Sortiere nach Linienname
+  // Sortieren nach Kategorie (U-Bahn → Tram → Bus → Nightline), dann Liniennummer.
+  function _wienCatRank(name) {
+    var n = String(name || '').trim().toUpperCase();
+    if (/^U\d/.test(n)) return 0;        // U-Bahn
+    if (n.charAt(0) === 'N') return 3;   // Nightline (vor der A/B-Bus-Prüfung)
+    if (/[AB]$/.test(n)) return 2;       // Bus (11A, 48B …)
+    return 1;                            // Tram (Ziffern, D, O …)
+  }
   otherLines.sort((a, b) => {
+    const ra = _wienCatRank(a.lineName), rb = _wienCatRank(b.lineName);
+    if (ra !== rb) return ra - rb;
     const aNum = parseInt(a.lineName.replace(/\D/g, '')) || 999;
     const bNum = parseInt(b.lineName.replace(/\D/g, '')) || 999;
-    return aNum - bNum;
+    return (aNum - bNum) || a.lineName.localeCompare(b.lineName, 'de');
   });
 
-  list.innerHTML = otherLines.map((ol, idx) => {
-    const lineType = wienBadgeClass(ol.lineName);
-    return `
-      <div class="line-group" id="wienOther_${idx}" style="margin-bottom:8px;">
-        <div class="line-group-header" onclick="toggleWienOtherLine(${idx}, ${ol.lineID}, '${ol.lineName}', ${ol.patternID}, ${ol.stopId}, '${ol.towards.replace(/'/g, "\\'")}')">
-          <input type="checkbox" id="wienOtherCheck_${idx}" style="width:18px;height:18px;pointer-events:none;">
-          <span class="line-badge ${lineType}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${ol.lineName}</span>
-          <span class="line-name">→ ${ol.towards}</span>
-        </div>
-      </div>
-    `;
-  }).join('');
+  // Nach Linie gruppieren: EINE Bubble pro Linie, alle Richtungen drin (je eigene Checkbox)
+  // — statt jede Richtung als eigene Bubble (war zu lang).
+  // Reihenfolge über ein Array halten (NICHT Object.keys — numerische Liniennamen wie "41"
+  // würden sonst von JS vor alphanumerische wie "10A" einsortiert → falsche Reihenfolge).
+  const _groups = [];
+  const _byLine = {};
+  otherLines.forEach((ol) => {
+    if (!_byLine[ol.lineName]) { _byLine[ol.lineName] = { name: ol.lineName, dirs: [] }; _groups.push(_byLine[ol.lineName]); }
+    _byLine[ol.lineName].dirs.push(ol);
+  });
+  let _html = '';
+  let _oidx = 0;
+  _groups.forEach((g) => {
+    const lineType = wienBadgeClass(g.name);
+    _html += `<div class="line-group" style="padding:0;overflow:hidden;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;">
+        <span class="line-badge ${lineType}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${g.name}</span>
+      </div>`;
+    g.dirs.forEach((ol) => {
+      _html += `<div class="wien-dir-row" id="wienOther_${_oidx}" onclick="toggleWienOtherLine(${_oidx}, ${ol.lineID}, '${ol.lineName.replace(/'/g, "\\'")}', ${ol.patternID}, ${ol.stopId}, '${ol.towards.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;border-top:1px solid #eee;">
+        <input type="checkbox" id="wienOtherCheck_${_oidx}" style="width:18px;height:18px;pointer-events:none;">
+        <span class="line-name">→ ${ol.towards}</span>
+      </div>`;
+      _oidx++;
+    });
+    _html += `</div>`;
+  });
+  list.innerHTML = _html;
 
   section.style.display = 'block';
 }
@@ -7114,10 +7174,10 @@ function toggleWienOtherLine(idx, lineID, lineName, patternID, stopId, towards) 
   checkbox.checked = !checkbox.checked;
 
   if (checkbox.checked) {
-    container.querySelector('.line-group-header').style.background = '#e3f2fd';
+    if (container) container.style.background = '#e3f2fd';
     wienOtherLines.push({ lineID, lineName, patternID, stopId, towards });
   } else {
-    container.querySelector('.line-group-header').style.background = '#f8f8f8';
+    if (container) container.style.background = '';
     wienOtherLines = wienOtherLines.filter(ol => !(ol.lineID === lineID && ol.patternID === patternID));
   }
 }
@@ -10526,7 +10586,11 @@ function findWienStationObjForEdit(station, lineObj) {
     if (savedIds.some(function(id){ return ids.indexOf(id) >= 0; })) match = byName[nn];
   });
   if (!match && byName[wantName]) match = byName[wantName];
-  return match;
+  if (!match) return null;
+  // WICHTIG: stopIds als ARRAY zurückgeben (wie der normale Such-Flow, showWienStationDropdown).
+  // showWienOtherLines ruft stopIds.includes() → bei einem Set würde es werfen und die
+  // "Andere Linien an dieser Station"-Sektion bliebe leer (nur die eine Linie sichtbar).
+  return { name: match.name, stopIds: Array.from(match.stopIds), directions: match.directions };
 }
 
 // Bearbeiten einer Wien-Station: Linie → Station → Richtungen vorbelegen.
@@ -10572,13 +10636,17 @@ async function restoreWienStationEdit(idx) {
                stopId: String(d.stopId || ''), towards: d.towards || '' };
     });
     // passende Checkboxen in der "Andere Linien"-Liste anhaken (kosmetisch, falls gerendert).
-    document.querySelectorAll('#wienOtherLinesList .line-group').forEach(function(el){
-      var lbl = el.querySelector('.line-name'), badge = el.querySelector('.line-badge');
+    // Neue Struktur: pro Linie EINE Bubble (.line-group) mit Badge oben + Richtungs-Zeilen
+    // (.wien-dir-row) darunter → über die Zeilen iterieren, Linie aus dem Karten-Badge lesen.
+    document.querySelectorAll('#wienOtherLinesList .wien-dir-row').forEach(function(row){
+      var lbl = row.querySelector('.line-name');
+      var card = row.closest('.line-group');
+      var badge = card ? card.querySelector('.line-badge') : null;
       var t = lbl ? norm(lbl.textContent.replace('→','')) : '';
       var ln = badge ? badge.textContent.trim() : '';
       if (others.some(function(d){ return d.line === ln && norm(d.towards) === t; })) {
-        var cb = el.querySelector('input[type=checkbox]');
-        if (cb) cb.checked = true;
+        var cb = row.querySelector('input[type=checkbox]');
+        if (cb) { cb.checked = true; row.style.background = '#e3f2fd'; }
       }
     });
   }
