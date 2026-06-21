@@ -4983,28 +4983,27 @@ function showStep(step) {
   if (addMoreBtn) addMoreBtn.classList.add('hidden');
 
   const _addStBtn = document.getElementById('addStationBtn');
+  const _isWienStep = (step === 'wienLine' || step === 'wienStation' || step === 'wienDirection');
   if (isEditingLines) {
-    // Bottom-Bar während Linien-/Stationswahl AUSBLENDEN → mehr Platz. Das Hinzufügen läuft
-    // über den In-Card-Button (addStationBtn im Lines-Step bzw. wienAddStationBtn bei Wien).
-    if (bottomBar) bottomBar.style.display = 'none';
-    if (_addStBtn) {
-      if (step === 'lines') {
-        _addStBtn.classList.remove('hidden');
-        _addStBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
-        _addStBtn.onclick = function() { showGroupingStep(); };
-        // Enable-Logik wie zuvor beim saveBtn (updateAddStationButton hält es danach in Sync).
-        const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
-        if (isP2P) {
-          _addStBtn.disabled = !oebb_toStop;
-        } else if (selectedNetwork === 'WESTBAHN') {
-          _addStBtn.disabled = !(fvActiveCats.size > 0 && (fvDests.length > 0 || fvAll));
-        } else if (isRegionalOebbNetwork()) {
-          _addStBtn.disabled = !(regLines.size > 0 && (regDests.length > 0 || regAll));
-        } else {
-          _addStBtn.disabled = selectedLines.size === 0;
-        }
+    if (_addStBtn) _addStBtn.classList.add('hidden');  // generischer In-Card-Button bleibt aus
+    if (_isWienStep) {
+      // Wien: Bottom-Bar AUS → das Hinzufügen läuft über wienAddStationBtn in der Karte (mehr Platz).
+      if (bottomBar) bottomBar.style.display = 'none';
+    } else {
+      // ANDERE Provider: Bottom-Bar "Station hinzufügen"/"Aktualisieren" wie gehabt (sonst fehlt
+      // der Add-Button komplett — der generische In-Card-Button greift dort nicht zuverlässig).
+      if (bottomBar) bottomBar.style.display = '';
+      saveBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
+      saveBtn.onclick = function() { showGroupingStep(); };
+      const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
+      if (isP2P) {
+        saveBtn.disabled = !oebb_toStop;
+      } else if (selectedNetwork === 'WESTBAHN') {
+        saveBtn.disabled = !(fvActiveCats.size > 0 && (fvDests.length > 0 || fvAll));
+      } else if (isRegionalOebbNetwork()) {
+        saveBtn.disabled = !(regLines.size > 0 && (regDests.length > 0 || regAll));
       } else {
-        _addStBtn.classList.add('hidden');  // search/Wien: kein generischer Add-Button
+        saveBtn.disabled = selectedLines.size === 0;
       }
     }
   } else if (stations.length > 0) {
@@ -6169,7 +6168,50 @@ var WIZARD_STEPS = [
 ];
 var wizardCurrentIdx = 0;
 // Persistenter Gehweg-State im Wizard (überlebt Schritt-Wechsel; DOM allein reicht nicht)
-var wizardGehwegState = { enabled: false, values: {} };  // values: stationKey -> Minuten
+var wizardGehwegState = { enabled: false, values: {} };  // values: stationKey -> Minuten (legacy/pro Station)
+
+// NEU: Gehweg PRO STOP-ID (Bahnsteig). Einzige Quelle für den per-rbl-|g im Build.
+// U-Bahn-Bahnsteige einer Station teilen sich einen Wert (gleicher Eingang); Tram/Bus
+// haben pro Richtung/Bahnsteig einen eigenen Wert (Bahnsteige liegen an verschiedenen Orten).
+var gehwegByStopIdState = {};  // bare stopId -> Minuten
+
+// Liefert die Gehweg-Eingabe-Gruppen einer Station: U-Bahn-Bahnsteige zusammengefasst,
+// jede Tram/Bus-Richtung einzeln. { label, stopIds:[...] } pro Gruppe.
+function gehwegGroupsForStation(s) {
+  var dirs = (s && Array.isArray(s.directions)) ? s.directions : [];
+  if (!dirs.length) {
+    var ids = String((s && (s.fullId || s.stopId)) || '').split(',')
+      .map(function(x){ return x.trim(); }).filter(Boolean);
+    return ids.map(function(id){ return { label: (s && s.stopName) || 'Haltestelle', stopIds: [id] }; });
+  }
+  // STRENG nach Bahnsteig (bare stopId / rbl) gruppieren: mehrere Linien am SELBEN Bahnsteig
+  // teilen sich EINEN Gehweg-Wert (gleicher Ort). Keine U-Bahn-Sonderlogik (type ist bei der
+  // Primärlinie immer 'metro' → wäre unzuverlässig).
+  var byStop = {}, order = [];
+  dirs.forEach(function(d) {
+    var sid = String(d.stopId || '').trim();
+    var gt = sid.indexOf('>'); if (gt > 0) sid = sid.substring(0, gt);  // ÖBB ">Ziel"-Endung weg
+    if (!sid) return;
+    if (!byStop[sid]) { byStop[sid] = []; order.push(sid); }
+    var lbl = d.line + (d.towards ? ' → ' + d.towards : '');
+    if (byStop[sid].indexOf(lbl) < 0) byStop[sid].push(lbl);
+  });
+  return order.map(function(sid){ return { label: byStop[sid].join(', '), stopIds: [sid] }; });
+}
+
+// Repräsentativer Gehweg-Wert einer Gruppe (Max über ihre Stop-IDs).
+function gehwegGroupValue(group) {
+  var v = 0;
+  (group.stopIds || []).forEach(function(sid) { var x = gehwegByStopIdState[sid] || 0; if (x > v) v = x; });
+  return v;
+}
+// Setzt den Wert auf ALLE Stop-IDs einer Gruppe.
+function setGehwegGroupValue(stopIdsCsv, val) {
+  val = parseInt(val || '0', 10) || 0;
+  String(stopIdsCsv).split(',').forEach(function(sid) {
+    sid = sid.trim(); if (sid) gehwegByStopIdState[sid] = val;
+  });
+}
 
 function getActiveWizardSteps() {
   return WIZARD_STEPS.filter(function(s) { return !s.isAvailable || s.isAvailable(); });
@@ -6361,29 +6403,32 @@ function renderWizardGehwegList() {
     return;
   }
 
-  // Vorherige Werte vor dem Re-Render aus dem DOM merken (falls State noch leer)
-  var prev = {};
-  list.querySelectorAll('.wizard-num-input[data-station-key]').forEach(function(inp) {
-    prev[inp.dataset.stationKey] = inp.value;
+  // Legacy-Migration: alte pro-Station-Werte (gekeyt nach fullId) auf die Bahnsteige
+  // verteilen, falls für die Station noch kein pro-Stop-ID-Wert existiert.
+  stops.forEach(function(s, idx) {
+    var legacy = wizardGehwegState.values[s.fullId];
+    if (legacy == null) legacy = wizardGehwegState.values['idx_' + idx];
+    if (legacy == null || !(parseInt(legacy, 10) > 0)) return;
+    var allIds = [].concat.apply([], gehwegGroupsForStation(s).map(function(g){ return g.stopIds; }));
+    if (!allIds.some(function(sid){ return gehwegByStopIdState[sid] != null; }))
+      allIds.forEach(function(sid){ gehwegByStopIdState[sid] = parseInt(legacy, 10) || 0; });
   });
 
   list.innerHTML = stops.map(function(s, idx) {
-    var key = s.fullId || ('idx_' + idx);
-    var lines = (s.filter || '').split(',').filter(function(x) { return x; });
-    var lineChips = lines.length
-      ? lines.map(function(l) { return '<span class="line-chip">' + escapeHtml(l) + '</span>'; }).join('')
-      : '<span style="color:#aaa;font-size:11px;">alle Linien</span>';
-    // Persistenter State hat Vorrang, dann DOM-Wert, sonst 0
-    var savedVal = (wizardGehwegState.values[key] != null) ? String(wizardGehwegState.values[key])
-                 : (prev[key] != null ? prev[key] : '0');
-    return '<div class="wizard-gehweg-item">' +
-      '<div class="stop-block">' +
-        '<div class="stop-name">' + escapeHtml(s.stopName || 'Unbenannt') + '</div>' +
-        '<div class="stop-lines">' + lineChips + '</div>' +
-      '</div>' +
-      '<input type="number" class="wizard-num-input" data-station-key="' + escapeHtml(key) + '" min="0" max="15" value="' + escapeHtml(savedVal) + '" ' +
-        'onchange="wizardGehwegState.values[this.dataset.stationKey] = parseInt(this.value||\'0\',10)||0">' +
+    var groups = gehwegGroupsForStation(s);
+    if (!groups.length) groups = [{ label: s.stopName || 'Haltestelle',
+      stopIds: [ String(s.stopId || '').split(',')[0] || ('idx_' + idx) ] }];
+    var rows = groups.map(function(g) {
+      return '<div class="wizard-gehweg-sub" style="display:flex;align-items:center;gap:10px;margin-top:6px;">' +
+        '<span style="flex:1;color:#555;font-size:13px;">' + escapeHtml(g.label) + '</span>' +
+        '<input type="number" class="wizard-num-input" data-stopids="' + escapeHtml(g.stopIds.join(',')) + '" min="0" max="15" value="' + escapeHtml(String(gehwegGroupValue(g))) + '" ' +
+          'onchange="setGehwegGroupValue(this.dataset.stopids, this.value)">' +
       '<span class="wizard-unit">min</span>' +
+      '</div>';
+    }).join('');
+    return '<div class="wizard-gehweg-item" style="display:block;">' +
+      '<div class="stop-name" style="font-weight:600;">' + escapeHtml(s.stopName || 'Unbenannt') + '</div>' +
+      rows +
     '</div>';
   }).join('');
 
@@ -10611,13 +10656,16 @@ async function restoreWienStationEdit(idx) {
 
   selectWienStation(stationObj);   // setzt wienSelectedStation, zeigt Richtungs-Step
   var norm = function(t){ return String(t || '').trim().toLowerCase(); };
+  // Tolerantes Richtungs-Matching: gespeicherte Namen können abgekürzt sein (z.B.
+  // "Schottentor" vs. frisch geladen "Schottentor U") → Prefix beidseitig zulassen.
+  var towardsMatch = function(a, b){ a = norm(a); b = norm(b); return !!a && !!b && (a === b || a.indexOf(b) === 0 || b.indexOf(a) === 0); };
 
   // Primär-Richtungen anhaken (bei nur 1 Richtung hat selectWienStation sie schon gewählt).
   var savedPrimary = dirs.filter(function(d){ return d.line === primaryLine; });
   if (stationObj.directions.length > 1) {
     savedPrimary.forEach(function(sd){
       var di = stationObj.directions.findIndex(function(d){
-        return norm(d.towards) === norm(sd.towards) || String(d.stopId) === String(sd.stopId);
+        return String(d.stopId) === String(sd.stopId) || towardsMatch(d.towards, sd.towards);
       });
       var cb = (di >= 0) ? document.getElementById('wienDirCheck_' + di) : null;
       if (cb && !cb.checked) {
@@ -10647,7 +10695,7 @@ async function restoreWienStationEdit(idx) {
       var badge = card ? card.querySelector('.line-badge') : null;
       var t = lbl ? norm(lbl.textContent.replace('→','')) : '';
       var ln = badge ? badge.textContent.trim() : '';
-      if (others.some(function(d){ return d.line === ln && norm(d.towards) === t; })) {
+      if (others.some(function(d){ return d.line === ln && towardsMatch(d.towards, t); })) {
         var cb = row.querySelector('input[type=checkbox]');
         if (cb) { cb.checked = true; row.style.background = '#e3f2fd'; }
       }
@@ -12041,7 +12089,12 @@ function populateGehwegQuickList() {
   }
 
   container.innerHTML = recommendedConfig.stationDetails.map((station, i) => {
-    const value = recommendedConfig.gehweg[i] || 0;
+    // Wert aus dem pro-Stop-ID-State (Max über die Bahnsteige) — Quick-Liste ist pro Station.
+    var value = 0;
+    String(station.id || '').split(',').forEach(function(sub) {
+      sub = sub.trim(); var gt = sub.indexOf('>'); if (gt > 0) sub = sub.substring(0, gt);
+      var v = gehwegByStopIdState[sub] || 0; if (v > value) value = v;
+    });
     return `
       <div class="gehweg-quick-item">
         <span class="station-name">${station.name}</span>
@@ -12056,7 +12109,13 @@ function populateGehwegQuickList() {
 function updateGehwegValue(index, value) {
   if (!recommendedConfig) return;
   const val = Math.max(0, Math.min(15, parseInt(value) || 0));
-  recommendedConfig.gehweg[index] = val;
+  recommendedConfig.gehweg[index] = val;  // legacy (pro Station)
+  // In den pro-Stop-ID-State auf ALLE Bahnsteige der Station schreiben (Build nutzt diesen).
+  var st = recommendedConfig.stationDetails && recommendedConfig.stationDetails[index];
+  if (st) String(st.id || '').split(',').forEach(function(sub) {
+    sub = sub.trim(); var gt = sub.indexOf('>'); if (gt > 0) sub = sub.substring(0, gt);
+    if (sub) gehwegByStopIdState[sub] = val;
+  });
 }
 
 function applyQuickSettings() {
@@ -13579,23 +13638,31 @@ function updateNightTimeVisibility() {
 
 function populateFtGehwegList() {
   const container = document.getElementById('ftGehwegList');
+  if (!container) return;
   container.innerHTML = '';
-
-  // Nutze stationDetails (unique stations) für konsistente Indices
-  // stationDetails hat bereits die richtigen stop-IDs für den Gehweg-String
-  if (!recommendedConfig.stationDetails) return;
-
-  recommendedConfig.stationDetails.forEach((station, index) => {
-    const gehwegValue = recommendedConfig.gehweg?.[index] || 0;
-    const item = document.createElement('div');
-    item.className = 'gehweg-item';
-    item.innerHTML = `
-      <span class="station-name">${station.name}</span>
-      <input type="number" min="0" max="30" value="${gehwegValue}"
-             id="ftGehweg_${index}" onchange="updateFinetuningPreview()">
-      <span class="unit">Min</span>
-    `;
-    container.appendChild(item);
+  // Pro Stop-ID (Bahnsteig): Tram/Bus pro Richtung, U-Bahn zusammen — gleiche Quelle wie der
+  // Wizard (gehwegByStopIdState). Werte stammen aus dem Round-Trip (masterrow |g) bzw. Wizard.
+  var stops = (typeof stations !== 'undefined' && Array.isArray(stations)) ? stations : [];
+  stops.forEach(function(s, idx) {
+    var groups = gehwegGroupsForStation(s);
+    if (!groups.length) groups = [{ label: s.stopName || 'Haltestelle',
+      stopIds: [ String(s.stopId || '').split(',')[0] || ('idx_' + idx) ] }];
+    var head = document.createElement('div');
+    head.style.cssText = 'font-weight:600;margin:8px 0 2px;';
+    head.textContent = s.stopName || 'Haltestelle';
+    container.appendChild(head);
+    groups.forEach(function(g) {
+      var item = document.createElement('div');
+      item.className = 'gehweg-item';
+      var lbl = document.createElement('span'); lbl.className = 'station-name'; lbl.textContent = g.label;
+      var inp = document.createElement('input');
+      inp.type = 'number'; inp.min = '0'; inp.max = '15';
+      inp.value = gehwegGroupValue(g); inp.dataset.stopids = g.stopIds.join(',');
+      inp.onchange = function() { setGehwegGroupValue(this.dataset.stopids, this.value); updateFinetuningPreview(); };
+      var unit = document.createElement('span'); unit.className = 'unit'; unit.textContent = 'Min';
+      item.appendChild(lbl); item.appendChild(inp); item.appendChild(unit);
+      container.appendChild(item);
+    });
   });
 }
 
@@ -15412,7 +15479,9 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       (data.gids || []).forEach(function(g, i) { if (g) mParts.push(i + ':' + g); });
       // Eintrag pro Station: rbl|lines|c<colour>|g<gehweg>[|m...]. Per-Display-Settings
       // (rows/interval/…) liegen separat in displaysettings (gekeyt nach colour).
-      var str = rbl + '|' + lines + '|c' + colour + '|g' + stationGehweg + (mParts.length ? '|m' + mParts.join(',') : '');
+      // Gehweg PRO Stop-ID (Bahnsteig) wenn vorhanden, sonst der Stations-Max (Fallback).
+      var _rblGw = (gehwegByStopId[data.bareId] != null) ? gehwegByStopId[data.bareId] : stationGehweg;
+      var str = rbl + '|' + lines + '|c' + colour + '|g' + _rblGw + (mParts.length ? '|m' + mParts.join(',') : '');
       // Erst sammeln (mit Rang + Ziel-Bucket), Reihenfolge entscheidet sich nach der Schleife.
       entries.push({ str: str, rank: (data.rank !== undefined ? data.rank : 1e9), isTime: (bucket === time) });
     });
@@ -15815,12 +15884,17 @@ function saveFromFinetuning() {
   const rowOrder = getRowOrderString();  // Einfach für Wien
   const rowOrderDestination = getRowOrderDestinationString();  // Mit Ziel für Linz
 
-  // Gehweg-Werte sammeln (durch stationDetails iterieren für konsistente Indices)
+  // Legacy pro-Station-gehweg-Array aus dem pro-Stop-ID-State ableiten (Max über die
+  // Bahnsteige). Der eigentliche per-rbl-Gehweg kommt im Build aus gehwegByStopIdState.
   const gehweg = [];
   if (recommendedConfig.stationDetails) {
-    recommendedConfig.stationDetails.forEach((_, index) => {
-      const input = document.getElementById(`ftGehweg_${index}`);
-      gehweg.push(input ? parseInt(input.value) || 0 : 0);
+    recommendedConfig.stationDetails.forEach((st) => {
+      var mx = 0;
+      String(st.id || '').split(',').forEach(function(sub) {
+        sub = sub.trim(); var gt = sub.indexOf('>'); if (gt > 0) sub = sub.substring(0, gt);
+        var v = gehwegByStopIdState[sub] || 0; if (v > mx) mx = v;
+      });
+      gehweg.push(mx);
     });
   }
 
@@ -15897,6 +15971,8 @@ function saveFromFinetuning() {
       if (sub) _gehwegByStopId[sub] = (gehweg[i] || 0);
     });
   });
+  // Pro-Stop-ID-Werte (Bahnsteig) haben Vorrang vor dem pro-Station-Wert.
+  Object.keys(gehwegByStopIdState).forEach(function(sid) { _gehwegByStopId[sid] = gehwegByStopIdState[sid] || 0; });
   try {
     var _rows = buildMasterAndTimeRows(_gehwegByStopId);
     recommendedConfig.masterRow = _rows.masterrow;
@@ -16467,11 +16543,30 @@ function allDeparturesStopIdsFromRows(masterRowStr) {
   return set;
 }
 
+// Gehweg PRO Stop-ID aus der masterrow (|g-Feld pro rbl) — für korrekten Round-Trip beim
+// Laden einer Geräte-Config (Bahnsteig-genau, nicht nur pro Station).
+function gehwegByStopIdFromRows(masterRowStr) {
+  var map = {};
+  if (!masterRowStr) return map;
+  String(masterRowStr).split(';').forEach(function(seg) {
+    seg = seg.trim(); if (!seg) return;
+    var rbl = (seg.split('|')[0] || '').trim();
+    var ci = rbl.indexOf(':');
+    var sid = ci > 0 ? rbl.substring(ci + 1) : rbl;
+    var gt = sid.indexOf('>'); if (gt > 0) sid = sid.substring(0, gt);  // ">Ziel"-Endung weg
+    var gm = seg.match(/\|g(\d+)/);
+    if (sid && gm) map[sid.trim()] = parseInt(gm[1], 10) || 0;
+  });
+  return map;
+}
+
 async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr) {
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
   const filterParts = filter ? filter.split('|') : [];
   const allDepStopIds = allDeparturesStopIdsFromRows(masterRowStr);
+  // Gehweg pro Bahnsteig aus der masterrow wiederherstellen (Round-Trip).
+  gehwegByStopIdState = gehwegByStopIdFromRows(masterRowStr);
 
   // Parse linefilterdestination ODER roworderdestination (beide haben gleiches Format)
   // roworderdestination hat Priorität für Wien (enthält die Richtungen)
