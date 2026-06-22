@@ -7249,27 +7249,24 @@ function addWienStation() {
     if (!stopIds.includes(ol.stopId)) stopIds.push(ol.stopId);
   });
 
-  // Edit-Modus: die bearbeitete Station ZUERST entfernen — sonst legt der push() unten ein
-  // Duplikat an bzw. der "bereits hinzugefügt"-Check würde fälschlich blocken.
-  if (typeof editingStationIndex !== 'undefined' && editingStationIndex !== null && stations[editingStationIndex]) {
-    stations.splice(editingStationIndex, 1);
-    editingStationIndex = null;
-  } else {
-    // Auch OHNE aktiven Edit-Modus dieselbe Wien-Station ersetzen statt duplizieren: der Weg
-    // "Linien ändern" → Station neu suchen setzt editingStationIndex nie (selectStop matcht den
-    // WL:-Prefix nicht gegen Wiens prefixlose fullId). Match per normalisiertem Namen ODER
-    // überlappenden Bahnsteig-IDs → alte Version (oft ohne Richtungen) raus.
-    var _newName = (typeof normalizeStationName === 'function')
-      ? normalizeStationName((wienSelectedStation && wienSelectedStation.name) || '') : '';
-    for (var _i = stations.length - 1; _i >= 0; _i--) {
-      var _s = stations[_i];
-      if (!_s || _s.network !== 'WL') continue;
-      var _sameName = _newName && (typeof normalizeStationName === 'function')
-        && normalizeStationName(_s.stopName || '') === _newName;
-      var _sIds = String(_s.stopId || '').split(',').map(function(x){ return x.trim(); });
-      var _overlap = _sIds.some(function(id){ return id && stopIds.indexOf(id) >= 0; });
-      if (_sameName || _overlap) stations.splice(_i, 1);
-    }
+  // Dieselbe Wien-Station IMMER vollständig entfernen, bevor die neue Version gepusht wird —
+  // egal ob via Edit-Button (editingStationIndex gesetzt) ODER "Linien ändern"/Neu-Suche (Index
+  // nie gesetzt, weil selectStop den WL:-Prefix nicht gegen Wiens prefixlose fullId matcht).
+  // Match per normalisiertem Namen ODER überlappenden Bahnsteig-IDs. Sammelt dabei auch
+  // ALT-Duplikate ein (mehrere stations-Objekte gleichen Namens) — updateStationsList GRUPPIERT
+  // nach network:stopName und MERGT deren directions, sonst blieben alte Linien (z.B.
+  // "71 → Schottenring") in "Deine Stationen" sichtbar, obwohl gerade rausgenommen.
+  editingStationIndex = null;
+  var _newName = (typeof normalizeStationName === 'function')
+    ? normalizeStationName((wienSelectedStation && wienSelectedStation.name) || '') : '';
+  for (var _i = stations.length - 1; _i >= 0; _i--) {
+    var _s = stations[_i];
+    if (!_s || _s.network !== 'WL') continue;
+    var _sameName = _newName && (typeof normalizeStationName === 'function')
+      && normalizeStationName(_s.stopName || '') === _newName;
+    var _sIds = String(_s.stopId || '').split(',').map(function(x){ return x.trim(); });
+    var _overlap = _sIds.some(function(id){ return id && stopIds.indexOf(id) >= 0; });
+    if (_sameName || _overlap) stations.splice(_i, 1);
   }
 
   // Liniennamen sammeln
