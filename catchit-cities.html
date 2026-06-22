@@ -10688,45 +10688,41 @@ async function restoreWienStationEdit(idx) {
   // "Schottentor" vs. frisch geladen "Schottentor U") → Prefix beidseitig zulassen.
   var towardsMatch = function(a, b){ a = norm(a); b = norm(b); return !!a && !!b && (a === b || a.indexOf(b) === 0 || b.indexOf(a) === 0); };
 
-  // Primär-Richtungen anhaken (bei nur 1 Richtung hat selectWienStation sie schon gewählt).
+  // Primär-Richtungen anhaken: über die FRISCH gerenderten Richtungen iterieren (jede Zeile
+  // genau EINMAL), Match bevorzugt über towards (Name), stopId nur als Fallback wenn ein
+  // towards fehlt. Früher wurde über die GESPEICHERTEN iteriert + per stopId gematcht → teilen
+  // sich zwei Richtungen einer Linie eine Bahnsteig-ID, traf der zweite Saved-Eintrag dieselbe
+  // (schon gehakte) Zeile → zweite Richtung blieb ungehakt.
   var savedPrimary = dirs.filter(function(d){ return d.line === primaryLine; });
   if (stationObj.directions.length > 1) {
-    savedPrimary.forEach(function(sd){
-      var di = stationObj.directions.findIndex(function(d){
-        return String(d.stopId) === String(sd.stopId) || towardsMatch(d.towards, sd.towards);
+    stationObj.directions.forEach(function(d, di){
+      var isSaved = savedPrimary.some(function(sd){
+        if (towardsMatch(d.towards, sd.towards)) return true;
+        return (!d.towards || !sd.towards) && String(d.stopId) === String(sd.stopId);
       });
-      var cb = (di >= 0) ? document.getElementById('wienDirCheck_' + di) : null;
-      if (cb && !cb.checked) {
-        var d = stationObj.directions[di];
-        toggleWienDirection(di, d.patternID, d.stopId, d.towards);
-      }
+      if (!isSaved) return;
+      var cb = document.getElementById('wienDirCheck_' + di);
+      if (cb && !cb.checked) toggleWienDirection(di, d.patternID, d.stopId, d.towards);
     });
   }
 
-  // Andere Linien (Tram/Bus an denselben Bahnsteigen) für korrektes Speichern wiederherstellen.
+  // Andere Linien wiederherstellen: NICHT vorab in wienOtherLines schreiben, sondern die
+  // gerenderte "Andere Linien"-Liste durchgehen und die gespeicherten Richtungen ECHT
+  // anklicken (row.click() → toggleWienOtherLine) → Checkbox-State UND wienOtherLines bleiben
+  // konsistent (korrektes Speichern + sichtbare Häkchen).
   var others = dirs.filter(function(d){ return d.line !== primaryLine; });
-  if (others.length) {
-    wienOtherLines = others.map(function(d){
-      var lo = wienData.find(function(l){ return l.lineName === d.line; });
-      return { lineID: lo ? lo.lineID : null, lineName: d.line, patternID: null,
-               stopId: String(d.stopId || ''), towards: d.towards || '' };
-    });
-    // Sicherstellen, dass die "Andere Linien"-Liste gerendert ist, bevor wir ankreuzen
-    // (bei mehreren Primär-Richtungen rendert sie erst beim ersten toggleWienDirection).
-    if (wienSelectedDirections.length > 0) showWienOtherLines();
-    // passende Checkboxen in der "Andere Linien"-Liste anhaken (kosmetisch, falls gerendert).
-    // Neue Struktur: pro Linie EINE Bubble (.line-group) mit Badge oben + Richtungs-Zeilen
-    // (.wien-dir-row) darunter → über die Zeilen iterieren, Linie aus dem Karten-Badge lesen.
+  wienOtherLines = [];
+  if (others.length && wienSelectedDirections.length > 0) {
+    showWienOtherLines();  // rendert die Liste (alle ungehakt)
     document.querySelectorAll('#wienOtherLinesList .wien-dir-row').forEach(function(row){
       var lbl = row.querySelector('.line-name');
       var card = row.closest('.line-group');
       var badge = card ? card.querySelector('.line-badge') : null;
       var t = lbl ? norm(lbl.textContent.replace('→','')) : '';
       var ln = badge ? badge.textContent.trim() : '';
-      if (others.some(function(d){ return d.line === ln && towardsMatch(d.towards, t); })) {
-        var cb = row.querySelector('input[type=checkbox]');
-        if (cb) { cb.checked = true; row.style.background = '#e3f2fd'; }
-      }
+      var cb = row.querySelector('input[type=checkbox]');
+      var match = others.some(function(d){ return d.line === ln && (towardsMatch(d.towards, t) || !d.towards); });
+      if (match && cb && !cb.checked) row.click();  // echter Toggle → füllt wienOtherLines
     });
   }
 
