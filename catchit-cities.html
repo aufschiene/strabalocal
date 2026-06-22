@@ -2801,12 +2801,10 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 10px 12px;
-      background: #f8f8f8;
-      border-radius: 10px;
-      margin-bottom: 8px;
+      padding: 7px 2px;
+      border-bottom: 1px solid #ececec;   /* Trennlinie statt graue Karten */
     }
-    .wizard-gehweg-item:last-child { margin-bottom: 0; }
+    .wizard-gehweg-item:last-child { border-bottom: none; }
     .wizard-gehweg-item .stop-block {
       flex: 1;
       min-width: 0;
@@ -2815,10 +2813,15 @@
       font-weight: 600;
       font-size: 14px;
       color: #333;
-      margin-bottom: 3px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .wizard-gehweg-item .stop-sub {
+      font-size: 12px;
+      color: #777;
+      line-height: 1.35;
+      margin-top: 1px;
     }
     .wizard-gehweg-item .stop-lines {
       font-size: 11px;
@@ -3634,7 +3637,7 @@ window.addEventListener('message', function(event) {
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'INNSBRUCK', 'VOR', 'OOEVV', 'KAERNTEN', 'VVT', 'VVV', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
+    networks: ['WL', 'WLB', 'STV', 'SALZBURG', 'INNSBRUCK', 'VOR', 'OOEVV', 'KAERNTEN', 'VVT', 'VVV', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
     // Verkehrsart → dann Bundesland oder direkt Netzwerk
     verkehrsarten: {
       stadt: {
@@ -3645,7 +3648,7 @@ const REGIONS = {
           AT_W: { name: 'Wien', wappen: 'wien', desc: 'U-Bahn, Tram, Bus, Badner Bahn', networks: ['WL', 'WLB'] },
           AT_NOE: { name: 'Niederösterreich', wappen: 'noe', desc: 'Bus, Tram (VOR)', networks: ['VOR'] },
           AT_BGLD: { name: 'Burgenland', wappen: 'burgenland', desc: 'Bus (VOR)', networks: ['VOR'] },
-          AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus', networks: ['LINZ', 'OOEVV'] },
+          AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus', networks: ['OOEVV'] },
           AT_STMK: { name: 'Steiermark', wappen: 'stmk', desc: 'Straßenbahn, Bus', networks: ['STV'] },
           AT_K: { name: 'Kärnten', wappen: 'kaernten', desc: 'Bus (Kärntner Linien)', networks: ['KAERNTEN'] },
           AT_SBG: { name: 'Salzburg', wappen: 'sbg', desc: 'Obus, Lokalbahn', networks: ['SALZBURG'] },
@@ -4480,7 +4483,9 @@ async function fetchDeparturesUnified(fullId) {
   // mit Caching/Rate-Limiting. Nie direkt an die Trainboard-API.
   const apiNetwork = (typeof mapNetworkForApi === 'function') ? mapNetworkForApi(network) : network;
   const apiFullId = apiNetwork ? (apiNetwork + ':' + stopId) : stopId;
-  const r = await fetch(DEPARTURES_API + '?stopId=' + encodeURIComponent(apiFullId));
+  // no-store + Cache-Bust: der Picker MUSS immer frische Richtungen sehen — sonst zeigt
+  // der Browser-Cache nach einem Server-Fix noch die alten Ziele (z.B. "Linz/Donau Auwiesen").
+  const r = await fetch(DEPARTURES_API + '?stopId=' + encodeURIComponent(apiFullId) + '&_=' + Date.now(), { cache: 'no-store' });
   return await r.json();
 }
 
@@ -4495,7 +4500,7 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
   // Der Server liefert für Nicht-Trainboard-Netze einfach eine leere Liste → No-Op.
   if (!network || network === 'WL') return;
   try {
-    const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(network) + '&stopId=' + encodeURIComponent(stopId));
+    const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(network) + '&stopId=' + encodeURIComponent(stopId) + '&_=' + Date.now(), { cache: 'no-store' });
     const data = await r.json();
     const lines = (data && data.lines) || [];
     if (!lines.length) return;
@@ -5504,8 +5509,7 @@ var DISPLAY_PRESETS = {
     wappen: 'ooe',
     photo: 'fotos/Oberösterreich.jpg',
     networks: [
-      { id: 'LINZ',          jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
-      { id: 'OOEVV',         label: 'OÖVV', desc: 'Bus, Tram, Lokalbahn', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
+      { id: 'OOEVV',         label: 'Bus & Tram', desc: 'Linz, Wels, Gmunden, Steyr …', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
       { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
       { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
     ]
@@ -6428,20 +6432,21 @@ function renderWizardGehwegList() {
 
   list.innerHTML = stops.map(function(s, idx) {
     var groups = gehwegGroupsForStation(s);
-    if (!groups.length) groups = [{ label: s.stopName || 'Haltestelle',
+    if (!groups.length) groups = [{ label: s.stopName || 'Haltestelle', lines: [ s.stopName || 'Haltestelle' ],
       stopIds: [ String(s.stopId || '').split(',')[0] || ('idx_' + idx) ] }];
-    var rows = groups.map(function(g) {
-      return '<div class="wizard-gehweg-sub" style="display:flex;align-items:center;gap:10px;margin-top:6px;">' +
-        '<span style="flex:1;color:#555;font-size:13px;line-height:1.5;">' + (g.lines || [g.label]).map(escapeHtml).join('<br>') + '</span>' +
+    // Kompakt: pro Station EINE Zeile (Name + Linien gestapelt links, Feld rechts), Stationen
+    // per Trennlinie getrennt. Mehrere Gruppen → Name nur in der ersten Zeile.
+    return groups.map(function(g, gi) {
+      return '<div class="wizard-gehweg-item">' +
+        '<div class="stop-block">' +
+          (gi === 0 ? '<div class="stop-name">' + escapeHtml(s.stopName || 'Unbenannt') + '</div>' : '') +
+          '<div class="stop-sub">' + (g.lines || [g.label]).map(escapeHtml).join('<br>') + '</div>' +
+        '</div>' +
         '<input type="number" class="wizard-num-input" data-stopids="' + escapeHtml(g.stopIds.join(',')) + '" min="0" max="15" value="' + escapeHtml(String(gehwegGroupValue(g))) + '" ' +
           'onchange="setGehwegGroupValue(this.dataset.stopids, this.value)">' +
-      '<span class="wizard-unit">min</span>' +
+        '<span class="wizard-unit">min</span>' +
       '</div>';
     }).join('');
-    return '<div class="wizard-gehweg-item" style="display:block;">' +
-      '<div class="stop-name" style="font-weight:600;">' + escapeHtml(s.stopName || 'Unbenannt') + '</div>' +
-      rows +
-    '</div>';
   }).join('');
 
   function escapeHtml(s) {
@@ -10242,6 +10247,7 @@ function removeStation(idx) {
   resetFinetuningData();
 
   updateStationsList();
+  if (!stations.length) goToRegionSelectionEmpty();
 }
 
 // Setzt alle Feintuning-Daten zurück
@@ -10443,7 +10449,37 @@ function removeStationGroup(key) {
   // Entferne alle Stationen mit diesem Key
   const [network, stopName] = [key.split(':')[0], key.split(':').slice(1).join(':')];
   stations = stations.filter(s => !(s.network === network && s.stopName === stopName));
+  resetFinetuningData();
   updateStationsList();
+  if (!stations.length) goToRegionSelectionEmpty();
+}
+
+// Letzte Station gelöscht → nicht in eine weiße Seite laufen (showAddedStationsStep blendet alle
+// Wizard-Steps aus, updateStationsList versteckt zusätzlich die leere stationsCard), sondern
+// zurück zur gespeicherten Regions-/Bundesland-Auswahl — exakt wie "Linien ändern".
+function goToRegionSelectionEmpty() {
+  currentStep = 'region';
+  var overlay = document.getElementById('configChoiceOverlay');
+  if (overlay) overlay.style.display = 'none';
+  var ft = document.getElementById('stepFinetuning');
+  if (ft) ft.classList.add('hidden');
+  var addMore = document.getElementById('addMoreStationsBtn');
+  var weiter  = document.getElementById('openFinetuningBtn');
+  if (addMore) addMore.classList.add('hidden');
+  if (weiter)  weiter.classList.add('hidden');
+  var bb = document.querySelector('.bottom-bar'); if (bb) bb.style.display = '';
+  var country = (typeof detectCountry === 'function' && detectCountry()) ||
+                (typeof DEFAULT_COUNTRY !== 'undefined' ? DEFAULT_COUNTRY : 'AT');
+  var hasBundeslaender = country && typeof DISPLAY_PRESETS !== 'undefined' &&
+    Object.values(DISPLAY_PRESETS).filter(function(p){ return p.parent === country; }).length > 1;
+  if (hasBundeslaender && typeof renderBundeslandChooser === 'function') {
+    renderBundeslandChooser(country);          // "Region in <Land> wählen"
+  } else if (typeof selectRegion === 'function' && country && typeof REGIONS !== 'undefined' && REGIONS[country]) {
+    selectRegion(country);                      // Land ohne Bundesländer → direkt Netz-Auswahl
+  } else if (typeof showStep === 'function') {
+    showStep('region');                         // Fallback: Länderwahl
+  }
+  window.scrollTo(0, 0);
 }
 
 // ==================== AUSWAHL-MENÜ BEI BESTEHENDER CONFIG ====================
@@ -11296,9 +11332,12 @@ function hasStableRichtungsId(network) {
   // HAMBURG seit 2026-06: Server mappt Ziele per GTFS-Bahnsteig-Lookup auf stabile
   //   2-Richtungs-IDs ("hh<bahnsteig>") → verzweigte Linien (U1 Norderstedt vs.
   //   Großhansdorf) kollabieren im Picker zu 2 Karten statt 5+.
+  // OÖVV/VOR/Kärnten/VVT/VVV seit 2026-06: Server nimmt die Steig-Id pro Abfahrt
+  //   ("st<stationId>") als richtungsId → 1 Steig = 1 Richtung, Kurzwenden kollabieren.
   return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO',
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
-          'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG'].includes(network);
+          'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG',
+          'OOEVV', 'VOR', 'KAERNTEN', 'VVT', 'VVV'].includes(network);
 }
 
 // Baut die geordneten lineGroups-Tokens EINER Station unter Berücksichtigung der
