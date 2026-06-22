@@ -6173,6 +6173,9 @@ var WIZARD_STEPS = [
 var wizardCurrentIdx = 0;
 // Persistenter Gehweg-State im Wizard (überlebt Schritt-Wechsel; DOM allein reicht nicht)
 var wizardGehwegState = { enabled: false, values: {} };  // values: stationKey -> Minuten (legacy/pro Station)
+// Nachtmodus-State: enabled=null = noch nicht aus der Config geseedet (passiert einmal beim
+// Anzeigen des Nacht-Schritts). Danach gewinnt die User-Eingabe, auch beim Vor/Zurück-Blättern.
+var wizardNightState = { enabled: null };
 
 // NEU: Gehweg PRO STOP-ID (Bahnsteig). Einzige Quelle für den per-rbl-|g im Build.
 // U-Bahn-Bahnsteige einer Station teilen sich einen Wert (gleicher Eingang); Tram/Bus
@@ -6405,6 +6408,27 @@ function wizardShowStep(idx) {
     renderWizardGehwegList();
   }
 
+  // Nachtmodus-Schritt: Toggle aus wizardNightState spiegeln. EINMAL pro Wizard-Lauf aus der
+  // Config seeden (enabled === null) — danach gewinnt die User-Eingabe, auch beim Vor/Zurück.
+  // OHNE das startete die Toggle immer auf AUS und überschrieb beim Speichern den Preset-Default
+  // (nightMode: true) bzw. eine bestehende Config ("Nachtmodus wird im Wizard nicht gespeichert").
+  if (step.id === 'stepWizardNight') {
+    var nStart = document.getElementById('wizardNightStart');
+    var nEnd   = document.getElementById('wizardNightEnd');
+    if (wizardNightState.enabled === null) {
+      wizardNightState.enabled = (recommendedConfig && recommendedConfig.nightMode !== undefined)
+        ? !!recommendedConfig.nightMode : true;  // Default: an
+      if (nStart && recommendedConfig && recommendedConfig.nightStart != null) nStart.value = recommendedConfig.nightStart;
+      if (nEnd   && recommendedConfig && recommendedConfig.nightEnd   != null) nEnd.value   = recommendedConfig.nightEnd;
+    }
+    var nToggle = document.getElementById('wizardNightToggle');
+    var nSub    = document.getElementById('wizardNightSub');
+    if (nToggle) {
+      nToggle.classList.toggle('active', !!wizardNightState.enabled);
+      if (nSub) nSub.classList.toggle('disabled', !wizardNightState.enabled);
+    }
+  }
+
   window.scrollTo(0, 0);
 }
 
@@ -6484,6 +6508,8 @@ function exitWizardToStations() {
 }
 
 function startSetupWizard() {
+  // Nachtmodus-State zurücksetzen → der Nacht-Schritt seedet frisch aus der aktuellen Config.
+  wizardNightState.enabled = null;
   // Alle Flow-Cards verstecken, Hero und Bottom-Bar weg, Wizard ab Schritt 0
   document.querySelectorAll('.container > .card').forEach(function(c) {
     c.classList.add('hidden');
@@ -6527,7 +6553,8 @@ function wizardBuildConfig() {
     style:           getSavedDisplayStyle() || 'compact',
     gehwegEnabled:   wizardGehwegState.enabled,
     gehwegPerStop:   gehwegPerStop,
-    nightEnabled:    document.getElementById('wizardNightToggle')?.classList.contains('active') || false,
+    nightEnabled:    (wizardNightState.enabled !== null) ? wizardNightState.enabled
+                       : ((recommendedConfig && recommendedConfig.nightMode !== undefined) ? !!recommendedConfig.nightMode : true),
     nightStart:      parseInt(document.getElementById('wizardNightStart')?.value || '22', 10),
     nightEnd:        parseInt(document.getElementById('wizardNightEnd')?.value || '7', 10),
     advanced:        Object.assign({}, advancedSettings)
@@ -6758,7 +6785,9 @@ function wizardNightToggle() {
   var sub = document.getElementById('wizardNightSub');
   if (!toggle || !sub) return;
   toggle.classList.toggle('active');
-  sub.classList.toggle('disabled', !toggle.classList.contains('active'));
+  var on = toggle.classList.contains('active');
+  sub.classList.toggle('disabled', !on);
+  wizardNightState.enabled = on;  // persistiert über Schritt-Wechsel (sonst Re-Seed aus Config)
 }
 
 // Auto-Trigger zum Testen: ?wizard=style|gehweg|night startet den Wizard direkt
@@ -12355,13 +12384,13 @@ function goToFinetuning() {
 // offline:true → Display-Typ wird im Auswahl-Dropdown ausgeblendet (aber Eintrag
 // bleibt erhalten, damit interne Lookups/Auto-Mapping nicht brechen).
 const DISPLAY_TYPE_FEATURES = {
-  1:  { rows: true, sorting: true, grouping: true, textColor: true, chopper: true, silberpfeil: true, name: 'Wiener Linien' },
+  1:  { rows: true, sorting: true, grouping: true, textColor: true, chopper: true, silberpfeil: true, altNext: true, name: 'Wiener Linien' },
   2:  { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Grüne Dot Matrix', offline: true },
   3:  { rows: true, sorting: true, grouping: true, name: 'VBB Berlin', offline: true },
   4:  { rows: true, sorting: true, grouping: true, name: 'WLB Badner Bahn', offline: true },
   5:  { rows: false, sorting: false, grouping: false, name: 'DB S-Bahn' },
   6:  { rows: false, sorting: false, grouping: false, name: 'DB Fernverkehr' },
-  7:  { rows: true, sorting: true, grouping: true, name: 'Blau/Gelb' },
+  7:  { rows: true, sorting: true, grouping: true, altNext: true, name: 'Blau/Gelb' },
   8:  { rows: true, sorting: true, grouping: true, name: 'Salzburg AG', offline: true },
   9:  { rows: true, sorting: true, grouping: true, name: 'Paris' },
   10: { rows: true, sorting: true, grouping: true, name: 'Straba', offline: true },
@@ -12373,7 +12402,7 @@ const DISPLAY_TYPE_FEATURES = {
   18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Schwarz/Weiß Matrix', offline: true },
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, name: 'MVG' },
-  23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, name: 'Matrix' },
+  23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, name: 'Matrix' },
   24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' }
 };
 
@@ -12558,6 +12587,12 @@ function rowsForColour(cid) {
   // Fallback und verhindert die Auto-Berechnung).
   if (v == null && document.getElementById('ftRows_' + cid)) {
     try { v = parseInt(getFtToggleVal('ftRows_' + cid)); } catch (e) { v = null; }
+  }
+  // Feintuning nicht offen → bereits gespeicherten Zeilen-Wert (geladene Config) BEHALTEN,
+  // bevor auf AUTO zurückgefallen wird — sonst setzt Wizard/Quick-Save die Zeilen zurück.
+  if ((!v || isNaN(v)) && typeof dsVal === 'function') {
+    var _ldr = dsVal(cid, 'r');
+    if (_ldr != null && !isNaN(_ldr)) v = _ldr;
   }
   if (!v || isNaN(v)) v = autoRowsForColour(cid);  // AUTO aus Inhalt statt statischem Default
   if (f.minRows && v < f.minRows) v = f.minRows;
@@ -12861,7 +12896,7 @@ function renderDisplayTypeSections() {
       var aDs = dsVal(dt.colour, 'a');
       var altOn = (aDs !== undefined) ? (aDs === 1) : !(recommendedConfig && recommendedConfig.alternateNext === false);
       var altActive = altOn ? ' active' : '';
-      html += '<div class="form-row"><div><div class="form-label">Abfahrten</div><div class="form-hint">An = erste &amp; nächste im Wechsel (Wien-Takt) · Aus = nur die nächste</div></div>';
+      html += '<div class="form-row"><div><div class="form-label">Abfahrten</div><div class="form-hint">An = 1. &amp; 2. Abfahrt im Wechsel · Aus = nur die 1. Abfahrt</div></div>';
       html += '<div class="toggle-switch' + altActive + '" id="ftAltNext_' + dt.colour + '" onclick="toggleFtSwitch(\'ftAltNext_' + dt.colour + '\')"></div></div>';
     }
     if (f.chopper) {
@@ -15607,6 +15642,18 @@ function buildMasterAndTimeRows(gehwegByStopId) {
 // Baut "c<colour>|r<rows>|i<interval>|s<sort>|t<textcolor>|b<bg>|w<von-bis>|
 //       h<chopper>|n<niederflurblink>|k<silberpfeil>|a<altnext>|d<delayhl>;..."
 // EIN Block pro eindeutiger colour (mehrere Stationen mit gleichem Typ teilen ihn).
+// Per-Display-Bool für displaysettings: Feintuning offen (DOM-Toggle da) → User-Wahl;
+// sonst den bereits gespeicherten Wert (dsVal aus geladener Config) BEHALTEN; sonst
+// den Preset-Default (rcVal); sonst def. Verhindert, dass Wizard/Quick-Save bereits
+// gesetzte Settings (Klima, Verspätung, Wien-Takt …) auf 0 zurücksetzt.
+function dsKeepBool(cid, key, domId, rcVal, def) {
+  if (document.getElementById(domId)) return isFtToggleActive(domId) ? 1 : 0;
+  var loaded = dsVal(cid, key);
+  if (loaded !== undefined) return loaded;
+  if (rcVal !== undefined && rcVal !== null) return rcVal ? 1 : 0;
+  return def;
+}
+
 function buildDisplaySettings() {
   // Über stationDisplayColour iterieren (DIESELBE Quelle wie die masterrow) →
   // deckt exakt die colours der masterrow ab, egal ob multi/single/manual.
@@ -15626,29 +15673,38 @@ function buildDisplaySettings() {
     var parts = ['c' + cid];
     // Zeilen
     parts.push('r' + rowsForColour(cid));
-    // Anzeigedauer (Slideshow-Intervall) — nur wenn der Toggle existiert, sonst
-    // weglassen (Firmware default = 10s). Verhindert falsche Fallback-Werte.
+    // Anzeigedauer (Slideshow-Intervall): Feintuning offen → Toggle; sonst gespeicherten
+    // Wert behalten; sonst weglassen (Firmware-Default 10s).
     if (document.getElementById('ftInterval_' + cid)) {
       var iv = parseInt(getFtToggleVal('ftInterval_' + cid));
       if (iv && !isNaN(iv)) parts.push('i' + iv);
+    } else {
+      var _li = dsVal(cid, 'i');
+      if (_li !== undefined) parts.push('i' + _li);
     }
-    // Sortierung (nur Stadt-Displays mit f.sorting; Zug-Displays sind via colour zeitbasiert)
+    // Sortierung: Feintuning offen → Toggle; sonst gespeicherten Wert behalten; sonst 1.
     if (f.sorting) {
-      var sv = parseInt(getFtToggleVal('ftSort_' + cid));
-      if (!sv || isNaN(sv)) sv = 1;
+      var sv = document.getElementById('ftSort_' + cid) ? parseInt(getFtToggleVal('ftSort_' + cid)) : NaN;
+      if (!sv || isNaN(sv)) { var _ls = dsVal(cid, 's'); sv = (_ls !== undefined) ? _ls : 1; }
       parts.push('s' + sv);
     }
     // Schriftfarbe / Farbton-Variante + Wien-Hintergrund.
-    // Default = Netz-Variante (Linz=2 grün, Berlin/Schweiz=3 orange) wenn der User
-    // den Toggle nicht angefasst hat; manuelle Auswahl gewinnt.
+    // Feintuning offen → Toggle; sonst gespeicherten Wert behalten; sonst Netz-Variante.
     if (f.textColor) {
       var tcEl = document.getElementById('ftTxtCol_' + cid);
       var tc = tcEl ? parseInt(getFtToggleVal('ftTxtCol_' + cid)) : NaN;
-      if (!tc || isNaN(tc)) { var nv = variantForColour(cid); tc = (nv != null) ? nv : 1; }
+      if (!tc || isNaN(tc)) {
+        var _lt = dsVal(cid, 't');
+        if (_lt !== undefined) tc = _lt;
+        else { var nv = variantForColour(cid); tc = (nv != null) ? nv : 1; }
+      }
       parts.push('t' + tc);
       if (document.getElementById('ftWienBg_' + cid)) {
         var bgv = getFtToggleVal('ftWienBg_' + cid);
         if (bgv !== null && bgv !== undefined && bgv !== '') parts.push('b' + (parseInt(bgv) || 0));
+      } else {
+        var _lb = dsVal(cid, 'b');
+        if (_lb !== undefined) parts.push('b' + _lb);
       }
     }
     // Wien U-Bahn-Badges (nur Wien colour 1): u0=Aus, u1=Linie, u2=Ganze Zeile.
@@ -15667,21 +15723,27 @@ function buildDisplaySettings() {
         if (su !== undefined && !isNaN(su) && su > 0) parts.push('u' + su);
       }
     }
-    // Zeitfenster
+    // Zeitfenster: Feintuning offen → Toggle-Zustand; sonst gespeicherten Wert behalten.
     var twToggle = document.getElementById('ftTimeWindow_' + cid);
-    if (twToggle && twToggle.classList.contains('active')) {
-      var from = document.getElementById('ftTimeFrom_' + cid);
-      var to = document.getElementById('ftTimeTo_' + cid);
-      parts.push('w' + ((from ? from.value : '6') + '-' + (to ? to.value : '22')));
+    if (twToggle) {
+      if (twToggle.classList.contains('active')) {
+        var from = document.getElementById('ftTimeFrom_' + cid);
+        var to = document.getElementById('ftTimeTo_' + cid);
+        parts.push('w' + ((from ? from.value : '6') + '-' + (to ? to.value : '22')));
+      }
+    } else {
+      var _lw = (typeof dsByCid !== 'undefined' && dsByCid[cid]) ? dsByCid[cid].w : undefined;
+      if (_lw) parts.push('w' + _lw);
     }
-    // Hochflurer / Niederflur-Blinken / Klima / Wien-Takt / Verspätung
+    // Hochflurer / Niederflur-Blinken / Klima / Wien-Takt / Verspätung — bereits gesetzte
+    // Werte behalten, wenn das Feintuning nicht offen ist (Wizard/Quick-Save), statt auf 0.
     if (f.chopper) {
-      parts.push('h' + (isFtToggleActive('ftChopper_' + cid) ? 1 : 0));
-      if (document.getElementById('ftNfBlink_' + cid)) parts.push('n' + (isFtToggleActive('ftNfBlink_' + cid) ? 1 : 0));
+      parts.push('h' + dsKeepBool(cid, 'h', 'ftChopper_' + cid, recommendedConfig && recommendedConfig.chopper, 0));
+      parts.push('n' + dsKeepBool(cid, 'n', 'ftNfBlink_' + cid, recommendedConfig && recommendedConfig.niederflurBlink, 0));
     }
-    if (f.silberpfeil) parts.push('k' + (isFtToggleActive('ftSilber_' + cid) ? 1 : 0));
-    if (f.altNext) parts.push('a' + (isFtToggleActive('ftAltNext_' + cid) ? 1 : 0));
-    if (f.delayHighlight) parts.push('d' + (isFtToggleActive('ftDelayHl_' + cid) ? 1 : 0));
+    if (f.silberpfeil) parts.push('k' + dsKeepBool(cid, 'k', 'ftSilber_' + cid, recommendedConfig && recommendedConfig.silberpfeil, 0));
+    if (f.altNext) parts.push('a' + dsKeepBool(cid, 'a', 'ftAltNext_' + cid, (recommendedConfig && recommendedConfig.alternateNext === false) ? 0 : 1, 1));
+    if (f.delayHighlight) parts.push('d' + dsKeepBool(cid, 'd', 'ftDelayHl_' + cid, recommendedConfig && recommendedConfig.delayHighlight, 0));
     segs.push(parts.join('|'));
   });
   return segs.join(';');
