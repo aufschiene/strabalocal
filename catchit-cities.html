@@ -2774,6 +2774,29 @@
     }
     .wizard-sub.disabled { opacity: 0.4; pointer-events: none; }
 
+    .db-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .db-chips .gattung-chip.on { background: #EC0016; }   /* DB-Rot statt Blau */
+    .db-opt-sep { flex-basis: 100%; font-size: 11px; color: #999; margin: 6px 0 -2px; }
+    .db-steig-list { display: flex; flex-direction: column; gap: 8px; }
+    .db-steig-row {
+      display: flex; align-items: baseline; gap: 12px;
+      padding: 10px 14px; border: 1.5px solid #e3e3e3; border-radius: 10px;
+      background: #fafafa; cursor: pointer; transition: all .12s;
+    }
+    .db-steig-row:hover { border-color: #ec001688; }
+    .db-steig-row.on { border-color: #EC0016; background: #fff5f5; }
+    .db-steig-num { font-weight: 700; color: #333; min-width: 46px; flex: 0 0 auto; }
+    .db-steig-row.on .db-steig-num { color: #EC0016; }
+    .db-steig-lines { font-size: 13px; color: #777; line-height: 1.4; }
+    .db-steig-check {
+      width: 20px; height: 20px; border: 2px solid #cfcfcf; border-radius: 5px;
+      flex: 0 0 auto; position: relative; align-self: center; transition: all .12s;
+    }
+    .db-steig-row.on .db-steig-check { border-color: #EC0016; background: #EC0016; }
+    .db-steig-row.on .db-steig-check::after {
+      content: '✓'; color: #fff; font-size: 13px; font-weight: 700;
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -55%);
+    }
     .wizard-num-input {
       width: 64px;
       padding: 8px 10px;
@@ -3028,6 +3051,53 @@
     <button class="btn btn-primary hidden" id="addStationBtn" onclick="showGroupingStep()" disabled>
       Station hinzufügen
     </button>
+  </div>
+
+  <!-- DB-Auswahl: DB hat kein /lines → Gattung/Bahnsteig aus den Departures (Discovery-Endpoint).
+       Zwei Modi: "Alle Abfahrten" (Gattung→Linie) und "Bahnsteig/Richtung" (planmäßig). -->
+  <div class="card hidden" id="stepDbSelect">
+    <button class="back-btn" onclick="goBack('search')">Zurück</button>
+    <h2 id="dbStationName" style="color:#EC0016;">DB Station</h2>
+    <p style="color:#666;font-size:13px;margin-bottom:14px;" id="dbStationInfo"></p>
+
+    <div class="lines-loading" id="dbLoading"><div>Lade Bahnsteige &amp; Linien...</div></div>
+    <div id="dbError" class="hidden" style="color:#888;font-size:13px;padding:14px;text-align:center;"></div>
+
+    <div id="dbContent" class="hidden">
+      <div style="display:flex;background:#f0f0f0;border-radius:10px;padding:4px;margin-bottom:14px;">
+        <button class="toggle-btn active" id="dbModeAll" onclick="setDbMode('all')" style="flex:1;">Alle Abfahrten</button>
+        <button class="toggle-btn" id="dbModeSteig" onclick="setDbMode('steig')" style="flex:1;">Bahnsteig/Richtung</button>
+      </div>
+
+      <!-- Modus: Alle Abfahrten — anklickbare Bubbles -->
+      <div id="dbPanelAll">
+        <div class="form-label" style="margin-bottom:8px;">Gattung</div>
+        <div id="dbAllGattChips" class="db-chips"></div>
+        <div id="dbAllLineWrap" class="hidden" style="margin-top:14px;">
+          <div class="form-label" style="margin-bottom:8px;">Linie</div>
+          <div id="dbAllLineChips" class="db-chips"></div>
+        </div>
+      </div>
+
+      <!-- Modus: Bahnsteig/Richtung — anklickbare Bubbles -->
+      <div id="dbPanelSteig" class="hidden">
+        <div style="background:#fff5f5;border:1px solid #f3c0c0;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#a23;line-height:1.45;">
+          Es wird der <b>planmäßige Bahnsteig</b> genommen. Außerplanmäßige Bahnsteigsänderungen berücksichtigt der Server automatisch, dadurch bleibt die Richtung stabil.
+        </div>
+        <div class="form-label" style="margin-bottom:8px;">Bahnsteig / Richtung</div>
+        <div id="dbSteigChips" class="db-steig-list"></div>
+        <div id="dbSteigGattWrap" class="hidden" style="margin-top:14px;">
+          <div class="form-label" style="margin-bottom:8px;">Gattung</div>
+          <div id="dbSteigGattChips" class="db-chips"></div>
+        </div>
+        <div id="dbSteigLineWrap" class="hidden" style="margin-top:14px;">
+          <div class="form-label" style="margin-bottom:8px;">Linie</div>
+          <div id="dbSteigLineChips" class="db-chips"></div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="dbAddBtn" onclick="addDbStation()" style="margin-top:8px;">Station hinzufügen</button>
+    </div>
   </div>
 
   <!-- Step 5 entfernt - Gruppierung jetzt nur im Feintuning -->
@@ -4963,6 +5033,8 @@ function showStep(step) {
   stepNetwork.classList.toggle('hidden', step !== 'network');
   stepSearch.classList.toggle('hidden', step !== 'search');
   stepLines.classList.toggle('hidden', step !== 'lines');
+  var _dbCard = document.getElementById('stepDbSelect');
+  if (_dbCard) _dbCard.classList.toggle('hidden', step !== 'dbSelect');
   if (step === 'search') applyVonNachSearchSkin();
 
   // Grouping Step entfernt - jetzt nur im Feintuning
@@ -7441,6 +7513,10 @@ const FV_AT_SET = new Set(FV_AT_STATIONS.map(normFvName));
 // (D, EC, EN, IC, ICE, IR, NJ, RJ, RJX, WB). Mehr Typen = wichtigerer Halt → weiter
 // oben in der Suche (z.B. Graz Hbf vor Graz Don Bosco). Pro Station gecacht.
 const FV_SCORE_CACHE = new Map();
+// Cache für die "fehlende Whitelist-Hubs nachladen"-Suchen: normFvName → station|null.
+// Die Hub-Bahnhöfe ändern sich nie → jeder wird pro Session HÖCHSTENS EINMAL gesucht
+// statt bei jeder Tasteneingabe erneut (spart ~6 Requests pro Suche).
+const FV_HUB_CACHE = new Map();
 async function fvStationScore(stationId) {
   if (FV_SCORE_CACHE.has(stationId)) return FV_SCORE_CACHE.get(stationId);
   let score = 0;
@@ -7572,19 +7648,27 @@ async function performSearch(query) {
       const ql = query.toLowerCase();
       const missing = FV_AT_STATIONS.filter(n => n.toLowerCase().includes(ql) && !haveNorms.has(normFvName(n)));
       for (const name of missing.slice(0, 6)) {
-        try {
-          const extra = await searchViaProxy(selectedNetwork, name);
-          const match = extra.find(e => normFvName(e.name) === normFvName(name));
-          if (match && !haveNorms.has(normFvName(match.name))) {
-            results.push(match);
-            haveNorms.add(normFvName(match.name));
-          }
-        } catch (e) {}
+        const nk = normFvName(name);
+        let match = FV_HUB_CACHE.get(nk);            // gecacht → kein erneuter Request
+        if (match === undefined) {                   // noch nie aufgelöst
+          try {
+            const extra = await searchViaProxy(selectedNetwork, name);
+            match = extra.find(e => normFvName(e.name) === nk) || null;
+          } catch (e) { match = null; }
+          FV_HUB_CACHE.set(nk, match);
+        }
+        if (match && !haveNorms.has(normFvName(match.name))) {
+          results.push(match);
+          haveNorms.add(normFvName(match.name));
+        }
       }
-      // nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben)
-      const scored = await Promise.all(results.slice(0, 15).map(async s => ({ s, score: await fvStationScore(s.id) })));
+      // nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben). NUR die Top 8
+      // scoren (spart Requests) — die großen Hubs stehen ohnehin oben; 9-15 bleiben in Reihenfolge.
+      const toScore = results.slice(0, 8);
+      const rest = results.slice(8, 15);
+      const scored = await Promise.all(toScore.map(async s => ({ s, score: await fvStationScore(s.id) })));
       scored.sort((a, b) => b.score - a.score);
-      results = scored.map(x => x.s);
+      results = scored.map(x => x.s).concat(rest);
     }
 
     displaySearchResults(results);
@@ -7687,8 +7771,197 @@ function displaySearchResults(results) {
   searchResults.classList.add('show');
 }
 
+// ==================== DB-AUSWAHL (kein /lines → Gattung / Bahnsteig, anklickbare Bubbles) ====================
+var dbState = { id: '', name: '', disco: null, mode: 'all', sel: { gatts:[], lines:[], steigs:[], sgatts:[], slines:[] } };
+
+function dbAttr(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function dbGattungJs(name) { var m = String(name||'').trim().match(/^([A-Za-zÄÖÜ]+)/); return m ? m[1].toUpperCase() : ''; }
+function dbEsc(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function dbChip(label, on, handler) { return '<span class="gattung-chip ' + (on?'on':'off') + '" onclick="' + handler + '">' + dbAttr(label) + '</span>'; }
+function dbSep(t){ return '<span class="db-opt-sep">' + dbAttr(t) + '</span>'; }
+function dbToggleIn(arr, v){ var i = arr.indexOf(v); if (i>=0) arr.splice(i,1); else arr.push(v); }
+
+async function startDbSelection(id, name) {
+  dbState = { id: id, name: name, disco: null, mode: 'all', sel: { gatts:[], lines:[], steigs:[], sgatts:[], slines:[] } };
+  editingStationIndex = null;
+  document.getElementById('dbStationName').textContent = name;
+  document.getElementById('dbStationInfo').textContent = 'Deutsche Bahn · ID: ' + id;
+  if (typeof searchResults !== 'undefined' && searchResults) searchResults.classList.remove('show');
+  showStep('dbSelect');
+  document.getElementById('dbLoading').classList.remove('hidden');
+  document.getElementById('dbContent').classList.add('hidden');
+  document.getElementById('dbError').classList.add('hidden');
+  try {
+    var r = await fetch('https://api.straba.at/api/v1/db/discover?stopId=' + encodeURIComponent(id));
+    var d = await r.json();
+    dbState.disco = d;
+    var hasData = d && ((d.platforms && d.platforms.length) || (d.gattungen && d.gattungen.length));
+    if (!hasData) throw new Error('leer');
+    document.getElementById('dbLoading').classList.add('hidden');
+    document.getElementById('dbContent').classList.remove('hidden');
+    setDbMode('all');
+  } catch (e) {
+    document.getElementById('dbLoading').classList.add('hidden');
+    var err = document.getElementById('dbError');
+    err.textContent = 'Bahnsteige/Linien gerade nicht ladbar (DB-Echtzeit ist manchmal kurz leer). Bitte nochmal versuchen.';
+    err.classList.remove('hidden');
+  }
+}
+
+function setDbMode(mode) {
+  dbState.mode = mode;
+  document.getElementById('dbModeAll').classList.toggle('active', mode === 'all');
+  document.getElementById('dbModeSteig').classList.toggle('active', mode === 'steig');
+  document.getElementById('dbPanelAll').classList.toggle('hidden', mode !== 'all');
+  document.getElementById('dbPanelSteig').classList.toggle('hidden', mode !== 'steig');
+  if (mode === 'all') dbRenderAll(); else dbRenderSteig();
+}
+
+function dbLinesForGattung(g) {
+  var out = [];
+  (dbState.disco.lines || []).forEach(function(l){
+    if (dbGattungJs(l.line) === g && !out.some(function(x){ return x.line === l.line && x.towards === l.towards; })) out.push(l);
+  });
+  return out;
+}
+function dbLinesForPlatform(p) {
+  var pl = (dbState.disco.platforms || []).find(function(x){ return x.platform === p; });
+  return pl ? pl.lines : [];
+}
+function dbLinesForSelectedPlatforms() {
+  var out = [];
+  dbState.sel.steigs.forEach(function(p){
+    dbLinesForPlatform(p).forEach(function(l){ if (!out.some(function(x){ return x.line===l.line&&x.towards===l.towards; })) out.push(l); });
+  });
+  return out;
+}
+// Unique Liniennamen einer Gattungs-Auswahl (über alle gewählten Gattungen).
+function dbLineNamesForGatts(gatts, poolLines) {
+  var names = [];
+  gatts.forEach(function(g){ (poolLines || dbLinesForGattung(g)).forEach(function(l){
+    if (dbGattungJs(l.line) === g && names.indexOf(l.line) < 0) names.push(l.line);
+  }); });
+  return names;
+}
+
+// ---- Modus: Alle Abfahrten ----
+function dbRenderAll() {
+  var d = dbState.disco, sel = dbState.sel;
+  if (!d) return;
+  document.getElementById('dbAllGattChips').innerHTML =
+    dbChip('Alle', sel.gatts.length === 0, "dbToggleAllGatt('')") +
+    (d.gattungen || []).map(function(g){ return dbChip(g, sel.gatts.indexOf(g)>=0, "dbToggleAllGatt('" + dbEsc(g) + "')"); }).join('');
+  var wrap = document.getElementById('dbAllLineWrap');
+  if (sel.gatts.length) {
+    wrap.classList.remove('hidden');
+    var names = dbLineNamesForGatts(sel.gatts);
+    var allLbl = sel.gatts.length > 1 ? 'Alle Linien' : ('Alle ' + sel.gatts[0]);
+    var html = dbChip(allLbl, sel.lines.length === 0, "dbToggleLine('')");
+    names.forEach(function(ln){ html += dbChip(ln, sel.lines.indexOf(ln)>=0, "dbToggleLine('" + dbEsc(ln) + "')"); });
+    document.getElementById('dbAllLineChips').innerHTML = html;
+  } else wrap.classList.add('hidden');
+}
+function dbToggleAllGatt(g){
+  if (!g) { dbState.sel.gatts = []; dbState.sel.lines = []; }
+  else {
+    dbToggleIn(dbState.sel.gatts, g);
+    dbState.sel.lines = dbState.sel.lines.filter(function(ln){ return dbState.sel.gatts.indexOf(dbGattungJs(ln)) >= 0; });
+  }
+  dbRenderAll();
+}
+function dbToggleLine(l){
+  if (!l) dbState.sel.lines = []; else dbToggleIn(dbState.sel.lines, l);
+  dbRenderAll();
+}
+
+// ---- Modus: Bahnsteig/Richtung ----
+function dbAllPlatformList() {
+  var known = {}; (dbState.disco.platforms || []).forEach(function(p){ known[String(p.platform)] = p; });
+  var max = 0; Object.keys(known).forEach(function(k){ var n = parseInt(k); if (!isNaN(n) && n > max) max = n; });
+  var out = [];
+  for (var i = 1; i <= max; i++) { var k = String(i); out.push({ platform: k, lines: known[k] ? known[k].lines : [] }); }
+  Object.keys(known).forEach(function(k){ if (isNaN(parseInt(k))) out.push({ platform: k, lines: known[k].lines }); });
+  return out;
+}
+function dbRenderSteig() {
+  var d = dbState.disco, sel = dbState.sel;
+  if (!d) return;
+  document.getElementById('dbSteigChips').innerHTML = dbAllPlatformList().map(function(p){
+    var uniq = []; p.lines.forEach(function(l){ if (uniq.indexOf(l.line) < 0) uniq.push(l.line); });
+    return '<div class="db-steig-row ' + (sel.steigs.indexOf(p.platform) >= 0 ? 'on' : '') + '" onclick="dbToggleSteig(\'' + dbEsc(p.platform) + '\')">' +
+             '<span class="db-steig-check"></span>' +
+             '<span class="db-steig-num">Gl ' + dbAttr(p.platform) + '</span>' +
+             (uniq.length ? '<span class="db-steig-lines">' + dbAttr(uniq.join(', ')) + '</span>' : '') +
+           '</div>';
+  }).join('');
+  var gWrap = document.getElementById('dbSteigGattWrap'), lWrap = document.getElementById('dbSteigLineWrap');
+  if (!sel.steigs.length) { gWrap.classList.add('hidden'); lWrap.classList.add('hidden'); return; }
+  var selLines = dbLinesForSelectedPlatforms();
+  var knownG = []; selLines.forEach(function(l){ var g = dbGattungJs(l.line); if (g && knownG.indexOf(g)<0) knownG.push(g); });
+  var otherG = (d.gattungen || []).filter(function(g){ return knownG.indexOf(g) < 0; });
+  gWrap.classList.remove('hidden');
+  var gh = dbChip(sel.steigs.length > 1 ? 'Alle (ganze Bahnsteige)' : 'Alle (ganzer Bahnsteig)', sel.sgatts.length === 0, "dbToggleSteigGatt('')")
+    + knownG.map(function(g){ return dbChip(g, sel.sgatts.indexOf(g)>=0, "dbToggleSteigGatt('" + dbEsc(g) + "')"); }).join('');
+  if (otherG.length) gh += dbSep('weitere:') + otherG.map(function(g){ return dbChip(g, sel.sgatts.indexOf(g)>=0, "dbToggleSteigGatt('" + dbEsc(g) + "')"); }).join('');
+  document.getElementById('dbSteigGattChips').innerHTML = gh;
+  if (!sel.sgatts.length) { lWrap.classList.add('hidden'); return; }
+  lWrap.classList.remove('hidden');
+  // Bahnsteig = Richtung → hier NUR Liniennummern (keine Ziele). Bekannte zuerst, Rest optional.
+  var knownNames = [];
+  selLines.forEach(function(l){ if (sel.sgatts.indexOf(dbGattungJs(l.line))>=0 && knownNames.indexOf(l.line) < 0) knownNames.push(l.line); });
+  var otherNames = [];
+  sel.sgatts.forEach(function(g){ dbLinesForGattung(g).forEach(function(l){ if (knownNames.indexOf(l.line) < 0 && otherNames.indexOf(l.line) < 0) otherNames.push(l.line); }); });
+  var lh = dbChip('Alle', sel.slines.length === 0, "dbToggleSteigLine('')");
+  knownNames.forEach(function(ln){ lh += dbChip(ln, sel.slines.indexOf(ln)>=0, "dbToggleSteigLine('" + dbEsc(ln) + "')"); });
+  if (otherNames.length) { lh += dbSep('weitere (optional):'); otherNames.forEach(function(ln){ lh += dbChip(ln, sel.slines.indexOf(ln)>=0, "dbToggleSteigLine('" + dbEsc(ln) + "')"); }); }
+  document.getElementById('dbSteigLineChips').innerHTML = lh;
+}
+function dbToggleSteig(p){ dbToggleIn(dbState.sel.steigs, p); dbRenderSteig(); }
+function dbToggleSteigGatt(g){
+  if (!g) { dbState.sel.sgatts = []; dbState.sel.slines = []; }
+  else {
+    dbToggleIn(dbState.sel.sgatts, g);
+    dbState.sel.slines = dbState.sel.slines.filter(function(ln){ return dbState.sel.sgatts.indexOf(dbGattungJs(ln)) >= 0; });
+  }
+  dbRenderSteig();
+}
+function dbToggleSteigLine(l){
+  if (!l) dbState.sel.slines = []; else dbToggleIn(dbState.sel.slines, l);
+  dbRenderSteig();
+}
+
+function addDbStation() {
+  var id = dbState.id, name = dbState.name, sel = dbState.sel;
+  if (!id) return;
+  var rbl, label;
+  if (dbState.mode === 'all') {
+    var tok = sel.lines.length ? sel.lines.join('~') : sel.gatts.join('~');
+    rbl = 'DBALL:' + id + (tok ? (':' + tok) : '');
+    label = name + ' · ' + (sel.lines.length ? sel.lines.join(', ') : (sel.gatts.length ? ('alle ' + sel.gatts.join('/')) : 'alle Abfahrten'));
+  } else {
+    if (!sel.steigs.length) { alert('Bitte mindestens einen Bahnsteig wählen.'); return; }
+    var stok = sel.slines.length ? sel.slines.join('~') : sel.sgatts.join('~');
+    rbl = 'DBSTEIG:' + id + ':' + sel.steigs.join('~') + (stok ? (':' + stok) : '');
+    var pl = sel.steigs.map(function(p){ return 'Gl ' + p; }).join('+');
+    label = name + ' · ' + pl + (sel.slines.length ? (' ' + sel.slines.join(', ')) : (sel.sgatts.length ? (' alle ' + sel.sgatts.join('/')) : ''));
+  }
+  if (stations.some(function(s){ return s.fullId === rbl; })) { alert('Diese Auswahl ist bereits hinzugefügt!'); return; }
+  stations.push({
+    network: 'DB', networkName: 'Deutsche Bahn',
+    stopId: id, stopName: label, dbBaseName: name,
+    filter: '', fullId: rbl, isExisting: false,
+    directions: [], allDepartures: true, allDepCat: 'all'
+  });
+  if (typeof resetFinetuningData === 'function') resetFinetuningData();
+  dbState = { id:'', name:'', disco:null, mode:'all', sel:{ gatts:[], lines:[], steigs:[], sgatts:[], slines:[] } };
+  if (typeof showAddedStationsStep === 'function') showAddedStationsStep();
+  else { updateStationsList(); showStep('added'); }
+}
+
 // ==================== STOP SELECTION ====================
 async function selectStop(id, name) {
+  // DB hat kein /lines → eigener Auswahl-Flow (Gattung / Bahnsteig, planmäßig).
+  if (selectedNetwork === 'DB') { await startDbSelection(id, name); return; }
   const fullId = `${selectedNetwork}:${id}`;
 
   // Prüfen ob diese Station schon existiert - dann automatisch Bearbeiten-Modus
@@ -10680,6 +10953,16 @@ async function editStation(idx) {
 
   // Setze Netzwerk
   selectedNetwork = station.network;
+
+  // DB: zurück in den DB-Auswahl-Flow (Gattung/Bahnsteig). Die alte Auswahl wird beim
+  // erneuten Hinzufügen ersetzt (gleiche rbl → Dedup), sonst entsteht eine zweite.
+  if (station.network === 'DB') {
+    editingStationIndex = null;  // DB-Add dedupt über die rbl selbst
+    var baseName = station.dbBaseName || String(station.stopName || '').split(' · ')[0];
+    if (typeof removeStation === 'function') removeStation(idx);  // alte Auswahl raus, dann neu wählen
+    await startDbSelection(station.stopId, baseName);
+    return;
+  }
 
   if (station.network === 'WL') {
     // Wien: Linie + Station + Richtungen aus der gespeicherten Station wiederherstellen,
