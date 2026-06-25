@@ -11688,11 +11688,13 @@ function hasStableRichtungsId(network) {
   //   Großhansdorf) kollabieren im Picker zu 2 Karten statt 5+.
   // OÖVV/VOR/Kärnten/VVT/VVV seit 2026-06: Server nimmt die Steig-Id pro Abfahrt
   //   ("st<stationId>") als richtungsId → 1 Steig = 1 Richtung, Kurzwenden kollabieren.
+  // BAYERN/VVO seit 2026-06-25: gleiches Steig-Schema (2 saubere Steige/Linie, keine
+  //   Platform) → München/Dresden kollabieren zu 2 Richtungen statt Hash-pro-Ziel.
   return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO',
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
           'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG',
           'OOEVV', 'VOR', 'KAERNTEN', 'VVT', 'VVV',
-          'BWEGT'].includes(network);
+          'BWEGT', 'BAYERN', 'VVO'].includes(network);
 }
 
 // Baut die geordneten lineGroups-Tokens EINER Station unter Berücksichtigung der
