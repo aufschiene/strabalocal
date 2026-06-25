@@ -11690,11 +11690,15 @@ function hasStableRichtungsId(network) {
   //   ("st<stationId>") als richtungsId → 1 Steig = 1 Richtung, Kurzwenden kollabieren.
   // BAYERN/VVO seit 2026-06-25: gleiches Steig-Schema (2 saubere Steige/Linie, keine
   //   Platform) → München/Dresden kollabieren zu 2 Richtungen statt Hash-pro-Ziel.
+  // BERLIN (BVG/VBB) seit 2026-06-25: Server liefert seit jeher stabile Platform-rid
+  //   ("p<platform>", z.B. "p1 (U2)") → U-Bahn-Kurzwenden (U2: 3 Ziele) kollabieren
+  //   auf 2 Karten. Server-rid UNVERÄNDERT → Alt-Configs (Ziel-Text-Filter) laufen
+  //   weiter, nur neue nutzen die Platform-rid. Kein Geräte-Breakage.
   return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO',
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
           'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG',
           'OOEVV', 'VOR', 'KAERNTEN', 'VVT', 'VVV',
-          'BWEGT', 'BAYERN', 'VVO'].includes(network);
+          'BWEGT', 'BAYERN', 'VVO', 'BERLIN'].includes(network);
 }
 
 // Baut die geordneten lineGroups-Tokens EINER Station unter Berücksichtigung der
