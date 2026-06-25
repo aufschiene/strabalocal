@@ -2494,6 +2494,26 @@
       background: #0055a4;
       color: #fff;
     }
+    /* Mobile: Button-Gruppen (Sortierung, Farbton, Zeilen …) liefen rechts aus dem Viewport.
+       Auf schmalen Schirmen das Label OBEN und die Buttons in voller Breite darunter, jeder
+       Button flex:1 + kleineres Padding → passt immer rein, nichts mehr abgeschnitten. */
+    @media (max-width: 600px) {
+      /* Baseline (auch ohne :has-Support): Gruppe darf schrumpfen, Buttons teilen sich die Breite */
+      .finetuning-step .toggle-row { flex-shrink: 1; min-width: 0; }
+      .finetuning-step .toggle-row .toggle-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 9px 6px;
+        font-size: 13px;
+      }
+      /* Moderne Browser (iOS Safari 15.4+): Label oben, Gruppe volle Breite drunter — sauberer */
+      .finetuning-step .form-row:has(.toggle-row) {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .finetuning-step .form-row:has(.toggle-row) .toggle-row { width: 100%; }
+    }
     /* Farb-Wahl-Buttons (Schrift- und Hintergrundfarbe) - inaktiv ausgegraut */
     .ft-color-btn {
       opacity: 0.32;
@@ -13302,7 +13322,9 @@ function renderDisplayTypeSections() {
         ftSortByCid[cidS]    = String(sDs !== undefined ? sDs : ((recommendedConfig && recommendedConfig.sortMode) || 1));
         ftGroupByCid[cidS]   = manualWanted ? 'on' : 'off';
         ftAdvModeByCid[cidS] = manualWanted ? 'manual' : 'auto';
-        if (manualWanted) ftSortByCid[cidS] = '1';  // Gruppen brauchen statische Reihenfolge
+        // Gruppen/manuelle Reihenfolge brauchen statische Sortierung — ABER eine bewusst
+        // gespeicherte zeitbasierte Sortierung (ZeitGruppe=2 / Zeit=3) NICHT überschreiben.
+        if (manualWanted && !(sDs === 2 || sDs === 3)) ftSortByCid[cidS] = '1';
       }
       // Persistente Toggle-States anwenden (statischer Default-Aufbau würde sie sonst
       // bei jedem Re-Render auf Auto/Aus zurücksetzen → "kickt die Gruppen").
@@ -16242,11 +16264,11 @@ function saveFromFinetuning() {
       rows = parseInt(getFtToggleVal('ftRows_' + dt.colour)) || rows;
     }
     if (f.sorting) {
-      // Per-Display-Sortierung nur uebernehmen wenn der Master auf "Manuell" steht.
-      // Bei "Automatisch" bleibt der auto-berechnete sortMode erhalten.
-      if (getFtToggleVal('ftAdvMode_' + dt.colour) === 'manual') {
-        sortMode = parseInt(getFtToggleVal('ftSort_' + dt.colour)) || sortMode;
-      }
+      // Per-Display-Sortierung (Statisch / ZeitGruppe / Zeit) IMMER übernehmen — das ist die
+      // explizite User-Wahl, unabhängig von Automatisch/Manuell. (Früher nur bei "Manuell"
+      // gelesen → bei "Automatisch" wurde "Zeit" verworfen und blieb Statisch.)
+      var _sv = parseInt(getFtToggleVal('ftSort_' + dt.colour));
+      if (_sv && !isNaN(_sv)) sortMode = _sv;
     }
     if (f.textColor) {
       textColor = parseInt(getFtToggleVal('ftTxtCol_' + dt.colour)) || textColor;
