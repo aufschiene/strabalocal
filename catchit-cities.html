@@ -3754,7 +3754,7 @@ const REGIONS = {
   },
   DE: {
     name: 'Deutschland',
-    networks: ['NRW', 'BAYERN', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'KOELN', 'AACHEN', 'BODO', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'NVV', 'VMT', 'SAARVV']
+    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'KOELN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'NVV', 'VMT', 'SAARVV']
   },
   CH: {
     name: 'Schweiz',
@@ -3907,6 +3907,16 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 7,             // BODO
+    defaultBrightness: 3
+  },
+  BWEGT: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 23,            // Matrix (orange) - BW, wie NRW/Berlin
+    defaultColorVariant: 3,
     defaultBrightness: 3
   },
   SALZBURG: {
@@ -4293,11 +4303,21 @@ const NETWORKS = {
     placeholder: 'z.B. Alexanderplatz...',
     isJourneyBased: false
   },
+  BWEGT: {
+    name: 'Baden-Württemberg',
+    shortName: 'BW',
+    region: 'DE',
+    desc: 'Tram, Bus, S-Bahn (ganz BW)',
+    searchType: 'trainboard',
+    trainboard: { path: '/de/baden-wuerttemberg' },
+    placeholder: 'z.B. Stuttgart, Karlsruhe, Freiburg, Ravensburg...',
+    isJourneyBased: false
+  },
   BODO: {
     name: 'BODO',
     shortName: 'BODO',
     region: 'DE',
-    desc: 'Bodensee-Oberschwaben',
+    desc: 'Tram/Bus (Bodensee-Oberschwaben)',
     searchType: 'server_proxy',
     placeholder: 'z.B. Ravensburg, Bahnhof...',
     isJourneyBased: false
@@ -5570,6 +5590,7 @@ var NETWORK_BRANDS = {
   BAYERN:        { bg: '#0065B1', fg: '#fff' }, // Nahverkehr Bayern Blau (MVG)
   AACHEN:        { bg: '#006AB3', fg: '#fff' }, // AVV Aachen Blau
   BODO:          { bg: '#005BBB', fg: '#fff' }, // BODO Bodensee Blau
+  BWEGT:         { bg: '#1d9b50', fg: '#fff' }, // bwegt Baden-Württemberg Grün
   DB:            { bg: '#EC0016', fg: '#fff' }, // DB Regio Rot
   PARIS:         { bg: '#003B80', fg: '#fff' }, // RATP Paris Blau
   PID:           { bg: '#1E61A0', fg: '#fff' }  // Prag PID Blau
@@ -5715,7 +5736,7 @@ DISPLAY_PRESETS.bw = {
   photo: 'fotos/baden württemberg.jpg',
   photoPos: 'center top', // Foto-Inhalt soll oben gezeigt werden
   networks: [
-    { id: 'BODO', jumpTo: { region: 'DE' } },
+    { id: 'BWEGT', label: 'Tram/Bus/S-Bahn', desc: 'Stuttgart, Karlsruhe, Freiburg, Bodensee …', jumpTo: { region: 'DE' } },
     { id: 'DB',   label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
   ]
 };
@@ -11217,6 +11238,7 @@ const NETWORK_COLORS = {
   SAARVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },    // Saarland (SaarVV) → orange Matrix
   TBILISI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Tbilisi → orange Matrix
   BODO: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
+  BWEGT: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // BW → orange Matrix
   SALZBURG: { id: 24, name: 'Paper White', color: '#000000', variant: 2 },
   PARIS: { id: 9, name: 'RATP Paris', color: '#003B80' },
   STRABA: { id: 10, name: 'Straba Ansicht', color: '#1e1e1e' },
