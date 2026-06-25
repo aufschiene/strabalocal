@@ -17029,6 +17029,37 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // Gehweg pro Bahnsteig aus der masterrow wiederherstellen (Round-Trip).
   gehwegByStopIdState = gehwegByStopIdFromRows(masterRowStr);
 
+  // Richtungen PRO rbl direkt aus der masterrow ("Linie>richtungsId" / "Linie:towards") —
+  // die echte, autoritative Quelle. Viele Netze (BAYERN/MVG, Trainboard /de …) liefern
+  // linefilterdestination/roworderdestination NICHT mit → ohne das fiele der Richtungs-Filter
+  // auf reine Liniennamen zurück und der Reload selektierte ALLE Richtungen (Gegenrichtung
+  // kommt dazu, masterrow wächst bei jedem Re-Save).
+  const masterDirsByRbl = {};
+  if (masterRowStr) {
+    String(masterRowStr).split(';').forEach(seg => {
+      seg = seg.trim(); if (!seg) return;
+      const fields = seg.split('|');
+      const segRbl = (fields[0] || '').trim();
+      const linesField = (fields[1] || '').trim();
+      if (!segRbl || !linesField || linesField === '*') return;  // '*' = Alle Abfahrten
+      const dirs = [];
+      linesField.split(',').forEach(tok => {
+        (tok || '').split('+').forEach(t => {   // '+' = Merge-Gruppe → einzeln
+          t = t.trim(); if (!t) return;
+          const gt = t.indexOf('>');   // richtungsId (Vorrang)
+          const cn = t.indexOf(':');   // Zieltext
+          let line, towards;
+          if (gt > 0) { line = t.substring(0, gt); towards = t.substring(gt + 1); }
+          else if (cn > 0) { line = t.substring(0, cn); towards = t.substring(cn + 1); }
+          else { line = t; towards = ''; }
+          line = line.trim(); towards = towards.trim();
+          if (line && !dirs.some(d => d.line === line && d.towards === towards)) dirs.push({ line, towards });
+        });
+      });
+      if (dirs.length) masterDirsByRbl[segRbl] = dirs;
+    });
+  }
+
   // Parse linefilterdestination ODER roworderdestination (beide haben gleiches Format)
   // roworderdestination hat Priorität für Wien (enthält die Richtungen)
   // Format kann sein: "1:Auwiesen,2:solarCity" oder mit Gruppen "1:Auwiesen+2:solarCity,3:xyz"
@@ -17131,11 +17162,14 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // Filter für diese Station: Liniennamen aus filterParts oder aus lineDestinations
     const stationFilter = filterParts[idx] || '';
     const filterLines = stationFilter ? stationFilter.split(',').map(f => f.trim()) : [];
+    // Richtungs-Filter dieser Station: PRIMÄR aus der masterrow (richtungsId-genau), sonst der
+    // global geparste linefilterdestination/linegroups-Fallback.
+    const stationDests = masterDirsByRbl[part] || lineDestinations;
     const bareStopId = isJourney ? stopId.split('>')[0] : stopId;
     // "Alle Abfahrten"-Station? Primär am "*"-Marker der masterrow erkennen; Fallback:
     // gar kein Filter UND keine Richtungs-Filter irgendwo (reine alle-Abfahrten-Config).
     const isAllDep = !!allDepStopIds[bareStopId]
-      || (!isJourney && filterLines.length === 0 && lineDestinations.length === 0
+      || (!isJourney && filterLines.length === 0 && stationDests.length === 0
           && network !== 'OEBB' && network !== 'OEBB_STAMM_SBAHN');
 
     // Station erstellen
@@ -17207,9 +17241,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
                 // Prüfen ob diese Linie+Richtung ausgewählt werden soll
                 let shouldInclude = false;
 
-                if (lineDestinations.length > 0) {
-                  // Prüfe gegen Linie + Destination (aus linefilterdestination oder linegroups)
-                  shouldInclude = lineDestinations.some(ld => {
+                if (stationDests.length > 0) {
+                  // Prüfe gegen Linie + Destination (aus masterrow bzw. linefilterdestination/linegroups)
+                  shouldInclude = stationDests.some(ld => {
                     if (ld.line !== lineName) return false;
                     if (!ld.towards || !towards) return true;  // Ohne Richtung: nur Linie matchen
                     // richtungsId-Match: das Config-Token kann eine richtungsId sein
@@ -17224,7 +17258,13 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
                       // Graz/STV "H"/"R") aber matcht NICHT → diese Richtung gehört nicht
                       // dazu. NICHT gegen Zieltext fuzzy-matchen (sonst falsche Treffer).
                       // Echte Ziel-Texte (mit Buchstaben/Leerzeichen) fallen durch zum Textmatch.
-                      const looksLikeRichtungsId = wanted.every(w => /^d\d/.test(w) || /^\d+$/.test(w) || w === 'H' || w === 'R');
+                      // richtungsId-Formen: ÖBB "d8100360", numerisch "1"/"2", Graz/STV "H"/"R",
+                      // Steig "st<id>" (BAYERN/MVG, AT-Verbünde), Platform "p<n>" (Berlin),
+                      // Hamburg "hh<id>", Berlin-Tram "bvm<id>". Matcht nicht → NICHT fuzzy gegen
+                      // Zieltext (sonst Gegenrichtung fälschlich rein).
+                      const looksLikeRichtungsId = wanted.every(w =>
+                        /^d\d/.test(w) || /^\d+$/.test(w) || w === 'H' || w === 'R' ||
+                        /^st/.test(w) || /^p\d/.test(w) || /^hh/.test(w) || /^bv/.test(w));
                       if (looksLikeRichtungsId) return false;
                     }
                     // Exakter Match
