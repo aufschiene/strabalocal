@@ -11694,11 +11694,16 @@ function hasStableRichtungsId(network) {
   //   ("p<platform>", z.B. "p1 (U2)") → U-Bahn-Kurzwenden (U2: 3 Ziele) kollabieren
   //   auf 2 Karten. Server-rid UNVERÄNDERT → Alt-Configs (Ziel-Text-Filter) laufen
   //   weiter, nur neue nutzen die Platform-rid. Kein Geräte-Breakage.
+  // KOELN/NRW seit 2026-06-26: Server liefert plattform-basierte richtungsId "p<platform>"
+  //   (KVB Köln + VRR/VRS/NRW, z.B. Linie 16 → p1/p2, Linie 3 → p14) — exakt wie Berlin.
+  //   Wurden bei der Allowlist-Umstellung schlicht vergessen → Richtungs-Filter war kaputt
+  //   (Linie nur ganz oder gar nicht, abgewählte Richtungen wurden beim Speichern wieder
+  //   angehakt). Bus-Stops ohne Platform fallen auf den stabilen Ziel-Hash zurück.
   return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO',
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
           'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG',
           'OOEVV', 'VOR', 'KAERNTEN', 'VVT', 'VVV',
-          'BWEGT', 'BAYERN', 'VVO', 'BERLIN'].includes(network);
+          'BWEGT', 'BAYERN', 'VVO', 'BERLIN', 'KOELN', 'NRW'].includes(network);
 }
 
 // Baut die geordneten lineGroups-Tokens EINER Station unter Berücksichtigung der
