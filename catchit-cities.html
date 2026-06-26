@@ -10901,7 +10901,7 @@ function showAddedStationsStep() {
   updateStationsList();  // Liste aktuell halten
   // Alle Wizard-Steps + bottom-bar ausblenden → nur die Stationsliste bleibt sichtbar.
   ['stepRegion','stepNetwork','stepSearch','stepLines','stepBundesland','stepDisplayPreset',
-   'stepWienLine','stepWienStation','stepWienDirection','stepDisplayConfig'].forEach(function(id) {
+   'stepWienLine','stepWienStation','stepWienDirection','stepDisplayConfig','stepDbSelect'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.classList.add('hidden');
   });
   var bb = document.querySelector('.bottom-bar'); if (bb) bb.style.display = 'none';
