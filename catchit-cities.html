@@ -17372,6 +17372,13 @@ async function resolveStationName(network, stopId) {
     const exact = stops.find(s => String(s.id) === String(stopId));
     if (exact && exact.name) return exact.name;
     if (stops.length && stops[0] && stops[0].name) return stops[0].name;
+    // DHID-IDs (de_de:…, NRW/VVO/BAYERN/BWEGT) findet die Such-API per ID NICHT → Name aus
+    // dem Departures-Monitor-Titel ("Köln Neumarkt"). Greift nur wenn die Suche leer war.
+    try {
+      const dep = await fetchDeparturesUnified(`${network}:${stopId}`);
+      const title = dep?.data?.monitors?.[0]?.locationStop?.properties?.title;
+      if (title && !/^Station\s/i.test(String(title))) return title;
+    } catch (e) {}
     return null;
   } catch (e) {
     console.warn(`Could not resolve name for ${network}:${stopId}`);
