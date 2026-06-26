@@ -7977,12 +7977,14 @@ function addDbStation() {
   var rbl, label;
   if (dbState.mode === 'all') {
     var tok = sel.lines.length ? sel.lines.join('~') : sel.gatts.join('~');
-    rbl = 'DBALL:' + id + (tok ? (':' + tok) : '');
+    // '!' trennt ID von Auswahl — die /global-DB-IDs sind doppelpunkt-reich, ':' wäre mehrdeutig.
+    rbl = 'DBALL:' + id + (tok ? ('!' + tok) : '');
     label = name + ' · ' + (sel.lines.length ? sel.lines.join(', ') : (sel.gatts.length ? ('alle ' + sel.gatts.join('/')) : 'alle Abfahrten'));
   } else {
     if (!sel.steigs.length) { alert('Bitte mindestens einen Bahnsteig wählen.'); return; }
     var stok = sel.slines.length ? sel.slines.join('~') : sel.sgatts.join('~');
-    rbl = 'DBSTEIG:' + id + ':' + sel.steigs.join('~') + (stok ? (':' + stok) : '');
+    // '!' trennt ID / Steige / Linie (doppelpunkt-reiche /global-IDs); Steige intern weiter '~'.
+    rbl = 'DBSTEIG:' + id + '!' + sel.steigs.join('~') + (stok ? ('!' + stok) : '');
     var pl = sel.steigs.map(function(p){ return 'Gl ' + p; }).join('+');
     label = name + ' · ' + pl + (sel.slines.length ? (' ' + sel.slines.join(', ')) : (sel.sgatts.length ? (' alle ' + sel.sgatts.join('/')) : ''));
   }
