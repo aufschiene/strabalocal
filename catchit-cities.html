@@ -12769,9 +12769,9 @@ const DISPLAY_TYPE_FEATURES = {
   15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   16: { rows: true, sorting: true, grouping: true, altNext: true, name: 'Prag / CZ-HU' },
   18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
-  21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Schwarz/Weiß Matrix', offline: true },
+  21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, fontExt: true, name: 'Schwarz/Weiß Matrix', offline: true },
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, name: 'MVG' },
-  23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, name: 'Matrix' },
+  23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, name: 'Matrix' },
   24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' }
 };
 
@@ -13267,6 +13267,12 @@ function renderDisplayTypeSections() {
       var altActive = altOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Abfahrten</div><div class="form-hint">An = 1. &amp; 2. Abfahrt im Wechsel · Aus = nur die 1. Abfahrt</div></div>';
       html += '<div class="toggle-switch' + altActive + '" id="ftAltNext_' + dt.colour + '" onclick="toggleFtSwitch(\'ftAltNext_' + dt.colour + '\')"></div></div>';
+    }
+    if (f.fontExt) {
+      var fDs = dsVal(dt.colour, 'f');
+      var fontOn = (fDs === 1);  // Default DACH (aus)
+      html += '<div class="form-row"><div><div class="form-label">Schriftart</div><div class="form-hint">Aus = DACH (Standard) &middot; An = CZ+HU (slawisch/ungarisch: &#352; &#268; &#381; &#336; &#368;)</div></div>';
+      html += '<div class="toggle-switch' + (fontOn ? ' active' : '') + '" id="ftFontExt_' + dt.colour + '" onclick="toggleFtSwitch(\'ftFontExt_' + dt.colour + '\')"></div></div>';
     }
     if (f.chopper) {
       var hDs = dsVal(dt.colour, 'h');
@@ -16114,6 +16120,7 @@ function buildDisplaySettings() {
     }
     if (f.silberpfeil) parts.push('k' + dsKeepBool(cid, 'k', 'ftSilber_' + cid, recommendedConfig && recommendedConfig.silberpfeil, 0));
     if (f.altNext) parts.push('a' + dsKeepBool(cid, 'a', 'ftAltNext_' + cid, (recommendedConfig && recommendedConfig.alternateNext === false) ? 0 : 1, 1));
+    if (f.fontExt) parts.push('f' + dsKeepBool(cid, 'f', 'ftFontExt_' + cid, 0, 0));  // Matrix-Schriftart: 0=DACH, 1=CZ+HU
     if (f.delayHighlight) parts.push('d' + dsKeepBool(cid, 'd', 'ftDelayHl_' + cid, recommendedConfig && recommendedConfig.delayHighlight, 0));
     segs.push(parts.join('|'));
   });
