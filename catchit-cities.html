@@ -12786,6 +12786,7 @@ let ftPerStationColour = [];  // Pro Station der Display-Typ
 // renderDisplayTypeSections()-Re-Render, der sonst die Buttons auf Default zurücksetzt.
 let ftRowsByCid = {};       // cid -> gewählte Zeilenzahl
 let ftFontModeByCid = {};   // cid -> 'big' | 'small'
+let ftFontExtByCid = {};    // cid -> '0' (DACH) | '1' (CZ+HU) — Matrix-Schriftart
 
 function setFtCompactSeparate(mode) {
   var btns = document.querySelectorAll('#ftCompactSeparateToggle .toggle-btn');
@@ -13269,10 +13270,11 @@ function renderDisplayTypeSections() {
       html += '<div class="toggle-switch' + altActive + '" id="ftAltNext_' + dt.colour + '" onclick="toggleFtSwitch(\'ftAltNext_' + dt.colour + '\')"></div></div>';
     }
     if (f.fontExt) {
-      var fDs = dsVal(dt.colour, 'f');
-      var fontOn = (fDs === 1);  // Default DACH (aus)
-      html += '<div class="form-row"><div><div class="form-label">Schriftart</div><div class="form-hint">Aus = DACH (Standard) &middot; An = CZ+HU (slawisch/ungarisch: &#352; &#268; &#381; &#336; &#368;)</div></div>';
-      html += '<div class="toggle-switch' + (fontOn ? ' active' : '') + '" id="ftFontExt_' + dt.colour + '" onclick="toggleFtSwitch(\'ftFontExt_' + dt.colour + '\')"></div></div>';
+      html += '<div class="form-row"><div><div class="form-label">Schriftart</div><div class="form-hint">DACH = Standard &middot; CZ+HU = slawisch/ungarisch (&#352; &#268; &#381; &#336; &#368;)</div></div>';
+      html += '<div class="toggle-row" id="ftFontExt_' + dt.colour + '">';
+      html += '<button class="toggle-btn active" data-value="0" onclick="setFtFontExt(' + dt.colour + ',\'0\')">DACH</button>';
+      html += '<button class="toggle-btn" data-value="1" onclick="setFtFontExt(' + dt.colour + ',\'1\')">CZ+HU</button>';
+      html += '</div></div>';
     }
     if (f.chopper) {
       var hDs = dsVal(dt.colour, 'h');
@@ -13422,6 +13424,15 @@ function renderDisplayTypeSections() {
     } else if (f.rows && f.bigText && ftFontModeByCid[dt.colour]) {
       setFtFontSize(dt.colour, ftFontModeByCid[dt.colour]);
     }
+    // Matrix-Schriftart (DACH/CZ+HU) aus persistentem State wiederherstellen
+    if (f.fontExt) {
+      if (ftFontExtByCid[dt.colour] == null) {
+        var _fDs = dsVal(dt.colour, 'f');
+        // Gespeicherte Wahl gewinnt; sonst Auto: CZ/HU-Ort dabei → CZ+HU, sonst DACH.
+        ftFontExtByCid[dt.colour] = String(_fDs !== undefined ? _fDs : (anyCZHUStation() ? 1 : 0));
+      }
+      setFtToggleVal('ftFontExt_' + dt.colour, ftFontExtByCid[dt.colour]);
+    }
     // Wien-Toggles aus gespeicherter Config restoren (sonst zeigt UI immer Default).
     // Matrix/Paper-White (23/24): Default = Netz-Variante (Linz grün, Berlin/Schweiz
     // orange) statt der globalen Wien-Schriftfarbe.
@@ -13450,6 +13461,21 @@ function setFtToggleVal(containerId, val) {
   if (!container) return;
   container.querySelectorAll('.toggle-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.value === String(val));
+  });
+}
+
+// Matrix-Schriftart-Segment (DACH/CZ+HU): wie Sort/Größe persistent (überlebt Re-Render)
+function setFtFontExt(cid, val) {
+  ftFontExtByCid[cid] = String(val);
+  setFtToggleVal('ftFontExt_' + cid, val);
+}
+
+// Ist mind. eine ausgewählte Station in CZ oder HU? → Default-Schriftart = CZ+HU.
+function anyCZHUStation() {
+  return (stations || []).some(function(s) {
+    var net = (s && s.network) || (s && s.fullId ? String(s.fullId).split(':')[0] : '');
+    var reg = net && NETWORKS[net] && NETWORKS[net].region;
+    return reg === 'CZ' || reg === 'HU';
   });
 }
 
@@ -13496,6 +13522,7 @@ function initFtRowsAndFontSize(config) {
   if (!config) return;
   ftRowsByCid = {};       // frisch seeden (kein Leak aus vorheriger Config)
   ftFontModeByCid = {};
+  ftFontExtByCid = {};
   var types = getUniqueDisplayTypes();
   // rows kann String "2,3" (multi) oder Number 2 (single) sein
   var rowsList = String(config.rows || '').split(',').map(function(s) { return parseInt(s.trim()); });
@@ -16120,7 +16147,11 @@ function buildDisplaySettings() {
     }
     if (f.silberpfeil) parts.push('k' + dsKeepBool(cid, 'k', 'ftSilber_' + cid, recommendedConfig && recommendedConfig.silberpfeil, 0));
     if (f.altNext) parts.push('a' + dsKeepBool(cid, 'a', 'ftAltNext_' + cid, (recommendedConfig && recommendedConfig.alternateNext === false) ? 0 : 1, 1));
-    if (f.fontExt) parts.push('f' + dsKeepBool(cid, 'f', 'ftFontExt_' + cid, 0, 0));  // Matrix-Schriftart: 0=DACH, 1=CZ+HU
+    if (f.fontExt) {  // Matrix-Schriftart: 0=DACH, 1=CZ+HU (Segment, persistent wie Sort/Größe)
+      var _fv = (ftFontExtByCid[cid] != null) ? ftFontExtByCid[cid]
+              : (dsVal(cid, 'f') !== undefined ? dsVal(cid, 'f') : (anyCZHUStation() ? 1 : 0));
+      parts.push('f' + (String(_fv) === '1' ? 1 : 0));
+    }
     if (f.delayHighlight) parts.push('d' + dsKeepBool(cid, 'd', 'ftDelayHl_' + cid, recommendedConfig && recommendedConfig.delayHighlight, 0));
     segs.push(parts.join('|'));
   });
