@@ -3727,7 +3727,7 @@ window.addEventListener('message', function(event) {
 const REGIONS = {
   AT: {
     name: 'Österreich',
-    networks: ['WL', 'WLB', 'STV', 'SALZBURG', 'INNSBRUCK', 'VOR', 'OOEVV', 'KAERNTEN', 'VVT', 'VVV', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
+    networks: ['WL', 'WLB', 'STVG', 'SALZBURG', 'INNSBRUCK', 'VOR', 'OOEVV', 'KAERNTEN', 'VVT', 'VVV', 'OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'],
     // Verkehrsart → dann Bundesland oder direkt Netzwerk
     verkehrsarten: {
       stadt: {
@@ -3739,7 +3739,7 @@ const REGIONS = {
           AT_NOE: { name: 'Niederösterreich', wappen: 'noe', desc: 'Bus, Tram (VOR)', networks: ['VOR'] },
           AT_BGLD: { name: 'Burgenland', wappen: 'burgenland', desc: 'Bus (VOR)', networks: ['VOR'] },
           AT_OOE: { name: 'Oberösterreich', wappen: 'ooe', desc: 'Straßenbahn, Bus', networks: ['OOEVV'] },
-          AT_STMK: { name: 'Steiermark', wappen: 'stmk', desc: 'Straßenbahn, Bus', networks: ['STV'] },
+          AT_STMK: { name: 'Steiermark', wappen: 'stmk', desc: 'Straßenbahn, Bus', networks: ['STVG'] },
           AT_K: { name: 'Kärnten', wappen: 'kaernten', desc: 'Bus (Kärntner Linien)', networks: ['KAERNTEN'] },
           AT_SBG: { name: 'Salzburg', wappen: 'sbg', desc: 'Obus, Lokalbahn', networks: ['SALZBURG'] },
           AT_T: { name: 'Tirol & Vorarlberg', wappen: 'tirol', desc: 'Bus, Tram, Bahn (VVT, VVV)', networks: ['VVT', 'VVV', 'INNSBRUCK'] }
@@ -4081,6 +4081,18 @@ const CITY_CAPABILITIES = {
     gehwegFilter: true,
     nightMode: true,
     defaultColour: 13,            // Holding Graz
+    defaultBrightness: 3
+  },
+  // STVG = Graz/Steiermark NEU (über /global): bessere Stop-Coverage (Hartberg etc.),
+  // Steig-Richtungen. Gleiche Capabilities/Renderer wie STV (colour 13). STV bleibt für
+  // Reload bestehender Geräte; neue Configs nehmen STVG.
+  STVG: {
+    textColorChangeable: false,
+    showHighFloor: false,
+    showAirCondition: false,
+    gehwegFilter: true,
+    nightMode: true,
+    defaultColour: 13,            // Holding Graz (gleicher Renderer wie STV)
     defaultBrightness: 3
   },
 
@@ -4451,6 +4463,16 @@ const NETWORKS = {
     desc: 'Straßenbahn, Bus (Graz & Steiermark)',
     searchType: 'server_proxy',
     placeholder: 'z.B. Hauptplatz, Jakominiplatz...',
+    isJourneyBased: false
+  },
+  // Graz/Steiermark NEU (über /global) — ersetzt STV in der Auswahl, STV bleibt für Reload.
+  STVG: {
+    name: 'Verbundlinie Steiermark',
+    shortName: 'STV',
+    region: 'AT',
+    desc: 'Straßenbahn, Bus (Graz & Steiermark)',
+    searchType: 'server_proxy',
+    placeholder: 'z.B. Jakominiplatz, Hartberg Busbahnhof...',
     isJourneyBased: false
   },
   PARIS: {
@@ -5564,6 +5586,7 @@ var NETWORK_BRANDS = {
   WESTBAHN:      { bg: '#003366', fg: '#fff' }, // (deaktiviert)
   LINZ:          { bg: '#009640', fg: '#fff' }, // Linz AG Grün
   STV:           { bg: '#009640', fg: '#fff' }, // STMK Grün
+  STVG:          { bg: '#009640', fg: '#fff' }, // STMK Grün (Graz NEU /global)
   SALZBURG:      { bg: '#E3000F', fg: '#fff' }, // Salzburg Rot
   INNSBRUCK:     { bg: '#C8102E', fg: '#fff' }, // Tirol/IVB Rot
   VOR:           { bg: '#00569D', fg: '#fff' }, // VOR Blau
@@ -5633,7 +5656,7 @@ var DISPLAY_PRESETS = {
     wappen: 'stmk',
     photo: 'fotos/GRAZ.jpg',
     networks: [
-      { id: 'STV',           jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_STMK' } },
+      { id: 'STVG',          jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_STMK' } },
       { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
       { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
     ]
@@ -11701,7 +11724,7 @@ function hasStableRichtungsId(network) {
   //   Wurden bei der Allowlist-Umstellung schlicht vergessen → Richtungs-Filter war kaputt
   //   (Linie nur ganz oder gar nicht, abgewählte Richtungen wurden beim Speichern wieder
   //   angehakt). Bus-Stops ohne Platform fallen auf den stabilen Ziel-Hash zurück.
-  return ['WL', 'WLB', 'LINZ', 'STV', 'SALZBURG', 'WESTBAHN', 'BODO',
+  return ['WL', 'WLB', 'LINZ', 'STV', 'STVG', 'SALZBURG', 'WESTBAHN', 'BODO',
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
           'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG',
           'OOEVV', 'VOR', 'KAERNTEN', 'VVT', 'VVV',
@@ -12743,7 +12766,7 @@ const DISPLAY_TYPE_FEATURES = {
   12: { rows: true, minRows: 2, maxRows: 3, defaultRows: 2, sorting: false, grouping: false, delayHighlight: true, name: 'ÖBB S-Bahn' },
   13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz', offline: true },
   14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
-  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix' },
+  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   16: { rows: true, sorting: true, grouping: true, altNext: true, name: 'Prag / CZ-HU' },
   18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Schwarz/Weiß Matrix', offline: true },
