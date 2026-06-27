@@ -3639,7 +3639,7 @@
       <option value="13">Holding Graz</option>
       <option value="14">Westbahn</option>
       <option value="15">Liechtenstein / Schweiz Nahverkehr</option>
-      <option value="16">Prag (PID)</option>
+      <option value="16">Prag / CZ-HU (schwarz/weiß)</option>
       <option value="17">Brünn (DPMB)</option>
       <option value="18">BVG Berlin</option>
       <option value="19">KVB Köln</option>
@@ -12147,6 +12147,12 @@ function updateRealisticPreview(config) {
       name: 'Orange Matrix',
       isLedMatrix: true
     },
+    16: { // Prag (PID) / CZ-HU - Wiener-Linien-Layout, schwarz/weiss
+      bg: '#000000',
+      text: '#ffffff',
+      highlight: '#87ceeb',
+      name: 'Prag / CZ-HU'
+    },
     18: { // Orange Matrix (Legacy BVG)
       bg: '#0a0500',
       text: '#ff8c00',
@@ -12476,7 +12482,7 @@ function updateQuickPreview() {
   // Settings Tags aktualisieren
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag (PID)',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -12574,7 +12580,7 @@ function initializeQuickPreview() {
   const caps = recommendedConfig.capabilities || {};
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag (PID)',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -12738,6 +12744,7 @@ const DISPLAY_TYPE_FEATURES = {
   13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz', offline: true },
   14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
   15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix' },
+  16: { rows: true, sorting: true, grouping: true, altNext: true, name: 'Prag / CZ-HU' },
   18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Schwarz/Weiß Matrix', offline: true },
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, name: 'MVG' },
@@ -17193,6 +17200,26 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       allDepCat: reloadAllCat,   // ÖBB "Alle Abfahrten"-Gattung (all/reg/fern), aus dem Prefix
       directions: []  // Wird unten befüllt (außer bei "Alle Abfahrten" → bleibt leer)
     };
+
+    // DBALL/DBSTEIG: der rbl kodiert die Auswahl (Gattung/Steig/Linie nach '!', alt ':').
+    // Beim Reload steht in der masterrow "…|*|" → ohne dieses Handling läse der Konfigurator
+    // nur "alle Abfahrten" und verlöre die Gattung. Als DB behandeln (Edit/Label) + Gattung
+    // ins Label ziehen, Basis-ID (ohne Auswahl) als stopId für ein sauberes Re-Edit.
+    if (network === 'DBALL' || network === 'DBSTEIG') {
+      var _bang = bareStopId.indexOf('!');
+      var _selRaw = '';
+      if (_bang >= 0) { _selRaw = bareStopId.slice(_bang + 1); station.stopId = bareStopId.slice(0, _bang); }
+      else { // alt ':'-Trenner — heuristisch: letztes Segment mit Buchstabe = Gattung/Linie
+        var _sg = bareStopId.split(':');
+        if (_sg.length >= 2 && /^[A-Za-z]/.test(_sg[_sg.length - 1])) { _selRaw = _sg.pop(); station.stopId = _sg.join(':'); }
+      }
+      station.network = 'DB';
+      station.networkName = 'Deutsche Bahn';
+      station.dbMode = (network === 'DBSTEIG') ? 'steig' : 'all';
+      station.dbBaseName = stopName;
+      var _selTxt = _selRaw ? String(_selRaw).replace(/!/g, ' ').replace(/~/g, '/').trim() : '';
+      station.stopName = stopName + ' · ' + (_selTxt ? ((network === 'DBSTEIG') ? ('Gl ' + _selTxt) : ('alle ' + _selTxt)) : 'alle Abfahrten');
+    }
 
     // "Alle Abfahrten": KEINE Richtungen einbacken — die Station ist ein generischer
     // "alle Linien"-Marker (rbl|*). Würde man hier die aktuell sichtbaren Abfahrten von
