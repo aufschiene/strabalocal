@@ -3795,6 +3795,10 @@ const REGIONS = {
   IE:  { name: 'Irland',         networks: ['IRISHRAIL'] },
   BE:  { name: 'Belgien',        networks: ['SNCB'] },
   LU:  { name: 'Luxemburg',      networks: ['CFL'] },
+  AU:  { name: 'Australien',     networks: ['SYDNEY'] },
+  RO:  { name: 'Rumänien',       networks: ['BUCHAREST'] },
+  NZ:  { name: 'Neuseeland',     networks: ['AUCKLAND'] },
+  US:  { name: 'USA',            networks: ['AUSTIN'] },
   INT: { name: 'International',   networks: ['FLIXBUS', 'EUSLEEPER'] }
 };
 
@@ -4103,6 +4107,10 @@ const CITY_CAPABILITIES = {
   LONDON:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   BUDAPEST:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   TBILISI:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  SYDNEY:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  BUCHAREST:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  AUCKLAND:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  AUSTIN:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   CH_OEFFI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 15, defaultBrightness: 3 },
   HELSINKI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   INNSBRUCK:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
@@ -4560,6 +4568,10 @@ const NETWORKS = {
   LONDON:     { name: 'Transport for London', shortName: 'TfL',  region: 'GB', desc: 'Tube, Overground, DLR, Bus', searchType: 'trainboard', trainboard: { path: '/gb/london' },    placeholder: 'z.B. Oxford Circus, Victoria...',  isJourneyBased: false },
   BUDAPEST:   { name: 'BKK Budapest',          shortName: 'BKK',  region: 'HU', desc: 'Metró, Villamos, Busz',       searchType: 'trainboard', trainboard: { path: '/hu/budapest' },   placeholder: 'z.B. Deák tér, Keleti...',         isJourneyBased: false },
   TBILISI:    { name: 'TTC Tbilisi',           shortName: 'TTC',  region: 'GE', desc: 'Metro, Bus, Tram',           searchType: 'trainboard', trainboard: { path: '/ge/tbilisi' },    placeholder: 'z.B. Rustaveli, Liberty Square...', isJourneyBased: false },
+  SYDNEY:     { name: 'Transport NSW (Sydney)', shortName: 'TfNSW', region: 'AU', desc: 'Train, Metro, Light Rail, Ferry, Bus', searchType: 'trainboard', trainboard: { path: '/au/nsw' },        placeholder: 'z.B. Circular Quay, Wynyard, Central...', isJourneyBased: false },
+  BUCHAREST:  { name: 'STB Bukarest',          shortName: 'STB',  region: 'RO', desc: 'Metrou, Tramvai, Bus',     searchType: 'trainboard', trainboard: { path: '/ro/bucuresti' },  placeholder: 'z.B. Unirii, Victoriei...',         isJourneyBased: false },
+  AUCKLAND:   { name: 'Auckland Transport',    shortName: 'AT',   region: 'NZ', desc: 'Train, Bus, Ferry',        searchType: 'trainboard', trainboard: { path: '/nz/auckland' },   placeholder: 'z.B. Britomart, Newmarket...',      isJourneyBased: false },
+  AUSTIN:     { name: 'CapMetro Austin',       shortName: 'CapM', region: 'US', desc: 'MetroRail, Bus',           searchType: 'trainboard', trainboard: { path: '/us/austin' },     placeholder: 'z.B. Congress, Guadalupe...',       isJourneyBased: false },
   CH_OEFFI:   { name: 'Öffis (Bus, Tram)',     shortName: 'Öffi', region: 'CH', desc: 'Bus, Tram, Obus – ganze Schweiz', searchType: 'trainboard', trainboard: { path: '/ch/zuerich' }, placeholder: 'z.B. Zürich, Bern, Basel, Luzern...', isJourneyBased: false },
   HELSINKI:   { name: 'HSL Helsinki',          shortName: 'HSL',  region: 'FI', desc: 'Metro, Tram, Bus, Zug',       searchType: 'trainboard', trainboard: { path: '/fi/helsinki' },   placeholder: 'z.B. Rautatientori, Kamppi...',    isJourneyBased: false },
   INNSBRUCK:  { name: 'Tirol & Vorarlberg',     shortName: 'VVT',  region: 'AT', desc: 'Bus, Tram, Obus (ganz Tirol & Vorarlberg)', searchType: 'trainboard', trainboard: { path: '/at/innsbruck' },  placeholder: 'z.B. Innsbruck, Kufstein, Bregenz, Dornbirn...', isJourneyBased: false },
@@ -5026,6 +5038,8 @@ const REGION_HERO = {
   IT:  { color: '#008c45' }, BE: { photo: 'fotos/belgien.jpg' }, LU: { photo: 'fotos/luxenburg.jpg' },
   DK:  { color: '#c8102e' }, NO: { photo: 'fotos/norway.jpg' }, SE: { color: '#006aa7' },
   EE:  { photo: 'fotos/estland.webp' }, IE: { photo: 'fotos/IRLAND.jpg' }, SI: { color: '#005da4' },
+  AU:  { photo: 'fotos/sydney.jpg' }, RO: { photo: 'fotos/bukarest.jpg' },
+  NZ:  { photo: 'fotos/auckland.jpg' }, US: { photo: 'fotos/austin.jpg' },
   INT: { color: '#3a6073' }
 };
 // Netz-spezifischer Hero (überschreibt Land/Bundesland, wenn dieses Netz gewählt ist)
@@ -5604,6 +5618,10 @@ var NETWORK_BRANDS = {
   VMT:           { bg: '#E2001A', fg: '#fff' }, // VMT Mittelthüringen Rot
   SAARVV:        { bg: '#004B93', fg: '#fff' }, // SaarVV Saarland Blau
   TBILISI:       { bg: '#DA251D', fg: '#fff' }, // TTC Tbilisi Rot
+  SYDNEY:        { bg: '#F47920', fg: '#fff' }, // Transport NSW Orange
+  BUCHAREST:     { bg: '#E30613', fg: '#fff' }, // STB Bukarest Rot
+  AUCKLAND:      { bg: '#00563F', fg: '#fff' }, // Auckland Transport Grün
+  AUSTIN:        { bg: '#005DAA', fg: '#fff' }, // CapMetro Austin Blau
   CH_OEFFI:      { bg: '#D52B1E', fg: '#fff' }, // Schweiz Öffis Rot
   SBB:           { bg: '#EB0000', fg: '#fff' }, // SBB Rot
   LIEMOBIL:      { bg: '#EF7D00', fg: '#fff' }, // LIEmobil Orange
@@ -6189,8 +6207,8 @@ function detectDisplayPreset() {
 // direkt in die Bundesland-/Netz-Auswahl dieses Landes. Nur wenn KEIN Land
 // bekannt ist (?country=none / window.deviceCountry===''), fragt der Dropdown nach.
 const DEFAULT_COUNTRY = 'AT';
-const COUNTRY_ORDER = ['AT','DE','CH','LI','CZ','FR','NL','BE','LU','IT','GB','HU','SI','DK','NO','SE','FI','EE','IE','GE','INT'];
-const COUNTRY_FLAGS = {AT:'🇦🇹',DE:'🇩🇪',CH:'🇨🇭',LI:'🇱🇮',CZ:'🇨🇿',FR:'🇫🇷',NL:'🇳🇱',BE:'🇧🇪',LU:'🇱🇺',IT:'🇮🇹',GB:'🇬🇧',HU:'🇭🇺',SI:'🇸🇮',DK:'🇩🇰',NO:'🇳🇴',SE:'🇸🇪',FI:'🇫🇮',EE:'🇪🇪',IE:'🇮🇪',GE:'🇬🇪',INT:'🌍'};
+const COUNTRY_ORDER = ['AT','DE','CH','LI','CZ','FR','NL','BE','LU','IT','GB','HU','RO','SI','DK','NO','SE','FI','EE','IE','GE','AU','NZ','US','INT'];
+const COUNTRY_FLAGS = {AT:'🇦🇹',DE:'🇩🇪',CH:'🇨🇭',LI:'🇱🇮',CZ:'🇨🇿',FR:'🇫🇷',NL:'🇳🇱',BE:'🇧🇪',LU:'🇱🇺',IT:'🇮🇹',GB:'🇬🇧',HU:'🇭🇺',RO:'🇷🇴',SI:'🇸🇮',DK:'🇩🇰',NO:'🇳🇴',SE:'🇸🇪',FI:'🇫🇮',EE:'🇪🇪',IE:'🇮🇪',GE:'🇬🇪',AU:'🇦🇺',NZ:'🇳🇿',US:'🇺🇸',INT:'🌍'};
 
 function populateCountrySelect() {
   var sel = document.getElementById('countrySelect');
@@ -11262,6 +11280,10 @@ const NETWORK_COLORS = {
   VMT: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Mittelthüringen (VMT) → orange Matrix
   SAARVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },    // Saarland (SaarVV) → orange Matrix
   TBILISI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Tbilisi → orange Matrix
+  SYDNEY:  { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Sydney/NSW → orange Matrix
+  BUCHAREST: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 }, // Bukarest → orange Matrix
+  AUCKLAND:  { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 }, // Auckland → orange Matrix
+  AUSTIN:    { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 }, // Austin → orange Matrix
   BODO: { id: 7, name: 'Blau/Gelb', color: '#005BBB' },
   BWEGT: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // BW → orange Matrix
   SALZBURG: { id: 24, name: 'Paper White', color: '#000000', variant: 2 },
@@ -11728,7 +11750,7 @@ function hasStableRichtungsId(network) {
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
           'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG',
           'OOEVV', 'VOR', 'KAERNTEN', 'VVT', 'VVV',
-          'BWEGT', 'BAYERN', 'VVO', 'BERLIN', 'KOELN', 'NRW', 'PID', 'BUDAPEST'].includes(network);
+          'BWEGT', 'BAYERN', 'VVO', 'BERLIN', 'KOELN', 'NRW', 'PID', 'BUDAPEST', 'SYDNEY', 'BUCHAREST', 'AUCKLAND', 'AUSTIN'].includes(network);
 }
 
 // Baut die geordneten lineGroups-Tokens EINER Station unter Berücksichtigung der
