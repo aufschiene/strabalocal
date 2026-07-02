@@ -3754,7 +3754,7 @@ const REGIONS = {
   },
   DE: {
     name: 'Deutschland',
-    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'KOELN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'NVV', 'VMT', 'SAARVV']
+    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'KOELN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'SACHSEN', 'NVV', 'VMT', 'SAARVV']
   },
   CH: {
     name: 'Schweiz',
@@ -4125,6 +4125,7 @@ const CITY_CAPABILITIES = {
   NAHSH:      { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   VSN:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   INSA:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  SACHSEN:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   NVV:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   VMT:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SAARVV:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
@@ -4586,6 +4587,7 @@ const NETWORKS = {
   NAHSH:      { name: 'Schleswig-Holstein (NAH.SH)', shortName: 'NAH.SH', region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/nahsh' }, placeholder: 'z.B. Kiel, Lübeck, Flensburg...', isJourneyBased: false },
   VSN:        { name: 'Süd-Niedersachsen (VSN)', shortName: 'VSN', region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vsn' }, placeholder: 'z.B. Göttingen, Northeim, Duderstadt...', isJourneyBased: false },
   INSA:       { name: 'Sachsen-Anhalt (INSA)', shortName: 'INSA', region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/insa' }, placeholder: 'z.B. Magdeburg, Halle, Dessau...', isJourneyBased: false },
+  SACHSEN:    { name: 'Sachsen', shortName: 'SN', region: 'DE', desc: 'Tram, Bus, S-Bahn (Leipzig, Dresden, Chemnitz)', searchType: 'trainboard', trainboard: { path: '/de/sachsen' }, placeholder: 'z.B. Leipzig Hbf, Dresden, Chemnitz...', isJourneyBased: false },
   NVV:        { name: 'Nordhessen (NVV)',       shortName: 'NVV',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/nvv' }, placeholder: 'z.B. Kassel, Fulda, Marburg...', isJourneyBased: false },
   VMT:        { name: 'Mittelthüringen (VMT)',  shortName: 'VMT',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vmt' }, placeholder: 'z.B. Erfurt, Weimar, Jena, Gotha...', isJourneyBased: false },
   SAARVV:     { name: 'Saarland (SaarVV)',      shortName: 'SaarVV', region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/saarvv' }, placeholder: 'z.B. Saarbrücken, Neunkirchen, Homburg...', isJourneyBased: false },
@@ -5051,6 +5053,7 @@ const NETWORK_HERO = {
   NAHSH:  { photo: 'fotos/Schleswig.jpg',   title: 'Schleswig-Holstein' },
   VSN:    { photo: 'fotos/Göttingen.jpg',   title: 'Süd-Niedersachsen' },
   INSA:   { photo: 'fotos/INSA.jpg',        title: 'Sachsen-Anhalt' },
+  SACHSEN: { photo: 'fotos/INSA.jpg',       title: 'Sachsen' },
   NVV:    { photo: 'fotos/NVV.jpg',          title: 'Nordhessen' },
   VMT:    { photo: 'fotos/VMT.jpg',          title: 'Mittelthüringen' },
   SAARVV: { photo: 'fotos/SAARLAND.webp',    title: 'Saarland' }
@@ -5614,6 +5617,7 @@ var NETWORK_BRANDS = {
   NAHSH:         { bg: '#009EE0', fg: '#fff' }, // NAH.SH Hellblau
   VSN:           { bg: '#E2001A', fg: '#fff' }, // VSN Süd-Nds Rot
   INSA:          { bg: '#005CA9', fg: '#fff' }, // INSA Sachsen-Anhalt Blau
+  SACHSEN:       { bg: '#e2001a', fg: '#fff' }, // Sachsen (LVB Rot)
   NVV:           { bg: '#009A45', fg: '#fff' }, // NVV Nordhessen Grün
   VMT:           { bg: '#E2001A', fg: '#fff' }, // VMT Mittelthüringen Rot
   SAARVV:        { bg: '#004B93', fg: '#fff' }, // SaarVV Saarland Blau
@@ -11276,6 +11280,7 @@ const NETWORK_COLORS = {
   NAHSH: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },     // Schleswig-Holstein (NAH.SH) → orange Matrix
   VSN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Süd-Nds (VSN) → orange Matrix
   INSA: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },      // Sachsen-Anhalt (INSA) → orange Matrix
+  SACHSEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Sachsen (Leipzig/Dresden/Chemnitz) → orange Matrix
   NVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Nordhessen (NVV) → orange Matrix
   VMT: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Mittelthüringen (VMT) → orange Matrix
   SAARVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },    // Saarland (SaarVV) → orange Matrix
@@ -11750,7 +11755,7 @@ function hasStableRichtungsId(network) {
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
           'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG',
           'OOEVV', 'VOR', 'KAERNTEN', 'VVT', 'VVV',
-          'BWEGT', 'BAYERN', 'VVO', 'BERLIN', 'KOELN', 'NRW', 'PID', 'BUDAPEST', 'SYDNEY', 'BUCHAREST', 'AUCKLAND', 'AUSTIN'].includes(network);
+          'BWEGT', 'BAYERN', 'VVO', 'BERLIN', 'KOELN', 'NRW', 'PID', 'BUDAPEST', 'SACHSEN', 'SYDNEY', 'BUCHAREST', 'AUCKLAND', 'AUSTIN'].includes(network);
 }
 
 // Baut die geordneten lineGroups-Tokens EINER Station unter Berücksichtigung der
@@ -13315,7 +13320,7 @@ function renderDisplayTypeSections() {
       var kDs = dsVal(dt.colour, 'k');
       var silberOn = (kDs !== undefined) ? (kDs === 1) : !!(recommendedConfig && recommendedConfig.silberpfeil);
       var silberActive = silberOn ? ' active' : '';
-      html += '<div class="form-row"><div><div class="form-label">Klimaanlage anzeigen</div></div>';
+      html += '<div class="form-row"><div><div class="form-label">Bim+U-Bahn Klima Anzeige</div><div class="form-hint">Alle Busse in Wien sind schon klimatisiert.</div></div>';
       html += '<div class="toggle-switch' + silberActive + '" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
     }
     if (f.delayHighlight) {
