@@ -4631,8 +4631,32 @@ async function fetchDeparturesUnified(fullId) {
   const apiFullId = apiNetwork ? (apiNetwork + ':' + stopId) : stopId;
   // no-store + Cache-Bust: der Picker MUSS immer frische Richtungen sehen — sonst zeigt
   // der Browser-Cache nach einem Server-Fix noch die alten Ziele (z.B. "Linz/Donau Auwiesen").
-  const r = await fetch(DEPARTURES_API + '?stopId=' + encodeURIComponent(apiFullId) + '&_=' + Date.now(), { cache: 'no-store' });
-  return await r.json();
+  //
+  // Retry mit Backoff: beim Config-Laden feuern loadExistingConfig + loadFullConfig +
+  // Namensauflösung fast gleichzeitig → der Server drosselt (HTTP 429). Ohne Retry stünde
+  // die Station dann fälschlich auf "keine Abfahrten" und erst ein manueller 2. Versuch
+  // klappte. Bis zu 4 Versuche, exponentieller Backoff + Jitter, Retry-After beachtet.
+  const MAX = 4;
+  for (let attempt = 0; attempt < MAX; attempt++) {
+    try {
+      const r = await fetch(DEPARTURES_API + '?stopId=' + encodeURIComponent(apiFullId) + '&_=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) return await r.json();
+      if ((r.status === 429 || r.status >= 500) && attempt < MAX - 1) {
+        const ra = parseInt(r.headers.get('retry-after') || '', 10);
+        const wait = (ra > 0 ? ra * 1000 : 400 * Math.pow(2, attempt)) + Math.random() * 250;
+        await new Promise(res => setTimeout(res, wait));
+        continue;  // erneut versuchen
+      }
+      return { data: { monitors: [] } };  // 4xx (außer 429) → nicht retrien
+    } catch (e) {
+      if (attempt < MAX - 1) {
+        await new Promise(res => setTimeout(res, 400 * Math.pow(2, attempt) + Math.random() * 250));
+        continue;  // Netzwerkfehler → Backoff + Retry
+      }
+      return { data: { monitors: [] } };
+    }
+  }
+  return { data: { monitors: [] } };
 }
 
 const STATION_LINES_API = 'https://api.straba.at/api/v1/stops/lines';
