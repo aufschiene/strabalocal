@@ -3754,7 +3754,7 @@ const REGIONS = {
   },
   DE: {
     name: 'Deutschland',
-    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'KOELN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'SACHSEN', 'NVV', 'VMT', 'SAARVV']
+    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'SACHSEN', 'NVV', 'VMT', 'SAARVV']
   },
   CH: {
     name: 'Schweiz',
@@ -5785,15 +5785,10 @@ DISPLAY_PRESETS.bw = {
     { id: 'DB',   label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
   ]
 };
-DISPLAY_PRESETS.koeln = {
-  name: 'Köln',
-  parent: 'DE',
-  photo: 'fotos/koeln.jpg',
-  networks: [
-    { id: 'KOELN', jumpTo: { region: 'DE' } },
-    { id: 'DB',    label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
-  ]
-};
+// Köln-Kachel entfernt: KVB Köln (Netz KOELN, colour 19) hatte instabile Bus-Richtungen
+// (kein platform/Steig → volatiler Hash). Köln läuft jetzt über das NRW-Netz (DELFI, stabile
+// Steig-Richtungen). NETWORKS.KOELN + displayStyles[19] bleiben definiert, damit bestehende
+// KVB-Configs beim Laden nicht crashen; nur neu wählbar ist es nicht mehr.
 DISPLAY_PRESETS.nrw = {
   name: 'NRW',
   parent: 'DE',
@@ -11211,11 +11206,17 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
           // Linienname muss übereinstimmen
           if (d.line !== line.name) return false;
 
+          // NUR Global-/Steig-Netze (NRW, Sachsen, VRN, OÖVV/VOR/… — richtungsId "st…"):
+          // exakt per Steig matchen. Der Zieltext ist dort fragil (Präfixe wie "Köln …",
+          // Umbenennungen); ohne diesen Steig-Match landet der Reload im Liniennamen-Fallback
+          // und hakt BEIDE Richtungen an. Wien/ÖBB/Berlin/Hamburg bleiben beim Zieltext-Match.
+          if (d.richtungsId && line.richtungsId && /^st/.test(String(d.richtungsId))) {
+            return String(d.richtungsId) === String(line.richtungsId);
+          }
+
           // Beide haben Richtung: müssen übereinstimmen
           if (d.towards && line.towards) {
-            const match = d.towards === line.towards;
-            console.log(`[editStation] Comparing: d.towards="${d.towards}" vs line.towards="${line.towards}" => ${match}`);
-            return match;
+            return d.towards === line.towards;
           }
 
           // Gespeicherte direction hat Richtung, aber API nicht: kein Match
@@ -17424,6 +17425,21 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       } catch (e) {
         // API error - station will have empty directions
       }
+    }
+
+    // Steig-genauer Round-Trip, NUR Global-/Steig-Netze (richtungsId "st…", z.B. NRW/Sachsen):
+    // JEDE in der masterrow konfigurierte Steig-Richtung MUSS in station.directions landen,
+    // auch wenn gerade keine Abfahrt dieser Richtung im Feed lag. Sonst bliebe directions
+    // leer/partiell → der Edit-Picker fällt auf reines Liniennamen-Matching zurück und hakt
+    // BEIDE Richtungen an (der gemeldete "beide ausgewählt"-Bug). Andere Netze unberührt.
+    if (!isAllDep && !isJourney && Array.isArray(stationDests) && stationDests.length) {
+      stationDests.forEach(sd => {
+        if (!sd.line || !sd.towards) return;
+        const rid = String(sd.towards);
+        if (!/^st/.test(rid)) return;   // nur Steig-rids (Global-/DELFI-Netze)
+        const has = station.directions.some(d => d.line === sd.line && String(d.richtungsId || '') === rid);
+        if (!has) station.directions.push({ line: sd.line, towards: '', type: '', richtungsId: rid });
+      });
     }
 
     stations.push(station);
