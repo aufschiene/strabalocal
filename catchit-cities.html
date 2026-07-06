@@ -12979,13 +12979,24 @@ function autoRowsForColour(cid) {
   cid = parseInt(cid);
   var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
   var dirCount = 0;
+  var hasAllDep = false;
   (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
     if (stationDisplayColour(s) !== cid) return;
+    if (s.allDepartures) hasAllDep = true;
     if (s.directions && s.directions.length > 0) dirCount += s.directions.length;
     else if (s.filter) dirCount += String(s.filter).split(',').filter(function(x){ return x.trim(); }).length;
     else dirCount += 1;
   });
   if (dirCount < 1) dirCount = 1;
+  // "Alle Abfahrten" (z.B. Köln all): keine festen Richtungen → das Brett soll möglichst voll
+  // sein. Default 3 Zeilen (an min/max geklemmt), statt aus dirCount=1 nur 1 Zeile abzuleiten.
+  // Manuell gewählte Zeilen gewinnen weiterhin (rowsForColour liest ftRowsByCid/'r' davor).
+  if (hasAllDep) {
+    var want = 3;
+    if (f.maxRows && want > f.maxRows) want = f.maxRows;
+    if (f.minRows && want < f.minRows) want = f.minRows;
+    return want;
+  }
   if (cid === 12) return 2;                       // ÖBB S-Bahn: Standard 2 (3 nur manuell)
   if (cid === 22) return 3;                       // MVG: immer 3
   if (cid === 14) return Math.max(Math.min(dirCount, 3), 2);  // Westbahn: 2-3
@@ -17097,7 +17108,7 @@ function saveConfig() {
 // linefilterdestination: Linz-Format "1:Auwiesen,2:solarCity,27:Chemiepark" mit Line:Destination
 // roworderdestination: Wien-Format "4A:Karlsplatz U,4A:Wittelsbachstraße,59A:Bhf. Meidling S U" mit Line:Destination
 let _loadExistingConfigPromise = null;
-async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr) {
+async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr, clearFirst) {
   if (!rbl || rbl.trim() === '') return;
 
   // Serialisierung: Warte auf vorherigen Aufruf bevor neuer startet
@@ -17106,7 +17117,7 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
     console.log('[loadExistingConfig] Warte auf vorherigen Aufruf...');
     await _loadExistingConfigPromise;
   }
-  _loadExistingConfigPromise = _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr);
+  _loadExistingConfigPromise = _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr, clearFirst);
   await _loadExistingConfigPromise;
   _loadExistingConfigPromise = null;
 }
@@ -17148,7 +17159,14 @@ function gehwegByStopIdFromRows(masterRowStr) {
   return map;
 }
 
-async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr) {
+async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr, clearFirst) {
+
+  // Race-Fix: loadFullConfig ist autoritativ (trägt die volle masterrow). Falls parallel ein
+  // loadExistingConfig-Aufruf mit UNVOLLSTÄNDIGER Config lief (leere masterrow → alle Richtungen
+  // per Liniennamen-Fallback), wird dessen Ergebnis HIER — nach der Serialisierung, also nachdem
+  // der vorige Aufruf wirklich fertig ist — verworfen. Sonst gewinnt seine falsche Station per
+  // Dedup ("erste behalten") und der Picker zeigt beide/alle Richtungen angehakt.
+  if (clearFirst) { try { stations.length = 0; } catch (e) {} }
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
   const filterParts = filter ? filter.split('|') : [];
@@ -17400,7 +17418,12 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
                     if (line.richtungsId) {
                       const rid = String(line.richtungsId);
                       const wanted = ld.towards.split('|').map(s => s.trim()).filter(Boolean);
-                      if (wanted.some(w => rid === w || (w.length >= 3 && rid.startsWith(w)))) return true;
+                      // Steig-rids (st…, z.B. Graz/DELFI "stat-…:0:2") sind volle Leaf-IDs und
+                      // teils Präfixe VONEINANDER (…:0:2 ⊂ …:0:20) → NUR exakt matchen, sonst
+                      // würde eine Richtung fälschlich beide Steige treffen. ÖBB "d…"/numerisch
+                      // bleibt hierarchischer Präfix wie bisher (Firmware isLineDestinationAllowed).
+                      if (wanted.some(w => rid === w
+                            || (!/^st/.test(w) && w.length >= 3 && rid.startsWith(w)))) return true;
                       // Token ist eine richtungsId (ÖBB "d8100360", numerisch "1"/"2",
                       // Graz/STV "H"/"R") aber matcht NICHT → diese Richtung gehört nicht
                       // dazu. NICHT gegen Zieltext fuzzy-matchen (sonst falsche Treffer).
@@ -17617,7 +17640,9 @@ async function handleConfigMessage(data) {
       await loadWienData();
     }
     const lineGroupsStr = data.config.linegroups || '';
-    await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest, lineGroupsStr, (data.config.masterrow || '') + ';' + (data.config.timerow || ''));
+    // clearFirst=true: loadFullConfig ist autoritativ und verwirft ein evtl. parallel gelaufenes
+    // (unvollständiges) loadExistingConfig-Ergebnis erst NACH der Serialisierung (Race-Fix).
+    await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest, lineGroupsStr, (data.config.masterrow || '') + ';' + (data.config.timerow || ''), true);
 
     // Initialisiere recommendedConfig falls noch nicht vorhanden
     if (!recommendedConfig) {
