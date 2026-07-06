@@ -4732,9 +4732,10 @@ const FV_CATS = ['RJX', 'WB', 'IC', 'ICE', 'NJ', 'IR', 'RGJ'];
 const FV_CAT_GATTUNGEN = { RJX: ['RJX', 'RJ'], WB: ['WB'], IC: ['IC', 'EC'], ICE: ['ICE'], NJ: ['NJ', 'EN'], IR: ['IR'], RGJ: ['RGJ', 'REGIOJET', 'RJET'] };
 const FV_CAT_LABEL = { RJX: 'Railjet', WB: 'Westbahn', IC: 'Intercity / EC', ICE: 'ICE', NJ: 'Nightjet', IR: 'InterRegio', RGJ: 'RegioJet' };
 const FV_CAT_COLOR = { RJX: '#E2002A', WB: '#1f9fb0', IC: '#3c4a54', ICE: '#2b6cb0', NJ: '#1a2e66', IR: '#6f3aa5', RGJ: '#F39200' };
-// Wikipedia / ÖBB: welche FV-Zugtypen tatsächlich auf welcher Strecke verkehren.
-// Diese Liste steuert, welche Chips am Bahnhof angezeigt werden — auch wenn
-// gerade kein Zug der Gattung in den aktuellen Daten ist (NJ tagsüber etc.).
+// NICHT MEHR LIMITIEREND (seit 2026-07): früher steuerte diese kuratierte Liste, welche
+// Zugtyp-Chips pro Strecke angeboten wurden — die Realität wich aber ab (Graz Puntigam:
+// IR fährt, „Südstrecke" listete IR nicht → nicht wählbar). Jetzt bekommen ALLE
+// FV-Bahnhöfe ALLE Zugtypen. Tabelle bleibt nur als Doku der typischen Bedienung.
 const FV_CORRIDOR_CATS = {
   'Westbahn':            ['RJX', 'WB', 'IC', 'ICE', 'NJ'],
   'Südstrecke':          ['RJX', 'IC', 'NJ'],
@@ -8614,17 +8615,11 @@ function renderLines() {
     //   Westbahn   → kein IR
     // Damit verschwinden „unmögliche" Chips — aber realistische bleiben sichtbar,
     // auch wenn aktuell kein Zug der Gattung im Datensatz ist (NJ tagsüber etc.).
-    const corridorsActive = fvCurrentMode === 'multiCorridor'
-      ? fvCurrentCorridors.filter(c => fvCheckedDirs.has(c))
-      : fvCurrentCorridors;
-    const allowedCats = new Set();
-    (corridorsActive.length ? corridorsActive : fvCurrentCorridors).forEach(function(c) {
-      (FV_CORRIDOR_CATS[c] || FV_CATS).forEach(function(x) { allowedCats.add(x); });
-    });
-    let chipCats = FV_CATS.filter(c => allowedCats.has(c));
-    // Keine Korridor-Info (z.B. gerade keine Abfahrten an einem kleinen FV-Bahnhof) → ALLE Zugtypen
-    // anbieten, damit der User trotzdem konfigurieren kann (Railjet/ICE/IC/NJ/IR…).
-    if (!chipCats.length) chipCats = FV_CATS.slice();
+    // ALLE Zugtypen an JEDEM FV-Bahnhof anbieten. Früher beschnitt die kuratierte
+    // FV_CORRIDOR_CATS-Liste die Chips pro Strecke — aber die Realität weicht ab
+    // (Graz Puntigam: InterRegio fährt dort, „Südstrecke" listete IR aber nicht →
+    // nicht wählbar). Lieber alle anbieten; ein Chip ohne echte Züge zeigt halt nichts.
+    let chipCats = FV_CATS.slice();
 
     // Zugtypen erst NACH Zielwahl, und nur die, die die gewählte Verbindung bedienen (Union).
     if (fvShowCats) {
@@ -9214,9 +9209,9 @@ function buildFvSave() {
       : ['E', 'W'];
     axes.forEach(function(axisKey) {
       if (!fvCheckedDirs.has(axisKey)) return;
-      const corr = axisCorridor.get(axisKey);
-      const allowed = (FV_CORRIDOR_CATS[corr] || FV_CATS);
-      if (corr && allowed.indexOf(cat) === -1) return;
+      // KEIN Korridor-Gate mehr: früher wurde ein gewählter Zugtyp hier stillschweigend
+      // verworfen, wenn die kuratierte FV_CORRIDOR_CATS-Liste ihn für die Strecke nicht
+      // kannte (z.B. IR auf der Südstrecke) — der User hatte ihn aber bewusst angehakt.
       // Exakte (cat × axis) rids/dests — wenn vorhanden, NUR die. Sonst Fallback
       // auf die ganze Achse (alle Gattungen) damit ein NJ-Filter auch matcht wenn
       // aktuell nur RJX/IC fährt und der NJ später dazu kommt.
@@ -12822,7 +12817,7 @@ const DISPLAY_TYPE_FEATURES = {
   16: { rows: true, sorting: true, grouping: true, altNext: true, name: 'Prag / CZ-HU' },
   18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, fontExt: true, name: 'Schwarz/Weiß Matrix', offline: true },
-  22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, name: 'MVG' },
+  22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, arrival: true, name: 'MVG' },
   23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, name: 'Matrix' },
   24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' }
 };
@@ -13358,6 +13353,13 @@ function renderDisplayTypeSections() {
       var silberActive = silberOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Bim+U-Bahn Klima Anzeige</div><div class="form-hint">Alle Busse in Wien sind schon klimatisiert.</div></div>';
       html += '<div class="toggle-switch' + silberActive + '" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
+    }
+    if (f.arrival) {
+      var eDs = dsVal(dt.colour, 'e');
+      var arrOn = (eDs !== undefined) ? (eDs === 1) : true;  // Default an
+      var arrActive = arrOn ? ' active' : '';
+      html += '<div class="form-row"><div><div class="form-label">Einfahr-Ansicht</div><div class="form-hint">Eine bald abfahrende Bahn (0 Min) wird gross angezeigt.</div></div>';
+      html += '<div class="toggle-switch' + arrActive + '" id="ftArrival_' + dt.colour + '" onclick="toggleFtSwitch(\'ftArrival_' + dt.colour + '\')"></div></div>';
     }
     if (f.delayHighlight) {
       var dDs = dsVal(dt.colour, 'd');
@@ -16209,6 +16211,7 @@ function buildDisplaySettings() {
       parts.push('n' + dsKeepBool(cid, 'n', 'ftNfBlink_' + cid, recommendedConfig && recommendedConfig.niederflurBlink, 0));
     }
     if (f.silberpfeil) parts.push('k' + dsKeepBool(cid, 'k', 'ftSilber_' + cid, recommendedConfig && recommendedConfig.silberpfeil, 0));
+    if (f.arrival) parts.push('e' + dsKeepBool(cid, 'e', 'ftArrival_' + cid, 1, 1));  // MVG Einfahr-Ansicht, Default an
     if (f.altNext) parts.push('a' + dsKeepBool(cid, 'a', 'ftAltNext_' + cid, (recommendedConfig && recommendedConfig.alternateNext === false) ? 0 : 1, 1));
     if (f.fontExt) {  // Matrix-Schriftart: 0=DACH, 1=CZ+HU (Segment, persistent wie Sort/Größe)
       var _fv = (ftFontExtByCid[cid] != null) ? ftFontExtByCid[cid]
