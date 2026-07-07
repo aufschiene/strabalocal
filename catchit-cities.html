@@ -3780,7 +3780,7 @@ const REGIONS = {
   },
   DK: {
     name: 'Dänemark',
-    networks: ['REJSEPLANEN']
+    networks: ['REJSEPLANEN', 'DKTRAIN']
   },
   // ===== NEU: weitere Länder (Trainboard) =====
   GB:  { name: 'Großbritannien', networks: ['LONDON', 'UKRAIL'] },
@@ -4138,6 +4138,7 @@ const CITY_CAPABILITIES = {
   VY:         { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   TRAFIKLAB:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   REJSEPLANEN:{ textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  DKTRAIN:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 6,  defaultBrightness: 3 },
   VR:         { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   PEATUS:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   IRISHRAIL:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
@@ -4600,7 +4601,9 @@ const NETWORKS = {
   TRENITALIA: { name: 'Trenitalia (Italien)',  shortName: 'TI',   region: 'IT', desc: 'Frecce, Regionale, IC',       searchType: 'trainboard', trainboard: { path: '/it' },           placeholder: 'z.B. Roma Termini, Milano...',     isJourneyBased: false },
   VY:         { name: 'Entur / VY (Norwegen)', shortName: 'VY',   region: 'NO', desc: 'Zug landesweit',              searchType: 'trainboard', trainboard: { path: '/no' },           placeholder: 'z.B. Oslo S, Bergen...',           isJourneyBased: false },
   TRAFIKLAB:  { name: 'Trafiklab (Schweden)',  shortName: 'SE',   region: 'SE', desc: 'Zug & Nahverkehr',            searchType: 'trainboard', trainboard: { path: '/se' },           placeholder: 'z.B. Stockholm, Göteborg...',      isJourneyBased: false },
-  REJSEPLANEN:{ name: 'Rejseplanen (Dänemark)',shortName: 'DSB',  region: 'DK', desc: 'Zug & Nahverkehr',            searchType: 'trainboard', trainboard: { path: '/dk' },           placeholder: 'z.B. København H...',              isJourneyBased: false },
+  REJSEPLANEN:{ name: 'Nahverkehr Dänemark',    shortName: 'DK',   region: 'DK', desc: 'Bus, Metro, S-Tog, Letbane',  searchType: 'trainboard', trainboard: { path: '/dk' },           placeholder: 'z.B. København H...',              isJourneyBased: false },
+  // Dänemark „Zug"-Button: DB-artiger Wizard (Gattung/Gleis) über DKALL/DKSTEIG (/dk)
+  DKTRAIN:    { name: 'Züge Dänemark',          shortName: 'DSB',  region: 'DK', desc: 'Re, IC, Zugzielanzeiger',     searchType: 'server_proxy', placeholder: 'z.B. København H, Næstved...',     isJourneyBased: false },
   VR:         { name: 'VR (Finnland)',         shortName: 'VR',   region: 'FI', desc: 'Zug landesweit',              searchType: 'trainboard', trainboard: { path: '/fi' },           placeholder: 'z.B. Helsinki, Tampere...',        isJourneyBased: false },
   PEATUS:     { name: 'Peatus (Estland)',      shortName: 'EE',   region: 'EE', desc: 'Zug, Bus, Tram',              searchType: 'trainboard', trainboard: { path: '/ee' },           placeholder: 'z.B. Tallinn, Tartu...',           isJourneyBased: false },
   IRISHRAIL:  { name: 'Irish Rail',            shortName: 'IÉ',   region: 'IE', desc: 'Zug landesweit',              searchType: 'trainboard', trainboard: { path: '/ie' },           placeholder: 'z.B. Dublin, Cork...',             isJourneyBased: false },
@@ -4705,6 +4708,7 @@ const API_NETWORK_MAP = {
   // 'GVB': 'OVAPI',   // GVB läuft jetzt direkt über die Trainboard-Proxy auf dem Server
   'RET': 'OVAPI',      // Rotterdam bleibt bei OVapi
   'WESTBAHN': 'OEBB',  // Westbahn-Abfahrten über Trainboard /at (Server-Kennung OEBB) statt HAFAS
+  'DKTRAIN': 'DKALL',  // Dänemark Zug-Wizard: Suche über die DKALL-Serverkennung (/dk)
 };
 function mapNetworkForApi(network) {
   return API_NETWORK_MAP[network] || network;
@@ -5662,6 +5666,7 @@ var NETWORK_BRANDS = {
   BODO:          { bg: '#005BBB', fg: '#fff' }, // BODO Bodensee Blau
   BWEGT:         { bg: '#1d9b50', fg: '#fff' }, // bwegt Baden-Württemberg Grün
   DB:            { bg: '#EC0016', fg: '#fff' }, // DB Regio Rot
+  DKTRAIN:       { bg: '#B4131F', fg: '#fff' }, // DSB Rot (Züge Dänemark)
   PARIS:         { bg: '#003B80', fg: '#fff' }, // RATP Paris Blau
   PID:           { bg: '#1E61A0', fg: '#fff' }  // Prag PID Blau
 };
@@ -7887,18 +7892,28 @@ function dbChip(label, on, handler) { return '<span class="gattung-chip ' + (on?
 function dbSep(t){ return '<span class="db-opt-sep">' + dbAttr(t) + '</span>'; }
 function dbToggleIn(arr, v){ var i = arr.indexOf(v); if (i>=0) arr.splice(i,1); else arr.push(v); }
 
+// DB-artiger Zug-Wizard für mehrere Netze: DB (Deutschland, /global) und DKTRAIN (Dänemark, /dk).
+// Gleiches UI/rbl-Schema, nur andere Prefixe + discover-network. dbWizardNet wird beim
+// Einstieg (selectStop/editStation) gesetzt.
+var dbWizardNet = 'DB';
+var DB_WIZARD_NETS = {
+  DB:      { all: 'DBALL', steig: 'DBSTEIG', disc: '',   name: 'Deutsche Bahn' },
+  DKTRAIN: { all: 'DKALL', steig: 'DKSTEIG', disc: 'DK', name: 'Rejseplanen Züge' }
+};
+function dbWiz() { return DB_WIZARD_NETS[dbWizardNet] || DB_WIZARD_NETS.DB; }
+
 async function startDbSelection(id, name) {
   dbState = { id: id, name: name, disco: null, mode: 'all', sel: { gatts:[], lines:[], steigs:[], sgatts:[], slines:[] } };
   editingStationIndex = null;
   document.getElementById('dbStationName').textContent = name;
-  document.getElementById('dbStationInfo').textContent = 'Deutsche Bahn · ID: ' + id;
+  document.getElementById('dbStationInfo').textContent = dbWiz().name + ' · ID: ' + id;
   if (typeof searchResults !== 'undefined' && searchResults) searchResults.classList.remove('show');
   showStep('dbSelect');
   document.getElementById('dbLoading').classList.remove('hidden');
   document.getElementById('dbContent').classList.add('hidden');
   document.getElementById('dbError').classList.add('hidden');
   try {
-    var r = await fetch('https://api.straba.at/api/v1/db/discover?stopId=' + encodeURIComponent(id));
+    var r = await fetch('https://api.straba.at/api/v1/db/discover?stopId=' + encodeURIComponent(id) + (dbWiz().disc ? ('&network=' + dbWiz().disc) : ''));
     var d = await r.json();
     dbState.disco = d;
     var hasData = d && ((d.platforms && d.platforms.length) || (d.gattungen && d.gattungen.length));
@@ -8043,19 +8058,19 @@ function addDbStation() {
   if (dbState.mode === 'all') {
     var tok = sel.lines.length ? sel.lines.join('~') : sel.gatts.join('~');
     // '!' trennt ID von Auswahl — die /global-DB-IDs sind doppelpunkt-reich, ':' wäre mehrdeutig.
-    rbl = 'DBALL:' + id + (tok ? ('!' + tok) : '');
+    rbl = dbWiz().all + ':' + id + (tok ? ('!' + tok) : '');
     label = name + ' · ' + (sel.lines.length ? sel.lines.join(', ') : (sel.gatts.length ? ('alle ' + sel.gatts.join('/')) : 'alle Abfahrten'));
   } else {
     if (!sel.steigs.length) { alert('Bitte mindestens einen Bahnsteig wählen.'); return; }
     var stok = sel.slines.length ? sel.slines.join('~') : sel.sgatts.join('~');
     // '!' trennt ID / Steige / Linie (doppelpunkt-reiche /global-IDs); Steige intern weiter '~'.
-    rbl = 'DBSTEIG:' + id + '!' + sel.steigs.join('~') + (stok ? ('!' + stok) : '');
+    rbl = dbWiz().steig + ':' + id + '!' + sel.steigs.join('~') + (stok ? ('!' + stok) : '');
     var pl = sel.steigs.map(function(p){ return 'Gl ' + p; }).join('+');
     label = name + ' · ' + pl + (sel.slines.length ? (' ' + sel.slines.join(', ')) : (sel.sgatts.length ? (' alle ' + sel.sgatts.join('/')) : ''));
   }
   if (stations.some(function(s){ return s.fullId === rbl; })) { alert('Diese Auswahl ist bereits hinzugefügt!'); return; }
   stations.push({
-    network: 'DB', networkName: 'Deutsche Bahn',
+    network: dbWizardNet, networkName: dbWiz().name,
     stopId: id, stopName: label, dbBaseName: name,
     filter: '', fullId: rbl, isExisting: false,
     directions: [], allDepartures: true, allDepCat: 'all'
@@ -8069,7 +8084,7 @@ function addDbStation() {
 // ==================== STOP SELECTION ====================
 async function selectStop(id, name) {
   // DB hat kein /lines → eigener Auswahl-Flow (Gattung / Bahnsteig, planmäßig).
-  if (selectedNetwork === 'DB') { await startDbSelection(id, name); return; }
+  if (selectedNetwork === 'DB' || selectedNetwork === 'DKTRAIN') { dbWizardNet = selectedNetwork; await startDbSelection(id, name); return; }
   const fullId = `${selectedNetwork}:${id}`;
 
   // Prüfen ob diese Station schon existiert - dann automatisch Bearbeiten-Modus
@@ -11058,7 +11073,8 @@ async function editStation(idx) {
 
   // DB: zurück in den DB-Auswahl-Flow (Gattung/Bahnsteig). Die alte Auswahl wird beim
   // erneuten Hinzufügen ersetzt (gleiche rbl → Dedup), sonst entsteht eine zweite.
-  if (station.network === 'DB') {
+  if (station.network === 'DB' || station.network === 'DKTRAIN') {
+    dbWizardNet = station.network;
     editingStationIndex = null;  // DB-Add dedupt über die rbl selbst
     var baseName = station.dbBaseName || String(station.stopName || '').split(' · ')[0];
     if (typeof removeStation === 'function') removeStation(idx);  // alte Auswahl raus, dann neu wählen
@@ -17339,7 +17355,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // Beim Reload steht in der masterrow "…|*|" → ohne dieses Handling läse der Konfigurator
     // nur "alle Abfahrten" und verlöre die Gattung. Als DB behandeln (Edit/Label) + Gattung
     // ins Label ziehen, Basis-ID (ohne Auswahl) als stopId für ein sauberes Re-Edit.
-    if (network === 'DBALL' || network === 'DBSTEIG') {
+    if (network === 'DBALL' || network === 'DBSTEIG' || network === 'DKALL' || network === 'DKSTEIG') {
       var _bang = bareStopId.indexOf('!');
       var _selRaw = '';
       if (_bang >= 0) { _selRaw = bareStopId.slice(_bang + 1); station.stopId = bareStopId.slice(0, _bang); }
@@ -17347,9 +17363,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         var _sg = bareStopId.split(':');
         if (_sg.length >= 2 && /^[A-Za-z]/.test(_sg[_sg.length - 1])) { _selRaw = _sg.pop(); station.stopId = _sg.join(':'); }
       }
-      station.network = 'DB';
-      station.networkName = 'Deutsche Bahn';
-      station.dbMode = (network === 'DBSTEIG') ? 'steig' : 'all';
+      station.network = (network === 'DKALL' || network === 'DKSTEIG') ? 'DKTRAIN' : 'DB';
+      station.networkName = (station.network === 'DKTRAIN') ? 'Rejseplanen Züge' : 'Deutsche Bahn';
+      station.dbMode = (network === 'DBSTEIG' || network === 'DKSTEIG') ? 'steig' : 'all';
       station.dbBaseName = stopName;
       var _selTxt = _selRaw ? String(_selRaw).replace(/!/g, ' ').replace(/~/g, '/').trim() : '';
       station.stopName = stopName + ' · ' + (_selTxt ? ((network === 'DBSTEIG') ? ('Gl ' + _selTxt) : ('alle ' + _selTxt)) : 'alle Abfahrten');
