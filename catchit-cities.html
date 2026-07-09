@@ -11787,11 +11787,16 @@ function hasStableRichtungsId(network) {
   //   Wurden bei der Allowlist-Umstellung schlicht vergessen → Richtungs-Filter war kaputt
   //   (Linie nur ganz oder gar nicht, abgewählte Richtungen wurden beim Speichern wieder
   //   angehakt). Bus-Stops ohne Platform fallen auf den stabilen Ziel-Hash zurück.
+  // VBN seit 2026-07-09: Server liefert Platform-rids ("p1"/"pA", Wolfenbüttel) — war in der
+  // Allowlist vergessen (gleiches Muster wie KOELN/NRW) → Richtungswahl kippte beim Speichern
+  // auf beide Richtungen zurück. Departures laufen jetzt über /global (de-VBN_-Ids), rid-Schema
+  // bleibt Platform.
   return ['WL', 'WLB', 'LINZ', 'STV', 'STVG', 'SALZBURG', 'WESTBAHN', 'BODO',
           'OEBB', 'OEBB_SBAHN', 'OEBB_REGIONAL', 'OEBB_STAMM_SBAHN',
           'OEBB_REG_NOE', 'OEBB_REG_OOE', 'HAMBURG',
           'OOEVV', 'VOR', 'KAERNTEN', 'VVT', 'VVV',
-          'BWEGT', 'BAYERN', 'VVO', 'BERLIN', 'KOELN', 'NRW', 'PID', 'BUDAPEST', 'SACHSEN', 'SYDNEY', 'BUCHAREST', 'AUCKLAND', 'AUSTIN'].includes(network);
+          'BWEGT', 'BAYERN', 'VVO', 'BERLIN', 'KOELN', 'NRW', 'PID', 'BUDAPEST', 'SACHSEN', 'SYDNEY', 'BUCHAREST', 'AUCKLAND', 'AUSTIN',
+          'VBN'].includes(network);
 }
 
 // Baut die geordneten lineGroups-Tokens EINER Station unter Berücksichtigung der
