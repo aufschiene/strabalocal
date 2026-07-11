@@ -7846,10 +7846,16 @@ async function searchViaProxy(network, query) {
 }
 
 function displaySearchResults(results) {
-  // Point-to-Point: Nur Fernverkehrshalte zeigen
+  // Point-to-Point (ÖBB Fernverkehr): früher tagte die HAFAS-Suche FV-Bahnhöfe mit
+  // info "Fernverkehr" → danach filtern. Seit die ÖBB-Suche über Trainboard /at läuft,
+  // ist info immer "AT · train station" → der alte Filter ließ NICHTS mehr durch
+  // ("Keine Stationen gefunden", z.B. Amstetten, 2026-07-11). /at liefert ohnehin nur
+  // Bahnhöfe; ob dort FV hält, entscheidet der Ziel-Picker danach. Darum: nur filtern,
+  // wenn das Tag überhaupt vorkommt (Rückwärtskompatibilität), sonst alles zeigen.
   let filtered = results;
   if (NETWORKS[selectedNetwork]?.isPointToPoint) {
-    filtered = results.filter(r => (r.info || '').includes('Fernverkehr'));
+    const tagged = results.filter(r => (r.info || '').includes('Fernverkehr'));
+    filtered = tagged.length ? tagged : results;
   }
 
   // NL-Netzwerke: Gleicher Name = eine Station mit mehreren Perrons (wie Wien Bahnsteige)
