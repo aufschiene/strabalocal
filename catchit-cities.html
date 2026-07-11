@@ -7599,24 +7599,38 @@ const FV_AT_STATIONS = [
   'Knittelfeld','Laßnitzhöhe','Leibnitz','Leoben Hbf','Liezen','Mariahof-St. Lambrecht','Mürzzuschlag',
   'Neumarkt in Steiermark','Öblarn','Raaba','Scheifling','Schladming','Selzthal','Spielfeld-Straß',
   'St. Georgen ob Judenburg','St. Michael','Stadt Rottenmann','Stainach-Irdning','Studenzen-Fladnitz',
-  'Tauplitz','Thalheim-Pöls','Weißenbach-St.Gallen','Unzmarkt','Fieberbrunn','Hochfilzen','Hopfgarten Berglift',
+  'Tauplitz','Thalheim-Pöls','Weißenbach-St.Gallen','Weststeiermark','Unzmarkt','Fieberbrunn','Hochfilzen','Hopfgarten Berglift',
   'Imst-Pitztal','Innsbruck Hbf','Jenbach','Kirchberg in Tirol','Kitzbühel','Kitzbühel Hahnenkamm','Kufstein',
   'Landeck-Zams','Lienz','Ötztal','St. Anton am Arlberg','St. Johann in Tirol','Telfs-Pfaffenhofen',
   'Westendorf','Wörgl Hbf','Altach','Bludenz','Bregenz','Dornbirn','Feldkirch','Frastanz','Götzis','Hohenems',
   'Langen am Arlberg','Nenzing','Rankweil','Riedenburg','Wien Hbf','Wien Hütteldorf','Wien Meidling','Wien Westbf'
 ];
-// Normalisierung: kleinschreiben, Umlaute, Klammern/Slash-Zusätze weg, Hbf/Westbf
-// vereinheitlichen, „Bahnhof/Bahnhst/Haltestelle" entfernen, dann nur a–z0–9.
+// Normalisierung für den Whitelist-Abgleich. ÖBB kürzt ab, Wikipedia schreibt aus —
+// beide Formen müssen auf denselben Key normalisieren (wortbasiert, KEIN Zusammenquetschen):
+//   "Amstetten NÖ"      ↔ "Amstetten"          (Bundesland-Suffix)
+//   "Bruck/Mur"         ↔ "Bruck an der Mur"   (Slash- vs. Präpositions-Form)
+//   "Wr.Neustadt Hbf"   ↔ "Wiener Neustadt Hbf"
+//   "Kirchdorf a.d.Krems" ↔ "Kirchdorf an der Krems"
+// Der alte Normalisierer quetschte alles zu einem String ("amstettenno"≠"amstetten",
+// "bruck"≠"bruckandermur") → FV-Suche fand Amstetten/Bruck nicht (2026-07-11).
 function normFvName(s) {
   s = (s || '').toLowerCase();
   s = s.replace(/ä/g,'a').replace(/ö/g,'o').replace(/ü/g,'u').replace(/ß/g,'ss');
-  s = s.replace(/\([^)]*\)/g,'');         // (U), (VIE) ...
-  s = s.replace(/\/[a-z]+/g,'');          // /donau, /ybbs, /krems ...
+  s = s.replace(/\([^)]*\)/g,' ');        // (U), (VIE) ...
+  s = s.replace(/\bwr\.\s*/g,'wiener ');  // Wr.Neustadt → wiener neustadt
   s = s.replace(/hauptbahnhof/g,'hbf');
   s = s.replace(/westbahnhof/g,'westbf');
-  s = s.replace(/bahnhaltestelle|bahnhst|haltestelle|bahnhof|bahnst/g,'');
-  s = s.replace(/[^a-z0-9]/g,'');
-  return s;
+  s = s.replace(/ostbahnhof/g,'ostbf');
+  s = s.replace(/bahnhaltestelle|bahnhst|haltestelle|bahnhof|bahnst/g,' ');
+  s = s.replace(/[.\-\/]/g,' ');          // St. / Bindestrich / Slash ("Bruck/Mur" → "bruck mur")
+  // Präpositions-WÖRTER droppen (kein Tail-Cut): "bruck an der mur" UND "bruck mur"
+  // → "bruck mur"; "Bruck/Leitha" bleibt "bruck leitha" und matcht korrekt NICHT.
+  // a/d fängt ÖBB-Kurzformen wie "Kirchdorf a.d.Krems".
+  s = s.replace(/(^|\s)(an|am|im|in|ob|bei|der|dem|a|d)(?=\s|$)/g,' ');
+  // ÖBB-Bundesland-Suffix (nach Umlaut-Fold: nö→no, oö→oo)
+  s = s.replace(/(^|\s)(no|noe|oo|ooe)(?=\s|$)/g,' ');
+  s = s.replace(/[^a-z0-9 ]/g,'');
+  return s.replace(/\s+/g,' ').trim();
 }
 const FV_AT_SET = new Set(FV_AT_STATIONS.map(normFvName));
 
@@ -7752,7 +7766,15 @@ async function performSearch(query) {
     // 2) nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben,
     //    z.B. Graz Hbf vor Graz Don Bosco).
     if (selectedNetwork === 'WESTBAHN') {
-      results = results.filter(s => FV_AT_SET.has(normFvName(s.name)));
+      // Whitelist + Dedupe: derselbe Bahnhof kommt aus der Suche unter mehreren Ids
+      // (Cluster- + Hafas-Id, "Amstetten NÖ" 2x) → pro normalisiertem Namen nur einer.
+      const seenFv = new Set();
+      results = results.filter(s => {
+        const k = normFvName(s.name);
+        if (!FV_AT_SET.has(k) || seenFv.has(k)) return false;
+        seenFv.add(k);
+        return true;
+      });
       const haveNorms = new Set(results.map(s => normFvName(s.name)));
       // Whitelist-Bahnhöfe, die zur Eingabe passen, aber wegen Trainboard-Ranking
       // fehlen (z.B. „Wien Meidling", „Wien Westbahnhof" bei Suche „Wien") → gezielt nachladen.
@@ -7845,82 +7867,16 @@ async function searchViaProxy(network, query) {
   }));
 }
 
-// Whitelist der österreichischen Fernverkehrsbahnhöfe (Quelle: Wikipedia "Liste der
-// Fernverkehrsbahnhöfe in Österreich", Stand 2026-07). Der FV-Wizard zeigt in der
-// Von-Suche NUR diese — die Trainboard-/at-Suche etikettiert sonst auch Stadtbus-Halte
-// als "train station" (der frühere HAFAS-"Fernverkehr"-Tag existiert nicht mehr).
-const FV_BAHNHOEFE = [
-  // Burgenland
-  'Jennersdorf',
-  // Kärnten
-  'Annenheim','Feldkirchen in Kärnten','Friesach','Greifenburg-Weißensee','Kappel am Krappfeld',
-  'Klagenfurt Annabichl','Klagenfurt Hbf','Krumpendorf','Kühnsdorf-Klopeiner See','Launsdorf-Hochosterwitz',
-  'Mallnitz-Obervellach','Micheldorf-Hirt','Oberdrauburg','Ossiach-Bodensdorf','Passering',
-  'Pörtschach am Wörthersee','Spittal-Millstättersee','Sattendorf','Steindorf am Ossiacher See',
-  'St. Georgen am Längsee','St. Paul im Lavanttal','St. Urban am Ossiachersee','St. Veit an der Glan',
-  'Treibach-Althofen','Velden am Wörthersee','Villach Hbf',
-  // Niederösterreich
-  'Amstetten','Flughafen Wien','Semmering','St. Pölten Hbf','St. Valentin','Tullnerfeld',
-  'Ulmerfeld-Hausmening','Waidhofen an der Ybbs','Wiener Neustadt Hbf',
-  // Oberösterreich
-  'Altmünster','Attnang-Puchheim','Bad Ischl','Bad Goisern','Ebensee','Freistadt','Gmunden','Hallstatt',
-  'Hinterstoder','Kefermarkt','Kirchdorf an der Krems','Klaus','Kleinreifling','Kremsmünster',
-  'Lasberg-St. Oswald','Linz Hbf','Micheldorf','Neuhofen an der Krems','Obertraun-Dachsteinhöhlen',
-  'Pregarten','Rohr-Bad Hall','Roßleithen','Schärding','Spital am Pyhrn','Steeg-Gosau','Summerau',
-  'Traun','Vöcklabruck','Wels Hbf','Weyer','Windischgarsten',
-  // Salzburg
-  'Altenmarkt im Pongau','Bad Gastein','Bad Hofgastein','Bischofshofen','Bruck-Fusch','Dorfgastein',
-  'Eben im Pongau','Golling-Abtenau','Gries im Pinzgau','Hallein','Kuchl','Lend','Maishofen-Saalbach',
-  'Neumarkt am Wallersee','Puch Urstein','Radstadt','Saalfelden','Salzburg Hbf','Salzburg Süd',
-  'Schwarzach-St. Veit','St. Johann im Pongau','Taxenbach-Rauris','Werfen','Zell am See',
-  // Steiermark
-  'Admont','Bad Aussee','Bad Mitterndorf','Bad Mitterndorf-Heilbrunn','Bruck an der Mur','Ehrenhausen',
-  'Fehring','Feldbach','Frohnleiten','Gleisdorf','Graz Don Bosco','Graz Hbf','Graz Liebenau-Murpark',
-  'Graz Ostbahnhof-Messe','Graz Puntigam','Gröbming','Gstatterboden im Nationalpark','Haus','Hieflau',
-  'Johnsbach im Nationalpark','Judenburg','Kaindorf an der Sulm','Kainisch','Kapfenberg','Knittelfeld',
-  'Laßnitzhöhe','Leibnitz','Leoben Hbf','Liezen','Mariahof-St. Lambrecht','Mürzzuschlag',
-  'Neumarkt in Steiermark','Öblarn','Raaba','Scheifling','Schladming','Selzthal','Spielfeld-Straß',
-  'St. Georgen ob Judenburg','St. Michael','Stadt Rottenmann','Stainach-Irdning','Studenzen-Fladnitz',
-  'Tauplitz','Thalheim-Pöls','Weißenbach-St.Gallen','Weststeiermark','Unzmarkt',
-  // Tirol
-  'Fieberbrunn','Hochfilzen','Hopfgarten Berglift','Imst-Pitztal','Innsbruck Hbf','Jenbach',
-  'Kirchberg in Tirol','Kitzbühel','Kitzbühel Hahnenkamm','Kufstein','Landeck-Zams','Lienz','Ötztal',
-  'St. Anton am Arlberg','St. Johann in Tirol','Telfs-Pfaffenhofen','Westendorf','Wörgl Hbf',
-  // Vorarlberg
-  'Altach','Bludenz','Bregenz','Dornbirn','Feldkirch','Frastanz','Götzis','Hohenems',
-  'Langen am Arlberg','Nenzing','Rankweil','Riedenburg',
-  // Wien
-  'Wien Hbf','Wien Hütteldorf','Wien Meidling','Wien Westbf'
-];
-// Normalisierung für den Whitelist-Abgleich: ÖBB kürzt ab ("Wr.Neustadt Hbf",
-// "Bruck/Mur", "Amstetten NÖ"), Wikipedia schreibt aus ("Wiener Neustadt Hbf",
-// "Bruck an der Mur", "Amstetten"). Präpositions-Tails werden gekappt, damit
-// Slash- und Langform aufeinander matchen.
-function normFvBahnhof(n) {
-  let s = String(n || '').toLowerCase();
-  s = s.replace(/\([^)]*\)/g, ' ');                                       // "(VIE)"
-  s = s.replace(/\bwr\.\s*/g, 'wiener ');                                 // Wr.Neustadt
-  s = s.replace(/hauptbahnhof/g, 'hbf').replace(/westbahnhof/g, 'westbf').replace(/ostbahnhof/g, 'ostbf');
-  s = s.replace(/ß/g, 'ss');
-  s = s.replace(/[.\-\/]/g, ' ');                                         // St. / Bindestrich / Slash ("Bruck/Mur" → "bruck mur")
-  // Präpositions-WÖRTER droppen (kein Tail-Cut!): "bruck an der mur" UND "bruck mur"
-  // normalisieren beide auf "bruck mur" — "Bruck/Leitha" bleibt "bruck leitha" und
-  // matcht damit korrekt NICHT. a/d fängt ÖBB-Kurzformen wie "Kirchdorf a.d.Krems".
-  s = s.replace(/(^|\s)(an|am|im|in|ob|bei|der|dem|a|d)(?=\s|$)/g, ' ');
-  s = s.replace(/(^|\s)(nö|noe|oö|ooe)(?=\s|$)/g, ' ');                   // ÖBB-Bundesland-Suffix (\b greift bei ö nicht!)
-  return s.replace(/\s+/g, ' ').trim();
-}
-const FV_BAHNHOEFE_NORM = new Set(FV_BAHNHOEFE.map(normFvBahnhof));
-
 function displaySearchResults(results) {
-  // Point-to-Point (ÖBB Fernverkehr): nur echte Fernverkehrsbahnhöfe anbieten
-  // (Whitelist oben). Duplikate (Cluster- + Hafas-Id mit gleichem Namen) einmal zeigen.
+  // Point-to-Point (ÖBB Fernverkehr, falls je wieder aktiviert): gleiche FV-Whitelist
+  // wie der WESTBAHN-Von→Nach-Wizard (FV_AT_STATIONS + normFvName, siehe performSearch).
+  // Duplikate (Cluster- + Hafas-Id mit gleichem Namen) einmal zeigen.
   let filtered = results;
   if (NETWORKS[selectedNetwork]?.isPointToPoint) {
     const seenNames = new Set();
     filtered = results.filter(r => {
-      const key = normFvBahnhof(r.name);
-      if (!FV_BAHNHOEFE_NORM.has(key) || seenNames.has(key)) return false;
+      const key = normFvName(r.name);
+      if (!FV_AT_SET.has(key) || seenNames.has(key)) return false;
       seenNames.add(key);
       return true;
     });
