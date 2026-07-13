@@ -13283,6 +13283,23 @@ function openCustomDisplayWizard(target) {
   fcCreateDisplay();
 }
 
+// ftColorSelect (verstecktes Kompatibilitäts-Select) hat nur die Standard-Typen als
+// Optionen — Eigene Displays (101+) fehlen. Ein value ohne passende Option wird vom
+// Browser zu '' verworfen → alles fiele auf Wiener Linien (1) zurück. Daher fehlende
+// Option vor dem Setzen anlegen (Reload-Bug: "Eigenes Display 2" wurde nicht restauriert).
+function setFtColorSelectValue(v) {
+  var colSel = document.getElementById('ftColorSelect');
+  if (!colSel) return;
+  v = String(v == null ? '' : v);
+  if (v && v.indexOf(',') < 0 && !colSel.querySelector('option[value="' + v + '"]')) {
+    var opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = (typeof ftDisplayName === 'function') ? ftDisplayName(parseInt(v)) : v;
+    colSel.appendChild(opt);
+  }
+  colSel.value = v;
+}
+
 // Kompakt-Einzelwähler füllen (verfügbare Display-Typen) + aktuellen Wert markieren.
 function populateKompaktDisplay() {
   var sel = document.getElementById('ftKompaktDisplay');
@@ -13294,7 +13311,7 @@ function populateKompaktDisplay() {
     cur = String(stationDisplayColour(stations[0]));
   }
   sel.innerHTML = displayTypeOptionsHtml(cur);
-  if (colSel.value !== sel.value) colSel.value = sel.value;  // ftColorSelect synchron halten
+  if (colSel.value !== sel.value) setFtColorSelectValue(sel.value);  // ftColorSelect synchron halten
 }
 
 // Kompakt-Wähler geändert → den einen Display-Typ (ftColorSelect) setzen.
@@ -13304,8 +13321,7 @@ function ftSetKompaktDisplay(val) {
     openCustomDisplayWizard({ type: 'kompakt' });
     return;
   }
-  var colSel = document.getElementById('ftColorSelect');
-  if (colSel) colSel.value = val;
+  setFtColorSelectValue(val);
   renderDisplayTypeSections();
 }
 
@@ -15241,7 +15257,10 @@ async function initFinetuningStep() {
 
   // Display-Typ für Hidden Select (Kompatibilität)
   var colourForSelect = config.multiDisplay ? (config.colourSingle || config.colour) : config.colour;
-  document.getElementById('ftColorSelect').value = colourForSelect;
+  // setFtColorSelectValue statt direkt .value: Eigene Displays (101+) haben keine
+  // statische Option im versteckten Select — direktes Setzen würde zu '' verworfen
+  // und alles fiele beim Reload auf Wiener Linien zurück.
+  setFtColorSelectValue(colourForSelect);
 
   // Kompakt/Spielerisch nur bei 2+ verschiedenen DISPLAY-TYPEN (colours) sinnvoll, NICHT Netzen:
   // ÖBB Regio + ÖBB FV sind 2 Netze, aber dieselbe ÖBB-Optik (colour 12) → keine Stil-Wahl nötig.
