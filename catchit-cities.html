@@ -14023,6 +14023,9 @@ function fcOpenWizard(cid, opts) {
   h += '<div id="fcBadgeFields_' + cid + '" style="display:' + (fcA === '1' ? '' : 'none') + ';">';
   h += fcColorFieldHtml(['H', 'Badge-Hintergrund', _errHV]);
   h += fcColorFieldHtml(['V', 'Badge-Text', _errHV]);
+  // Umrandung darf gleich dem Badge-Hintergrund sein (= unsichtbar, der Default) →
+  // bewusst KEINE Konflikt-Validierung (kein FC_COLOR_PAIRS-Eintrag).
+  h += fcColorFieldHtml(['U', 'Badge-Umrandung', '']);
   h += '</div>';
   var fcG = fcStyleVal(cid, 'G');
   h += '<div class="form-row"><div><div class="form-label">Hintergrund</div><div class="form-hint">Pixel = LED-Matrix-Optik mit Punktraster</div></div>';
@@ -14584,10 +14587,9 @@ function renderDisplayTypeSections() {
     html += '</div>';   // .config-card
   });
 
-  // Eigenes Display erstellen (öffnet den Design-Wizard) — solange ein Slot (c1-c3) frei ist
-  if (fcFreeSlot()) {
-    html += '<button onclick="fcCreateDisplay()" style="width:100%;padding:14px;background:rgba(123,31,162,0.06);border:1px dashed rgba(123,31,162,0.5);border-radius:12px;color:#7b1fa2;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">+ Eigenes Display erstellen</button>';
-  }
+  // "+ Eigenes Display erstellen"-Button entfernt (Paul 2026-07-13): Erstellen läuft
+  // jetzt über den gleichnamigen Eintrag in JEDEM Display-Typ-Dropdown
+  // (displayTypeOptionsHtml → openCustomDisplayWizard) — der Button war doppelt.
 
   container.innerHTML = html;
 
