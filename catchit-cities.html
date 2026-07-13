@@ -13175,8 +13175,10 @@ function renderDisplayTypeSections() {
     html += '<div class="ft-display-body" style="display:' + (openByDefault ? 'block' : 'none') + ';">';
     // Stationen mit Netzwerk-Herkunft auflisten
     dt.stations.forEach(function(s) {
-      var snc = NETWORK_COLORS[s.network];
-      var netName = snc ? snc.name : s.network;
+      // NETZWERK-Name zeigen ("Nahverkehr Bayern"), NICHT NETWORK_COLORS[..].name — das ist
+      // der Default-DISPLAY-TYP des Netzes ("Paper White") und stand verwirrend neben
+      // Stationen, die manuell einem anderen Design zugeordnet waren (Kunde 2026-07-13, Pkt 5).
+      var netName = (NETWORKS[s.network] && NETWORKS[s.network].name) || s.network;
       var lines = s.filter ? s.filter.split(',').slice(0, 3).join(', ') : '';
       if (s.filter && s.filter.split(',').length > 3) lines += ' ...';
       html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0;">';
@@ -14178,8 +14180,9 @@ async function initFinetuningStep() {
 
   // Nachtmodus
   setFtToggle('ftNightModeToggle', config.nightMode);
-  document.getElementById('ftNightStart').value = config.nightStart || 22;
-  document.getElementById('ftNightEnd').value = config.nightEnd || 6;
+  // ?? statt ||: 0 Uhr ist ein gueltiger Wert (Kunde 2026-07-13, Nachtmodus ab Mitternacht)
+  document.getElementById('ftNightStart').value = (config.nightStart ?? 22);
+  document.getElementById('ftNightEnd').value = (config.nightEnd ?? 6);
   updateNightTimeVisibility();
 
   // Fun Messages
@@ -16535,8 +16538,11 @@ function saveFromFinetuning() {
 
   const displayLight = getFtBrightness();
   const nightMode = isFtToggleActive('ftNightModeToggle');
-  const nightStart = parseInt(document.getElementById('ftNightStart').value) || 22;
-  const nightEnd = parseInt(document.getElementById('ftNightEnd').value) || 6;
+  // isNaN-Check statt ||: 0 Uhr ist gueltig (parseInt('0')||22 wurde faelschlich 22)
+  const _ns = parseInt(document.getElementById('ftNightStart').value, 10);
+  const _ne = parseInt(document.getElementById('ftNightEnd').value, 10);
+  const nightStart = isNaN(_ns) ? 22 : _ns;
+  const nightEnd = isNaN(_ne) ? 6 : _ne;
   const showFunMessages = isFtToggleActive('ftFunMessagesToggle');
   // sortMode already declared above from per-display-type sections
   const rowOrder = getRowOrderString();  // Einfach für Wien
@@ -17260,6 +17266,20 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     });
   }
 
+  // Display-Typ (colour) PRO rbl aus der masterrow (|cNN-Feld) — Round-Trip der manuellen
+  // Design-Zuordnung. Ohne das fiel JEDE Station beim erneuten Öffnen auf den Netz-Default
+  // zurück (Kunde 2026-07-13: zweite Station stand immer wieder auf "Paper White", die
+  // manuelle Zuordnung musste bei jedem Öffnen neu getätigt werden).
+  const colourByRbl = {};
+  if (masterRowStr) {
+    String(masterRowStr).split(';').forEach(seg => {
+      seg = seg.trim(); if (!seg) return;
+      const segRbl = (seg.split('|')[0] || '').trim();
+      const cm = seg.match(/\|c(\d+)/);
+      if (segRbl && cm) colourByRbl[segRbl] = parseInt(cm[1], 10);
+    });
+  }
+
   // Parse linefilterdestination ODER roworderdestination (beide haben gleiches Format)
   // roworderdestination hat Priorität für Wien (enthält die Richtungen)
   // Format kann sein: "1:Auwiesen,2:solarCity" oder mit Gruppen "1:Auwiesen+2:solarCity,3:xyz"
@@ -17386,6 +17406,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       allDepCat: reloadAllCat,   // ÖBB "Alle Abfahrten"-Gattung (all/reg/fern), aus dem Prefix
       directions: []  // Wird unten befüllt (außer bei "Alle Abfahrten" → bleibt leer)
     };
+    // Gespeicherten Display-Typ (|cNN aus der masterrow) als Zuordnung wiederherstellen —
+    // exakter Round-Trip statt Netz-Default (siehe colourByRbl oben).
+    if (colourByRbl[part] != null) station.colourOverride = colourByRbl[part];
 
     // DBALL/DBSTEIG: der rbl kodiert die Auswahl (Gattung/Steig/Linie nach '!', alt ':').
     // Beim Reload steht in der masterrow "…|*|" → ohne dieses Handling läse der Konfigurator
@@ -17791,10 +17814,10 @@ async function handleConfigMessage(data) {
       recommendedConfig.nightMode = data.config.night_mode_enabled;
     }
     if (data.config.night_mode_start !== undefined) {
-      recommendedConfig.nightStart = parseInt(data.config.night_mode_start) || 22;
+      { const v = parseInt(data.config.night_mode_start, 10); recommendedConfig.nightStart = isNaN(v) ? 22 : v; }  // 0 Uhr gueltig
     }
     if (data.config.night_mode_end !== undefined) {
-      recommendedConfig.nightEnd = parseInt(data.config.night_mode_end) || 6;
+      { const v = parseInt(data.config.night_mode_end, 10); recommendedConfig.nightEnd = isNaN(v) ? 6 : v; }  // 0 Uhr gueltig
     }
     if (data.config.show_fun_messages !== undefined) {
       recommendedConfig.showFunMessages = data.config.show_fun_messages;
