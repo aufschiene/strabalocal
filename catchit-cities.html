@@ -295,6 +295,20 @@
       line-height: 1;
     }
     
+    /* PRO-Badge (z.B. "Nach Städten gruppieren") */
+    .pro-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #6a3df5, #b03df5);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      vertical-align: 2px;
+      margin-left: 6px;
+    }
+
     /* Network Brand Colors */
     .network-badge {
       display: inline-block;
@@ -3491,8 +3505,10 @@
       <p>Passe dein Display individuell an</p>
     </div>
 
-    <!-- Display Preview -->
-    <div class="preview-container">
+    <!-- Display Preview: AUSGEBLENDET (Paul 2026-07-13, war meistens nur schwarz).
+         Element bleibt im DOM, weil updateFinetuningPreview/ftFocusPreview hineinschreiben —
+         nur nicht mehr sichtbar. Bei Bedarf display:none entfernen. -->
+    <div class="preview-container" style="display:none;">
       <div class="preview-display" id="finetuningPreview">
         <!-- Wird dynamisch gefüllt -->
       </div>
@@ -3555,6 +3571,22 @@
           <!-- Dynamisch: pro Station ein Dropdown -->
         </div>
       </div>
+      <!-- Nach Städten gruppieren (PRO): Stationen derselben Stadt/desselben Netzes teilen
+           sich EIN Display (ein masterrow-Segment mit komma-gejointen rbls). Braucht
+           Firmware >= 2.3.18 (?fw= in der iframe-URL), sonst ausgegraut. -->
+      <div class="form-row" id="ftGroupByCityRow" style="display:none;">
+        <div>
+          <div class="form-label">Nach Städten gruppieren<span class="pro-badge">PRO</span></div>
+          <div class="form-hint" id="ftGroupByCityHint">Stationen derselben Stadt teilen sich ein Display</div>
+        </div>
+        <div class="toggle-switch active" id="ftGroupByCityToggle" onclick="toggleGroupByCity()"></div>
+      </div>
+      <!-- Toggle AN (Spielerisch): ein Typ-Dropdown pro Stadt/Provider.
+           Toggle AUS: Zuordnungs-Wizard Station → Display-Instanz (eigene Slideshow-Seite). -->
+      <div id="ftInstanceAssignment" style="display:none; margin-top:12px;">
+        <div class="form-hint" id="ftInstanceIntroHint" style="margin-bottom:8px;"></div>
+        <div id="ftInstanceList"></div>
+      </div>
     </div>
 
     <!-- 2. Pro-Display-Sektionen (dynamisch, zum Aufklappen) -->
@@ -3587,7 +3619,7 @@
       <div class="form-row">
         <div>
           <div class="form-label">Nachtmodus aktivieren</div>
-          <div class="form-hint">Display nachts dimmen</div>
+          <div class="form-hint">Display nachts ausschalten</div>
         </div>
         <div class="toggle-switch" id="ftNightModeToggle" onclick="toggleFtSwitch('ftNightModeToggle'); updateNightTimeVisibility()"></div>
       </div>
@@ -6336,7 +6368,18 @@ var WIZARD_STEPS = [
       for (var i = 0; i < stations.length; i++) {
         cols[(typeof stationDisplayColour === 'function') ? stationDisplayColour(stations[i]) : (stations[i].network || '')] = true;
       }
-      return Object.keys(cols).length >= 2;
+      if (Object.keys(cols).length < 2) return false;
+      // Mit „Nach Städten gruppieren" (fw>=2.3.18, Toggle AN) teilen sich Stationen
+      // derselben Stadt EIN Display — die Gemischt/Durchwechseln-Frage stellt sich dann
+      // NUR noch, wenn Stationen aus VERSCHIEDENEN Städten (Netzen) dabei sind.
+      if (typeof groupByCityActive === 'function' && groupByCityActive()) {
+        var nets = {};
+        for (var j = 0; j < stations.length; j++) {
+          nets[stations[j].network || ''] = true;
+        }
+        if (Object.keys(nets).length < 2) return false;
+      }
+      return true;
     },
     validate: function() { return !!getSavedDisplayStyle(); }
   },
@@ -6410,9 +6453,19 @@ function gehwegGroupValue(group) {
 // Setzt den Wert auf ALLE Stop-IDs einer Gruppe.
 function setGehwegGroupValue(stopIdsCsv, val) {
   val = parseInt(val || '0', 10) || 0;
+  // Gehweg-Maximum 15 min: größere Eingaben automatisch auf 15 korrigieren (Paul 2026-07-13).
+  // Zentral hier geklemmt — ALLE Pfade (Wizard-onchange, Feintuning, DOM-Sweep beim Save)
+  // laufen über diese Funktion. Sichtbare Eingabefelder gleich mitkorrigieren.
+  if (val > 15) val = 15;
+  if (val < 0) val = 0;
   String(stopIdsCsv).split(',').forEach(function(sid) {
     sid = sid.trim(); if (sid) gehwegByStopIdState[sid] = val;
   });
+  try {
+    document.querySelectorAll('input[data-stopids]').forEach(function(inp) {
+      if (inp.dataset.stopids === String(stopIdsCsv) && parseInt(inp.value, 10) !== val) inp.value = val;
+    });
+  } catch (e) {}
 }
 
 function getActiveWizardSteps() {
@@ -7633,6 +7686,31 @@ function normFvName(s) {
   return s.replace(/\s+/g,' ').trim();
 }
 const FV_AT_SET = new Set(FV_AT_STATIONS.map(normFvName));
+// Whitelist-Abgleich mit Toleranz: exakter Norm-Treffer ODER Token-Teilmenge mit max.
+// 1 Wort Unterschied. Nötig, weil ÖBB und Wikipedia Namens-Zusätze unterschiedlich
+// führen: "Linz/Donau Hbf" (ÖBB) vs "Linz Hbf" (Liste, 2026-07-13 nicht auffindbar),
+// "Haus im Ennstal" vs "Haus". Rückgabe: der WHITELIST-Key (für Dedup — ÖBB- und
+// Wiki-Variante derselben Station landen auf demselben Key) oder null.
+const FV_AT_KEYS = FV_AT_STATIONS.map(function(n) {
+  const k = normFvName(n);
+  return { key: k, toks: k.split(' ').filter(Boolean) };
+});
+function fvWhitelistKey(name) {
+  const k = normFvName(name);
+  if (FV_AT_SET.has(k)) return k;
+  const toks = k.split(' ').filter(Boolean);
+  if (!toks.length) return null;
+  for (let i = 0; i < FV_AT_KEYS.length; i++) {
+    const w = FV_AT_KEYS[i];
+    const small = toks.length <= w.toks.length ? toks : w.toks;
+    const big = toks.length <= w.toks.length ? w.toks : toks;
+    if (big.length - small.length > 1) continue;
+    let ok = true;
+    for (let t = 0; t < small.length; t++) { if (big.indexOf(small[t]) < 0) { ok = false; break; } }
+    if (ok) return w.key;
+  }
+  return null;
+}
 
 // Score = Anzahl verschiedener Fernverkehr-Zugtypen, die an der Station halten
 // (D, EC, EN, IC, ICE, IR, NJ, RJ, RJX, WB). Mehr Typen = wichtigerer Halt → weiter
@@ -7766,16 +7844,16 @@ async function performSearch(query) {
     // 2) nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben,
     //    z.B. Graz Hbf vor Graz Don Bosco).
     if (selectedNetwork === 'WESTBAHN') {
-      // Whitelist + Dedupe: derselbe Bahnhof kommt aus der Suche unter mehreren Ids
-      // (Cluster- + Hafas-Id, "Amstetten NÖ" 2x) → pro normalisiertem Namen nur einer.
+      // Whitelist (tolerant: "Linz/Donau Hbf" ↔ "Linz Hbf") + Dedupe: derselbe Bahnhof
+      // kommt aus der Suche unter mehreren Ids/Namensvarianten → pro WHITELIST-Key nur einer.
       const seenFv = new Set();
       results = results.filter(s => {
-        const k = normFvName(s.name);
-        if (!FV_AT_SET.has(k) || seenFv.has(k)) return false;
+        const k = fvWhitelistKey(s.name);
+        if (!k || seenFv.has(k)) return false;
         seenFv.add(k);
         return true;
       });
-      const haveNorms = new Set(results.map(s => normFvName(s.name)));
+      const haveNorms = new Set(results.map(s => fvWhitelistKey(s.name)).filter(Boolean));
       // Whitelist-Bahnhöfe, die zur Eingabe passen, aber wegen Trainboard-Ranking
       // fehlen (z.B. „Wien Meidling", „Wien Westbahnhof" bei Suche „Wien") → gezielt nachladen.
       const ql = query.toLowerCase();
@@ -7786,13 +7864,15 @@ async function performSearch(query) {
         if (match === undefined) {                   // noch nie aufgelöst
           try {
             const extra = await searchViaProxy(selectedNetwork, name);
-            match = extra.find(e => normFvName(e.name) === nk) || null;
+            // Tolerant matchen: ÖBB-Suchtreffer heißt oft anders als der Listen-Name
+            // ("Linz/Donau Hbf" für "Linz Hbf") → fvWhitelistKey statt Norm-Gleichheit.
+            match = extra.find(e => fvWhitelistKey(e.name) === nk) || null;
           } catch (e) { match = null; }
           FV_HUB_CACHE.set(nk, match);
         }
-        if (match && !haveNorms.has(normFvName(match.name))) {
+        if (match && !haveNorms.has(fvWhitelistKey(match.name))) {
           results.push(match);
-          haveNorms.add(normFvName(match.name));
+          haveNorms.add(fvWhitelistKey(match.name));
         }
       }
       // nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben). NUR die Top 8
@@ -7875,8 +7955,8 @@ function displaySearchResults(results) {
   if (NETWORKS[selectedNetwork]?.isPointToPoint) {
     const seenNames = new Set();
     filtered = results.filter(r => {
-      const key = normFvName(r.name);
-      if (!FV_AT_SET.has(key) || seenNames.has(key)) return false;
+      const key = fvWhitelistKey(r.name);   // tolerant ("Linz/Donau Hbf" ↔ "Linz Hbf")
+      if (!key || seenNames.has(key)) return false;
       seenNames.add(key);
       return true;
     });
@@ -12319,7 +12399,10 @@ function updateRealisticPreview(config) {
       text: '#222222',
       highlight: '#888888',
       name: 'Paper White'
-    }
+    },
+    101: { bg: '#' + fcVal(101, 'B'), text: '#' + fcVal(101, 'T'), highlight: '#' + fcVal(101, 'H'), name: 'Eigenes Display 1' },
+    102: { bg: '#' + fcVal(102, 'B'), text: '#' + fcVal(102, 'T'), highlight: '#' + fcVal(102, 'H'), name: 'Eigenes Display 2' },
+    103: { bg: '#' + fcVal(103, 'B'), text: '#' + fcVal(103, 'T'), highlight: '#' + fcVal(103, 'H'), name: 'Eigenes Display 3' }
   };
 
   const style = displayStyles[colour] || displayStyles[1];
@@ -12871,7 +12954,12 @@ const DISPLAY_TYPE_FEATURES = {
   21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, fontExt: true, name: 'Schwarz/Weiß Matrix', offline: true },
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, arrival: true, name: 'MVG' },
   23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, delayHighlight: true, name: 'Matrix' },
-  24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' }
+  24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' },
+  // Eigene Displays (Custom): colour 101-103 = customrow-Slot c1-c3. Frei gestaltbares
+  // Bodo-Layout (Farben, Hintergrund Simpel/Pixel, Schriftart, Badge-Farben pro Linie, Name).
+  101: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, name: 'Eigenes Display 1' },
+  102: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, name: 'Eigenes Display 2' },
+  103: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, name: 'Eigenes Display 3' }
 };
 
 // Display-Typen die einen Schriftgrößen-Toggle haben (Graz auch)
@@ -12887,6 +12975,278 @@ let ftRowsByCid = {};       // cid -> gewählte Zeilenzahl
 let ftFontModeByCid = {};   // cid -> 'big' | 'small'
 let ftFontExtByCid = {};    // cid -> '0' (DACH) | '1' (CZ+HU) — Matrix-Schriftart
 
+// ==================== NACH STÄDTEN GRUPPIEREN (PRO) + DISPLAY-INSTANZEN ====================
+// ftGroupByCity AN (Default): Stationen derselben Stadt/desselben Netzes teilen sich EIN
+// Display = EIN masterrow-Segment mit komma-gejointen rbls ("BAYERN:a,BAYERN:b|<lines>|c24|g0"),
+// wie Wien ("4131,4136"). AUS: Zuordnungs-Wizard — jede Station wird einer eigenen
+// Display-INSTANZ (= eigene Slideshow-Seite) zugeordnet, ausdrücklich auch mehrere
+// Instanzen desselben Typs. Instanz = Gruppe von Stationen = ein masterrow-Segment.
+// VERSIONS-GATE: merged Segmente NUR bei Firmware >= 2.3.18 (?fw= in der iframe-URL) —
+// erst dort strippt parseMasterRowInto Netz-Prefixe pro Komma-Token und mappt
+// getFilterForRbl segment-bewusst. Ohne/älteres fw: Toggle ausgegraut, altes Verhalten
+// (ein Segment pro Station). Wien (WL, bare-numerische rbls) bleibt unangetastet.
+let ftGroupByCity = true;
+let _nextInstanceId = 1;
+
+var MERGED_SEGMENTS_MIN_FW = '2.3.18';
+
+function fwVersionParam() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    return (params.get('fw') || '').trim();
+  } catch (e) { return ''; }
+}
+
+// Numerischer Segment-Vergleich ("2.3.18" vs. "2.3.9" → 18 > 9, kein String-Vergleich).
+// Fehlende Segmente zählen als 0; ohne fw-Param immer false.
+function fwAtLeast(minVer) {
+  var cur = fwVersionParam();
+  if (!cur) return false;
+  var a = String(cur).split('.').map(function(x) { return parseInt(x, 10) || 0; });
+  var b = String(minVer).split('.').map(function(x) { return parseInt(x, 10) || 0; });
+  for (var i = 0; i < Math.max(a.length, b.length); i++) {
+    var av = a[i] || 0, bv = b[i] || 0;
+    if (av !== bv) return av > bv;
+  }
+  return true;
+}
+
+function mergedSegmentsSupported() {
+  // Paul 2026-07-13: Versions-Gate entfernt — das Feature ist für ALLE verfügbar.
+  // Wer eine ältere Firmware hat, sieht am Gerät ohnehin den Update-Hinweis.
+  // (?fw= schickt das Gerät weiter mit; fwAtLeast/fwVersionParam bleiben für
+  // künftige Gates erhalten, werden hier aber nicht mehr ausgewertet.)
+  return true;
+}
+
+// Stadt-Gruppenschlüssel einer Station: gleiche Stadt/gleiches Netz + gleicher Display-Typ
+// = ein gemeinsames Display. Wien (WL/WLB) bleibt außen vor (war schon immer merged),
+// "Alle Abfahrten"-Bretter und von→nach-Journeys behalten IMMER ihr eigenes Segment.
+function cityGroupKeyOf(s) {
+  if (!s || s.network === 'WL' || s.network === 'WLB') return null;
+  if (s.allDepartures || s.isJourney) return null;
+  return (s.network || '') + '/' + stationDisplayColour(s);
+}
+
+// Gruppieren AN + Gate erfüllt → merged Stadt-Segmente. Gate nicht erfüllt → false
+// (altes Verhalten, ein Segment pro Station).
+function groupByCityActive() {
+  return mergedSegmentsSupported() && ftGroupByCity !== false;
+}
+// Instanz-Modus (Toggle AUS, Gate erfüllt): Station → eigene Display-Instanz.
+function instanceModeActive() {
+  return mergedSegmentsSupported() && ftGroupByCity === false;
+}
+
+// Instanz-Id jeder Station sicherstellen (Default: jede Station ihr eigenes Display).
+function ensureInstanceIds() {
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    if (s.displayInstance == null) s.displayInstance = _nextInstanceId++;
+    else if (s.displayInstance >= _nextInstanceId) _nextInstanceId = s.displayInstance + 1;
+  });
+}
+
+// Display-Instanzen in Reihenfolge des Auftretens: [{ id, colour, stations, fixed }].
+// Wien (WL/WLB) bleibt vom Segment-Merging unangetastet — alle Wien-Bahnsteige landen
+// in EINER fixen Box ("wien"), die Zuordnung hätte auf die masterrow keinen Effekt.
+function getDisplayInstances() {
+  ensureInstanceIds();
+  var order = [], byId = {};
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    var isWien = (s.network === 'WL' || s.network === 'WLB');
+    var id = isWien ? 'wien' : s.displayInstance;
+    if (!byId[id]) { byId[id] = { id: id, colour: stationDisplayColour(s), stations: [], fixed: isWien }; order.push(byId[id]); }
+    byId[id].stations.push(s);
+  });
+  return order;
+}
+
+function toggleGroupByCity() {
+  if (!mergedSegmentsSupported()) return;  // ausgegraut: Firmware-Update nötig
+  ftGroupByCity = !ftGroupByCity;
+  if (!ftGroupByCity) ensureInstanceIds();
+  // updateStyleAssignmentUI (statt nur updateGroupByCityUI): blendet auch den
+  // Kompakt-Einzelwähler aus/ein und ruft updateGroupByCityUI am Ende selbst.
+  updateStyleAssignmentUI();
+  renderDisplayTypeSections();
+}
+
+// Toggle-Row + Zuordnungs-Wizard sichtbar/gesperrt halten. Bei <2 Stationen ausblenden
+// (nichts zu gruppieren); ohne fw>=2.3.18 ausgegraut mit Hinweis "Firmware-Update nötig".
+function updateGroupByCityUI() {
+  var row = document.getElementById('ftGroupByCityRow');
+  var tgl = document.getElementById('ftGroupByCityToggle');
+  var hint = document.getElementById('ftGroupByCityHint');
+  var assign = document.getElementById('ftInstanceAssignment');
+  if (!row || !tgl) return;
+  var multi = (typeof stations !== 'undefined' && stations.length >= 2);
+  row.style.display = multi ? '' : 'none';
+  if (assign) assign.style.display = 'none';
+  if (!multi) return;
+  if (!mergedSegmentsSupported()) {
+    ftGroupByCity = true;  // altes Verhalten erzwingen (ein Segment pro Station)
+    tgl.classList.remove('active');
+    tgl.style.opacity = '0.35';
+    tgl.style.pointerEvents = 'none';
+    if (hint) hint.textContent = 'Firmware-Update nötig (ab Version 2.3.18)';
+    // Display-Typ PRO STATION geht trotzdem (per-Station c-Tokens kann auch die alte
+    // Firmware — nur das Zusammenlegen braucht 2.3.18). Liste nur zeigen, wenn nicht
+    // ohnehin die alte Zuordnungs-UI (Spielerisch: Automatisch/Manuell) sichtbar ist.
+    var introOld = document.getElementById('ftInstanceIntroHint');
+    var assignOld = document.getElementById('ftInstanceAssignment');
+    if (assignOld && (typeof ftIsMultiDisplay === 'undefined' || !ftIsMultiDisplay)) {
+      assignOld.style.display = '';
+      if (introOld) introOld.textContent = 'Display-Typ pro Haltestelle wählen:';
+      renderStationTypeListInto('ftInstanceList');
+    }
+    return;
+  }
+  tgl.style.opacity = '';
+  tgl.style.pointerEvents = '';
+  tgl.classList.toggle('active', ftGroupByCity !== false);
+  if (hint) hint.textContent = (ftGroupByCity !== false)
+    ? 'Stationen derselben Stadt teilen sich ein Display'
+    : 'Aus: jede Haltestelle bekommt ihr eigenes Display';
+  var intro = document.getElementById('ftInstanceIntroHint');
+  if (assign && ftGroupByCity === false) {
+    // Toggle AUS: Zuordnung pro STATION (Display-Instanzen).
+    assign.style.display = '';
+    if (intro) intro.textContent = 'Jede Haltestelle bekommt ihr eigenes Display (eigene Seite). Du kannst Stationen auch auf ein gemeinsames Display legen.';
+    renderStationInstanceList();
+  } else if (assign && typeof ftIsMultiDisplay !== 'undefined' && ftIsMultiDisplay) {
+    // Toggle AN + Spielerisch: ein Typ-Dropdown pro Stadt/Provider (Wien → Wiener
+    // Linien, ÖBB Regio → ÖBB …) — sichtbar und für die ganze Gruppe umstellbar.
+    assign.style.display = '';
+    if (intro) intro.textContent = 'Ein Display pro Stadt. Hier stellst du den Look jeder Stadt um.';
+    renderCityGroupList();
+  }
+}
+
+// Spielerisch + Toggle AN: EIN Typ-Dropdown pro Stadt/Provider-Gruppe. Umstellen
+// setzt den colourOverride ALLER Stationen dieser Stadt (Gruppe bleibt zusammen).
+function renderCityGroupList() {
+  var container = document.getElementById('ftInstanceList');
+  if (!container) return;
+  var order = [], byNet = {};
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    var net = s.network || '';
+    if (!byNet[net]) { byNet[net] = { net: net, colour: stationDisplayColour(s), stations: [] }; order.push(byNet[net]); }
+    byNet[net].stations.push(s);
+  });
+  var html = '';
+  order.forEach(function(grp) {
+    var netColor = colourIdToColor(grp.colour);
+    var label = (typeof NETWORKS !== 'undefined' && NETWORKS[grp.net] && NETWORKS[grp.net].name)
+                || (grp.stations[0] && grp.stations[0].networkName) || grp.net;
+    var names = grp.stations.map(function(s) { return s.stopName || ''; }).filter(Boolean).slice(0, 3).join(', ');
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0;">';
+    html += '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:' + netColor + ';flex:0 0 auto;"></span>';
+    html += '<div style="min-width:0;"><div style="font-size:13px;font-weight:600;">' + escapeHtmlFt(label) + '</div>'
+          + (names ? '<div style="font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlFt(names) + '</div>' : '')
+          + '</div>';
+    html += '<select onchange="setCityGroupColour(\'' + grp.net + '\', this.value)" style="margin-left:auto;flex:0 0 auto;padding:4px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;">';
+    html += displayTypeOptionsHtml(grp.colour);
+    html += '</select></div>';
+  });
+  container.innerHTML = html;
+}
+
+function setCityGroupColour(net, val) {
+  if (val === 'newcustom') {
+    renderCityGroupList();  // Auswahl zurücksetzen, bis der Wizard fertig ist
+    openCustomDisplayWizard({ type: 'city', net: net });
+    return;
+  }
+  var cid = parseInt(val);
+  if (isNaN(cid)) return;
+  stations.forEach(function(s) { if ((s.network || '') === net) s.colourOverride = cid; });
+  renderCityGroupList();
+  renderDisplayTypeSections();
+  if (typeof ftFocusPreview === 'function') ftFocusPreview(cid);
+}
+
+// Zuordnungs-Wizard (Toggle AUS): eine Box pro Display-INSTANZ, Stationen per Dropdown
+// verschiebbar — auch auf "+ Neues Display" (eigene Seite, gleicher Typ möglich).
+function renderStationInstanceList() {
+  var container = document.getElementById('ftInstanceList');
+  if (!container) return;
+  var insts = getDisplayInstances();
+  // Typ-Dropdown IMMER pro Instanz anbieten — auch wenn (noch) alle denselben Typ haben:
+  // genau dafür ist der Wizard da (gleiche Stadt, unterschiedliche Displays).
+  function instCid(inst) { return inst.colour; }
+  // Laufende Display-Nummern nur über verschiebbare Boxen (Wien zählt nicht mit).
+  var dispNo = {}, _no = 0;
+  insts.forEach(function(it) { if (!it.fixed) dispNo[it.id] = ++_no; });
+  var html = '';
+  insts.forEach(function(inst) {
+    var netColor = colourIdToColor(instCid(inst));
+    var title = inst.fixed ? 'Wien' : ('Display ' + dispNo[inst.id]);
+    html += '<div style="border:1px solid ' + netColor + '55;border-left:4px solid ' + netColor + ';border-radius:10px;padding:8px 12px;margin-bottom:10px;">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">';
+    html += '<span style="font-weight:700;font-size:13px;">' + escapeHtmlFt(title) + '</span>';
+    // Display-Typ der ganzen Instanz umstellen (colourOverride aller Mitglieder)
+    html += '<select onchange="setInstanceColour(\'' + inst.id + '\', this.value)" style="margin-left:auto;padding:4px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;">';
+    html += displayTypeOptionsHtml(inst.colour);
+    html += '</select>';
+    html += '</div>';
+    inst.stations.forEach(function(s) {
+      var idx = stations.indexOf(s);
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #f0f0f0;">';
+      html += '<span style="font-size:13px;font-weight:500;">' + escapeHtmlFt(s.stopName || ('Station ' + (idx + 1))) + '</span>';
+      if (!inst.fixed) {  // Wien-Bahnsteige bleiben zusammen (kein Verschieben)
+        html += '<select onchange="moveStationToInstance(' + idx + ', this.value)" style="margin-left:auto;padding:4px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;">';
+        insts.forEach(function(other) {
+          if (other.fixed) return;  // Wien-Box ist kein Ziel für andere Stationen
+          html += '<option value="' + other.id + '"' + (other.id === inst.id ? ' selected' : '') + '>Display ' + dispNo[other.id] + ' · ' + escapeHtmlFt(ftDisplayName(instCid(other))) + '</option>';
+        });
+        html += '<option value="new">+ Neues Display</option>';
+        html += '</select>';
+      }
+      html += '</div>';
+    });
+    if (inst.fixed) {
+      html += '<div class="form-hint" style="margin-top:4px;">Wien-Bahnsteige bleiben immer zusammen auf einem Display.</div>';
+    }
+    html += '</div>';
+  });
+  container.innerHTML = html;
+}
+
+function setInstanceColour(instId, val) {
+  if (val === 'newcustom') {
+    renderStationInstanceList();  // Auswahl zurücksetzen, bis der Wizard fertig ist
+    openCustomDisplayWizard({ type: 'instance', instId: instId });
+    return;
+  }
+  var cid = parseInt(val);
+  if (isNaN(cid)) return;
+  stations.forEach(function(s) {
+    var isWien = (s.network === 'WL' || s.network === 'WLB');
+    var match = (instId === 'wien') ? isWien : (!isWien && String(s.displayInstance) === String(instId));
+    if (match) s.colourOverride = cid;
+  });
+  renderStationInstanceList();
+  renderDisplayTypeSections();
+  if (typeof ftFocusPreview === 'function') ftFocusPreview(cid);
+}
+
+function moveStationToInstance(stationIdx, val) {
+  var s = stations[stationIdx];
+  if (!s) return;
+  if (val === 'new') {
+    s.displayInstance = _nextInstanceId++;
+  } else {
+    var target = parseInt(val);
+    if (isNaN(target)) return;
+    s.displayInstance = target;
+    // Ein Segment hat genau EIN colour → Typ der Ziel-Instanz übernehmen
+    var mate = stations.find(function(o) { return o !== s && o.displayInstance === target; });
+    if (mate) s.colourOverride = stationDisplayColour(mate);
+  }
+  renderStationInstanceList();
+  renderDisplayTypeSections();
+}
+
 function setFtCompactSeparate(mode) {
   var btns = document.querySelectorAll('#ftCompactSeparateToggle .toggle-btn');
   btns.forEach(function(b) { b.classList.toggle('active', b.dataset.value === mode); });
@@ -12896,6 +13256,31 @@ function setFtCompactSeparate(mode) {
   if (!ftIsMultiDisplay) ftIsManualAssignment = false;
   updateStyleAssignmentUI();
   renderDisplayTypeSections();
+}
+
+// Optionen eines Display-Typ-Dropdowns: leere „Eigenes Display"-Slots ausblenden
+// (fcSlotVisible — nur benannte/benutzte Slots erscheinen, mit eigenem Namen), am Ende
+// EIN Eintrag "+ Eigenes Display erstellen", der direkt den Design-Wizard öffnet
+// (statt leerer Slot-Einträge, deren Konfiguration weiter unten versteckt war).
+function displayTypeOptionsHtml(selectedCid) {
+  var html = '';
+  Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
+    if (DISPLAY_TYPE_FEATURES[k].offline) return;
+    if (typeof fcSlotVisible === 'function' && !fcSlotVisible(parseInt(k))) return;
+    html += '<option value="' + k + '"' + (parseInt(k) === parseInt(selectedCid) ? ' selected' : '') + '>' + escapeHtmlFt(ftDisplayName(parseInt(k))) + '</option>';
+  });
+  if (typeof fcFreeSlot === 'function' && fcFreeSlot() != null) {
+    html += '<option value="newcustom">+ Eigenes Display erstellen</option>';
+  }
+  return html;
+}
+
+// Ziel-Kontext für den Design-Wizard: wohin das neue Eigene Display nach "Fertig"
+// zugewiesen wird (kompakt | city | instance | station). Von den Dropdowns gesetzt.
+var fcWizardTarget = null;
+function openCustomDisplayWizard(target) {
+  fcWizardTarget = target || null;
+  fcCreateDisplay();
 }
 
 // Kompakt-Einzelwähler füllen (verfügbare Display-Typen) + aktuellen Wert markieren.
@@ -12908,18 +13293,17 @@ function populateKompaktDisplay() {
   if ((!cur || cur === '') && typeof stations !== 'undefined' && stations[0]) {
     cur = String(stationDisplayColour(stations[0]));
   }
-  var html = '';
-  Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
-    var f = DISPLAY_TYPE_FEATURES[k];
-    if (f.offline) return;
-    html += '<option value="' + k + '"' + (String(k) === String(cur) ? ' selected' : '') + '>' + f.name + '</option>';
-  });
-  sel.innerHTML = html;
+  sel.innerHTML = displayTypeOptionsHtml(cur);
   if (colSel.value !== sel.value) colSel.value = sel.value;  // ftColorSelect synchron halten
 }
 
 // Kompakt-Wähler geändert → den einen Display-Typ (ftColorSelect) setzen.
 function ftSetKompaktDisplay(val) {
+  if (val === 'newcustom') {
+    populateKompaktDisplay();  // Auswahl zurücksetzen, bis der Wizard fertig ist
+    openCustomDisplayWizard({ type: 'kompakt' });
+    return;
+  }
   var colSel = document.getElementById('ftColorSelect');
   if (colSel) colSel.value = val;
   renderDisplayTypeSections();
@@ -12931,10 +13315,23 @@ function updateStyleAssignmentUI() {
   var zRow = document.getElementById('ftZuordnungRow');
   var mAssign = document.getElementById('ftManualAssignment');
   var kRow = document.getElementById('ftKompaktDisplayRow');
-  if (zRow) zRow.style.display = kompakt ? 'none' : '';
-  if (kompakt && mAssign) mAssign.style.display = 'none';
-  if (kRow) kRow.style.display = kompakt ? '' : 'none';
-  if (kompakt) populateKompaktDisplay();
+  // fw >= 2.3.18: Die alte Automatisch/Manuell-Zuordnung ist durch „Nach Städten
+  // gruppieren" ersetzt. Spielerisch gruppiert die Display-Typen automatisch nach
+  // Städten (WL → Wien-Design, ÖBB → ÖBB-Design, wie bisher „Automatisch"); erst
+  // Toggle AUS öffnet den Zuordnungs-Wizard, in dem einzelne Haltestellen eigenen
+  // Displays zugewiesen werden. Ältere Firmware behält die alte Zuordnungs-UI.
+  var merged = (typeof mergedSegmentsSupported === 'function' && mergedSegmentsSupported());
+  if (merged) ftIsManualAssignment = false;
+  if (zRow) zRow.style.display = (kompakt || merged) ? 'none' : '';
+  if (mAssign && (kompakt || merged)) mAssign.style.display = 'none';
+  // Kompakt-Einzelwähler ausblenden, sobald der Instanz-Wizard ODER die per-Station-
+  // Zuweisung aktiv ist — dort hat jedes Display sein eigenes Typ-Dropdown, der eine
+  // globale Wähler wäre widersprüchlich (und würde beim Speichern ignoriert).
+  var instMode = (typeof instanceModeActive === 'function' && instanceModeActive());
+  var kompaktSelector = kompakt && !instMode && !ftIsManualAssignment;
+  if (kRow) kRow.style.display = kompaktSelector ? '' : 'none';
+  if (kompaktSelector) populateKompaktDisplay();
+  if (typeof updateGroupByCityUI === 'function') updateGroupByCityUI();
 }
 
 // Feintuning: Klick auf eine Stil-Karte (Kompakt/Spielerisch) setzt direkt die
@@ -12963,12 +13360,53 @@ function renderStationDisplayList() {
     var currentColour = stationDisplayColour(s);
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #eee;">';
     html += '<span style="font-size:14px;font-weight:500;">' + (s.stopName || 'Station ' + (i+1)) + '</span>';
-    html += '<select onchange="stations[' + i + '].colourOverride=parseInt(this.value);renderDisplayTypeSections();ftFocusPreview(this.value)" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;">';
-    Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
-      var f = DISPLAY_TYPE_FEATURES[k];
-      if (f.offline) return;  // ausgeblendete Display-Typen nicht zur Auswahl anbieten
-      html += '<option value="' + k + '"' + (parseInt(k) === currentColour ? ' selected' : '') + '>' + f.name + '</option>';
-    });
+    html += '<select onchange="setStationDisplayColour(' + i + ', this.value)" style="padding:6px 8px;border-radius:8px;border:1px solid #ddd;">';
+    html += displayTypeOptionsHtml(currentColour);
+    html += '</select></div>';
+  });
+  container.innerHTML = html;
+}
+
+// Dropdown der Pro-Station-Zuordnung: Typ setzen; "+ Eigenes Display erstellen"
+// öffnet direkt den Design-Wizard und weist das neue Display danach dieser Station zu.
+function setStationDisplayColour(idx, val) {
+  var legacyList = (typeof mergedSegmentsSupported === 'function' && !mergedSegmentsSupported());
+  if (val === 'newcustom') {
+    renderStationDisplayList();  // Auswahl zurücksetzen, bis der Wizard fertig ist
+    if (legacyList) renderStationTypeListInto('ftInstanceList');
+    openCustomDisplayWizard({ type: 'station', idx: idx });
+    return;
+  }
+  var cid = parseInt(val);
+  if (isNaN(cid) || !stations[idx]) return;
+  stations[idx].colourOverride = cid;
+  // Per-Station-Zuordnung aktiv markieren — sonst würde der Kompakt-Einheitswert
+  // (ftColorSelect) beim Speichern die Zuordnung überschreiben (gleiche Stadt!).
+  ftIsManualAssignment = true;
+  renderStationDisplayList();
+  if (legacyList) {
+    renderStationTypeListInto('ftInstanceList');
+    // Kompakt-Einzelwähler jetzt ausblenden (per-Station-Zuordnung gewinnt)
+    var kRowEl = document.getElementById('ftKompaktDisplayRow');
+    if (kRowEl) kRowEl.style.display = 'none';
+  }
+  renderDisplayTypeSections();
+  if (typeof ftFocusPreview === 'function') ftFocusPreview(cid);
+}
+
+// Einfache Typ-Liste pro Station (für den "Firmware-Update nötig"-Fall unter dem
+// Gruppieren-Toggle): Station + Display-Typ-Dropdown, ohne Verschieben/Mergen.
+function renderStationTypeListInto(containerId) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var html = '';
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s, i) {
+    var cur = stationDisplayColour(s);
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0;">';
+    html += '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:' + colourIdToColor(cur) + ';flex:0 0 auto;"></span>';
+    html += '<span style="font-size:13px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtmlFt(s.stopName || ('Station ' + (i + 1))) + '</span>';
+    html += '<select onchange="setStationDisplayColour(' + i + ', this.value)" style="margin-left:auto;flex:0 0 auto;padding:4px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;">';
+    html += displayTypeOptionsHtml(cur);
     html += '</select></div>';
   });
   container.innerHTML = html;
@@ -13082,9 +13520,11 @@ function rowsForColour(cid) {
 
 function getUniqueDisplayTypes() {
   // Kompakt OHNE manuelle Zuordnung: ein einheitlicher Display-Typ.
-  // Bei manueller Zuordnung IMMER pro Station gruppieren — damit sich "Displays im
-  // Detail" sofort mitändert, wenn man im Zuordnungs-Dropdown umstellt.
-  if (!ftIsMultiDisplay && !ftIsManualAssignment) {
+  // Bei manueller Zuordnung ODER Instanz-Modus (Nach-Städten-Gruppieren AUS) IMMER
+  // pro Station/colour gruppieren — damit sich "Displays im Detail" sofort mitändert,
+  // wenn man im Zuordnungs-Dropdown umstellt (auch bei gleicher Stadt!).
+  if (!ftIsMultiDisplay && !ftIsManualAssignment
+      && !(typeof instanceModeActive === 'function' && instanceModeActive())) {
     var col = parseInt(document.getElementById('ftColorSelect').value) || 1;
     return [{ colour: col, stations: stations.slice() }];
   }
@@ -13129,7 +13569,10 @@ var COLOUR_HEX = {
   12: '#003366', // ÖBB S-Bahn (Blau)
   13: '#F39200', // Holding Graz
   14: '#0055A4', // Westbahn
-  15: '#CE1126'  // Liechtenstein
+  15: '#CE1126', // Liechtenstein
+  101: '#7b1fa2', // Eigenes Display 1
+  102: '#00838f', // Eigenes Display 2
+  103: '#5d4037'  // Eigenes Display 3
 };
 function colourIdToColor(colourId) {
   return COLOUR_HEX[colourId] || '#666';
@@ -13150,10 +13593,654 @@ function dsVal(cid, key) {
   return isNaN(n) ? undefined : n;
 }
 
+// Roh-String aus displaysettings (Hex-Farben, Pro-Linie-Liste, Name) — dsVal parsed nur ints.
+function dsStrVal(cid, key) {
+  var o = dsByCid[cid];
+  if (!o || o[key] === undefined) return undefined;
+  return String(o[key]);
+}
+
+// ===== Eigene Displays / Custom (colour 101+, Design in eigener customrow) =====
+// customrow: "c1|Nname|B..|T..|U..|H..|V..|P..|G1|F1;c2|..." — Slot n ↔ colour 100+n.
+// Eigene Row statt displaysettings, damit die Design-Definitionen (v.a. die
+// Pro-Linie-Liste P) die displaysettings nicht aufblähen. Das Gerät sieht c101
+// in der masterrow und weiß: Design steht in customrow-Segment c1.
+// Defaults = Blau/Gelb (DisplayBodo); G=Hintergrund (1 Simpel, 2 Pixel),
+// F=Schriftart (1 Modern/Poppins, 2 Classic/ÖBB, 3 Matrix DACH, 4 Matrix CZ).
+var FC_DEFAULTS = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff', G: '1', F: '1', A: '1' };  // A: Linien-Badges (1=an, Firmware-Default)
+var FC_MIN_COLOUR = 101, FC_MAX_COLOUR = 103;   // 3 Slots im Konfigurator (Firmware kann 101-109)
+var customRowBySlot = {};   // slot -> { N,B,T,U,H,V,P,G,F,A } (raw, Hex ohne '#'; A=Badges 1/0)
+
+function fcIsCustomColour(cid) { return cid >= FC_MIN_COLOUR && cid <= FC_MAX_COLOUR; }
+function fcSlot(cid) { return cid - 100; }
+
+// Gegenstück zu buildCustomRow(): geladene customrow → customRowBySlot.
+function parseCustomRow(str) {
+  customRowBySlot = {};
+  if (!str) return;
+  String(str).split(';').forEach(function(seg) {
+    seg = seg.trim();
+    if (!seg) return;
+    var slot = null;
+    var o = {};
+    seg.split('|').forEach(function(t) {
+      t = t.trim();
+      if (!t) return;
+      var key = t.charAt(0);
+      var val = t.substring(1);
+      if (key === 'c') slot = parseInt(val);
+      else o[key] = val;
+    });
+    if (slot != null && !isNaN(slot)) customRowBySlot[slot] = o;
+  });
+}
+
+// Gespeichertes customrow-Token für ein Custom-Display, sonst undefined.
+function fcStored(cid, key) {
+  var o = customRowBySlot[fcSlot(cid)];
+  return (o && o[key] !== undefined && o[key] !== '') ? String(o[key]) : undefined;
+}
+
+// Grundfarbe: offenes Feintuning-Input → live, sonst gespeichertes Token, sonst Default.
+// Liefert Hex OHNE '#'.
+function fcVal(cid, key) {
+  var el = document.getElementById('ftFc' + key + '_' + cid);
+  if (el && el.value) return String(el.value).replace('#', '').toLowerCase();
+  var s = fcStored(cid, key);
+  if (s) return s.replace('#', '').toLowerCase();
+  return FC_DEFAULTS[key];
+}
+
+// Hintergrund-Stil (G) / Schriftart (F): offener Toggle → live, sonst gespeichert, sonst '1'.
+function fcStyleVal(cid, key) {
+  var el = document.getElementById('ftFc' + key + '_' + cid);
+  if (el) {
+    var v = getFtToggleVal('ftFc' + key + '_' + cid);
+    if (v) return String(v);
+  }
+  return fcStored(cid, key) || FC_DEFAULTS[key];
+}
+
+// Name des Displays (N-Token): ohne |;, (Trenner in customrow bzw. P-Liste), max. 10 Zeichen.
+function fcSanitizeName(v) {
+  return String(v || '').replace(/[|;,]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 10).trim();
+}
+function fcName(cid) {
+  var el = document.getElementById('ftFcName_' + cid);
+  if (el) return fcSanitizeName(el.value);
+  return fcSanitizeName(fcStored(cid, 'N') || '');
+}
+
+// Anzeigename eines Display-Typs im Feintuning: eigener Name (Custom-Display) vor generischem.
+function ftDisplayName(cid) {
+  var f = DISPLAY_TYPE_FEATURES[cid] || {};
+  if (f.customColors) { var n = fcName(cid); if (n) return n; }
+  return f.name || 'Display';
+}
+
+// Pro-Linie Badge-Farben als Map { line: {bg,tx,ol} } (Hex ohne '#').
+// Feintuning offen (DOM-Zeilen da) → nur aktivierte Linien; sonst gespeicherte P-Liste.
+function fcLineColors(cid) {
+  var out = {};
+  var rows = document.querySelectorAll('.fc-line-row[data-cid="' + cid + '"]');
+  if (rows.length > 0) {
+    rows.forEach(function(rw) {
+      var sw = rw.querySelector('.fc-line-toggle');
+      if (!sw || !sw.classList.contains('active')) return;
+      var ln = rw.dataset.line;
+      if (!ln) return;
+      var pick = function(cls) {
+        var inp = rw.querySelector(cls);
+        return inp && inp.value ? String(inp.value).replace('#', '').toLowerCase() : '';
+      };
+      out[ln] = { bg: pick('.fc-line-bg'), tx: pick('.fc-line-tx'), ol: pick('.fc-line-ol') };
+    });
+    return out;
+  }
+  var p = fcStored(cid, 'P');
+  if (p) {
+    p.split(',').forEach(function(e) {
+      var t = e.split(':');
+      var ln = (t[0] || '').trim();
+      if (!ln) return;
+      out[ln] = { bg: (t[1] || '').toLowerCase(), tx: (t[2] || '').toLowerCase(), ol: (t[3] || '').toLowerCase() };
+    });
+  }
+  return out;
+}
+
+// Baut die customrow für den Save. Feintuning offen (Inputs im DOM) → User-Werte;
+// sonst gespeicherte Segmente unverändert behalten (Quick-Save löscht keine Designs).
+function buildCustomRow() {
+  var segs = [];
+  for (var slot = 1; slot <= FC_MAX_COLOUR - 100; slot++) {
+    var cid = 100 + slot;
+    var parts = [];
+    if (document.getElementById('ftFcB_' + cid)) {
+      ['B', 'T', 'U', 'H', 'V'].forEach(function(k) {
+        var el = document.getElementById('ftFc' + k + '_' + cid);
+        var v = el && el.value ? String(el.value).replace('#', '').toLowerCase() : '';
+        if (v && v !== FC_DEFAULTS[k]) parts.push(k + v);
+      });
+      var g = fcStyleVal(cid, 'G');
+      if (g !== '1') parts.push('G' + g);
+      var fv = fcStyleVal(cid, 'F');
+      if (fv !== '1') parts.push('F' + fv);
+      // Linien-Badges (A): kein Input im Detail-Bereich → fcStyleVal liest den Store
+      // (Wizard-Wert). Ohne diese Zeile ginge A0 beim Save mit offenem Feintuning verloren.
+      var av = fcStyleVal(cid, 'A');
+      if (av !== '1') parts.push('A' + av);
+      var map = fcLineColors(cid);
+      var p = [];
+      Object.keys(map).forEach(function(ln) {
+        var lc = map[ln];
+        var lnSafe = String(ln).replace(/[|;:,]/g, '');  // ':' und ',' sind P-Listen-Trenner
+        if (!lnSafe) return;
+        p.push(lnSafe + ':' + (lc.bg || '') + ':' + (lc.tx || '') + ':' + (lc.ol || ''));
+      });
+      if (p.length > 0) parts.push('P' + p.join(','));
+      var nm = fcName(cid);
+      if (nm) parts.push('N' + nm);
+    } else {
+      var o = customRowBySlot[slot];
+      if (o) Object.keys(o).forEach(function(k) { if (o[k] !== '') parts.push(k + o[k]); });
+    }
+    if (parts.length > 0) segs.push('c' + slot + '|' + parts.join('|'));
+  }
+  return segs.join(';');
+}
+
+// ===== Geräteechte Vorschau (Bodo-Layout-Replik, 320x170 wie das Display) =====
+// Metriken 1:1 aus display_free_color.cpp: margin 8, Badge 38px hoch / Breite nach
+// Linienlänge (38/54/70/84 + 4), Radius 6, 2px-Umrandung, Ziel max. 2 Zeilen,
+// Countdown rechts. Schriftgrößen je F-Stil an die Geräte-Fonts angenähert.
+function fcPreviewConfig(cid) {
+  return { B: fcVal(cid, 'B'), T: fcVal(cid, 'T'), U: fcVal(cid, 'U'), H: fcVal(cid, 'H'),
+           V: fcVal(cid, 'V'), G: fcStyleVal(cid, 'G'), F: fcStyleVal(cid, 'F'),
+           A: fcStyleVal(cid, 'A'), P: fcLineColors(cid) };
+}
+
+function fcApplyPreviewBg(el, cfg) {
+  el.style.background = '#' + cfg.B;
+  if (cfg.G === '2') {
+    // Punktraster wie am Gerät (DOT_SIZE 3 / DOT_SPACING 5), Grid-Farbe aus BG abgeleitet
+    var bgInt = parseInt(cfg.B, 16);
+    var lum = (((bgInt >> 16) & 255) * 3 + ((bgInt >> 8) & 255) * 6 + (bgInt & 255)) / 10;
+    var d = lum > 128 ? -18 : 18;
+    var ch = function(v) { return Math.max(0, Math.min(255, v + d)); };
+    var grid = 'rgb(' + ch((bgInt >> 16) & 255) + ',' + ch((bgInt >> 8) & 255) + ',' + ch(bgInt & 255) + ')';
+    el.style.backgroundImage = 'radial-gradient(circle, ' + grid + ' 1.5px, transparent 1.5px)';
+    el.style.backgroundSize = '5px 5px';
+  } else {
+    el.style.backgroundImage = 'none';
+  }
+}
+
+function fcDevicePreviewHTML(cfg, data) {
+  var rows = Math.min(3, Math.max(2, data.length));
+  data = data.slice(0, rows);
+  var W = 320, H = 170, rowH = Math.floor(H / rows);
+  var margin = 8;
+  var badgeWFor = function(ln) { var l = String(ln || '').length; return l <= 1 ? 38 : (l === 2 ? 54 : (l === 3 ? 70 : 84)); };
+  var maxW = 0;
+  data.forEach(function(dp) { var w = badgeWFor(dp.line); if (w > maxW) maxW = w; });
+  var badgeW = maxW + 4, badgeH = Math.min(38, rowH - 6);
+  var isMatrix = (cfg.F === '3' || cfg.F === '4');
+  var font = isMatrix ? "'Courier New',monospace" : (cfg.F === '2' ? 'Arial,Helvetica,sans-serif' : "'Poppins',sans-serif");
+  // Geräte-Fonts angenähert: Modern Poppins 16pt/12pt/24pt, Classic FreeSans, Matrix font1/Matrix8x6
+  var badgeFs = cfg.F === '2' ? 17 : (isMatrix ? 15 : 20);
+  var destFs  = cfg.F === '2' ? 13 : (isMatrix ? 12 : 14);
+  var cdFs    = cfg.F === '2' ? 30 : (isMatrix ? 26 : 34);
+  var glowT = isMatrix ? 'text-shadow:0 0 5px #' + cfg.T + ';' : '';
+  var html = '';
+  data.forEach(function(dep, i) {
+    var lc = (cfg.P || {})[dep.line] || null;
+    var bBg = (lc && lc.bg) ? '#' + lc.bg : '#' + cfg.H;
+    var bTx = (lc && lc.tx) ? '#' + lc.tx : '#' + cfg.V;
+    var bOl = lc ? ((lc.ol ? '#' + lc.ol : bBg)) : '#' + cfg.U;
+    var showOl = bOl.toLowerCase() !== bBg.toLowerCase();
+    var destX = margin + maxW + 12;
+    var destW = W - destX - 55;
+    html += '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:' + W + 'px;height:' + rowH + 'px;">';
+    if (cfg.A === '0') {
+      // Badges aus: Linienname als großer Text in Schriftfarbe (wie Wien), linksbündig
+      html += '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;width:' + badgeW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + badgeFs + 'px;' + glowT + '">' + escapeHtmlFt(dep.line) + '</div>';
+    } else {
+      html += '<div style="position:absolute;left:' + margin + 'px;top:' + Math.round((rowH - badgeH) / 2) + 'px;width:' + badgeW + 'px;height:' + badgeH + 'px;background:' + bBg + ';border-radius:6px;' + (showOl ? 'box-shadow:inset 0 0 0 2px ' + bOl + ';' : '') + 'display:flex;align-items:center;justify-content:center;color:' + bTx + ';font-weight:600;font-size:' + badgeFs + 'px;' + (isMatrix ? 'text-shadow:0 0 4px ' + bTx + ';' : '') + '">' + escapeHtmlFt(dep.line) + '</div>';
+    }
+    html += '<div style="position:absolute;left:' + destX + 'px;top:0;height:' + rowH + 'px;width:' + destW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-size:' + destFs + 'px;line-height:1.25;' + glowT + '"><span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + escapeHtmlFt(dep.dest) + '</span></div>';
+    html += '<div style="position:absolute;right:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">' + dep.time + '</div>';
+    html += '</div>';
+  });
+  return '<div style="position:relative;width:' + W + 'px;height:' + H + 'px;font-family:' + font + ';overflow:hidden;">' + html + '</div>';
+}
+
+// Vorschau-Daten: echte Richtungen/Ziele der Stationen (wie am Gerät), sonst Beispiel.
+function fcPreviewData() {
+  var data = [];
+  var t = 3;
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    if (s.directions && s.directions.length > 0) {
+      s.directions.forEach(function(d) {
+        if (d.line && data.length < 3) { data.push({ line: d.line, dest: d.towards || s.stopName || '', time: t }); t += 3; }
+      });
+    } else if (s.filter) {
+      s.filter.split(',').forEach(function(l) {
+        l = l.trim();
+        if (l && data.length < 3) { data.push({ line: l, dest: s.stopName || '', time: t }); t += 3; }
+      });
+    }
+  });
+  if (data.length === 0) {
+    data = [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }];
+  }
+  return data;
+}
+
+// ===== Design-Wizard (Eigenes Display erstellen/bearbeiten) =====
+// Nutzt DIESELBEN Input-Ids wie fcVal/fcStyleVal/fcLineColors (ftFcB_<cid> …), dadurch
+// funktionieren Live-Preview und buildCustomRow unverändert, solange der Wizard offen ist.
+// Fertig → Werte in customRowBySlot persistieren; Abbrechen → Store bleibt unberührt.
+var fcWizardCid = null;
+var fcWizardStep = 1;
+var fcWizardCreate = false;
+
+// Freier Slot (1-3): weder Design gespeichert noch colour in Verwendung.
+function fcFreeSlot() {
+  var used = {};
+  (getUniqueDisplayTypes() || []).forEach(function(dt) { used[dt.colour] = true; });
+  for (var slot = 1; slot <= FC_MAX_COLOUR - 100; slot++) {
+    var o = customRowBySlot[slot];
+    var hasDesign = o && Object.keys(o).length > 0;
+    if (!hasDesign && !used[100 + slot]) return slot;
+  }
+  return null;
+}
+
+function fcCreateDisplay() {
+  var slot = fcFreeSlot();
+  if (!slot) return;
+  fcOpenWizard(100 + slot, { create: true });
+}
+
+// Custom-Slot in Pickern anzeigen? Nur wenn ein Design existiert oder der Slot gerade
+// in Verwendung ist — leere Slots entstehen ausschließlich über "+ Eigenes Display erstellen".
+function fcSlotVisible(cid) {
+  if (!fcIsCustomColour(cid)) return true;
+  var o = customRowBySlot[fcSlot(cid)];
+  if (o && Object.keys(o).length > 0) return true;
+  return (getUniqueDisplayTypes() || []).some(function(dt) { return dt.colour === cid; });
+}
+
+// 24 Vorschlags-Farben für die Wizard-Palette (8×3): Schwarz/Grau/Weiß, dann
+// Display-taugliche Brand-/LED-Töne (WL-Gelb, Amber, ÖBB-Rot/-Blau, Linz-Grün …).
+var FC_PALETTE = [
+  '000000', '1e1e1e', '4a4a4a', '9e9e9e', 'ffffff', 'ffd500', 'ffb300', 'ff8c00',
+  'ff5722', 'e2001a', 'c62828', 'e91e63', '9c27b0', '6a3df5', '3f51b5', '003366',
+  '005bbb', '2196f3', '56a0d3', '00bcd4', '009688', '009640', '66bb6a', 'cddc39'
+];
+
+// Palette eines Farbfelds auf-/zuklappen (nur eine gleichzeitig offen).
+function fcTogglePalette(k, cid) {
+  var id = 'fcPal_' + k + '_' + cid;
+  document.querySelectorAll('.fc-pal').forEach(function(p) {
+    if (p.id !== id) p.style.display = 'none';
+  });
+  var p = document.getElementById(id);
+  if (!p) return;
+  var open = p.style.display !== 'none';
+  p.style.display = open ? 'none' : '';
+  if (!open) fcSyncSwatch(k, cid);  // Auswahl-Markierung beim Aufklappen setzen
+}
+
+// Text- und zugehörige Hintergrund-Farbe dürfen nie identisch sein (unlesbar):
+// Schrift (T) ↔ Hintergrund (B), Badge-Text (V) ↔ Badge-Hintergrund (H).
+var FC_COLOR_PAIRS = { B: 'T', T: 'B', H: 'V', V: 'H' };
+function fcColorPairConflict(k, cid, hex) {
+  var pair = FC_COLOR_PAIRS[k];
+  if (!pair) return false;
+  return fcVal(cid, pair) === String(hex).replace('#', '').toLowerCase();
+}
+
+function fcShowColorError(k, cid) {
+  var el = document.getElementById('fcColErr_' + k + '_' + cid);
+  if (!el) return;
+  el.style.display = '';
+  clearTimeout(el._t);
+  el._t = setTimeout(function() { el.style.display = 'none'; }, 2500);
+}
+
+// Palette-Farbe angetippt → in den nativen Farbpicker-Input schreiben (bleibt die
+// eine Quelle für fcVal/Preview/Finish) + Vorschau aktualisieren. Konflikt (gleiche
+// Farbe wie das Gegenstück) wird abgelehnt und kurz erklärt.
+function fcPickColor(k, cid, hex) {
+  if (fcColorPairConflict(k, cid, hex)) { fcShowColorError(k, cid); return; }
+  var inp = document.getElementById('ftFc' + k + '_' + cid);
+  if (inp) { inp.value = '#' + hex; inp.dataset.prev = hex; }
+  fcSyncSwatch(k, cid);
+  fcWizardPreviewUpdate();
+}
+
+// Nativer Farbpicker geändert: Konflikt → auf den vorherigen Wert zurückspringen.
+function fcColorInputChanged(k, cid, inp) {
+  var hex = String(inp.value).replace('#', '').toLowerCase();
+  if (fcColorPairConflict(k, cid, hex)) {
+    inp.value = '#' + (inp.dataset.prev || FC_DEFAULTS[k]);
+    fcShowColorError(k, cid);
+  } else {
+    inp.dataset.prev = hex;
+  }
+  fcSyncSwatch(k, cid);
+  fcWizardPreviewUpdate();
+}
+
+// Linien-Badges-Toggle im Wizard: Badge-Farbfelder ein-/ausblenden + Vorschau.
+function fcBadgesToggleChanged(cid) {
+  var box = document.getElementById('fcBadgeFields_' + cid);
+  if (box) box.style.display = (fcStyleVal(cid, 'A') === '1') ? '' : 'none';
+  fcWizardPreviewUpdate();
+}
+
+// Farb-Button der Zeile + Auswahl-Markierung in der Palette mit dem Input syncen.
+function fcSyncSwatch(k, cid) {
+  var inp = document.getElementById('ftFc' + k + '_' + cid);
+  var btn = document.getElementById('fcSwBtn_' + k + '_' + cid);
+  if (inp && btn) btn.style.background = inp.value;
+  var val = inp ? String(inp.value).replace('#', '').toLowerCase() : '';
+  document.querySelectorAll('#fcPal_' + k + '_' + cid + ' .fc-sw').forEach(function(sw) {
+    sw.style.boxShadow = (sw.dataset.hex === val) ? '0 0 0 2px #fff, 0 0 0 3px #333' : 'none';
+  });
+}
+
+function fcOpenWizard(cid, opts) {
+  fcWizardCid = cid;
+  fcWizardCreate = !!(opts && opts.create);
+  fcWizardStep = 1;
+  var old = document.getElementById('fcWizardOverlay');
+  if (old) old.remove();
+
+  // Basisfarben immer; Badge-Farben nur bei aktivierten Linien-Badges (Toggle unten).
+  // Badge-Umrandung (U) ist aus dem Wizard raus — Default (= Badge-Hintergrund) ist
+  // unsichtbar, gespeicherte U-Werte bleiben über den Store erhalten.
+  var fcColorBase = [['B', 'Hintergrundfarbe'], ['T', 'Schriftfarbe']];
+  var fcColorBadge = [['H', 'Badge-Hintergrund'], ['V', 'Badge-Text']];
+  // Badges-Zustand: NEUES Display standardmäßig AUS (großer Linien-Text wie Wien),
+  // bestehendes Display behält seinen gespeicherten Wert (Firmware-Default = an).
+  var fcA = fcWizardCreate ? '0' : fcStyleVal(cid, 'A');
+  var h = '';
+  h += '<div style="background:#fff;border-radius:18px;max-width:460px;width:100%;max-height:92vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,0.35);" onclick="event.stopPropagation()">';
+  // Kopf
+  h += '<div style="display:flex;align-items:center;margin-bottom:12px;">';
+  h += '<div><div style="font-weight:700;font-size:17px;">' + (fcWizardCreate ? 'Eigenes Display erstellen' : 'Eigenes Display bearbeiten') + '</div>';
+  h += '<div id="fcWizStepLabel" style="font-size:12px;color:#888;"></div></div>';
+  h += '<button onclick="fcWizardCancel()" style="margin-left:auto;border:none;background:#f0f0f0;width:32px;height:32px;border-radius:50%;font-size:15px;cursor:pointer;color:#555;">&#10005;</button>';
+  h += '</div>';
+  // Geräte-Vorschau mit Bezel (wie das echte catch it)
+  h += '<div style="display:flex;justify-content:center;margin-bottom:16px;">';
+  h += '<div style="background:#111;border-radius:14px;padding:10px 12px;box-shadow:0 6px 18px rgba(0,0,0,0.3);">';
+  h += '<div id="fcWizardPreview" style="width:320px;height:170px;border-radius:4px;overflow:hidden;"></div>';
+  h += '</div></div>';
+
+  // Schritt 1: Farben & Stil. Pro Farbfeld: aktueller Farb-Button → klappt eine
+  // Palette mit 24 Farben zum Antippen auf, darunter der volle Farbpicker (16,7 Mio.
+  // Farben). Der native <input type="color"> behält seine Id ftFc<K>_<cid> — fcVal,
+  // Live-Preview und fcWizardFinish lesen unverändert daraus.
+  h += '<div id="fcWizStep1">';
+  // Farbfeld-Zeile: Farb-Button → Palette (24 Farben) + vollbreiter Farbpicker.
+  // Farbpicker VOLLBREIT: das native Picker-Panel ankert am Input — bei einem kleinen
+  // Swatch am rechten Rand öffnete es nach rechts aus dem Wizard raus. Vollbreite Leiste
+  // → Panel öffnet innerhalb der Wizard-Breite; Mobile zeigt ohnehin das System-Sheet.
+  function fcColorFieldHtml(fd) {
+    var cur = fcVal(cid, fd[0]);
+    var fh = '';
+    fh += '<div class="form-row" style="border-bottom:none;padding-bottom:4px;"><div><div class="form-label">' + fd[1] + '</div></div>';
+    fh += '<button id="fcSwBtn_' + fd[0] + '_' + cid + '" onclick="fcTogglePalette(\'' + fd[0] + '\',' + cid + ')" style="width:46px;height:32px;border:1px solid #bbb;border-radius:8px;background:#' + cur + ';cursor:pointer;box-shadow:inset 0 0 0 2px #fff;"></button></div>';
+    // Konflikt-Hinweis (Schrift = Hintergrund bzw. Badge-Text = Badge-Hintergrund)
+    fh += '<div id="fcColErr_' + fd[0] + '_' + cid + '" style="display:none;color:#c62828;font-size:11px;margin:-2px 0 6px;">' + fd[2] + '</div>';
+    fh += '<div class="fc-pal" id="fcPal_' + fd[0] + '_' + cid + '" style="display:none;padding:10px;background:#f6f6f6;border-radius:10px;margin:2px 0 10px;">';
+    fh += '<div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:10px;">';
+    FC_PALETTE.forEach(function(hex) {
+      fh += '<button class="fc-sw" data-hex="' + hex + '" onclick="fcPickColor(\'' + fd[0] + '\',' + cid + ',\'' + hex + '\')" style="aspect-ratio:1/1;width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:6px;background:#' + hex + ';cursor:pointer;padding:0;"></button>';
+    });
+    fh += '</div>';
+    fh += '<div><div style="font-size:12px;color:#666;margin-bottom:6px;">Eigene Farbe (Farbpicker)</div>';
+    fh += '<input type="color" id="ftFc' + fd[0] + '_' + cid + '" value="#' + cur + '" data-prev="' + cur + '" oninput="fcColorInputChanged(\'' + fd[0] + '\',' + cid + ',this)" style="display:block;width:100%;height:40px;border:1px solid #ddd;border-radius:8px;padding:2px;background:#fff;cursor:pointer;">';
+    fh += '</div></div>';
+    return fh;
+  }
+  var _errBT = 'Schrift- und Hintergrundfarbe dürfen nicht gleich sein';
+  var _errHV = 'Badge-Text und Badge-Hintergrund dürfen nicht gleich sein';
+  h += fcColorFieldHtml(['B', 'Hintergrundfarbe', _errBT]);
+  h += fcColorFieldHtml(['T', 'Schriftfarbe', _errBT]);
+  // Linien-Badges an/aus: AUS (Default bei neuen Displays) = Linienname als großer
+  // Text wie Wien; AN = Badge-Kästchen mit eigenen Farben (2 Farbpicker darunter).
+  h += '<div class="form-row"><div><div class="form-label">Linien-Badges</div><div class="form-hint">Aus = Linienname als großer Text (wie Wien)</div></div>';
+  h += '<div class="toggle-row" id="ftFcA_' + cid + '">';
+  [['1', 'An'], ['0', 'Aus']].forEach(function(ab) {
+    h += '<button class="toggle-btn' + (fcA === ab[0] ? ' active' : '') + '" data-value="' + ab[0] + '" onclick="setFtToggleVal(\'ftFcA_' + cid + '\',\'' + ab[0] + '\');fcBadgesToggleChanged(' + cid + ')">' + ab[1] + '</button>';
+  });
+  h += '</div></div>';
+  h += '<div id="fcBadgeFields_' + cid + '" style="display:' + (fcA === '1' ? '' : 'none') + ';">';
+  h += fcColorFieldHtml(['H', 'Badge-Hintergrund', _errHV]);
+  h += fcColorFieldHtml(['V', 'Badge-Text', _errHV]);
+  h += '</div>';
+  var fcG = fcStyleVal(cid, 'G');
+  h += '<div class="form-row"><div><div class="form-label">Hintergrund</div><div class="form-hint">Pixel = LED-Matrix-Optik mit Punktraster</div></div>';
+  h += '<div class="toggle-row" id="ftFcG_' + cid + '">';
+  [['1', 'Simpel'], ['2', 'Pixel']].forEach(function(gb) {
+    h += '<button class="toggle-btn' + (fcG === gb[0] ? ' active' : '') + '" data-value="' + gb[0] + '" onclick="setFtToggleVal(\'ftFcG_' + cid + '\',\'' + gb[0] + '\');fcWizardPreviewUpdate()">' + gb[1] + '</button>';
+  });
+  h += '</div></div>';
+  var fcF = fcStyleVal(cid, 'F');
+  h += '<div class="form-row"><div><div class="form-label">Schriftart</div><div class="form-hint">Matrix CZ = slawisch/ungarisch (&#352; &#268; &#381; &#336; &#368;)</div></div>';
+  h += '<div class="toggle-row" id="ftFcF_' + cid + '">';
+  [['1', 'Modern'], ['2', 'Classic'], ['3', 'Matrix'], ['4', 'Matrix CZ']].forEach(function(fb) {
+    h += '<button class="toggle-btn' + (fcF === fb[0] ? ' active' : '') + '" data-value="' + fb[0] + '" onclick="setFtToggleVal(\'ftFcF_' + cid + '\',\'' + fb[0] + '\');fcWizardPreviewUpdate()">' + fb[1] + '</button>';
+  });
+  h += '</div></div>';
+  h += '</div>';
+
+  // Schritt 2: Badge-Farben pro Linie
+  h += '<div id="fcWizStep2" style="display:none;">';
+  var fcLines = [];
+  var fcSeen = {};
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    var arr = [];
+    if (s.directions && s.directions.length > 0) s.directions.forEach(function(d) { if (d.line) arr.push(String(d.line)); });
+    else if (s.filter) s.filter.split(',').forEach(function(l) { if (l.trim()) arr.push(l.trim()); });
+    arr.forEach(function(l) { if (!fcSeen[l]) { fcSeen[l] = true; fcLines.push(l); } });
+  });
+  if (fcLines.length > 0) {
+    h += '<div class="form-hint" style="margin-bottom:8px;">Einzelnen Linien eigene Badge-Farben geben (z.B. U1 rot, U2 gr&uuml;n). Aus = globale Badge-Farben.</div>';
+    h += '<div style="background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:2px 12px;margin-bottom:10px;">';
+    var fcStoredP = fcLineColors(cid);
+    fcLines.forEach(function(ln) {
+      var lnAttr = escapeHtmlFt(ln).replace(/"/g, '');
+      var st = fcStoredP[ln];
+      var on = !!st;
+      var bg = '#' + ((st && st.bg) || fcVal(cid, 'H'));
+      var tx = '#' + ((st && st.tx) || fcVal(cid, 'V'));
+      var ol = '#' + ((st && st.ol) || (st && st.bg) || fcVal(cid, 'U'));
+      h += '<div class="fc-line-row" data-cid="' + cid + '" data-line="' + lnAttr + '" style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #eee;">';
+      h += '<span style="font-weight:700;background:' + bg + ';color:' + tx + ';border:2px solid ' + ol + ';padding:2px 8px;border-radius:5px;font-size:12px;min-width:26px;text-align:center;">' + escapeHtmlFt(ln) + '</span>';
+      h += '<span style="font-size:12px;color:#888;margin-right:auto;">Eigene Farben</span>';
+      h += '<div class="fc-line-inputs" style="display:' + (on ? 'flex' : 'none') + ';align-items:center;gap:5px;">';
+      [['fc-line-bg', 'BG', bg], ['fc-line-tx', 'Text', tx], ['fc-line-ol', 'Rand', ol]].forEach(function(ip) {
+        h += '<label style="font-size:10px;color:#888;">' + ip[1] + '</label>';
+        h += '<input type="color" class="' + ip[0] + '" value="' + ip[2] + '" oninput="fcWizardPreviewUpdate()" style="width:32px;height:26px;border:1px solid #ddd;border-radius:6px;padding:1px;background:#fff;cursor:pointer;">';
+      });
+      h += '</div>';
+      h += '<div class="toggle-switch fc-line-toggle' + (on ? ' active' : '') + '" onclick="fcWizardToggleLine(this)"></div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  } else {
+    h += '<div class="form-hint">Noch keine Stationen gew&auml;hlt, daher keine Linien. Diesen Schritt kannst du &uuml;berspringen.</div>';
+  }
+  h += '</div>';
+
+  // Schritt 3: Name
+  h += '<div id="fcWizStep3" style="display:none;">';
+  h += '<div class="form-row"><div><div class="form-label">Name des Displays</div><div class="form-hint">Max. 10 Zeichen, erscheint &uuml;berall statt "Eigenes Display"</div></div>';
+  h += '<input type="text" id="ftFcName_' + cid + '" value="' + escapeHtmlFt(fcName(cid)) + '" maxlength="10" placeholder="z.B. BVG Gelb" oninput="fcWizardPreviewUpdate()" style="padding:8px 10px;border-radius:8px;border:1px solid #ddd;font-size:14px;width:150px;"></div>';
+  h += '</div>';
+
+  // Fußzeile
+  h += '<div style="display:flex;gap:10px;margin-top:16px;">';
+  h += '<button id="fcWizBack" onclick="fcWizardNav(-1)" style="flex:1;padding:12px;border:none;background:#f0f0f0;border-radius:10px;font-size:14px;cursor:pointer;display:none;">Zur&uuml;ck</button>';
+  h += '<button id="fcWizNext" onclick="fcWizardNav(1)" style="flex:2;padding:12px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">Weiter</button>';
+  h += '</div>';
+  h += '</div>';
+
+  var ov = document.createElement('div');
+  ov.id = 'fcWizardOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.onclick = fcWizardCancel;
+  ov.innerHTML = h;
+  document.body.appendChild(ov);
+  fcWizardSetStep(1);
+  fcWizardPreviewUpdate();
+}
+
+function fcWizardSetStep(n) {
+  fcWizardStep = n;
+  for (var i = 1; i <= 3; i++) {
+    var st = document.getElementById('fcWizStep' + i);
+    if (st) st.style.display = (i === n) ? 'block' : 'none';
+  }
+  var lbl = document.getElementById('fcWizStepLabel');
+  if (lbl) lbl.textContent = 'Schritt ' + n + '/3 · ' + ['Farben & Stil', 'Linien-Badges', 'Name'][n - 1];
+  var back = document.getElementById('fcWizBack');
+  if (back) back.style.display = (n > 1) ? 'block' : 'none';
+  var next = document.getElementById('fcWizNext');
+  if (next) next.textContent = (n < 3) ? 'Weiter' : 'Fertig';
+}
+
+function fcWizardNav(dir) {
+  var n = fcWizardStep + dir;
+  // Badges aus → Schritt 2 (Badge-Farben pro Linie) überspringen
+  if (n === 2 && fcWizardCid != null && fcStyleVal(fcWizardCid, 'A') !== '1') n += dir;
+  if (n < 1) n = 1;
+  if (n > 3) { fcWizardFinish(); return; }
+  fcWizardSetStep(n);
+}
+
+function fcWizardToggleLine(el) {
+  el.classList.toggle('active');
+  var row = el.closest('.fc-line-row');
+  var inp = row ? row.querySelector('.fc-line-inputs') : null;
+  if (inp) inp.style.display = el.classList.contains('active') ? 'flex' : 'none';
+  fcWizardPreviewUpdate();
+}
+
+function fcWizardPreviewUpdate() {
+  if (fcWizardCid == null) return;
+  var el = document.getElementById('fcWizardPreview');
+  if (!el) return;
+  var cfg = fcPreviewConfig(fcWizardCid);
+  fcApplyPreviewBg(el, cfg);
+  el.innerHTML = fcDevicePreviewHTML(cfg, fcPreviewData());
+}
+
+function fcWizardCancel() {
+  var ov = document.getElementById('fcWizardOverlay');
+  if (ov) ov.remove();
+  fcWizardCid = null;
+  fcWizardTarget = null;
+}
+
+function fcWizardFinish() {
+  var cid = fcWizardCid;
+  if (cid == null) return;
+  // Werte aus den Wizard-Inputs in den Store persistieren (nur Nicht-Defaults → schlanke Row)
+  var o = {};
+  ['B', 'T', 'U', 'H', 'V'].forEach(function(k) {
+    var v = fcVal(cid, k);
+    if (v && v !== FC_DEFAULTS[k]) o[k] = v;
+  });
+  var g = fcStyleVal(cid, 'G');
+  if (g !== '1') o.G = g;
+  // Linien-Badges (A): Firmware-Default ist AN → nur "0" (aus) explizit speichern.
+  var av = fcStyleVal(cid, 'A');
+  if (av !== '1') o.A = av;
+  var fv = fcStyleVal(cid, 'F');
+  if (fv !== '1') o.F = fv;
+  var map = fcLineColors(cid);
+  var p = [];
+  Object.keys(map).forEach(function(ln) {
+    var lc = map[ln];
+    var lnSafe = String(ln).replace(/[|;:,]/g, '');
+    if (!lnSafe) return;
+    p.push(lnSafe + ':' + (lc.bg || '') + ':' + (lc.tx || '') + ':' + (lc.ol || ''));
+  });
+  if (p.length > 0) o.P = p.join(',');
+  var nm = fcName(cid);
+  if (nm) o.N = nm;
+  customRowBySlot[fcSlot(cid)] = o;
+
+  var wasCreate = fcWizardCreate;
+  var tgt = fcWizardTarget;  // VOR fcWizardCancel lesen (Cancel räumt das Ziel auf)
+  fcWizardCancel();  // Overlay entfernen (danach lesen fcVal & Co. wieder aus dem Store)
+
+  // UI überall auffrischen (Picker-Namen, Box-Header, Vorschau)
+  if (typeof populateKompaktDisplay === 'function') populateKompaktDisplay();
+  if (wasCreate) {
+    if (tgt && tgt.type === 'city' && typeof setCityGroupColour === 'function') {
+      // Aus dem Stadt-Dropdown erstellt → der ganzen Stadt-Gruppe zuweisen
+      setCityGroupColour(tgt.net, String(cid));
+    } else if (tgt && tgt.type === 'instance' && typeof setInstanceColour === 'function') {
+      // Aus dem Instanz-Dropdown erstellt → dieser Display-Instanz zuweisen
+      setInstanceColour(tgt.instId, String(cid));
+    } else if (tgt && tgt.type === 'station' && typeof stations !== 'undefined' && stations[tgt.idx]) {
+      // Aus der alten Pro-Station-Zuordnung erstellt → dieser Station zuweisen
+      stations[tgt.idx].colourOverride = cid;
+      if (typeof renderStationDisplayList === 'function') renderStationDisplayList();
+    } else if (!ftIsMultiDisplay && !ftIsManualAssignment) {
+      // Kompakt: neues Display direkt als gewählten Stil übernehmen
+      var colSel = document.getElementById('ftColorSelect');
+      if (colSel) {
+        if (!colSel.querySelector('option[value="' + cid + '"]')) {
+          var opt = document.createElement('option');
+          opt.value = String(cid);
+          colSel.appendChild(opt);
+        }
+        colSel.value = String(cid);
+      }
+      var kSel = document.getElementById('ftKompaktDisplay');
+      if (kSel) kSel.value = String(cid);
+    } else if (typeof mergedSegmentsSupported === 'function' && mergedSegmentsSupported()) {
+      // Neue Zuordnungs-UI (Stadt-/Instanz-Liste) auffrischen — zeigt den neuen Namen
+      if (typeof updateGroupByCityUI === 'function') updateGroupByCityUI();
+    } else {
+      // Alte UI (Firmware < 2.3.18): Zuordnung auf Manuell öffnen, damit das neue
+      // Display sofort pro Station zuweisbar ist (Dropdowns zeigen den neuen Namen).
+      setFtAutoManual('manual');
+    }
+  }
+  if (ftIsManualAssignment && typeof renderStationDisplayList === 'function') renderStationDisplayList();
+  renderDisplayTypeSections();
+  if (typeof updateFinetuningPreview === 'function') updateFinetuningPreview();
+}
+
 function renderDisplayTypeSections() {
   var container = document.getElementById('ftDisplayTypeSections');
   if (!container) return;
   var types = getUniqueDisplayTypes();
+  // Instanz-Modus ("Nach Städten gruppieren" AUS): eine Box pro Display-INSTANZ statt pro
+  // Typ — auch mehrere Boxen desselben Typs (getrennte Slideshow-Seiten). Die Design-
+  // Controls (IDs ftRows_<cid> …) gibt es pro colour nur EINMAL (Firmware speichert
+  // displaysettings pro Typ) → weitere Instanzen gleichen Typs listen nur ihre Stationen.
+  if (typeof instanceModeActive === 'function' && instanceModeActive()) {
+    var _seenInstCid = {};
+    var _instNo = 0;
+    types = getDisplayInstances().map(function(inst) {
+      var cid = inst.colour;
+      var dup = !!_seenInstCid[cid];
+      _seenInstCid[cid] = true;
+      var label = inst.fixed ? ('Wien · ' + ftDisplayName(cid)) : ('Display ' + (++_instNo) + ' · ' + ftDisplayName(cid));
+      return { colour: cid, stations: inst.stations, _instLabel: label, _skipControls: dup };
+    });
+  }
   var html = '';
 
   types.forEach(function(dt, dtIdx) {
@@ -13167,7 +14254,7 @@ function renderDisplayTypeSections() {
     html += '<div class="config-card ft-display-card" style="border:1px solid ' + netColor + '55;border-top:4px solid ' + netColor + ';padding-top:0;">';
     html += '<div class="ft-display-head" data-cid="' + dt.colour + '" onclick="toggleFtDisplayBox(this)" style="cursor:pointer;margin:0 -20px 14px;padding:11px 20px;background:' + netColor + '14;border-bottom:1px solid ' + netColor + '33;display:flex;align-items:center;gap:10px;">';
     html += '<span style="display:inline-block;width:16px;height:16px;border-radius:4px;background:' + netColor + ';flex:0 0 auto;"></span>';
-    html += '<span style="font-weight:700;font-size:16px;color:' + netColor + ';">' + (f.name || 'Display') + '</span>';
+    html += '<span' + (dt._skipControls ? '' : ' id="ftDispName_' + dt.colour + '"') + ' style="font-weight:700;font-size:16px;color:' + netColor + ';">' + escapeHtmlFt(dt._instLabel || ftDisplayName(dt.colour)) + '</span>';
     html += '<span style="margin-left:auto;font-size:11px;color:#999;">' + dt.stations.length + (dt.stations.length === 1 ? ' Station' : ' Stationen') + '</span>';
     html += '<span class="ft-chev" style="font-size:14px;color:' + netColor + ';width:14px;text-align:center;">' + (openByDefault ? '▾' : '▸') + '</span>';
     html += '</div>';
@@ -13186,6 +14273,14 @@ function renderDisplayTypeSections() {
       html += '<span style="font-size:11px;color:#999;margin-left:auto;">' + netName + (lines ? ' · ' + lines : '') + '</span>';
       html += '</div>';
     });
+
+    // Zweite Instanz desselben Typs (Instanz-Modus): eigene Slideshow-Seite, aber die
+    // Design-Einstellungen sind pro TYP — nur Stationsliste + Hinweis, keine Controls.
+    if (dt._skipControls) {
+      html += '<div class="form-hint" style="margin-top:8px;">Eigene Seite in der Slideshow. Design-Einstellungen teilt sich dieses Display mit dem gleichnamigen Display oben.</div>';
+      html += '</div></div>';
+      return;
+    }
 
     // Schriftgröße-Toggle (nur Graz/Liechtenstein) - vor Zeilen
     if (f.bigText) {
@@ -13328,6 +14423,19 @@ function renderDisplayTypeSections() {
 
       if (!window._dtAllDirs) window._dtAllDirs = {};
       window._dtAllDirs[cid] = allDirs;
+    }
+
+    // Eigenes Display (colour 101+): Design (Farben/Hintergrund/Schriftart/Badges/Name)
+    // wird im Wizard bearbeitet (fcOpenWizard) — hier nur Mini-Farbchips + Button.
+    if (f.customColors) {
+      var cidF = dt.colour;
+      html += '<div class="form-row"><div><div class="form-label">Design</div><div class="form-hint">Farben, Hintergrund, Schriftart &amp; Name</div></div>';
+      html += '<div style="display:flex;align-items:center;gap:6px;">';
+      ['B', 'H', 'T'].forEach(function(k) {
+        html += '<span style="width:18px;height:18px;border-radius:5px;border:1px solid #ddd;background:#' + fcVal(cidF, k) + ';"></span>';
+      });
+      html += '<button onclick="fcOpenWizard(' + cidF + ')" style="margin-left:6px;padding:8px 14px;border:none;background:#4285f4;color:#fff;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Bearbeiten</button>';
+      html += '</div></div>';
     }
 
     // Farbton/Schriftfarbe (nutzt dasselbe textColor-Setting 1/2/3; Labels je Display-Typ)
@@ -13475,6 +14583,11 @@ function renderDisplayTypeSections() {
     html += '</div>';   // .ft-display-body
     html += '</div>';   // .config-card
   });
+
+  // Eigenes Display erstellen (öffnet den Design-Wizard) — solange ein Slot (c1-c3) frei ist
+  if (fcFreeSlot()) {
+    html += '<button onclick="fcCreateDisplay()" style="width:100%;padding:14px;background:rgba(123,31,162,0.06);border:1px dashed rgba(123,31,162,0.5);border-radius:12px;color:#7b1fa2;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;">+ Eigenes Display erstellen</button>';
+  }
 
   container.innerHTML = html;
 
@@ -14161,6 +15274,11 @@ async function initFinetuningStep() {
   // für single-type (wo setFtCompactSeparate oben nicht läuft).
   updateStyleAssignmentUI();
 
+  // „Nach Städten gruppieren"-Toggle (PRO) + Zuordnungs-Wizard: Zustand kommt aus der
+  // geladenen Config (loadExistingConfig leitet ihn aus den Segmenten ab) bzw. Default AN;
+  // ohne fw>=2.3.18 ausgegraut ("Firmware-Update nötig").
+  if (typeof updateGroupByCityUI === 'function') updateGroupByCityUI();
+
   // Display-Typ Sektionen rendern
   renderDisplayTypeSections();
 
@@ -14686,7 +15804,10 @@ function updateFinetuningPreview() {
       19: [{ line: '1', dest: 'Weiden West', time: 3 }, { line: '9', dest: 'Sülz', time: 6 }, { line: '18', dest: 'Klettenberg', time: 9 }],
       20: [{ line: '3A', dest: 'Uniklinik', time: 4 }, { line: '5', dest: 'Kaiserplatz', time: 7 }, { line: '25', dest: 'Vaals', time: 11 }],
       23: [{ line: '1', dest: 'Auwiesen', time: 2 }, { line: '3', dest: 'Landgutstr.', time: 5 }, { line: '46', dest: 'Hauptbahnhof', time: 8 }, { line: '17', dest: 'Solarcity', time: 12 }, { line: '25', dest: 'Universität', time: 16 }],
-      24: [{ line: 'S2', dest: 'Hauptbahnhof', time: 3 }, { line: '1', dest: 'Salzburg Süd', time: 6 }, { line: '22', dest: 'Aigen', time: 9 }, { line: '7', dest: 'Itzling', time: 13 }, { line: '4', dest: 'Liefering', time: 17 }]
+      24: [{ line: 'S2', dest: 'Hauptbahnhof', time: 3 }, { line: '1', dest: 'Salzburg Süd', time: 6 }, { line: '22', dest: 'Aigen', time: 9 }, { line: '7', dest: 'Itzling', time: 13 }, { line: '4', dest: 'Liefering', time: 17 }],
+      101: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
+      102: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
+      103: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }]
     };
     data = fallbackData[colour] || fallbackData[1];
   }
@@ -14791,6 +15912,12 @@ function updateFinetuningPreview() {
           <span style="font-weight:bold;font-size:16px;">${dep.time}</span>
         </div>`).join('')}
     </div>`;
+  }
+  else if (fcIsCustomColour(colour)) {
+    // Eigenes Display: geräteechte Bodo-Replik (gleicher Renderer wie im Design-Wizard)
+    const fcCfg = fcPreviewConfig(colour);
+    fcApplyPreviewBg(previewEl, fcCfg);
+    html = fcDevicePreviewHTML(fcCfg, data);
   }
   else if (colour === 22) {
     // MVG München: helles Blau, U-Bahn-Badges (MVG-Farben), sonst weiße Schrift, "Min"-Header
@@ -15829,7 +16956,8 @@ function applyFinetuningOrderToStations() {
   //   die Reihenfolge-Liste sie verschachtelt zeigt. Der Rang kommt aus dem einen Display-Typ
   //   (ftColorSelect), dessen Richtungs-Liste alle Stationen enthält.
   var kompaktUnified = (typeof ftIsMultiDisplay !== 'undefined' && !ftIsMultiDisplay
-                        && typeof ftIsManualAssignment !== 'undefined' && !ftIsManualAssignment);
+                        && typeof ftIsManualAssignment !== 'undefined' && !ftIsManualAssignment
+                        && !(typeof instanceModeActive === 'function' && instanceModeActive()));
   if (kompaktUnified) {
     var uCidEl = document.getElementById('ftColorSelect');
     var uCid = (uCidEl && parseInt(uCidEl.value)) || 1;
@@ -15962,8 +17090,10 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     });
   }
   // Kompakt = ein einheitliches Display über alle Stationen → masterrow-Zeilen global nach Rang.
+  // Instanz-Modus zählt NICHT als Kompakt: dort gilt die per-Station-Zuordnung.
   var kompaktUnified = (typeof ftIsMultiDisplay !== 'undefined' && !ftIsMultiDisplay
-                        && typeof ftIsManualAssignment !== 'undefined' && !ftIsManualAssignment);
+                        && typeof ftIsManualAssignment !== 'undefined' && !ftIsManualAssignment
+                        && !(typeof instanceModeActive === 'function' && instanceModeActive()));
   var entries = [];  // { str, rank, isTime } — erst sammeln, dann (Kompakt) global sortieren
 
   // Gehweg pro PHYSISCHEM Halt (stopName): eine Wien-U-Bahn-Station liegt als ZWEI Station-
@@ -15993,7 +17123,9 @@ function buildMasterAndTimeRows(gehwegByStopId) {
   // sonst leitet die Firmware aus den per-Stop c-Tokens (c1,c12,…) Multi-Display ab und
   // schaltet um, obwohl Kompakt gewählt ist. Multi/Manuell → Feld hat Komma → per Station.
   var _gc = String((typeof recommendedConfig !== 'undefined' && recommendedConfig && recommendedConfig.colour) || '');
-  var _unifiedColour = (_gc && _gc.indexOf(',') < 0 && !isNaN(parseInt(_gc))) ? parseInt(_gc) : null;
+  var _unifiedColour = (_gc && _gc.indexOf(',') < 0 && !isNaN(parseInt(_gc))
+                      && !(typeof instanceModeActive === 'function' && instanceModeActive()))
+                     ? parseInt(_gc) : null;  // Instanz-Modus: per-Station-colour zählt, nie vereinheitlichen
   (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
     var colour = (_unifiedColour != null) ? _unifiedColour : stationDisplayColour(s);
     var bucket = (MASTERROW_TIME_COLOURS.indexOf(colour) >= 0) ? time : master;
@@ -16096,23 +17228,77 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       if (v > stationGehweg) stationGehweg = v;
     });
 
+    // Display-Instanz-Schlüssel dieser Station (merged Segmente, NUR fw >= 2.3.18):
+    // Toggle AN → Stadt-Gruppe (Netz+colour) teilt sich EIN Segment; Toggle AUS → die
+    // manuelle Instanz-Zuordnung entscheidet. Wien (WL/WLB), "Alle Abfahrten" und
+    // von→nach-Journeys bleiben IMMER ein eigenes Segment (null = kein Merge).
+    var instKey = null;
+    if (typeof mergedSegmentsSupported === 'function' && mergedSegmentsSupported()
+        && s.network !== 'WL' && s.network !== 'WLB' && !s.allDepartures && !s.isJourney) {
+      if (typeof ftGroupByCity !== 'undefined' && ftGroupByCity === false) {
+        if (s.displayInstance != null) instKey = 'inst/' + s.displayInstance;
+      } else {
+        instKey = 'city/' + (s.network || '') + '/' + colour + '/' + ((bucket === time) ? 't' : 'm');
+      }
+    }
+
     rblOrder.forEach(function(rbl) {
       if (_emittedRbls[rbl]) return;  // doppelte Station überspringen (kein Gehweg-Artefakt)
       _emittedRbls[rbl] = true;
       var data = rblData[rbl];
-      var lines = data.lineParts.length ? data.lineParts.join(',') : '*';
-      // Gruppen-Marker m<tokenIdx>:<gid> für alle gruppierten Linien-Tokens dieser
-      // Station. Ältere Firmware ignoriert das unbekannte Feld (Tokens bleiben sauber).
-      var mParts = [];
-      (data.gids || []).forEach(function(g, i) { if (g) mParts.push(i + ':' + g); });
       // Eintrag pro Station: rbl|lines|c<colour>|g<gehweg>[|m...]. Per-Display-Settings
       // (rows/interval/…) liegen separat in displaysettings (gekeyt nach colour).
       // Gehweg PRO Stop-ID (Bahnsteig) wenn vorhanden, sonst der Stations-Max (Fallback).
+      // Serialisiert wird erst NACH dem Instanz-Merge (m-Token-Indizes verschieben sich).
       var _rblGw = (gehwegByStopId[data.bareId] != null) ? gehwegByStopId[data.bareId] : stationGehweg;
-      var str = rbl + '|' + lines + '|c' + colour + '|g' + _rblGw + (mParts.length ? '|m' + mParts.join(',') : '');
-      // Erst sammeln (mit Rang + Ziel-Bucket), Reihenfolge entscheidet sich nach der Schleife.
-      entries.push({ str: str, rank: (data.rank !== undefined ? data.rank : 1e9), isTime: (bucket === time) });
+      // '*'-Einträge (alle Linien) nie mit konkreten Linien-Tokens mergen — gemischte
+      // Semantik in EINEM Segment wäre nicht abbildbar.
+      var _instKey = (data.lineParts.length === 1 && data.lineParts[0] === '*') ? null : instKey;
+      entries.push({
+        rbl: rbl,
+        lineParts: data.lineParts.slice(),
+        gids: (data.gids || []).slice(),
+        colour: colour,
+        gehweg: _rblGw,
+        instKey: _instKey,
+        rank: (data.rank !== undefined ? data.rank : 1e9),
+        isTime: (bucket === time)
+      });
     });
+  });
+
+  // MERGED SEGMENTE (fw >= 2.3.18): Einträge derselben Display-Instanz bzw. Stadt-Gruppe
+  // zu EINEM masterrow-Segment mit komma-gejointen rbls verschmelzen
+  // ("BAYERN:a,BAYERN:b|<lines beider>|c24|g0", wie Wien "4131,4136"). Position = erstes
+  // Mitglied; Linien-Tokens dedupliziert (wie Firmware seenTok); Gehweg = Max der Stops.
+  (function mergeInstanceSegments() {
+    var byKey = {};
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!e.instKey) continue;
+      var tgt = byKey[e.instKey];
+      if (!tgt) { byKey[e.instKey] = e; continue; }
+      if (tgt.isTime !== e.isTime || tgt.colour !== e.colour) continue;  // Sicherheitsnetz
+      tgt.rbl += ',' + e.rbl;
+      e.lineParts.forEach(function(lp, li) {
+        if (tgt.lineParts.indexOf(lp) >= 0) return;  // Dedup über die Stops des Segments
+        tgt.lineParts.push(lp);
+        tgt.gids.push(e.gids[li] || 0);
+      });
+      if (e.gehweg > tgt.gehweg) tgt.gehweg = e.gehweg;
+      if (e.rank < tgt.rank) tgt.rank = e.rank;
+      entries.splice(i, 1); i--;
+    }
+  })();
+
+  // Serialisieren (m-Token-Indizes jetzt final, auch nach Merge).
+  entries.forEach(function(e) {
+    var lines = e.lineParts.length ? e.lineParts.join(',') : '*';
+    // Gruppen-Marker m<tokenIdx>:<gid> für alle gruppierten Linien-Tokens dieser
+    // Station. Ältere Firmware ignoriert das unbekannte Feld (Tokens bleiben sauber).
+    var mParts = [];
+    (e.gids || []).forEach(function(g, i) { if (g) mParts.push(i + ':' + g); });
+    e.str = e.rbl + '|' + lines + '|c' + e.colour + '|g' + e.gehweg + (mParts.length ? '|m' + mParts.join(',') : '');
   });
 
   // Kompakt (ein Display für alle): ZEILEN global nach dt-Rang sortieren — so kann eine
@@ -16186,7 +17372,9 @@ function buildDisplaySettings() {
   // Netz-colour der Station. Dann hier dieselbe _unifiedColour verwenden, sonst landet z.B.
   // r3 unter dem nativen c6, das Display läuft aber als c7 → findet kein r → Default 2 Zeilen.
   var _gc = String((typeof recommendedConfig !== 'undefined' && recommendedConfig && recommendedConfig.colour) || '');
-  var _unifiedColour = (_gc && _gc.indexOf(',') < 0 && !isNaN(parseInt(_gc))) ? parseInt(_gc) : null;
+  var _unifiedColour = (_gc && _gc.indexOf(',') < 0 && !isNaN(parseInt(_gc))
+                      && !(typeof instanceModeActive === 'function' && instanceModeActive()))
+                     ? parseInt(_gc) : null;  // Instanz-Modus: per-Station-colour zählt, nie vereinheitlichen
   var segs = [];
   var seen = {};
   (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
@@ -16274,6 +17462,9 @@ function buildDisplaySettings() {
       parts.push('f' + (String(_fv) === '1' ? 1 : 0));
     }
     if (f.delayHighlight) parts.push('d' + dsKeepBool(cid, 'd', 'ftDelayHl_' + cid, recommendedConfig && recommendedConfig.delayHighlight, 0));
+    // Eigene Displays (colour 101+): Design-Tokens (Farben/Name/Schriftart/…) liegen
+    // in der CUSTOMROW (buildCustomRow), NICHT hier — displaysettings hält für sie
+    // nur die generischen Tokens (r/i/s/w/a).
     segs.push(parts.join('|'));
   });
   return segs.join(';');
@@ -16457,11 +17648,11 @@ function saveFromFinetuning() {
   // Stationen innerhalb eines Display-Typs.
   if (typeof applyFinetuningOrderToStations === 'function') applyFinetuningOrderToStations();
 
-  // Multi-Display ODER manuelle Zuordnung: colour pro Station sammeln.
-  // (Manuelle Zuordnung muss auch im Kompakt-Modus greifen, sonst wird der im
-  // Dropdown gewählte Display-Typ beim Speichern ignoriert.)
+  // Multi-Display ODER manuelle Zuordnung ODER Instanz-Modus: colour pro Station sammeln.
+  // (Muss auch im Kompakt-Modus greifen, sonst wird der im Dropdown/Instanz-Wizard
+  // gewählte Display-Typ beim Speichern ignoriert — auch bei gleicher Stadt.)
   let colour;
-  if (ftIsMultiDisplay || ftIsManualAssignment) {
+  if (ftIsMultiDisplay || ftIsManualAssignment || (typeof instanceModeActive === 'function' && instanceModeActive())) {
     // colour pro Station DIREKT vom Objekt (stationDisplayColour) → exakt index-gleich
     // mit rbl/filter/gehweg, kein paralleles Array das verrutschen kann.
     const perStation = stations.map(function(s) { return stationDisplayColour(s); });
@@ -16521,11 +17712,11 @@ function saveFromFinetuning() {
     }
   });
 
-  // Multi-Display / manuelle Zuordnung: Zeilen PRO Display als Komma-Liste — gleiche
-  // Reihenfolge & Länge wie die colour-Liste (Firmware liest sie via GetLinesCountForGroup).
-  // Ohne das überschreibt die obige Schleife rows zu einem Einzelwert → alle Displays
-  // bekommen nur eine Zeile (Bug: lines_count "1" statt "4,2").
-  if (ftIsMultiDisplay || ftIsManualAssignment) {
+  // Multi-Display / manuelle Zuordnung / Instanz-Modus: Zeilen PRO Display als Komma-Liste —
+  // gleiche Reihenfolge & Länge wie die colour-Liste (Firmware liest sie via
+  // GetLinesCountForGroup). Ohne das überschreibt die obige Schleife rows zu einem
+  // Einzelwert → alle Displays bekommen nur eine Zeile (Bug: lines_count "1" statt "4,2").
+  if (ftIsMultiDisplay || ftIsManualAssignment || (typeof instanceModeActive === 'function' && instanceModeActive())) {
     rows = stations.map(function(s, i) {
       var cid = stationDisplayColour(s);
       var f = DISPLAY_TYPE_FEATURES[cid] || {};
@@ -16773,6 +17964,17 @@ function sendConfigToDeviceDirect(config) {
     console.error('[DISPLAYSETTINGS] Build-Fehler:', e);
   }
 
+  // customrow (Designs der Eigenen Displays, colour 101+) — analog zu displaysettings:
+  // Feintuning offen → aus den Inputs, sonst gespeicherte Segmente behalten.
+  try {
+    if (typeof buildCustomRow === 'function') {
+      var _cr = buildCustomRow();
+      if (_cr) { config.customRow = _cr; console.log('[CUSTOMROW]', _cr); }
+    }
+  } catch (e) {
+    console.error('[CUSTOMROW] Build-Fehler:', e);
+  }
+
   // Config-Daten für ESP32
   console.log('[sendConfigToDeviceDirect] config.sortMode:', config.sortMode, '(1=Statisch, 2=Zeit)');
 
@@ -16869,7 +18071,8 @@ function sendConfigToDeviceDirect(config) {
     // scheitert (dann greift MigrateFieldsToRows aus rbl+filter).
     masterrow: config.masterRow || '',  // single source of truth (line-based)
     timerow: config.timeRow || '',      // single source of truth (zeitbasiert)
-    displaysettings: config.displaySettings || ''  // Settings pro Display-Typ
+    displaysettings: config.displaySettings || '',  // Settings pro Display-Typ
+    customrow: config.customRow || ''   // Designs der Eigenen Displays (c1;c2;…)
   };
 
   // Prüfe ob wir im iframe sind
@@ -16949,6 +18152,7 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('masterrow', configData.masterrow);
     formData.append('timerow', configData.timerow);
     formData.append('displaysettings', configData.displaysettings);
+    formData.append('customrow', configData.customrow);
 
     updateSavingOverlay('Speichere Einstellungen...');
 
@@ -17195,12 +18399,15 @@ function allDeparturesStopIdsFromRows(masterRowStr) {
     if (!seg) return;
     var fields = seg.split('|');
     if (fields.length < 2) return;
-    var rbl = (fields[0] || '').trim();           // NET:stopId
+    var rbl = (fields[0] || '').trim();           // NET:stopId[,NET:stopId…] (merged Segment)
     var lineField = (fields[1] || '').trim();      // "*" = alle Linien
     if (lineField !== '*') return;
-    var ci = rbl.indexOf(':');
-    var sid = ci > 0 ? rbl.substring(ci + 1) : rbl;
-    if (sid) set[sid] = true;
+    rbl.split(',').forEach(function(tok) {
+      tok = tok.trim(); if (!tok) return;
+      var ci = tok.indexOf(':');
+      var sid = ci > 0 ? tok.substring(ci + 1) : tok;
+      if (sid) set[sid] = true;
+    });
   });
   return set;
 }
@@ -17213,9 +18420,13 @@ function gehwegByStopIdFromRows(masterRowStr) {
   String(masterRowStr).split(';').forEach(function(seg) {
     seg = seg.trim(); if (!seg) return;
     var rbl = (seg.split('|')[0] || '').trim();
-    var sid = gehwegKey(rbl);  // Prefix weg, ">Ziel" BLEIBT (= Build-/Firmware-Key)
     var gm = seg.match(/\|g(\d+)/);
-    if (sid && gm) map[sid] = parseInt(gm[1], 10) || 0;
+    if (!gm) return;
+    // Merged Segmente tragen mehrere komma-gejointe rbls → der g-Wert gilt für jeden Stop.
+    rbl.split(',').forEach(function(tok) {
+      var sid = gehwegKey(tok);  // Prefix weg, ">Ziel" BLEIBT (= Build-/Firmware-Key)
+      if (sid) map[sid] = parseInt(gm[1], 10) || 0;
+    });
   });
   return map;
 }
@@ -17262,7 +18473,18 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           if (line && !dirs.some(d => d.line === line && d.towards === towards)) dirs.push({ line, towards });
         });
       });
-      if (dirs.length) masterDirsByRbl[segRbl] = dirs;
+      if (dirs.length) {
+        masterDirsByRbl[segRbl] = dirs;
+        // Merged Segment (komma-gejointe rbls, fw>=2.3.18): dieselben Richtungen für
+        // jeden Stop-Token hinterlegen — die API-Abfrage pro Station behält unten nur
+        // die Richtungen, die an diesem Stop tatsächlich vorkommen.
+        if (segRbl.indexOf(',') >= 0) {
+          segRbl.split(',').forEach(tok => {
+            tok = tok.trim();
+            if (tok && !masterDirsByRbl[tok]) masterDirsByRbl[tok] = dirs;
+          });
+        }
+      }
     });
   }
 
@@ -17276,8 +18498,34 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       seg = seg.trim(); if (!seg) return;
       const segRbl = (seg.split('|')[0] || '').trim();
       const cm = seg.match(/\|c(\d+)/);
-      if (segRbl && cm) colourByRbl[segRbl] = parseInt(cm[1], 10);
+      // Merged Segmente: das c-Feld gilt für jeden Stop-Token des Segments.
+      if (segRbl && cm) {
+        const cVal = parseInt(cm[1], 10);
+        segRbl.split(',').forEach(tok => { tok = tok.trim(); if (tok) colourByRbl[tok] = cVal; });
+      }
     });
+  }
+
+  // Segment-Struktur der masterrow: Stop-Token → { segIdx, tokenCount }. segIdx zählt über
+  // masterrow UND timerow (Aufrufer übergibt "master;time") — dieselbe Reihenfolge, in der
+  // die Firmware das filter-Feld generiert (EIN |-Segment pro masterrow-Segment). Merged
+  // Segmente (Komma-rbls) lösen sich damit in einzelne Stations-Objekte MIT gemeinsamer
+  // Display-Instanz (displayInstance = segIdx+1) auf.
+  const segInfoByToken = {};
+  {
+    let _segCount = 0;
+    if (masterRowStr) {
+      String(masterRowStr).split(';').forEach(seg => {
+        seg = seg.trim(); if (!seg) return;
+        const segRbl = (seg.split('|')[0] || '').trim();
+        if (!segRbl) return;
+        const toks = segRbl.split(',').map(t => t.trim()).filter(Boolean);
+        const segIdx = _segCount++;
+        toks.forEach(tok => {
+          if (segInfoByToken[tok] === undefined) segInfoByToken[tok] = { segIdx: segIdx, tokenCount: toks.length };
+        });
+      });
+    }
   }
 
   // Parse linefilterdestination ODER roworderdestination (beide haben gleiches Format)
@@ -17379,8 +18627,12 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       if (cachedName) stopName = cachedName;
     }
 
-    // Filter für diese Station: Liniennamen aus filterParts oder aus lineDestinations
-    const stationFilter = filterParts[idx] || '';
+    // Filter für diese Station: Liniennamen aus filterParts oder aus lineDestinations.
+    // Das filter-Feld hat EIN |-Segment pro masterrow-SEGMENT (nicht pro Stop) — bei
+    // merged Segmenten daher über den Segment-Index zugreifen, sonst verrutscht die
+    // Zuordnung sobald ein Segment mehrere komma-gejointe rbls trägt.
+    const _segInfo = segInfoByToken[part];
+    const stationFilter = (_segInfo !== undefined) ? (filterParts[_segInfo.segIdx] || '') : (filterParts[idx] || '');
     const filterLines = stationFilter ? stationFilter.split(',').map(f => f.trim()) : [];
     // Richtungs-Filter dieser Station: PRIMÄR aus der masterrow (richtungsId-genau), sonst der
     // global geparste linefilterdestination/linegroups-Fallback.
@@ -17409,6 +18661,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // Gespeicherten Display-Typ (|cNN aus der masterrow) als Zuordnung wiederherstellen —
     // exakter Round-Trip statt Netz-Default (siehe colourByRbl oben).
     if (colourByRbl[part] != null) station.colourOverride = colourByRbl[part];
+    // Display-Instanz = masterrow-Segment: Stationen desselben (merged) Segments teilen
+    // sich eine Instanz — Grundlage für den Zuordnungs-Wizard und die Toggle-Ableitung.
+    if (_segInfo !== undefined) station.displayInstance = _segInfo.segIdx + 1;
 
     // DBALL/DBSTEIG: der rbl kodiert die Auswahl (Gattung/Steig/Linie nach '!', alt ':').
     // Beim Reload steht in der masterrow "…|*|" → ohne dieses Handling läse der Konfigurator
@@ -17557,7 +18812,13 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // auch wenn gerade keine Abfahrt dieser Richtung im Feed lag. Sonst bliebe directions
     // leer/partiell → der Edit-Picker fällt auf reines Liniennamen-Matching zurück und hakt
     // BEIDE Richtungen an (der gemeldete "beide ausgewählt"-Bug). Andere Netze unberührt.
-    if (!isAllDep && !isJourney && Array.isArray(stationDests) && stationDests.length) {
+    // Bei merged Segmenten (tokenCount > 1) nur nachtragen, wenn die API GAR KEINE
+    // Richtungen lieferte: die stationDests decken dort ALLE Stops des Segments ab —
+    // eine Steig-Richtung des Nachbar-Stops würde sonst fälschlich auch hier landen.
+    // (Leere API = Offline/Nacht-Fall: lieber die Segment-Union behalten als die
+    // richtungsIds beim Re-Save zu verlieren; der Merge dedupliziert die Tokens wieder.)
+    if (!isAllDep && !isJourney && Array.isArray(stationDests) && stationDests.length
+        && (_segInfo === undefined || _segInfo.tokenCount === 1 || station.directions.length === 0)) {
       stationDests.forEach(sd => {
         if (!sd.line || !sd.towards) return;
         const rid = String(sd.towards);
@@ -17576,6 +18837,22 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // (await pro Station für Namen/Abfahrten). Dadurch kann dieselbe Station mehrfach
   // landen. Hier final per fullId deduplizieren (erste behalten).
   dedupeStationsByFullId();
+
+  // „Nach Städten gruppieren"-Zustand aus der Config ableiten: mehrere Stationen derselben
+  // Stadt-Gruppe (Netz+colour) in GETRENNTEN Segmenten = Toggle AUS (Instanz-Modus).
+  // Sonst Default AN. Nur relevant wenn die Firmware merged Segmente überhaupt kann.
+  if (typeof mergedSegmentsSupported === 'function' && mergedSegmentsSupported()) {
+    let _derivedGroupByCity = true;
+    const _segByCity = {};
+    stations.forEach(s => {
+      const k = (typeof cityGroupKeyOf === 'function') ? cityGroupKeyOf(s) : null;
+      if (!k || s.displayInstance == null) return;
+      if (_segByCity[k] === undefined) _segByCity[k] = s.displayInstance;
+      else if (_segByCity[k] !== s.displayInstance) _derivedGroupByCity = false;
+    });
+    ftGroupByCity = _derivedGroupByCity;
+    if (typeof updateGroupByCityUI === 'function') updateGroupByCityUI();
+  }
 
   if (stations.length > 0) {
     updateStationsList();
@@ -17829,6 +19106,9 @@ async function handleConfigMessage(data) {
     if (data.config.displaysettings) {
       applyDisplaySettingsToConfig(data.config.displaysettings);
     }
+    // customrow (Designs der Eigenen Displays, colour 101+) wiederherstellen —
+    // Restore liest pro Slot (fcStored), analog zum dsByCid-Muster.
+    parseCustomRow(data.config.customrow || '');
     // advancedSettings (Helligkeit/Textfarbe/Modus/Interval) aus der geladenen Config
     // seeden → wizardBuildConfig überschreibt die Werte sonst mit Defaults (Reload-Bug).
     seedAdvancedFromConfig(recommendedConfig);
