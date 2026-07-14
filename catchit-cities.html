@@ -8747,13 +8747,12 @@ function renderLines() {
     // nicht wählbar). Lieber alle anbieten; ein Chip ohne echte Züge zeigt halt nichts.
     let chipCats = FV_CATS.slice();
 
-    // Zugtypen erst NACH Zielwahl, und nur die, die die gewählte Verbindung bedienen (Union).
+    // Zugtypen erst NACH Zielwahl. IMMER alle Gattungen anbieten (einheitlich an
+    // jedem FV-Bahnhof): die frühere Einengung auf fvServingCats() (nur beobachtete
+    // Zugtypen der Verbindung) versteckte real existierende Chips, wenn die
+    // Routendaten lückenhaft waren (Wien→Linz ohne Westbahn/ICE, 2026-07-14).
+    // Ein Chip ohne echte Züge zeigt schlicht nichts an — das ist harmlos.
     if (fvShowCats) {
-      if (!fvAll && fvDests.length) {
-        const serving = fvServingCats();
-        const f = chipCats.filter(function(c) { return serving.has(c); });
-        if (f.length) chipCats = f;   // Fallback: keine Routeninfo → alle zeigen
-      }
       let catBody = '<div class="fv-filter-hint" style="margin-bottom:9px;">Gestrichelte sind <strong>auswählbar</strong>: antippen zum Hinzufügen oder Entfernen.</div><div class="fv-chips">';
       chipCats.forEach(function(cat) {
         const active = fvActiveCats.has(cat);
@@ -10864,8 +10863,19 @@ function updateStationsList() {
   } else {
     emptyState.style.display = 'none';
     saveBtn.disabled = false;
-    // openFinetuningBtn nicht mehr verwenden — alles über saveBtn in bottom-bar
-    if (openFinetuningBtn) openFinetuningBtn.classList.add('hidden');
+    // openFinetuningBtn nur ausserhalb der "Hinzugefügte Stationen"-Zwischenseite
+    // verstecken: DORT ist die bottom-bar (saveBtn) ausgeblendet und der Weiter-Button
+    // der EINZIGE Ausweg. Das bedingungslose Verstecken erzeugte eine Sackgasse:
+    // Station auf der Zwischenseite löschen → updateStationsList versteckte den
+    // Weiter-Button → gar kein Button mehr, User kam nur noch über
+    // "Konfigurationen löschen" raus (Kundenreport 2026-07-14).
+    if (openFinetuningBtn) {
+      if (typeof currentStep !== 'undefined' && currentStep === 'added') {
+        openFinetuningBtn.classList.remove('hidden');
+      } else {
+        openFinetuningBtn.classList.add('hidden');
+      }
+    }
     if (stationsCardEl) stationsCardEl.classList.remove('hidden');
   }
 
@@ -11190,6 +11200,21 @@ async function editStation(idx) {
     var baseName = station.dbBaseName || String(station.stopName || '').split(' · ')[0];
     if (typeof removeStation === 'function') removeStation(idx);  // alte Auswahl raus, dann neu wählen
     await startDbSelection(station.stopId, baseName);
+    return;
+  }
+
+  // ÖBB Fernverkehr: Der FV-Wizard (von→nach + Zugtypen-Chips + Restore) läuft unter dem
+  // WESTBAHN-Netz. Reloadete FV-Stationen tragen aber das rbl-Prefix als Netz (OEBBFERN)
+  // → ohne dieses Mapping landete "Bearbeiten" im generischen Linien-Flow und sah aus
+  // wie ÖBB Regional (Kundenreport 2026-07-14). Wie beim In-Session-Edit: selectedStop
+  // = NUR die Von-Station (id vor '>', Name vor '→'); Ziele/Zugtypen stellt der
+  // renderLines-FV-Restore aus fullId+filter wieder her.
+  if (station.network === 'OEBBFERN') {
+    selectedNetwork = 'WESTBAHN';
+    const fvFromId = String(station.stopId || '').split('>')[0];
+    const fvFromName = String(station.stopName || '').split(' → ')[0] || fvFromId;
+    selectedStop = { id: fvFromId, name: fvFromName };
+    await selectStopForEdit(fvFromId, fvFromName, station.directions || [], station.filter || '');
     return;
   }
 
