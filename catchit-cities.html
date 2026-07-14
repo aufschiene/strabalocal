@@ -3680,6 +3680,7 @@
       <option value="22">MVG</option>
       <option value="23">Matrix</option>
       <option value="24">Paper White</option>
+      <option value="25">SBB</option>
     </select>
     <div id="ftWienOptions" style="display:none;"></div>
     <div id="ftGroupingCard" style="display:none;">
@@ -4162,7 +4163,7 @@ const CITY_CAPABILITIES = {
   VMT:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SAARVV:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   LJUBLJANA:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
-  SBB:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 15, defaultBrightness: 3 },
+  SBB:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 25, defaultBrightness: 3 },
   NS:         { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   SNCF:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   UKRAIL:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
@@ -4606,7 +4607,7 @@ const NETWORKS = {
   BUCHAREST:  { name: 'STB Bukarest',          shortName: 'STB',  region: 'RO', desc: 'Metrou, Tramvai, Bus',     searchType: 'trainboard', trainboard: { path: '/ro/bucuresti' },  placeholder: 'z.B. Unirii, Victoriei...',         isJourneyBased: false },
   AUCKLAND:   { name: 'Auckland Transport',    shortName: 'AT',   region: 'NZ', desc: 'Train, Bus, Ferry',        searchType: 'trainboard', trainboard: { path: '/nz/auckland' },   placeholder: 'z.B. Britomart, Newmarket...',      isJourneyBased: false },
   AUSTIN:     { name: 'CapMetro Austin',       shortName: 'CapM', region: 'US', desc: 'MetroRail, Bus',           searchType: 'trainboard', trainboard: { path: '/us/austin' },     placeholder: 'z.B. Congress, Guadalupe...',       isJourneyBased: false },
-  CH_OEFFI:   { name: 'Öffis (Bus, Tram)',     shortName: 'Öffi', region: 'CH', desc: 'Bus, Tram, Obus – ganze Schweiz', searchType: 'trainboard', trainboard: { path: '/ch/zuerich' }, placeholder: 'z.B. Zürich, Bern, Basel, Luzern...', isJourneyBased: false },
+  CH_OEFFI:   { name: 'Öffis (Bus, Tram)',     shortName: 'Öffi', region: 'CH', desc: 'Bus, Tram, Postauto in der ganzen Schweiz', searchType: 'trainboard', trainboard: { path: '/ch' }, placeholder: 'z.B. Zürich, Bern, Bergün, Luzern...', isJourneyBased: false },
   HELSINKI:   { name: 'HSL Helsinki',          shortName: 'HSL',  region: 'FI', desc: 'Metro, Tram, Bus, Zug',       searchType: 'trainboard', trainboard: { path: '/fi/helsinki' },   placeholder: 'z.B. Rautatientori, Kamppi...',    isJourneyBased: false },
   INNSBRUCK:  { name: 'Tirol & Vorarlberg',     shortName: 'VVT',  region: 'AT', desc: 'Bus, Tram, Obus (ganz Tirol & Vorarlberg)', searchType: 'trainboard', trainboard: { path: '/at/innsbruck' },  placeholder: 'z.B. Innsbruck, Kufstein, Bregenz, Dornbirn...', isJourneyBased: false },
   VOR:        { name: 'Niederösterreich & Burgenland', shortName: 'VOR', region: 'AT', desc: 'Bus, Tram (VOR, ganze Ostregion)', searchType: 'trainboard', trainboard: { path: '/at/vor' }, placeholder: 'z.B. St. Pölten, Wr. Neustadt, Eisenstadt...', isJourneyBased: false },
@@ -11410,7 +11411,7 @@ const NETWORK_COLORS = {
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
   BERLIN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
   CH_OEFFI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // Schweiz Öffis → orange Matrix
-  SBB: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },        // Schweiz Zug → orange Matrix
+  SBB: { id: 25, name: 'SBB', color: '#EB0000' },                             // Schweiz Zug → SBB Zugzielanzeiger
   KOELN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
   NRW: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
   BAYERN: { id: 24, name: 'Paper White', color: '#dcdcdc', variant: 3 },
@@ -11660,6 +11661,10 @@ function calculateRecommendedConfig() {
   // auf ÖBB-Display (12), pure-WB-Filter auf Westbahn-Renderer (14). Damit stimmen
   // Anzeige-Stil + Fine-tuning + Device alle überein.
   function _colourForStation(s) {
+    // Manuelle Zuordnung (colourOverride, z.B. Eigenes Display 102) hat IMMER Vorrang —
+    // sonst verliert der erneute Einstieg ins Feintuning (Stationen → zurück →
+    // Feintuning) die Zuweisung und fällt auf den Netz-Default (Wien) zurück.
+    if (s && s.colourOverride != null && !isNaN(s.colourOverride)) return parseInt(s.colourOverride);
     if (s.network === 'WESTBAHN') {
       const codes = new Set();
       (s.filter || '').split(',').forEach(c => { const t = c.trim().toUpperCase(); if (t) codes.add(t); });
@@ -11729,8 +11734,15 @@ function calculateRecommendedConfig() {
   const hasMultipleDisplayTypes = uniqueColours.length > 1;
 
   // colourStr: Wenn verschiedene Netzwerke → komma-separiert pro Station
-  // z.B. "1,14" für WL + Westbahn
-  const colourStr = hasMultipleDisplayTypes ? perStationColours.join(',') : String(displayType);
+  // z.B. "1,14" für WL + Westbahn. Bei EINEM Typ die tatsächliche per-Station-colour
+  // nehmen (respektiert colourOverride/Eigenes Display), NICHT den Netz-Default —
+  // sonst verlor der Wiedereinstieg ins Feintuning das zugewiesene Display.
+  const colourStr = hasMultipleDisplayTypes ? perStationColours.join(',')
+                    : String(uniqueColours.length ? uniqueColours[0] : displayType);
+  if (!hasMultipleDisplayTypes && uniqueColours.length && uniqueColours[0] !== displayType
+      && typeof ftDisplayName === 'function') {
+    displayName = ftDisplayName(uniqueColours[0]);  // z.B. "BVG Gelb" statt "Wiener Linien"
+  }
 
   return {
     // Station-Daten
@@ -12400,6 +12412,12 @@ function updateRealisticPreview(config) {
       highlight: '#888888',
       name: 'Paper White'
     },
+    25: { // SBB Zugzielanzeiger - Perron-Blau, weiße Schrift
+      bg: '#264c9a',
+      text: '#ffffff',
+      highlight: '#ffffff',
+      name: 'SBB'
+    },
     101: { bg: '#' + fcVal(101, 'B'), text: '#' + fcVal(101, 'T'), highlight: '#' + fcVal(101, 'H'), name: 'Eigenes Display 1' },
     102: { bg: '#' + fcVal(102, 'B'), text: '#' + fcVal(102, 'T'), highlight: '#' + fcVal(102, 'H'), name: 'Eigenes Display 2' },
     103: { bg: '#' + fcVal(103, 'B'), text: '#' + fcVal(103, 'T'), highlight: '#' + fcVal(103, 'H'), name: 'Eigenes Display 3' }
@@ -12687,7 +12705,7 @@ function updateQuickPreview() {
   // Settings Tags aktualisieren
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen',25:'SBB'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -12785,7 +12803,7 @@ function initializeQuickPreview() {
   const caps = recommendedConfig.capabilities || {};
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen',25:'SBB'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -12955,6 +12973,7 @@ const DISPLAY_TYPE_FEATURES = {
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, arrival: true, name: 'MVG' },
   23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, delayHighlight: true, name: 'Matrix' },
   24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' },
+  25: { rows: false, sorting: false, grouping: false, name: 'SBB' },
   // Eigene Displays (Custom): colour 101-103 = customrow-Slot c1-c3. Frei gestaltbares
   // Bodo-Layout (Farben, Hintergrund Simpel/Pixel, Schriftart, Badge-Farben pro Linie, Name).
   101: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, name: 'Eigenes Display 1' },
@@ -13322,6 +13341,14 @@ function ftSetKompaktDisplay(val) {
     return;
   }
   setFtColorSelectValue(val);
+  // Kompakt = dieses EINE Display für alle Stationen → als colourOverride an die
+  // Stationen stempeln. Nur so überlebt die Wahl den Wiedereinstieg ins Feintuning
+  // (Stationen → zurück → Feintuning läuft über calculateRecommendedConfig, das die
+  // colour aus den Stationen ableitet) und den Geräte-Reload (masterrow |c-Roundtrip).
+  var cid = parseInt(val);
+  if (!isNaN(cid) && typeof stations !== 'undefined') {
+    stations.forEach(function(s) { s.colourOverride = cid; });
+  }
   renderDisplayTypeSections();
 }
 
@@ -13623,7 +13650,7 @@ function dsStrVal(cid, key) {
 // in der masterrow und weiß: Design steht in customrow-Segment c1.
 // Defaults = Blau/Gelb (DisplayBodo); G=Hintergrund (1 Simpel, 2 Pixel),
 // F=Schriftart (1 Modern/Poppins, 2 Classic/ÖBB, 3 Matrix DACH, 4 Matrix CZ).
-var FC_DEFAULTS = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff', G: '1', F: '1', A: '1' };  // A: Linien-Badges (1=an, Firmware-Default)
+var FC_DEFAULTS = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff', G: '1', F: '1', A: '1', W: '0' };  // A: Linien-Badges (1=an, FW-Default) · W: Ziel-Text dick (0=dünn)
 var FC_MIN_COLOUR = 101, FC_MAX_COLOUR = 103;   // 3 Slots im Konfigurator (Firmware kann 101-109)
 var customRowBySlot = {};   // slot -> { N,B,T,U,H,V,P,G,F,A } (raw, Hex ohne '#'; A=Badges 1/0)
 
@@ -13742,10 +13769,13 @@ function buildCustomRow() {
       if (g !== '1') parts.push('G' + g);
       var fv = fcStyleVal(cid, 'F');
       if (fv !== '1') parts.push('F' + fv);
-      // Linien-Badges (A): kein Input im Detail-Bereich → fcStyleVal liest den Store
-      // (Wizard-Wert). Ohne diese Zeile ginge A0 beim Save mit offenem Feintuning verloren.
+      // Linien-Badges (A) + Ziel-Text dick (W): keine Inputs im Detail-Bereich →
+      // fcStyleVal liest den Store (Wizard-Werte). Ohne diese Zeilen gingen A0/W1
+      // beim Save mit offenem Feintuning verloren.
       var av = fcStyleVal(cid, 'A');
       if (av !== '1') parts.push('A' + av);
+      var wv = fcStyleVal(cid, 'W');
+      if (wv !== '0') parts.push('W' + wv);
       var map = fcLineColors(cid);
       var p = [];
       Object.keys(map).forEach(function(ln) {
@@ -13773,7 +13803,7 @@ function buildCustomRow() {
 function fcPreviewConfig(cid) {
   return { B: fcVal(cid, 'B'), T: fcVal(cid, 'T'), U: fcVal(cid, 'U'), H: fcVal(cid, 'H'),
            V: fcVal(cid, 'V'), G: fcStyleVal(cid, 'G'), F: fcStyleVal(cid, 'F'),
-           A: fcStyleVal(cid, 'A'), P: fcLineColors(cid) };
+           A: fcStyleVal(cid, 'A'), W: fcStyleVal(cid, 'W'), P: fcLineColors(cid) };
 }
 
 function fcApplyPreviewBg(el, cfg) {
@@ -13797,16 +13827,22 @@ function fcDevicePreviewHTML(cfg, data) {
   data = data.slice(0, rows);
   var W = 320, H = 170, rowH = Math.floor(H / rows);
   var margin = 8;
-  var badgeWFor = function(ln) { var l = String(ln || '').length; return l <= 1 ? 38 : (l === 2 ? 54 : (l === 3 ? 70 : 84)); };
-  var maxW = 0;
-  data.forEach(function(dp) { var w = badgeWFor(dp.line); if (w > maxW) maxW = w; });
-  var badgeW = maxW + 4, badgeH = Math.min(38, rowH - 6);
   var isMatrix = (cfg.F === '3' || cfg.F === '4');
   var font = isMatrix ? "'Courier New',monospace" : (cfg.F === '2' ? 'Arial,Helvetica,sans-serif' : "'Poppins',sans-serif");
   // Geräte-Fonts angenähert: Modern Poppins 16pt/12pt/24pt, Classic FreeSans, Matrix font1/Matrix8x6
   var badgeFs = cfg.F === '2' ? 17 : (isMatrix ? 15 : 20);
   var destFs  = cfg.F === '2' ? 13 : (isMatrix ? 12 : 14);
   var cdFs    = cfg.F === '2' ? 30 : (isMatrix ? 26 : 34);
+  // Ziel-Text dick (W1): fette Zielschrift (Matrix hat keine Bold-Variante)
+  var destWeight = (cfg.W === '1' && !isMatrix) ? 700 : 400;
+  var badgeWFor = function(ln) { var l = String(ln || '').length; return l <= 1 ? 38 : (l === 2 ? 54 : (l === 3 ? 70 : 84)); };
+  var maxW = 0;
+  data.forEach(function(dp) {
+    // Badges aus: Linie läuft in der GROSSEN Countdown-Schrift → Breite daran bemessen
+    var w = (cfg.A === '0') ? Math.ceil(String(dp.line || '').length * cdFs * 0.62) : badgeWFor(dp.line);
+    if (w > maxW) maxW = w;
+  });
+  var badgeW = maxW + 4, badgeH = Math.min(38, rowH - 6);
   var glowT = isMatrix ? 'text-shadow:0 0 5px #' + cfg.T + ';' : '';
   var html = '';
   data.forEach(function(dep, i) {
@@ -13819,12 +13855,13 @@ function fcDevicePreviewHTML(cfg, data) {
     var destW = W - destX - 55;
     html += '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:' + W + 'px;height:' + rowH + 'px;">';
     if (cfg.A === '0') {
-      // Badges aus: Linienname als großer Text in Schriftfarbe (wie Wien), linksbündig
-      html += '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;width:' + badgeW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + badgeFs + 'px;' + glowT + '">' + escapeHtmlFt(dep.line) + '</div>';
+      // Badges aus: Linienname GROSS (Countdown-Schriftgröße, wie die Zahl rechts),
+      // linksbündig in Schriftfarbe
+      html += '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;width:' + badgeW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">' + escapeHtmlFt(dep.line) + '</div>';
     } else {
       html += '<div style="position:absolute;left:' + margin + 'px;top:' + Math.round((rowH - badgeH) / 2) + 'px;width:' + badgeW + 'px;height:' + badgeH + 'px;background:' + bBg + ';border-radius:6px;' + (showOl ? 'box-shadow:inset 0 0 0 2px ' + bOl + ';' : '') + 'display:flex;align-items:center;justify-content:center;color:' + bTx + ';font-weight:600;font-size:' + badgeFs + 'px;' + (isMatrix ? 'text-shadow:0 0 4px ' + bTx + ';' : '') + '">' + escapeHtmlFt(dep.line) + '</div>';
     }
-    html += '<div style="position:absolute;left:' + destX + 'px;top:0;height:' + rowH + 'px;width:' + destW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-size:' + destFs + 'px;line-height:1.25;' + glowT + '"><span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + escapeHtmlFt(dep.dest) + '</span></div>';
+    html += '<div style="position:absolute;left:' + destX + 'px;top:0;height:' + rowH + 'px;width:' + destW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:' + destWeight + ';font-size:' + destFs + 'px;line-height:1.25;' + glowT + '"><span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + escapeHtmlFt(dep.dest) + '</span></div>';
     html += '<div style="position:absolute;right:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">' + dep.time + '</div>';
     html += '</div>';
   });
@@ -14057,6 +14094,15 @@ function fcOpenWizard(cid, opts) {
     h += '<button class="toggle-btn' + (fcF === fb[0] ? ' active' : '') + '" data-value="' + fb[0] + '" onclick="setFtToggleVal(\'ftFcF_' + cid + '\',\'' + fb[0] + '\');fcWizardPreviewUpdate()">' + fb[1] + '</button>';
   });
   h += '</div></div>';
+  // Ziel-Text dünn/dick (Token W, Default dünn). Matrix-Schriften haben keine
+  // Bold-Variante — dort ohne Wirkung.
+  var fcW = fcStyleVal(cid, 'W');
+  h += '<div class="form-row"><div><div class="form-label">Ziel-Text</div><div class="form-hint">Dick = fette Zielschrift (nicht bei Matrix)</div></div>';
+  h += '<div class="toggle-row" id="ftFcW_' + cid + '">';
+  [['0', 'Dünn'], ['1', 'Dick']].forEach(function(wb) {
+    h += '<button class="toggle-btn' + (fcW === wb[0] ? ' active' : '') + '" data-value="' + wb[0] + '" onclick="setFtToggleVal(\'ftFcW_' + cid + '\',\'' + wb[0] + '\');fcWizardPreviewUpdate()">' + wb[1] + '</button>';
+  });
+  h += '</div></div>';
   h += '</div>';
 
   // Schritt 2: Badge-Farben pro Linie
@@ -14182,6 +14228,9 @@ function fcWizardFinish() {
   // Linien-Badges (A): Firmware-Default ist AN → nur "0" (aus) explizit speichern.
   var av = fcStyleVal(cid, 'A');
   if (av !== '1') o.A = av;
+  // Ziel-Text dick (W): Default dünn → nur "1" (dick) explizit speichern.
+  var wv = fcStyleVal(cid, 'W');
+  if (wv !== '0') o.W = wv;
   var fv = fcStyleVal(cid, 'F');
   if (fv !== '1') o.F = fv;
   var map = fcLineColors(cid);
@@ -14215,16 +14264,9 @@ function fcWizardFinish() {
       stations[tgt.idx].colourOverride = cid;
       if (typeof renderStationDisplayList === 'function') renderStationDisplayList();
     } else if (!ftIsMultiDisplay && !ftIsManualAssignment) {
-      // Kompakt: neues Display direkt als gewählten Stil übernehmen
-      var colSel = document.getElementById('ftColorSelect');
-      if (colSel) {
-        if (!colSel.querySelector('option[value="' + cid + '"]')) {
-          var opt = document.createElement('option');
-          opt.value = String(cid);
-          colSel.appendChild(opt);
-        }
-        colSel.value = String(cid);
-      }
+      // Kompakt: neues Display direkt als gewählten Stil übernehmen (stempelt auch
+      // colourOverride auf alle Stationen — überlebt Wiedereinstieg + Reload).
+      ftSetKompaktDisplay(String(cid));
       var kSel = document.getElementById('ftKompaktDisplay');
       if (kSel) kSel.value = String(cid);
     } else if (typeof mergedSegmentsSupported === 'function' && mergedSegmentsSupported()) {
@@ -18075,7 +18117,7 @@ function sendConfigToDeviceDirect(config) {
     delayhighlight: String(config.delayHighlight || 0),
     alternatenext: (config.alternateNext === false ? '0' : '1'),
     colour: String(config.colour),
-    displaylight: String(config.displayLight),
+    displaylight: String(config.displayLight || 3),  // Fallback 3 (Hell): undefined würde als "undefined" ankommen
     textcolor: String(config.textColor || 1),  // Wien Schriftfarbe (1=Gelb, 2=Weiß, 3=Orange)
     wienbg: String(config.wienBg !== undefined ? config.wienBg : 0),  // Wien BG (0=Schwarz Default, 1=Grün)
     nightmode: config.nightMode ? '1' : '0',
