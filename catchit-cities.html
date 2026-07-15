@@ -3816,7 +3816,7 @@ const REGIONS = {
     networks: ['REJSEPLANEN', 'DKTRAIN']
   },
   // ===== NEU: weitere Länder (Trainboard) =====
-  GB:  { name: 'Großbritannien', networks: ['LONDON', 'UKRAIL'] },
+  GB:  { name: 'Großbritannien', networks: ['LONDON', 'GB_LOCAL', 'UKRAIL'] },
   HU:  { name: 'Ungarn',         networks: ['BUDAPEST'] },
   GE:  { name: 'Georgien',       networks: ['TBILISI'] },
   SI:  { name: 'Slowenien',      networks: ['LJUBLJANA'] },
@@ -4159,6 +4159,7 @@ const CITY_CAPABILITIES = {
   VSN:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   INSA:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SACHSEN:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  GB_LOCAL:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   NVV:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   VMT:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SAARVV:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
@@ -4622,6 +4623,7 @@ const NETWORKS = {
   VSN:        { name: 'Süd-Niedersachsen (VSN)', shortName: 'VSN', region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vsn' }, placeholder: 'z.B. Göttingen, Northeim, Duderstadt...', isJourneyBased: false },
   INSA:       { name: 'Sachsen-Anhalt (INSA)', shortName: 'INSA', region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/insa' }, placeholder: 'z.B. Magdeburg, Halle, Dessau...', isJourneyBased: false },
   SACHSEN:    { name: 'Sachsen', shortName: 'SN', region: 'DE', desc: 'Tram, Bus, S-Bahn (Leipzig, Dresden, Chemnitz)', searchType: 'trainboard', trainboard: { path: '/de/sachsen' }, placeholder: 'z.B. Leipzig Hbf, Dresden, Chemnitz...', isJourneyBased: false },
+  GB_LOCAL:   { name: 'Großbritannien (Bus, Tram)', shortName: 'GB', region: 'GB', desc: 'Bus, Tram (u.a. Edinburgh Tram): Fahrplan', searchType: 'trainboard', trainboard: { path: '/gb/local' }, placeholder: 'z.B. St Andrew Square, Edinburgh Park, York Place...', isJourneyBased: false },
   NVV:        { name: 'Nordhessen (NVV)',       shortName: 'NVV',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/nvv' }, placeholder: 'z.B. Kassel, Fulda, Marburg...', isJourneyBased: false },
   VMT:        { name: 'Mittelthüringen (VMT)',  shortName: 'VMT',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vmt' }, placeholder: 'z.B. Erfurt, Weimar, Jena, Gotha...', isJourneyBased: false },
   SAARVV:     { name: 'Saarland (SaarVV)',      shortName: 'SaarVV', region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/saarvv' }, placeholder: 'z.B. Saarbrücken, Neunkirchen, Homburg...', isJourneyBased: false },
@@ -5116,6 +5118,7 @@ const NETWORK_HERO = {
   VSN:    { photo: 'fotos/Göttingen.jpg',   title: 'Süd-Niedersachsen' },
   INSA:   { photo: 'fotos/INSA.jpg',        title: 'Sachsen-Anhalt' },
   SACHSEN: { photo: 'fotos/INSA.jpg',       title: 'Sachsen' },
+  GB_LOCAL: { photo: 'fotos/LONDON .jpg',   title: 'Großbritannien' },
   NVV:    { photo: 'fotos/NVV.jpg',          title: 'Nordhessen' },
   VMT:    { photo: 'fotos/VMT.jpg',          title: 'Mittelthüringen' },
   SAARVV: { photo: 'fotos/SAARLAND.webp',    title: 'Saarland' }
@@ -5680,6 +5683,7 @@ var NETWORK_BRANDS = {
   VSN:           { bg: '#E2001A', fg: '#fff' }, // VSN Süd-Nds Rot
   INSA:          { bg: '#005CA9', fg: '#fff' }, // INSA Sachsen-Anhalt Blau
   SACHSEN:       { bg: '#e2001a', fg: '#fff' }, // Sachsen (LVB Rot)
+  GB_LOCAL:      { bg: '#8d122a', fg: '#fff' }, // Großbritannien Bus/Tram (Edinburgh Trams Maroon)
   NVV:           { bg: '#009A45', fg: '#fff' }, // NVV Nordhessen Grün
   VMT:           { bg: '#E2001A', fg: '#fff' }, // VMT Mittelthüringen Rot
   SAARVV:        { bg: '#004B93', fg: '#fff' }, // SaarVV Saarland Blau
@@ -11453,6 +11457,7 @@ const NETWORK_COLORS = {
   VSN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Süd-Nds (VSN) → orange Matrix
   INSA: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },      // Sachsen-Anhalt (INSA) → orange Matrix
   SACHSEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Sachsen (Leipzig/Dresden/Chemnitz) → orange Matrix
+  GB_LOCAL: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // Großbritannien Bus/Tram (Edinburgh Tram) → orange Matrix
   NVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Nordhessen (NVV) → orange Matrix
   VMT: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Mittelthüringen (VMT) → orange Matrix
   SAARVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },    // Saarland (SaarVV) → orange Matrix
@@ -18171,6 +18176,9 @@ function sendConfigToDeviceDirect(config) {
     customrow: config.customRow || ''   // Designs der Eigenen Displays (c1;c2;…)
   };
 
+  // Anonyme Display-Konfig-Telemetrie (nur Einstellungen, KEINE Städte/Stops) — fire & forget
+  try { trackDisplayConfig(config, configData); } catch (e) { /* nie den Speichern-Flow stören */ }
+
   // Prüfe ob wir im iframe sind
   const inIframe = window.parent && window.parent !== window;
 
@@ -18208,6 +18216,50 @@ function sendConfigToDeviceDirect(config) {
     // Nicht im iframe - versuche direkt an straba.local zu senden
     sendConfigDirectToDevice(configData, config);
   }
+}
+
+// ===== Anonyme Display-Konfig-Telemetrie =====
+// Schickt beim Speichern EINEN leichten Event: welche Display-Einstellungen der User
+// gewählt hat. Bewusst NUR Display-Konfig — KEINE Städte/Stops/rbl/Namen/Filter.
+const DISPSTATS_ENDPOINT = 'https://api.straba.at/api/v1/dispstats';
+function trackDisplayConfig(config, configData) {
+  const num = v => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
+  const isOn = v => v === '1' || v === 1 || v === true;
+  const ds = String(configData.displaysettings || '');
+  // Zeitfenster: Feld 'w' (Index 7) in irgendeinem c<cid>-Segment gesetzt?
+  const dsHasTimeWindow = ds.split(';').some(seg => {
+    const f = seg.split('|'); return f.length > 7 && f[7] && f[7] !== '0';
+  });
+  const payload = {
+    flags: {
+      nightMode:       isOn(configData.nightmode),
+      funMessages:     isOn(configData.showfunmessages),
+      chopper:         isOn(configData.chopper),
+      silberpfeil:     isOn(configData.silberpfeil),
+      niederflurBlink: isOn(configData.niederflurblink),
+      delayHighlight:  isOn(configData.delayhighlight),
+      alternateNext:   isOn(configData.alternatenext),
+      multiDisplay:    !!config.multiDisplay,
+      lineGroups:      !!(config.lineGroups && String(config.lineGroups).trim()),
+      gehweg:          !!(config.gehweg && (config.gehweg.length || String(config.gehweg).trim())),
+      timeWindows:     dsHasTimeWindow || !!(config.timeWindows && String(config.timeWindows).trim()),
+      customDisplay:   !!(configData.customrow && configData.customrow.trim()) || [101, 102, 103].includes(num(configData.colour)),
+      allDepartures:   /\|\*/.test(String(configData.masterrow || '')),
+    },
+    dist: {
+      displayType: num(configData.colour),
+      displayMode: num(configData.displaymode),
+      sortMode:    num(configData.sortmode),
+      rows:        num(configData.zeilen),
+      textColor:   num(configData.textcolor),
+      wienBg:      num(configData.wienbg),
+    },
+  };
+  fetch(DISPSTATS_ENDPOINT, {
+    method: 'POST', keepalive: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
 }
 
 // Direkte Kommunikation mit straba.local (Fallback wenn nicht im iframe)
@@ -19339,6 +19391,99 @@ window.addEventListener('DOMContentLoaded', () => {
   // Stationsliste initial rendern → leere "Deine Stationen"-Karte wird ausgeblendet
   updateStationsList();
 });
+</script>
+
+<!-- ===== Feintuning-Dashboard (intern, öffnen über URL-Anker #dispstats) =====
+     Zeigt anonym WELCHE Display-Einstellungen die User wählen (Prozente). Keine Städte. -->
+<div id="dispStatsOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:#0d1117;color:#e6edf3;overflow:auto;font-family:'Poppins',system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;">
+  <div style="max-width:860px;margin:0 auto;padding:28px 20px 60px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;">
+      <h1 style="font-size:22px;font-weight:600;margin:0;">Feintuning-Dashboard</h1>
+      <button onclick="document.getElementById('dispStatsOverlay').style.display='none';location.hash='';" style="background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:8px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;">Schließen</button>
+    </div>
+    <p style="margin:0 0 20px;color:#8b949e;font-size:13px;line-height:1.5;">Anonyme Auswertung, welche Display-Einstellungen die User beim Speichern wählen. Nur Display-Konfig, keine Städte oder Stops.</p>
+    <div id="dispStatsBody"><p style="color:#8b949e;">Lade…</p></div>
+    <p id="dispStatsMeta" style="color:#6e7681;font-size:12px;margin-top:24px;"></p>
+  </div>
+</div>
+<script>
+(function () {
+  const API = 'https://api.straba.at/api/v1/dispstats';
+  const FLAG_LABELS = {
+    nightMode: 'Nachtmodus', funMessages: 'Fun-Nachrichten', chopper: 'Hochflurer (Chopper)',
+    silberpfeil: 'Silberpfeil', niederflurBlink: 'Niederflur-Blinken', delayHighlight: 'Verspätung hervorheben',
+    alternateNext: 'Nächste abwechselnd', multiDisplay: 'Mehrere Displays', lineGroups: 'Linien gruppiert',
+    gehweg: 'Fußweg (Gehweg)', timeWindows: 'Zeitfenster', customDisplay: 'Eigenes Display',
+    allDepartures: 'Alle Abfahrten',
+  };
+  const DIST_LABELS = {
+    displayType: 'Display-Typ', displayMode: 'Anzeige-Modus', sortMode: 'Sortierung',
+    rows: 'Zeilen', textColor: 'Schriftfarbe (Wien)', wienBg: 'Hintergrund (Wien)',
+  };
+  const VALUE_LABELS = {
+    displayMode: { 1: 'Normal', 2: 'Slideshow' },
+    sortMode: { 1: 'Statisch', 2: 'Dynamisch (Zeit)' },
+    textColor: { 1: 'Gelb', 2: 'Weiß', 3: 'Orange' },
+    wienBg: { 0: 'Schwarz', 1: 'Grün' },
+  };
+  function valLabel(k, v) {
+    if (k === 'displayType') {
+      const f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined') && DISPLAY_TYPE_FEATURES[v];
+      return f && f.name ? f.name + ' (' + v + ')' : 'Typ ' + v;
+    }
+    return (VALUE_LABELS[k] && VALUE_LABELS[k][v] !== undefined) ? VALUE_LABELS[k][v] : String(v);
+  }
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function bar(label, pct, count) {
+    return '<div style="margin:8px 0;">'
+      + '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;">'
+      + '<span>' + esc(label) + '</span>'
+      + '<span style="color:#8b949e;">' + pct + '%<span style="color:#4d5560;"> · ' + count + '</span></span></div>'
+      + '<div style="background:#21262d;border-radius:5px;height:8px;overflow:hidden;">'
+      + '<div style="background:#2f81f7;height:100%;width:' + Math.min(100, pct) + '%;border-radius:5px;"></div></div></div>';
+  }
+  function render(d) {
+    const body = document.getElementById('dispStatsBody');
+    if (!d.total) { body.innerHTML = '<p style="color:#8b949e;">Noch keine Daten gesammelt.</p>'; return; }
+    let h = '';
+    h += '<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px 18px;margin-bottom:22px;">';
+    h += '<span style="font-size:30px;font-weight:600;">' + d.total + '</span>'
+      + '<span style="color:#8b949e;font-size:14px;margin-left:8px;">gespeicherte Konfigurationen</span></div>';
+    // Funktionen (Flags)
+    h += '<h2 style="font-size:15px;font-weight:600;margin:0 0 6px;">Aktivierte Funktionen</h2>';
+    h += '<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:14px 18px;margin-bottom:26px;">';
+    h += (d.flags || []).map(f => bar(FLAG_LABELS[f.key] || f.key, f.pct, f.count)).join('') || '<p style="color:#8b949e;">–</p>';
+    h += '</div>';
+    // Verteilungen
+    Object.keys(DIST_LABELS).forEach(k => {
+      const rows = (d.dist && d.dist[k]) || [];
+      if (!rows.length) return;
+      h += '<h2 style="font-size:15px;font-weight:600;margin:0 0 6px;">' + esc(DIST_LABELS[k]) + '</h2>';
+      h += '<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:14px 18px;margin-bottom:26px;">';
+      h += rows.map(r => bar(valLabel(k, r.value), r.pct, r.count)).join('');
+      h += '</div>';
+    });
+    body.innerHTML = h;
+    document.getElementById('dispStatsMeta').textContent = 'Stand: ' + (d.updatedAt ? new Date(d.updatedAt).toLocaleString('de-AT') : '–');
+  }
+  async function load() {
+    const ov = document.getElementById('dispStatsOverlay');
+    ov.style.display = 'block';
+    let pw = new URLSearchParams(location.search).get('statspw') || sessionStorage.getItem('dispStatsPw');
+    if (!pw) { pw = prompt('Dashboard-Passwort:'); if (!pw) { ov.style.display = 'none'; location.hash = ''; return; } }
+    try {
+      const r = await fetch(API + '?pw=' + encodeURIComponent(pw));
+      if (r.status === 403) { sessionStorage.removeItem('dispStatsPw'); document.getElementById('dispStatsBody').innerHTML = '<p style="color:#f85149;">Falsches Passwort.</p>'; return; }
+      sessionStorage.setItem('dispStatsPw', pw);
+      render(await r.json());
+    } catch (e) {
+      document.getElementById('dispStatsBody').innerHTML = '<p style="color:#f85149;">Fehler beim Laden: ' + esc(e.message) + '</p>';
+    }
+  }
+  function maybeOpen() { if (location.hash === '#dispstats') load(); }
+  window.addEventListener('hashchange', maybeOpen);
+  maybeOpen();
+})();
 </script>
 
 </body>
