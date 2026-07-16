@@ -18230,18 +18230,21 @@ function trackDisplayConfig(config, configData) {
   const dsHasTimeWindow = ds.split(';').some(seg => {
     const f = seg.split('|'); return f.length > 7 && f[7] && f[7] !== '0';
   });
+  // Gehweg: max Minuten über alle Stationen (Array aus Minuten je Station; 0 = kein Gehweg)
+  let gehwegMax = 0;
+  if (Array.isArray(config.gehweg)) config.gehweg.forEach(v => { const n = parseInt(v, 10); if (!isNaN(n) && n > gehwegMax) gehwegMax = n; });
+  else if (config.gehweg) { const n = parseInt(config.gehweg, 10); if (!isNaN(n)) gehwegMax = n; }
   const payload = {
     flags: {
       nightMode:       isOn(configData.nightmode),
       funMessages:     isOn(configData.showfunmessages),
       chopper:         isOn(configData.chopper),
-      silberpfeil:     isOn(configData.silberpfeil),
       niederflurBlink: isOn(configData.niederflurblink),
       delayHighlight:  isOn(configData.delayhighlight),
       alternateNext:   isOn(configData.alternatenext),
       multiDisplay:    !!config.multiDisplay,
       lineGroups:      !!(config.lineGroups && String(config.lineGroups).trim()),
-      gehweg:          !!(config.gehweg && (config.gehweg.length || String(config.gehweg).trim())),
+      gehweg:          gehwegMax > 0,
       timeWindows:     dsHasTimeWindow || !!(config.timeWindows && String(config.timeWindows).trim()),
       customDisplay:   !!(configData.customrow && configData.customrow.trim()) || [101, 102, 103].includes(num(configData.colour)),
       allDepartures:   /\|\*/.test(String(configData.masterrow || '')),
@@ -18253,8 +18256,16 @@ function trackDisplayConfig(config, configData) {
       rows:        num(configData.zeilen),
       textColor:   num(configData.textcolor),
       wienBg:      num(configData.wienbg),
+      brightness:  num(configData.displaylight),   // Helligkeit (gerätweit, 1=Dunkel..3=Hell)
     },
   };
+  // Nacht-Zeitfenster nur mitschicken, wenn Nachtmodus aktiv (sonst verfälschen Defaults die Statistik)
+  if (isOn(configData.nightmode)) {
+    payload.dist.nightStart = num(configData.nightstart);
+    payload.dist.nightEnd   = num(configData.nightend);
+  }
+  // Gehweg-Minuten nur mitschicken, wenn gesetzt (>0), damit der Ø nicht durch Nullen verzerrt wird
+  if (gehwegMax > 0) payload.dist.gehwegMinutes = gehwegMax;
   fetch(DISPSTATS_ENDPOINT, {
     method: 'POST', keepalive: true,
     headers: { 'Content-Type': 'application/json' },
