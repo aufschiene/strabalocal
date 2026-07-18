@@ -17273,6 +17273,14 @@ function buildMasterAndTimeRows(gehwegByStopId) {
           var wr = d.richtungsId ? String(d.richtungsId).trim() : '';
           var wl = String(d.line || '').trim();
           lp = wr ? (wl + '>' + wr) : wl;
+        } else if (sid.indexOf('>') >= 0) {
+          // Richtung steckt SCHON in der rbl ("OEBB:1291501>8100013") — der Server liefert
+          // dann nur noch diese Richtung. Denselben Grund wie bei Wien oben: kein Ziel als
+          // Richtung anhaengen. Sonst entsteht "WB>Linz/Donau Hbf", und das ist ENGER als die
+          // Richtung: Zuege, die ueber Linz hinaus nach Bregenz/Innsbruck/Salzburg fahren,
+          // haben ein anderes Endziel und fallen raus. Uebrig bliebe nur der Zug, der IN Linz
+          // endet (der letzte am Abend) — er sah dann aus wie "die naechste Abfahrt".
+          lp = String(d.line || '').trim();
         } else {
           lp = _mrLinePart({ line: d.line, towards: d.towards, richtungsId: d.richtungsId });
         }
