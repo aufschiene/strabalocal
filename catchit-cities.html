@@ -17264,12 +17264,12 @@ function buildMasterAndTimeRows(gehwegByStopId) {
           sid = fid.indexOf(':') > 0 ? fid.substring(fid.indexOf(':') + 1) : fid;
         }
         if (!sid) return;
-        // Leerzeichen in Stop-Ids (München Lerchenstraße: "de:09162:1986:3:LRN 1") schon HIER
-        // kodieren. Das Gerät hängt die rbl unverändert an die Anfrage-URL — ein rohes
-        // Leerzeichen macht die HTTP-Zeile ungültig, der Server antwortet 400 und das Display
-        // bleibt leer (Kunde 20.07.2026). Mit %20 funktioniert es auf JEDER Firmware, auch auf
-        // bereits ausgelieferten Geräten ohne Update.
-        sid = sid.replace(/ /g, '%20');
+        // Stop-Ids mit LEERZEICHEN (München Lerchenstraße: "de:09162:1986:3:LRN 1") bewusst
+        // MIT Leerzeichen speichern — das ist die kanonische Id. Kodiert wird erst beim Bauen
+        // der Anfrage-URL (Firmware urlSafeRbl → %20; die Picker-Fetches hier nutzen
+        // encodeURIComponent). Ein früher hier eingebautes vorab-%20 hat die Namensauflösung
+        // beim Reload zerschossen (fetchDeparturesUnified kodierte das %20 doppelt → Station
+        // wurde nicht mehr erkannt).
         var rbl = net + ':' + sid;
         var lp;
         if (net === 'WL') {
