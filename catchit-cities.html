@@ -3681,6 +3681,7 @@
       <option value="23">Matrix</option>
       <option value="24">Paper White</option>
       <option value="25">SBB</option>
+      <option value="26">CH/LI</option>
     </select>
     <div id="ftWienOptions" style="display:none;"></div>
     <div id="ftGroupingCard" style="display:none;">
@@ -3981,7 +3982,7 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 15,            // LIEmobil/SBB orange
+    defaultColour: 26,            // CH/LI Öffi-Monitor
     defaultBrightness: 3
   },
   PID: {
@@ -4144,7 +4145,7 @@ const CITY_CAPABILITIES = {
   BUCHAREST:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   AUCKLAND:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   AUSTIN:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
-  CH_OEFFI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 15, defaultBrightness: 3 },
+  CH_OEFFI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 26, defaultBrightness: 3 },
   HELSINKI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   INNSBRUCK:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   VOR:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
@@ -11439,7 +11440,7 @@ const NETWORK_COLORS = {
   DB_FERN: { id: 6, name: 'DB Fernverkehr', color: '#EC0016' },
   DB_SBAHN: { id: 5, name: 'DB S-Bahn', color: '#009640' },
   BERLIN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
-  CH_OEFFI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // Schweiz Öffis → orange Matrix
+  CH_OEFFI: { id: 26, name: 'CH/LI', color: '#4082dc' },                    // Schweiz Öffis → CH/LI-Monitor
   SBB: { id: 25, name: 'SBB', color: '#EB0000' },                             // Schweiz Zug → SBB Zugzielanzeiger
   KOELN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
   NRW: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },
@@ -11485,7 +11486,7 @@ const NETWORK_COLORS = {
   OEBBREG: { id: 12, name: 'ÖBB Regional', color: '#0055A4' },
   OEBBFERN: { id: 12, name: 'ÖBB', color: '#E2001A' },
   WESTBAHN: { id: 14, name: 'Westbahn', color: '#0055A4' },
-  LIEMOBIL: { id: 15, name: 'LIEmobil', color: '#CE1126' },
+  LIEMOBIL: { id: 26, name: 'CH/LI', color: '#4082dc' },
   PID: { id: 16, name: 'Prag (PID)', color: '#D7141A' },
   GVB: { id: 1, name: 'GVB Amsterdam', color: '#004B93' },
   RET: { id: 1, name: 'RET Rotterdam', color: '#E4002B' },
@@ -12448,6 +12449,12 @@ function updateRealisticPreview(config) {
       highlight: '#ffffff',
       name: 'SBB'
     },
+    26: { // CH/LI Öffi-Monitor - Dunkelblau, Hellblau-Akzente, Fahrzeug-Icons
+      bg: '#09163a',
+      text: '#ffffff',
+      highlight: '#4082dc',
+      name: 'CH/LI'
+    },
     101: { bg: '#' + fcVal(101, 'B'), text: '#' + fcVal(101, 'T'), highlight: '#' + fcVal(101, 'H'), name: 'Eigenes Display 1' },
     102: { bg: '#' + fcVal(102, 'B'), text: '#' + fcVal(102, 'T'), highlight: '#' + fcVal(102, 'H'), name: 'Eigenes Display 2' },
     103: { bg: '#' + fcVal(103, 'B'), text: '#' + fcVal(103, 'T'), highlight: '#' + fcVal(103, 'H'), name: 'Eigenes Display 3' }
@@ -12735,7 +12742,7 @@ function updateQuickPreview() {
   // Settings Tags aktualisieren
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen',25:'SBB'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen',25:'SBB',26:'CH/LI'};
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[colour] || 'Standard'}</span>
     <span class="setting-tag">${rows} Zeile${rows > 1 ? 'n' : ''}</span>
@@ -12833,7 +12840,7 @@ function initializeQuickPreview() {
   const caps = recommendedConfig.capabilities || {};
   // Hinweis: colour 11 (ÖBB Fernverkehr / DisplayOEBB) wurde entfernt — alle FV-Netze
   // teilen sich mit Regional den ÖBB-Renderer (colour 12 / DisplayOEBBSBahn).
-  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen',25:'SBB'};
+  const colorNames = {1:'Wiener Linien',2:'Grüne Dot Matrix',3:'VBB Berlin',4:'WLB',5:'DB S-Bahn',6:'DB Fernverkehr',7:'Blau/Gelb',8:'Salzburg AG',9:'Paris',10:'Straba Ansicht',12:'ÖBB',13:'Holding Graz',14:'Westbahn',15:'Orange Matrix',16:'Prag / CZ-HU',17:'Brünn (DPMB)',18:'Orange Matrix',19:'KVB Köln',20:'AVV Aachen',25:'SBB',26:'CH/LI'};
 
   settingsList.innerHTML = `
     <span class="setting-tag">${colorNames[recommendedConfig.colour] || 'Standard'}</span>
@@ -13004,6 +13011,7 @@ const DISPLAY_TYPE_FEATURES = {
   23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, delayHighlight: true, name: 'Matrix' },
   24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' },
   25: { rows: false, sorting: false, grouping: false, name: 'SBB' },
+  26: { rows: true, sorting: true, grouping: true, maxRows: 5, defaultRows: 3, bigText: true, altNext: true, name: 'CH/LI' },
   // Eigene Displays (Custom): colour 101-103 = customrow-Slot c1-c3. Frei gestaltbares
   // Bodo-Layout (Farben, Hintergrund Simpel/Pixel, Schriftart, Badge-Farben pro Linie, Name).
   101: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, name: 'Eigenes Display 1' },
@@ -14384,7 +14392,8 @@ function renderDisplayTypeSections() {
     // Schriftgröße-Toggle (nur Graz/Liechtenstein) - vor Zeilen
     if (f.bigText) {
       var cid = dt.colour;
-      html += '<div class="form-row"><div><div class="form-label">Schriftgröße</div><div class="form-hint">Groß = 2 große Zeilen, Klein = 3-4 kompakte Zeilen</div></div>';
+      var bigHint = 'Groß = 1-3 große Zeilen · Klein = 4' + ((f.maxRows || 4) >= 5 ? '-5' : '') + ' kompakte';
+      html += '<div class="form-row"><div><div class="form-label">Schriftgröße</div><div class="form-hint">' + bigHint + '</div></div>';
       html += '<div class="toggle-row" id="ftFontSize_' + cid + '">';
       html += '<button class="toggle-btn" data-value="big" onclick="setFtFontSize(' + cid + ',\'big\')">Groß</button>';
       html += '<button class="toggle-btn active" data-value="small" onclick="setFtFontSize(' + cid + ',\'small\')">Klein</button>';
