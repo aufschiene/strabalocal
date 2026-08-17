@@ -3788,7 +3788,7 @@ const REGIONS = {
   },
   DE: {
     name: 'Deutschland',
-    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'SACHSEN', 'NVV', 'VMT', 'SAARVV']
+    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'SACHSEN', 'ROSTOCK', 'NVV', 'VMT', 'SAARVV']
   },
   CH: {
     name: 'Schweiz',
@@ -4160,6 +4160,7 @@ const CITY_CAPABILITIES = {
   VSN:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   INSA:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SACHSEN:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  ROSTOCK:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   GB_LOCAL:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   NVV:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   VMT:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
@@ -4624,6 +4625,7 @@ const NETWORKS = {
   VSN:        { name: 'Süd-Niedersachsen (VSN)', shortName: 'VSN', region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vsn' }, placeholder: 'z.B. Göttingen, Northeim, Duderstadt...', isJourneyBased: false },
   INSA:       { name: 'Sachsen-Anhalt (INSA)', shortName: 'INSA', region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/insa' }, placeholder: 'z.B. Magdeburg, Halle, Dessau...', isJourneyBased: false },
   SACHSEN:    { name: 'Sachsen', shortName: 'SN', region: 'DE', desc: 'Tram, Bus, S-Bahn (Leipzig, Dresden, Chemnitz)', searchType: 'trainboard', trainboard: { path: '/de/sachsen' }, placeholder: 'z.B. Leipzig Hbf, Dresden, Chemnitz...', isJourneyBased: false },
+  ROSTOCK:    { name: 'Rostock', shortName: 'HRO', region: 'DE', desc: 'Tram, Bus, S-Bahn (RSAG)', searchType: 'trainboard', trainboard: { path: '/de/rostock' }, placeholder: 'z.B. Neuer Markt, Hauptbahnhof, Doberaner Platz...', isJourneyBased: false },
   GB_LOCAL:   { name: 'Großbritannien (Bus, Tram)', shortName: 'GB', region: 'GB', desc: 'Bus, Tram (u.a. Edinburgh Tram): Fahrplan', searchType: 'trainboard', trainboard: { path: '/gb/local' }, placeholder: 'z.B. St Andrew Square, Edinburgh Park, York Place...', isJourneyBased: false },
   NVV:        { name: 'Nordhessen (NVV)',       shortName: 'NVV',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/nvv' }, placeholder: 'z.B. Kassel, Fulda, Marburg...', isJourneyBased: false },
   VMT:        { name: 'Mittelthüringen (VMT)',  shortName: 'VMT',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vmt' }, placeholder: 'z.B. Erfurt, Weimar, Jena, Gotha...', isJourneyBased: false },
@@ -4719,7 +4721,20 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
     // (z.B. nachts, wenn gerade nichts fährt).
     const seen = new Set(availableLines.map(l => norm(l.name) + '|' + norm(l.towards)));
     lines.forEach(ln => {
-      (ln.directions || []).forEach(d => {
+      const dirs = ln.directions || [];
+      // Steig-Netze (VOR/OÖVV/Kärnten/VVT/VVV): der Server liefert die Linie mit LEERER
+      // richtungsId (reine Linien-Angabe — ihr /lines hat keine brauchbaren Richtungen).
+      // Solche Linien NUR aufnehmen, wenn sie gar nicht aus den Departures kommen (Schul-/
+      // Ferienlinien wie 679, die heute nicht fahren). Fahrende Linien behalten ihre echten
+      // Steig-Richtungen aus den Abfahrten — kein Überschreiben mit einer Pseudo-Richtung.
+      const lineOnly = dirs.length && dirs.every(d => !norm(d.richtungsId));
+      if (lineOnly) {
+        if (availableLines.some(l => norm(l.name) === norm(ln.name))) return;  // fährt schon → Steige behalten
+        availableLines.push({ name: ln.name, towards: dirs[0].towards || '', type: ln.type || '', richtungsId: '', stopovers: [] });
+        return;
+      }
+      // Netze mit stabiler richtungsId (Graz/STV …): fehlende Richtungen mergen (Nacht-Lücken).
+      dirs.forEach(d => {
         const key = norm(ln.name) + '|' + norm(d.towards);
         if (seen.has(key)) return;
         seen.add(key);
@@ -5119,6 +5134,7 @@ const NETWORK_HERO = {
   VSN:    { photo: 'fotos/Göttingen.jpg',   title: 'Süd-Niedersachsen' },
   INSA:   { photo: 'fotos/INSA.jpg',        title: 'Sachsen-Anhalt' },
   SACHSEN: { photo: 'fotos/INSA.jpg',       title: 'Sachsen' },
+  ROSTOCK: { photo: 'fotos/Rostock.jpg',    title: 'Rostock' },
   GB_LOCAL: { photo: 'fotos/LONDON .jpg',   title: 'Großbritannien' },
   NVV:    { photo: 'fotos/NVV.jpg',          title: 'Nordhessen' },
   VMT:    { photo: 'fotos/VMT.jpg',          title: 'Mittelthüringen' },
@@ -5684,6 +5700,7 @@ var NETWORK_BRANDS = {
   VSN:           { bg: '#E2001A', fg: '#fff' }, // VSN Süd-Nds Rot
   INSA:          { bg: '#005CA9', fg: '#fff' }, // INSA Sachsen-Anhalt Blau
   SACHSEN:       { bg: '#e2001a', fg: '#fff' }, // Sachsen (LVB Rot)
+  ROSTOCK:       { bg: '#009ee0', fg: '#fff' }, // Rostock (RSAG Cyan-Blau)
   GB_LOCAL:      { bg: '#8d122a', fg: '#fff' }, // Großbritannien Bus/Tram (Edinburgh Trams Maroon)
   NVV:           { bg: '#009A45', fg: '#fff' }, // NVV Nordhessen Grün
   VMT:           { bg: '#E2001A', fg: '#fff' }, // VMT Mittelthüringen Rot
@@ -5919,6 +5936,15 @@ DISPLAY_PRESETS.vbn = {
   networks: [
     { id: 'VBN', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn', jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',   jumpTo: { region: 'DE' } }
+  ]
+};
+DISPLAY_PRESETS.rostock = {
+  name: 'Rostock (RSAG)',
+  parent: 'DE',
+  photo: 'fotos/Rostock.jpg',
+  networks: [
+    { id: 'ROSTOCK', label: 'Nahverkehr', desc: 'Tram, Bus, S-Bahn', jumpTo: { region: 'DE' } },
+    { id: 'DB',      label: 'DB Regio',  desc: 'RE, RB, S-Bahn',     jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.vrn = {
@@ -11458,6 +11484,7 @@ const NETWORK_COLORS = {
   VSN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Süd-Nds (VSN) → orange Matrix
   INSA: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },      // Sachsen-Anhalt (INSA) → orange Matrix
   SACHSEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Sachsen (Leipzig/Dresden/Chemnitz) → orange Matrix
+  ROSTOCK: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Rostock (RSAG Tram/Bus) → orange Matrix
   GB_LOCAL: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // Großbritannien Bus/Tram (Edinburgh Tram) → orange Matrix
   NVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Nordhessen (NVV) → orange Matrix
   VMT: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Mittelthüringen (VMT) → orange Matrix
