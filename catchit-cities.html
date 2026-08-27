@@ -13123,10 +13123,18 @@ function mergedSegmentsSupported() {
 // Stadt-Gruppenschlüssel einer Station: gleiche Stadt/gleiches Netz + gleicher Display-Typ
 // = ein gemeinsames Display. Wien (WL/WLB) bleibt außen vor (war schon immer merged),
 // "Alle Abfahrten"-Bretter und von→nach-Journeys behalten IMMER ihr eigenes Segment.
+// ÖBB Regional/Fernverkehr/S-Bahn sind verschiedene "Netze" (OEBBREG, OEBB, OEBB_SBAHN …),
+// aber DIESELBE Stadt/Station und dieselbe Optik → fürs Städte-Gruppieren als EIN Netz behandeln
+// (Kunde 2026-08: Regional + FV am selben Halt sollen sich EIN Display teilen; sonst zog der
+// Merge-Key sie am Netz auseinander, obwohl es dieselbe Station 8100516 ist).
+function cityGroupNetwork(net) {
+  net = String(net || '');
+  return /^OEBB/.test(net) ? 'OEBB' : net;
+}
 function cityGroupKeyOf(s) {
   if (!s || s.network === 'WL' || s.network === 'WLB') return null;
   if (s.allDepartures || s.isJourney) return null;
-  return (s.network || '') + '/' + stationDisplayColour(s);
+  return cityGroupNetwork(s.network) + '/' + stationDisplayColour(s);
 }
 
 // Gruppieren AN + Gate erfüllt → merged Stadt-Segmente. Gate nicht erfüllt → false
@@ -17406,7 +17414,7 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       if (typeof ftGroupByCity !== 'undefined' && ftGroupByCity === false) {
         if (s.displayInstance != null) instKey = 'inst/' + s.displayInstance;
       } else {
-        instKey = 'city/' + (s.network || '') + '/' + colour + '/' + ((bucket === time) ? 't' : 'm');
+        instKey = 'city/' + cityGroupNetwork(s.network) + '/' + colour + '/' + ((bucket === time) ? 't' : 'm');
       }
     }
 
