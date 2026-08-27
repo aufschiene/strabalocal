@@ -4730,7 +4730,18 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
       const lineOnly = dirs.length && dirs.every(d => !norm(d.richtungsId));
       if (lineOnly) {
         if (availableLines.some(l => norm(l.name) === norm(ln.name))) return;  // fährt schon → Steige behalten
-        availableLines.push({ name: ln.name, towards: dirs[0].towards || '', type: ln.type || '', richtungsId: '', stopovers: [] });
+        // ALLE Terminals als wählbare Richtungen aufnehmen (beide Fahrtrichtungen), nicht nur die
+        // erste — der Server liefert seit 2026-08-26 alle Endpunkte aus dem /lines-`terminals`-Feld
+        // (Martin/VOR). So kann der Kunde bei einer heute NICHT fahrenden Linie (Schul-/Ferienlinie
+        // 679, Susanne/Graz 31) die richtige Richtung wählen. richtungsId bleibt leer → sobald die
+        // Linie fährt, gewinnt die Steig-Richtung der Departures (Dedup unten schützt davor).
+        const towardsList = dirs.map(d => d.towards || '').filter((t, i, a) => a.indexOf(t) === i);
+        (towardsList.length ? towardsList : ['']).forEach(tw => {
+          const key = norm(ln.name) + '|' + norm(tw);
+          if (seen.has(key)) return;
+          seen.add(key);
+          availableLines.push({ name: ln.name, towards: tw, type: ln.type || '', richtungsId: '', stopovers: [] });
+        });
         return;
       }
       // Netze mit stabiler richtungsId (Graz/STV …): fehlende Richtungen mergen (Nacht-Lücken).
@@ -11413,7 +11424,13 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
           // Umbenennungen); ohne diesen Steig-Match landet der Reload im Liniennamen-Fallback
           // und hakt BEIDE Richtungen an. Wien/ÖBB/Berlin/Hamburg bleiben beim Zieltext-Match.
           if (d.richtungsId && line.richtungsId && /^st/.test(String(d.richtungsId))) {
-            return String(d.richtungsId) === String(line.richtungsId);
+            // Prefix-tolerant: die Steig-rid ist seit 2026-08 linien-eindeutig
+            // ('st<steig>' → 'st<steig>l<linie>', gegen Bus-Knoten-Kollisionen wie
+            // Hoferstiege 250/253). Alt-Configs speicherten die kurze rid → sie ist
+            // Prefix der neuen (Grenze am 'l'). Beidseitig prüfen, damit Reload sowohl
+            // alte als auch neue Configs wiederfindet (analog Firmware-startsWith).
+            const a = String(d.richtungsId), b = String(line.richtungsId);
+            return a === b || b.startsWith(a + 'l') || a.startsWith(b + 'l');
           }
 
           // Beide haben Richtung: müssen übereinstimmen
@@ -17411,6 +17428,7 @@ function buildMasterAndTimeRows(gehwegByStopId) {
         gids: (data.gids || []).slice(),
         colour: colour,
         gehweg: _rblGw,
+        gehwegs: [_rblGw],   // pro rbl-Token (Merge hängt an) — erhält PRO-STOP-Gehzeiten
         instKey: _instKey,
         rank: (data.rank !== undefined ? data.rank : 1e9),
         isTime: (bucket === time)
@@ -17431,6 +17449,11 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       if (!tgt) { byKey[e.instKey] = e; continue; }
       if (tgt.isTime !== e.isTime || tgt.colour !== e.colour) continue;  // Sicherheitsnetz
       tgt.rbl += ',' + e.rbl;
+      // Gehweg PRO STOP mitführen (index-parallel zur rbl-Komma-Liste) — EIN Max-Wert
+      // fürs ganze Segment hob sonst alle Gehzeiten auf die größte an (Kundin Luisa
+      // 2026-08: S-Bahn 15 min zog Bus-Stops 6/7 mit hoch und filterte deren Abfahrten weg).
+      if (!tgt.gehwegs) tgt.gehwegs = [tgt.gehweg];
+      tgt.gehwegs.push(e.gehweg);
       e.lineParts.forEach(function(lp, li) {
         if (tgt.lineParts.indexOf(lp) >= 0) return;  // Dedup über die Stops des Segments
         tgt.lineParts.push(lp);
@@ -17449,7 +17472,15 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     // Station. Ältere Firmware ignoriert das unbekannte Feld (Tokens bleiben sauber).
     var mParts = [];
     (e.gids || []).forEach(function(g, i) { if (g) mParts.push(i + ':' + g); });
-    e.str = e.rbl + '|' + lines + '|c' + e.colour + '|g' + e.gehweg + (mParts.length ? '|m' + mParts.join(',') : '');
+    // Merged Segment mit UNTERSCHIEDLICHEN Gehzeiten → Komma-Liste index-parallel zu den
+    // rbls ("g15,6,7"; Firmware ab 2.4.6 mappt pro Stop, ältere nimmt per toInt den ersten
+    // Wert). Einheitliche Werte bleiben kompakt als "g15" (voll abwärtskompatibel).
+    var gPart = String(e.gehweg);
+    if (e.gehwegs && e.gehwegs.length > 1 &&
+        e.gehwegs.some(function(g) { return g !== e.gehwegs[0]; })) {
+      gPart = e.gehwegs.join(',');
+    }
+    e.str = e.rbl + '|' + lines + '|c' + e.colour + '|g' + gPart + (mParts.length ? '|m' + mParts.join(',') : '');
   });
 
   // Kompakt (ein Display für alle): ZEILEN global nach dt-Rang sortieren — so kann eine
@@ -18629,12 +18660,14 @@ function gehwegByStopIdFromRows(masterRowStr) {
   String(masterRowStr).split(';').forEach(function(seg) {
     seg = seg.trim(); if (!seg) return;
     var rbl = (seg.split('|')[0] || '').trim();
-    var gm = seg.match(/\|g(\d+)/);
+    var gm = seg.match(/\|g(\d+(?:,\d+)*)/);
     if (!gm) return;
-    // Merged Segmente tragen mehrere komma-gejointe rbls → der g-Wert gilt für jeden Stop.
-    rbl.split(',').forEach(function(tok) {
+    // Merged Segmente: EIN Wert gilt für alle Stops; eine Komma-Liste ("g15,6,7") ist
+    // index-parallel zur rbl-Komma-Liste → PRO STOP sein eigener Wert (Luisa-Fix).
+    var vals = gm[1].split(',').map(function(x) { return parseInt(x, 10) || 0; });
+    rbl.split(',').forEach(function(tok, i) {
       var sid = gehwegKey(tok);  // Prefix weg, ">Ziel" BLEIBT (= Build-/Firmware-Key)
-      if (sid) map[sid] = parseInt(gm[1], 10) || 0;
+      if (sid) map[sid] = (vals.length > 1) ? (vals[i] != null ? vals[i] : vals[vals.length - 1]) : vals[0];
     });
   });
   return map;
