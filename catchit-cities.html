@@ -6678,6 +6678,14 @@ function wizardShowStep(idx) {
         if (anyGw) wizardGehwegState.enabled = true;
       }
     }
+    // 3) Round-Trip-Werte (masterrow |g → gehwegByStopIdState) zählen fürs Toggle mit:
+    // die Eingabefelder zeigten die geladenen Gehzeiten (5/5/0), der Toggle stand aber
+    // auf AUS → "nur durchdrücken" speicherte alle Gehzeiten als 0 weg (Moritz-Repro).
+    if (!wizardGehwegState.enabled && typeof gehwegByStopIdState === 'object') {
+      for (var _gk in gehwegByStopIdState) {
+        if ((parseInt(gehwegByStopIdState[_gk], 10) || 0) > 0) { wizardGehwegState.enabled = true; break; }
+      }
+    }
     var gwToggle = document.getElementById('wizardGehwegToggle');
     var gwSub = document.getElementById('wizardGehwegSub');
     if (gwToggle) {
@@ -6859,7 +6867,8 @@ function wizardBuildConfig() {
   var _prevGrouping = recommendedConfig ? {
     lineGroups: recommendedConfig.lineGroups,
     rowOrder: recommendedConfig.rowOrder,
-    rowOrderDestination: recommendedConfig.rowOrderDestination
+    rowOrderDestination: recommendedConfig.rowOrderDestination,
+    sortMode: recommendedConfig.sortMode
   } : null;
 
   var cfg = calculateRecommendedConfig();
@@ -6899,6 +6908,12 @@ function wizardBuildConfig() {
       if (_prevGrouping.rowOrderDestination) cfg.rowOrderDestination = _prevGrouping.rowOrderDestination;
     } else {
       console.warn('[wizardFinish] vorherige Gruppierung passt nicht mehr zu den Stationen → frisch berechnet (rbl=' + cfg.rbl + ')');
+    }
+    // Sortiermodus der GELADENEN Config erhalten (unabhängig von der Gruppierungs-Passung):
+    // calculateRecommendedConfig setzt sonst den Default (2=Zeit) und "nur durchdrücken"
+    // kippte Statisch-Configs auf Dynamisch (Moritz-Repro: sort_mode 1 → gespeichert 2).
+    if (_prevGrouping.sortMode !== undefined && _prevGrouping.sortMode !== null) {
+      cfg.sortMode = _prevGrouping.sortMode;
     }
   }
 
@@ -19078,7 +19093,81 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       });
     }
 
+    // LETZTES NETZ (Kunde Moritz/Karlsruhe 2026-08-28, BWEGT "H"/"R"-rids): schlägt der
+    // Abfahrten-Fetch fehl oder liefert leer (429/Funkloch/Betriebspause), blieb die
+    // Station ein Namens-Skelett OHNE directions — der nächste Save (Wizard/Feintuning
+    // "nur durchgedrückt") baute daraus rid-lose, zusammengeklebte Tokens und ZERSTÖRTE
+    // die Config ("nur noch Linie 3"). Die masterrow-Tokens sind autoritativ vorhanden →
+    // direkt als directions übernehmen. richtungsId-Formen von Ziel-Texten unterscheiden
+    // (gleiche Heuristik wie der Matcher oben). Merged Segmente: Union aller Segment-
+    // Tokens pro Stop ist korrekt — der Merge dedupliziert beim Re-Save wieder.
+    if (!isAllDep && !isJourney && station.directions.length === 0
+        && Array.isArray(stationDests) && stationDests.length) {
+      stationDests.forEach(sd => {
+        if (!sd.line) return;
+        const ref = String(sd.towards || '');
+        const looksRid = /^d\d/.test(ref) || /^\d+$/.test(ref) || ref === 'H' || ref === 'R' ||
+                         /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref);
+        const has = station.directions.some(d => d.line === sd.line &&
+          (String(d.richtungsId || '') === ref || String(d.towards || '') === ref));
+        if (!has) station.directions.push({ line: sd.line, towards: looksRid ? '' : ref,
+                                            type: '', richtungsId: looksRid ? ref : '' });
+      });
+      if (station.directions.length) {
+        console.warn('[loadExistingConfig] ' + (station.fullId || station.stopId) +
+          ': Abfahrten-Fetch leer — Richtungen aus masterrow rekonstruiert (' +
+          station.directions.length + ')');
+      }
+    }
+
     stations.push(station);
+  }
+
+  // KEIN masterrow-TOKEN DARF VERLOREN GEHEN (Moritz-Klasse, partielle Variante):
+  // Eine konfigurierte Richtung, deren Linie gerade KEINE Abfahrt im Feed hatte (S4
+  // abends, Betriebspause), landet nach der API-Rekonstruktion an keiner Station —
+  // beim nächsten Re-Save verschwände sie aus der Config. Darum: Tokens jedes
+  // Segments gegen die Union der rekonstruierten directions prüfen und Fehlende an
+  // die ERSTE Station des Segments anhängen (Merge dedupliziert beim Save wieder).
+  if (masterRowStr) {
+    let _segIdx2 = -1;
+    String(masterRowStr).split(';').forEach(seg => {
+      seg = seg.trim(); if (!seg) return;
+      const f = seg.split('|');
+      const segRbl = (f[0] || '').trim();
+      if (!segRbl) return;
+      _segIdx2++;
+      const linesField = (f[1] || '').trim();
+      if (!linesField || linesField === '*') return;
+      const segStations = stations.filter(s => s.displayInstance === _segIdx2 + 1 && !s.allDepartures && !s.isJourney);
+      if (!segStations.length) return;
+      const union = new Set();
+      segStations.forEach(s => (s.directions || []).forEach(d => {
+        // BEIDE Schlüssel-Formen: Token kann rid ("3>H") ODER Zieltext ("1:Auwiesen")
+        // sein — sonst würde eine vorhandene Richtung als fehlend gelten (Duplikat).
+        if (d.richtungsId) union.add(String(d.line) + '|' + String(d.richtungsId));
+        if (d.towards) union.add(String(d.line) + '|' + String(d.towards));
+        if (!d.richtungsId && !d.towards) union.add(String(d.line) + '|');
+      }));
+      linesField.split(',').forEach(tok => {
+        (tok || '').split('+').forEach(t => {
+          t = t.trim(); if (!t) return;
+          const gt = t.indexOf('>'); const cn = t.indexOf(':');
+          let line, ref;
+          if (gt > 0) { line = t.substring(0, gt).trim(); ref = t.substring(gt + 1).trim(); }
+          else if (cn > 0) { line = t.substring(0, cn).trim(); ref = t.substring(cn + 1).trim(); }
+          else { line = t; ref = ''; }
+          if (!line || union.has(line + '|' + ref)) return;
+          const looksRid = /^d\d/.test(ref) || /^\d+$/.test(ref) || ref === 'H' || ref === 'R' ||
+                           /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref);
+          segStations[0].directions.push({ line: line, towards: looksRid ? '' : ref,
+                                           type: '', richtungsId: looksRid ? ref : '' });
+          union.add(line + '|' + ref);
+          console.warn('[loadExistingConfig] Token "' + t + '" ohne aktuelle Abfahrt — an ' +
+                       (segStations[0].fullId || segStations[0].stopId) + ' angehängt (kein Config-Verlust)');
+        });
+      });
+    });
   }
 
   // Safety-Net gegen Race-bedingte Dubletten: Wenn mehrere loadFullConfig/
