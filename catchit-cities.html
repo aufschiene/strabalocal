@@ -5699,7 +5699,7 @@ var NETWORK_BRANDS = {
   STVG:          { bg: '#009640', fg: '#fff' }, // STMK Grün (Graz NEU /global)
   SALZBURG:      { bg: '#E3000F', fg: '#fff' }, // Salzburg Rot
   INNSBRUCK:     { bg: '#C8102E', fg: '#fff' }, // Tirol/IVB Rot
-  VOR:           { bg: '#00569D', fg: '#fff' }, // VOR Blau
+  VOR:           { bg: '#87B537', fg: '#fff' }, // VOR Grün (Markenfarbe, Paul 2026-08-28)
   OOEVV:         { bg: '#E2001A', fg: '#fff' }, // OÖVV Rot
   KAERNTEN:      { bg: '#E2001A', fg: '#fff' }, // Kärntner Linien Rot
   VVT:           { bg: '#009BB4', fg: '#fff' }, // VVT Tirol Türkis
@@ -5744,6 +5744,9 @@ var DISPLAY_PRESETS = {
     networks: [
       { id: 'WL',            jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_W' } },
       { id: 'WLB',           jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_W' } },
+      // Überlandbusse rund um Wien (VOR-Regionalbusse, z.B. 200er/300er/400er Richtung
+      // NÖ): liefen bisher nur über die NÖ-Kachel, Wiener Umland-Kunden suchten sie hier.
+      { id: 'VOR',           label: 'Überlandbus', desc: 'Regionalbusse rund um Wien (VOR)', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_NOE' } },
       { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
       { id: 'OEBB_FERN',     jumpTo: { region: 'AT' } },
       { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
@@ -19130,17 +19133,36 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // Segments gegen die Union der rekonstruierten directions prüfen und Fehlende an
   // die ERSTE Station des Segments anhängen (Merge dedupliziert beim Save wieder).
   if (masterRowStr) {
+    // /lines-Lookup (gecacht, NUR im Fehltoken-Fall): welche Station des Segments
+    // bedient die Linie wirklich? Der Endpunkt liefert auch gerade NICHT fahrende
+    // Linien (terminals-Augment) — so landet z.B. die abends pausierende S4 am
+    // richtigen Stop statt pauschal an der ersten Segment-Station.
+    const _segLinesCache = {};
+    const _stationServesLine = async (st, lineName) => {
+      const key = (st.network || '') + ':' + (st.stopId || '');
+      if (_segLinesCache[key] === undefined) {
+        _segLinesCache[key] = new Set();
+        try {
+          const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(st.network || '')
+            + '&stopId=' + encodeURIComponent(st.stopId || '') + '&_=' + Date.now(), { cache: 'no-store' });
+          const data = await r.json();
+          ((data && data.lines) || []).forEach(ln =>
+            _segLinesCache[key].add(String(ln.name || '').trim().toLowerCase()));
+        } catch (e) { /* Endpunkt-Fehler → Cache bleibt leer, Fallback erste Station */ }
+      }
+      return _segLinesCache[key].has(String(lineName || '').trim().toLowerCase());
+    };
     let _segIdx2 = -1;
-    String(masterRowStr).split(';').forEach(seg => {
-      seg = seg.trim(); if (!seg) return;
+    for (const _segRaw of String(masterRowStr).split(';')) {
+      const seg = _segRaw.trim(); if (!seg) continue;
       const f = seg.split('|');
       const segRbl = (f[0] || '').trim();
-      if (!segRbl) return;
+      if (!segRbl) continue;
       _segIdx2++;
       const linesField = (f[1] || '').trim();
-      if (!linesField || linesField === '*') return;
+      if (!linesField || linesField === '*') continue;
       const segStations = stations.filter(s => s.displayInstance === _segIdx2 + 1 && !s.allDepartures && !s.isJourney);
-      if (!segStations.length) return;
+      if (!segStations.length) continue;
       const union = new Set();
       segStations.forEach(s => (s.directions || []).forEach(d => {
         // BEIDE Schlüssel-Formen: Token kann rid ("3>H") ODER Zieltext ("1:Auwiesen")
@@ -19149,25 +19171,32 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         if (d.towards) union.add(String(d.line) + '|' + String(d.towards));
         if (!d.richtungsId && !d.towards) union.add(String(d.line) + '|');
       }));
-      linesField.split(',').forEach(tok => {
-        (tok || '').split('+').forEach(t => {
-          t = t.trim(); if (!t) return;
+      for (const _tokRaw of linesField.split(',')) {
+        for (const _tRaw of (_tokRaw || '').split('+')) {
+          const t = _tRaw.trim(); if (!t) continue;
           const gt = t.indexOf('>'); const cn = t.indexOf(':');
           let line, ref;
           if (gt > 0) { line = t.substring(0, gt).trim(); ref = t.substring(gt + 1).trim(); }
           else if (cn > 0) { line = t.substring(0, cn).trim(); ref = t.substring(cn + 1).trim(); }
           else { line = t; ref = ''; }
-          if (!line || union.has(line + '|' + ref)) return;
+          if (!line || union.has(line + '|' + ref)) continue;
+          // Ziel-Station via /lines bestimmen (nur bei mehreren Stationen im Segment nötig)
+          let target = segStations[0];
+          if (segStations.length > 1) {
+            for (const st of segStations) {
+              if (await _stationServesLine(st, line)) { target = st; break; }
+            }
+          }
           const looksRid = /^d\d/.test(ref) || /^\d+$/.test(ref) || ref === 'H' || ref === 'R' ||
                            /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref);
-          segStations[0].directions.push({ line: line, towards: looksRid ? '' : ref,
-                                           type: '', richtungsId: looksRid ? ref : '' });
+          target.directions.push({ line: line, towards: looksRid ? '' : ref,
+                                   type: '', richtungsId: looksRid ? ref : '' });
           union.add(line + '|' + ref);
           console.warn('[loadExistingConfig] Token "' + t + '" ohne aktuelle Abfahrt — an ' +
-                       (segStations[0].fullId || segStations[0].stopId) + ' angehängt (kein Config-Verlust)');
-        });
-      });
-    });
+                       (target.fullId || target.stopId) + ' angehängt (kein Config-Verlust)');
+        }
+      }
+    }
   }
 
   // Safety-Net gegen Race-bedingte Dubletten: Wenn mehrere loadFullConfig/
