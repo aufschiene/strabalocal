@@ -7385,6 +7385,7 @@ function selectWienStation(station) {
 
   wienSelectedDirections = [];
   wienOtherLines = [];
+  window._wienPrefilledFor = null;   // Bestand-Voranhaken bei jedem Picker-Öffnen frisch
 
   // Stale "Andere Linien an dieser Station"-Vorschläge der VORHERIGEN Station sofort
   // ausblenden + leeren. Sonst bleiben sie hängen, bis man hier eine Richtung klickt
@@ -7397,6 +7398,27 @@ function selectWienStation(station) {
   // Titel aktualisieren
   document.getElementById('wienDirectionTitle').innerHTML = `📍 ${station.name}`;
   document.getElementById('wienDirectionInfo').textContent = `Linie ${wienSelectedLine.lineName} - Wähle die Richtung(en)`;
+
+  // BESTAND dieser Station einsammeln (Kunde 2026-08-29: „2 → Dornbach sollte schon
+  // ausgewählt sein, weil unten schon hinzugefügt") — Kombis line|towards, die in
+  // „Deine Stationen" bereits gewählt sind, werden im Picker VORANGEHAKT.
+  window._wienExistingKeys = {};
+  (function() {
+    var newName = (typeof normalizeStationName === 'function') ? normalizeStationName(station.name || '') : '';
+    var myIds = station.stopIds || [];
+    stations.forEach(function(s) {
+      if (!s || s.network !== 'WL') return;
+      var same = newName && (typeof normalizeStationName === 'function')
+        && normalizeStationName(s.stopName || '') === newName;
+      var sIds = String(s.stopId || '').split(',').map(function(x) { return x.trim(); });
+      var overlap = sIds.some(function(id) { return id && myIds.indexOf(id) >= 0; });
+      if (same || overlap) {
+        (s.directions || []).forEach(function(d) {
+          if (d && d.line) window._wienExistingKeys[d.line + '|' + (d.towards || '')] = 1;
+        });
+      }
+    });
+  })();
 
   // Richtungen anzeigen
   const dirList = document.getElementById('wienDirectionList');
@@ -7424,15 +7446,19 @@ function selectWienStation(station) {
           <span class="line-badge ${wienBadgeClass(wienSelectedLine.lineName)}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
           <span style="color:#888;font-size:13px;">Richtung(en) wählen</span>
         </div>
-        ${uniqueDirections.map((dir, idx) => `
-          <div class="wien-dir-row" id="wienDir_${idx}" onclick="toggleWienDirection(${idx}, ${dir.patternID}, ${dir.stopId}, '${dir.towards.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;border-top:1px solid #eee;">
-            <input type="checkbox" id="wienDirCheck_${idx}" style="width:18px;height:18px;pointer-events:none;">
+        ${uniqueDirections.map((dir, idx) => {
+          const pre = window._wienExistingKeys[wienSelectedLine.lineName + '|' + (dir.towards || '')] ? true : false;
+          if (pre) wienSelectedDirections.push({ patternID: dir.patternID, stopId: dir.stopId, towards: dir.towards });
+          return `
+          <div class="wien-dir-row" id="wienDir_${idx}" onclick="toggleWienDirection(${idx}, ${dir.patternID}, ${dir.stopId}, '${dir.towards.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;border-top:1px solid #eee;${pre ? 'background:#e8f5e9;' : ''}">
+            <input type="checkbox" id="wienDirCheck_${idx}"${pre ? ' checked' : ''} style="width:18px;height:18px;pointer-events:none;">
             <span class="line-name">→ ${dir.towards}</span>
-          </div>
-        `).join('')}
+          </div>`;
+        }).join('')}
       </div>
     `;
-    document.getElementById('wienAddStationBtn').disabled = true;
+    document.getElementById('wienAddStationBtn').disabled = wienSelectedDirections.length === 0;
+    if (wienSelectedDirections.length > 0) showWienOtherLines();
   }
 
   showStep('wienDirection');
@@ -7539,6 +7565,23 @@ function showWienOtherLines() {
     if (!_byLine[ol.lineName]) { _byLine[ol.lineName] = { name: ol.lineName, dirs: [] }; _groups.push(_byLine[ol.lineName]); }
     _byLine[ol.lineName].dirs.push(ol);
   });
+  // Angebotene Kombis merken (addWienStation erbt vom Bestand nur, was der Picker NICHT
+  // anbot — für Sichtbares ist die UI die Wahrheit, Abhaken entfernt also wirklich).
+  window._wienOfferedOther = {};
+  otherLines.forEach(function(ol) { window._wienOfferedOther[ol.lineName + '|' + (ol.towards || '')] = 1; });
+  // BESTAND voranhaken: beim ERSTEN Render dieser Station die schon hinzugefügten Kombis
+  // in wienOtherLines aufnehmen; bei Re-Renders (Primär-Richtung getoggelt) den Zustand
+  // aus dem Array spiegeln, damit User-Häkchen nicht optisch verloren gehen.
+  var _stKey = (wienSelectedStation && wienSelectedStation.name) || '';
+  if (window._wienPrefilledFor !== _stKey) {
+    window._wienPrefilledFor = _stKey;
+    otherLines.forEach(function(ol) {
+      if ((window._wienExistingKeys || {})[ol.lineName + '|' + (ol.towards || '')]
+          && !wienOtherLines.some(function(x) { return x.lineID === ol.lineID && x.patternID === ol.patternID; })) {
+        wienOtherLines.push({ lineID: ol.lineID, lineName: ol.lineName, patternID: ol.patternID, stopId: ol.stopId, towards: ol.towards });
+      }
+    });
+  }
   let _html = '';
   let _oidx = 0;
   _groups.forEach((g) => {
@@ -7548,8 +7591,9 @@ function showWienOtherLines() {
         <span class="line-badge ${lineType}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${g.name}</span>
       </div>`;
     g.dirs.forEach((ol) => {
-      _html += `<div class="wien-dir-row" id="wienOther_${_oidx}" onclick="toggleWienOtherLine(${_oidx}, ${ol.lineID}, '${ol.lineName.replace(/'/g, "\\'")}', ${ol.patternID}, ${ol.stopId}, '${ol.towards.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;border-top:1px solid #eee;">
-        <input type="checkbox" id="wienOtherCheck_${_oidx}" style="width:18px;height:18px;pointer-events:none;">
+      const sel = wienOtherLines.some(function(x) { return x.lineID === ol.lineID && x.patternID === ol.patternID; });
+      _html += `<div class="wien-dir-row" id="wienOther_${_oidx}" onclick="toggleWienOtherLine(${_oidx}, ${ol.lineID}, '${ol.lineName.replace(/'/g, "\\'")}', ${ol.patternID}, ${ol.stopId}, '${ol.towards.replace(/'/g, "\\'")}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;border-top:1px solid #eee;${sel ? 'background:#e3f2fd;' : ''}">
+        <input type="checkbox" id="wienOtherCheck_${_oidx}"${sel ? ' checked' : ''} style="width:18px;height:18px;pointer-events:none;">
         <span class="line-name">→ ${ol.towards}</span>
       </div>`;
       _oidx++;
@@ -7613,28 +7657,29 @@ function addWienStation() {
     if (_sameName || _overlap) {
       (_s.directions || []).forEach(function(d) {
         if (!d || !d.line) return;
+        // Kombis, die der Picker ANGEBOTEN hat (Primärlinie + „Andere Linien"), NICHT erben:
+        // sie waren als vorangehakte Checkbox sichtbar — hat der User sie abgehakt, will er
+        // sie WEG. Geerbt wird nur, was der Picker nicht zeigen konnte (kein Config-Verlust).
+        var _k = d.line + '|' + (d.towards || '');
+        var _offered = ((window._wienOfferedOther || {})[_k])
+          || (wienSelectedLine && d.line === wienSelectedLine.lineName);
+        if (_offered) return;
         // Bestands-Directions tragen nach Config-Load oft KEINE stopId — dann den rbl der
         // Alt-Station anheften (eindeutig, wenn sie genau einen hat), sonst baut der Save
         // ihr Token ins falsche Segment und der alte Bahnsteig fällt aus der masterrow.
         if (!d.stopId && _sIds.length === 1 && _sIds[0]) d.stopId = _sIds[0];
         _inheritedDirs.push(d);
       });
-      String(_s.filter || '').split(',').forEach(function(f) {
-        f = f.trim();
-        if (f && _inheritedLines.indexOf(f) < 0) _inheritedLines.push(f);
-      });
-      // Auch die Bahnsteig-rbls der Alt-Station übernehmen (Bestands-Directions tragen nach
-      // einem Config-Load oft KEIN stopId-Feld — ohne das verlöre der Merge den alten rbl,
-      // z.B. den 18er-Bahnsteig, wenn der 57A separat dazukommt).
-      _sIds.forEach(function(id) { if (id && stopIds.indexOf(id) < 0) stopIds.push(id); });
       stations.splice(_i, 1);
     }
   }
-  // Geerbte Bahnsteige mit in die Stop-Liste (rbl/fullId), sonst verlöre der gemergte
-  // Eintrag die Bahnsteige der zuvor separat gewählten Linie.
+  // Geerbte Bahnsteige + Liniennamen NUR aus den wirklich geerbten Richtungen ableiten
+  // (nicht pauschal aus filter/rbl der Alt-Station — sonst kämen abgehakte Linien als
+  // Filter-Eintrag bzw. verwaister rbl zurück, ein leeres Segment würde sogar Wildcard).
   _inheritedDirs.forEach(function(d) {
     var sid = String(d.stopId || '').trim();
     if (sid && stopIds.indexOf(sid) < 0) stopIds.push(sid);
+    if (d.line && _inheritedLines.indexOf(d.line) < 0) _inheritedLines.push(d.line);
   });
 
   // Liniennamen sammeln (inkl. der von der ersetzten Alt-Station geerbten)
