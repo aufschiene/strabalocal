@@ -3472,10 +3472,12 @@
       </div>
     </div>
 
-    <div class="wizard-sub disabled" id="advSlideshow">
+    <!-- Anzeigedauer gilt in ALLEN Modi (Blatt-Takt beim Umblättern + Slideshow +
+         Stationswechsel) — seit 2026-08-29 nicht mehr an den Slideshow-Modus gekoppelt. -->
+    <div class="wizard-sub" id="advSlideshow">
       <div class="wizard-row" style="border-bottom:none;padding:6px 0;">
         <div class="label-block">
-          <div class="name">Wechsel-Intervall</div>
+          <div class="name">Anzeigedauer</div>
         </div>
         <div class="toggle-row" id="advInterval">
           <button class="toggle-btn" data-value="5" onclick="setAdv('interval','5')">5s<span style="display:block;font-size:10px;font-weight:400;">Sehr schnell</span></button>
@@ -6558,10 +6560,8 @@ function setAdv(field, value) {
       b.classList.toggle('active', b.dataset.value === value);
     });
   }
-  if (field === 'mode') {
-    var sub = document.getElementById('advSlideshow');
-    if (sub) sub.classList.toggle('disabled', value !== 'slideshow');
-  }
+  // Anzeigedauer-Sub wird NICHT mehr an den Modus gekoppelt — stop_interval ist der
+  // Blatt-Takt in allen Modi (Gemischt-Paging, Slideshow, Stationswechsel).
 }
 
 function getSavedDisplayStyle() {
@@ -6615,7 +6615,7 @@ function selectDisplayStyle(value) {
       slideBtn.style.opacity = '0.4';
       slideBtn.style.cursor = 'not-allowed';
     }
-    if (slideSub) slideSub.classList.add('disabled');
+    // slideSub (Anzeigedauer) bleibt auch im Kompakt-Modus aktiv — Blatt-Takt gilt überall
   } else {
     if (slideBtn) {
       slideBtn.disabled = false;
@@ -12248,10 +12248,10 @@ function goToDisplayConfig() {
     }
   }
 
-  // Wechselgeschwindigkeit nur bei Multi-Display zeigen
+  // Anzeigedauer IMMER zeigen (Blatt-Takt gilt in allen Modi, nicht nur Multi-Display)
   var speedRow = document.getElementById('quickSpeedRow');
   if (speedRow) {
-    speedRow.style.display = recommendedConfig.multiDisplay ? '' : 'none';
+    speedRow.style.display = '';
   }
 
   // Nachtmodus Toggle mit bestehender Einstellung initialisieren
@@ -14722,9 +14722,10 @@ function renderDisplayTypeSections() {
       html += '<p class="form-hint">Chronologisch sortiert, keine weiteren Einstellungen nötig.</p>';
     }
 
-    // Anzeigedauer (nur bei Multi-Display) — Standardwerte 5/8/12/15 mit Tempo-Label,
-    // Default 12 s (Paul 2026-08-29; Alt-Werte 10/20 snappen auf den nächsten Standard).
-    if (types.length > 1) {
+    // Anzeigedauer — Standardwerte 5/8/12/15 mit Tempo-Label, Default 12 s (Paul
+    // 2026-08-29; Alt-Werte 10/20 snappen auf den nächsten Standard). Seit dem
+    // Blatt-Takt-Fix IMMER sichtbar, nicht mehr nur bei Multi-Display.
+    {
       var iDs = dsVal(dt.colour, 'i');
       var iSel = (iDs !== undefined) ? iDs : 12;   // gespeicherte Dauer, sonst Default 12s
       if (iSel !== 5 && iSel !== 8 && iSel !== 12 && iSel !== 15) {
