@@ -13152,7 +13152,7 @@ const DISPLAY_TYPE_FEATURES = {
   18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, fontExt: true, name: 'Schwarz/Weiß Matrix', offline: true },
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, arrival: true, name: 'MVG' },
-  23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, delayHighlight: true, timeMode: true, name: 'Matrix' },
+  23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, delayHighlight: true, name: 'Matrix' },
   24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' },
   25: { rows: false, sorting: false, grouping: false, name: 'SBB' },
   26: { rows: true, sorting: true, grouping: true, maxRows: 5, defaultRows: 3, bigText: true, altNext: true, name: 'CH/LI' },
@@ -14789,19 +14789,6 @@ function renderDisplayTypeSections() {
       var dhActive = dhOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Verspätung herausstechend</div><div class="form-hint">Zeigt "+X" farbig (orange/rot) und färbt die Abfahrtszeit</div></div>';
       html += '<div class="toggle-switch' + dhActive + '" id="ftDelayHl_' + dt.colour + '" onclick="toggleFtSwitch(\'ftDelayHl_' + dt.colour + '\')"></div></div>';
-    }
-    // Zeit-Anzeige (Kundenwunsch 08/2026: "12:46" statt "in 7 Minuten" — unterwegs
-    // weiss man sonst nicht mehr, worauf sich die Minutenzahl bezog).
-    if (f.timeMode) {
-      var mDs = dsVal(dt.colour, 'm');
-      var mSel = (mDs !== undefined) ? mDs : 0;   // 0 = Minuten (Default, wie bisher)
-      var mOpts = [[0, 'Minuten', '7'], [1, 'Uhrzeit', '12:46'], [2, 'Uhrzeit kurz', ':46']];
-      html += '<div class="form-row"><div><div class="form-label">Zeit-Anzeige</div><div class="form-hint">Restminuten oder echte Abfahrtszeit</div></div>';
-      html += '<div class="toggle-row" id="ftTimeMode_' + dt.colour + '">';
-      mOpts.forEach(function(o) {
-        html += '<button class="toggle-btn' + (o[0] === mSel ? ' active' : '') + '" data-value="' + o[0] + '" onclick="setFtToggleVal(\'ftTimeMode_' + dt.colour + '\',' + o[0] + ')">' + o[1] + '<span style="display:block;font-size:10px;font-weight:400;">' + o[2] + '</span></button>';
-      });
-      html += '</div></div>';
     }
 
     // Info für Zug-Displays
@@ -17771,14 +17758,6 @@ function buildDisplaySettings() {
       parts.push('f' + (String(_fv) === '1' ? 1 : 0));
     }
     if (f.delayHighlight) parts.push('d' + dsKeepBool(cid, 'd', 'ftDelayHl_' + cid, recommendedConfig && recommendedConfig.delayHighlight, 0));
-    // Zeit-Anzeige: 0/1/2. Nur schreiben wenn nicht Default (0) — haelt die
-    // displaysettings schlank und Bestandsgeraete unveraendert.
-    if (f.timeMode) {
-      var _tmEl = document.getElementById('ftTimeMode_' + cid);
-      var _tm = _tmEl ? parseInt(getFtToggleVal('ftTimeMode_' + cid)) : dsVal(cid, 'm');
-      if (isNaN(_tm) || _tm == null) _tm = dsVal(cid, 'm');
-      if (_tm) parts.push('m' + _tm);
-    }
     // Eigene Displays (colour 101+): Design-Tokens (Farben/Name/Schriftart/…) liegen
     // in der CUSTOMROW (buildCustomRow), NICHT hier — displaysettings hält für sie
     // nur die generischen Tokens (r/i/s/w/a).
