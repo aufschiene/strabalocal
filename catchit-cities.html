@@ -4622,7 +4622,7 @@ const NETWORKS = {
   KAERNTEN:   { name: 'Kärnten',                shortName: 'KÄR',  region: 'AT', desc: 'Bus (Kärntner Linien, ganz Kärnten)', searchType: 'trainboard', trainboard: { path: '/at/kaernten' }, placeholder: 'z.B. Klagenfurt, Villach, Wolfsberg...', isJourneyBased: false },
   VVT:        { name: 'Tirol (VVT)',            shortName: 'VVT',  region: 'AT', desc: 'Bus, Tram, Bahn (ganz Tirol)', searchType: 'trainboard', trainboard: { path: '/at/vvt' }, placeholder: 'z.B. Innsbruck, Kufstein, Wörgl, Lienz...', isJourneyBased: false },
   VVV:        { name: 'Vorarlberg (VVV)',       shortName: 'VVV',  region: 'AT', desc: 'Bus, Bahn (ganz Vorarlberg)', searchType: 'trainboard', trainboard: { path: '/at/vvv' }, placeholder: 'z.B. Bregenz, Dornbirn, Feldkirch, Bludenz...', isJourneyBased: false },
-  VBN:        { name: 'Bremen & Niedersachsen (VBN)', shortName: 'VBN', region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vbn' }, placeholder: 'z.B. Bremen, Bremerhaven, Oldenburg...', isJourneyBased: false },
+  VBN:        { name: 'Niedersachsen & Bremen', shortName: 'VBN', region: 'DE', desc: 'Bus, Tram, Bahn (VBN, Ems-Jade …)', searchType: 'trainboard', trainboard: { path: '/de/vbn' }, placeholder: 'z.B. Bremen, Oldenburg, Wilhelmshaven, Emden...', isJourneyBased: false },
   VRN:        { name: 'Rhein-Neckar (VRN)',     shortName: 'VRN',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vrn' }, placeholder: 'z.B. Mannheim, Heidelberg, Ludwigshafen...', isJourneyBased: false },
   VOS:        { name: 'Osnabrück (VOS)',        shortName: 'VOS',  region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vos' }, placeholder: 'z.B. Osnabrück, Bramsche, Melle...', isJourneyBased: false },
   NAHSH:      { name: 'Schleswig-Holstein (NAH.SH)', shortName: 'NAH.SH', region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/nahsh' }, placeholder: 'z.B. Kiel, Lübeck, Flensburg...', isJourneyBased: false },
@@ -5143,7 +5143,7 @@ const REGION_HERO = {
 // Netz-spezifischer Hero (überschreibt Land/Bundesland, wenn dieses Netz gewählt ist)
 const NETWORK_HERO = {
   LONDON: { photo: 'fotos/LONDON .jpg', title: 'London' },
-  VBN:    { photo: 'fotos/Bremen.jpg',      title: 'Bremen & Niedersachsen' },
+  VBN:    { photo: 'fotos/Bremen.jpg',      title: 'Niedersachsen & Bremen' },
   VRN:    { photo: 'fotos/Rhein-Nekar.jpg', title: 'Rhein-Neckar' },
   VOS:    { photo: 'fotos/Osnabrück.webp',  title: 'Osnabrück' },
   NAHSH:  { photo: 'fotos/Schleswig.jpg',   title: 'Schleswig-Holstein' },
@@ -5949,13 +5949,15 @@ DISPLAY_PRESETS.aachen = {
   ]
 };
 // Neue deutsche Verbünde (Trainboard /de/*)
-DISPLAY_PRESETS.vbn = {
-  name: 'Bremen & Nds. (VBN)',
+DISPLAY_PRESETS.niedersachsen = {
+  name: 'Niedersachsen & Bremen',
   parent: 'DE',
   photo: 'fotos/Bremen.jpg',
   networks: [
-    { id: 'VBN', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn', jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',   jumpTo: { region: 'DE' } }
+    { id: 'VBN', label: 'Nordwest & Bremen',  desc: 'Bus, Tram, Bahn (VBN, Ems-Jade)', jumpTo: { region: 'DE' } },
+    { id: 'VOS', label: 'Osnabrück',           desc: 'Bus, Bahn (VOS)',                 jumpTo: { region: 'DE' } },
+    { id: 'VSN', label: 'Süd-Niedersachsen',   desc: 'Bus, Bahn (Göttingen, VSN)',      jumpTo: { region: 'DE' } },
+    { id: 'DB',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.rostock = {
@@ -5976,15 +5978,6 @@ DISPLAY_PRESETS.vrn = {
     { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',   jumpTo: { region: 'DE' } }
   ]
 };
-DISPLAY_PRESETS.vos = {
-  name: 'Osnabrück (VOS)',
-  parent: 'DE',
-  photo: 'fotos/Osnabrück.webp',
-  networks: [
-    { id: 'VOS', label: 'Nahverkehr', desc: 'Bus, Bahn',      jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',  jumpTo: { region: 'DE' } }
-  ]
-};
 DISPLAY_PRESETS.nahsh = {
   name: 'Schleswig-Holstein (NAH.SH)',
   parent: 'DE',
@@ -5992,15 +5985,6 @@ DISPLAY_PRESETS.nahsh = {
   networks: [
     { id: 'NAHSH', label: 'Nahverkehr', desc: 'Bus, Bahn',     jumpTo: { region: 'DE' } },
     { id: 'DB',    label: 'DB Regio',  desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
-  ]
-};
-DISPLAY_PRESETS.vsn = {
-  name: 'Süd-Niedersachsen (VSN)',
-  parent: 'DE',
-  photo: 'fotos/Göttingen.jpg',
-  networks: [
-    { id: 'VSN', label: 'Nahverkehr', desc: 'Bus, Bahn',      jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',  jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.insa = {
@@ -13168,7 +13152,7 @@ const DISPLAY_TYPE_FEATURES = {
   18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, fontExt: true, name: 'Schwarz/Weiß Matrix', offline: true },
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, arrival: true, name: 'MVG' },
-  23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, delayHighlight: true, name: 'Matrix' },
+  23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, delayHighlight: true, timeMode: true, name: 'Matrix' },
   24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' },
   25: { rows: false, sorting: false, grouping: false, name: 'SBB' },
   26: { rows: true, sorting: true, grouping: true, maxRows: 5, defaultRows: 3, bigText: true, altNext: true, name: 'CH/LI' },
@@ -14805,6 +14789,19 @@ function renderDisplayTypeSections() {
       var dhActive = dhOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Verspätung herausstechend</div><div class="form-hint">Zeigt "+X" farbig (orange/rot) und färbt die Abfahrtszeit</div></div>';
       html += '<div class="toggle-switch' + dhActive + '" id="ftDelayHl_' + dt.colour + '" onclick="toggleFtSwitch(\'ftDelayHl_' + dt.colour + '\')"></div></div>';
+    }
+    // Zeit-Anzeige (Kundenwunsch 08/2026: "12:46" statt "in 7 Minuten" — unterwegs
+    // weiss man sonst nicht mehr, worauf sich die Minutenzahl bezog).
+    if (f.timeMode) {
+      var mDs = dsVal(dt.colour, 'm');
+      var mSel = (mDs !== undefined) ? mDs : 0;   // 0 = Minuten (Default, wie bisher)
+      var mOpts = [[0, 'Minuten', '7'], [1, 'Uhrzeit', '12:46'], [2, 'Uhrzeit kurz', ':46']];
+      html += '<div class="form-row"><div><div class="form-label">Zeit-Anzeige</div><div class="form-hint">Restminuten oder echte Abfahrtszeit</div></div>';
+      html += '<div class="toggle-row" id="ftTimeMode_' + dt.colour + '">';
+      mOpts.forEach(function(o) {
+        html += '<button class="toggle-btn' + (o[0] === mSel ? ' active' : '') + '" data-value="' + o[0] + '" onclick="setFtToggleVal(\'ftTimeMode_' + dt.colour + '\',' + o[0] + ')">' + o[1] + '<span style="display:block;font-size:10px;font-weight:400;">' + o[2] + '</span></button>';
+      });
+      html += '</div></div>';
     }
 
     // Info für Zug-Displays
@@ -17774,6 +17771,14 @@ function buildDisplaySettings() {
       parts.push('f' + (String(_fv) === '1' ? 1 : 0));
     }
     if (f.delayHighlight) parts.push('d' + dsKeepBool(cid, 'd', 'ftDelayHl_' + cid, recommendedConfig && recommendedConfig.delayHighlight, 0));
+    // Zeit-Anzeige: 0/1/2. Nur schreiben wenn nicht Default (0) — haelt die
+    // displaysettings schlank und Bestandsgeraete unveraendert.
+    if (f.timeMode) {
+      var _tmEl = document.getElementById('ftTimeMode_' + cid);
+      var _tm = _tmEl ? parseInt(getFtToggleVal('ftTimeMode_' + cid)) : dsVal(cid, 'm');
+      if (isNaN(_tm) || _tm == null) _tm = dsVal(cid, 'm');
+      if (_tm) parts.push('m' + _tm);
+    }
     // Eigene Displays (colour 101+): Design-Tokens (Farben/Name/Schriftart/…) liegen
     // in der CUSTOMROW (buildCustomRow), NICHT hier — displaysettings hält für sie
     // nur die generischen Tokens (r/i/s/w/a).
@@ -20041,7 +20046,11 @@ window.addEventListener('DOMContentLoaded', () => {
     'U-Bahn, Straßenbahn, Bus': 'Metro, tram, bus', 'U-Bahn, S-Bahn, Bus, Fähre': 'Metro, S-Bahn, bus, ferry',
     'Straßenbahn, Bus': 'Tram, bus', 'Metro, Tram, Bus, Fähre – live': 'Metro, tram, bus, ferry – live',
     'Nahverkehr Dänemark': 'Local transit Denmark',
-    'Niederlande Nahverkehr': 'Netherlands local transit', 'Bus, Tram landesweit (OVapi)': 'Bus, tram nationwide (OVapi)', 'Züge Dänemark': 'Trains Denmark', 'Rejseplanen Züge': 'Rejseplanen trains',
+    'Niederlande Nahverkehr': 'Netherlands local transit', 'Bus, Tram landesweit (OVapi)': 'Bus, tram nationwide (OVapi)',
+    'Nordwest & Bremen': 'Northwest & Bremen', 'Bus, Tram, Bahn (VBN, Ems-Jade)': 'Bus, tram, rail (VBN, Ems-Jade)',
+    'Süd-Niedersachsen': 'South Lower Saxony', 'Bus, Bahn (Göttingen, VSN)': 'Bus, rail (Göttingen, VSN)',
+    'Bus, Bahn (VOS)': 'Bus, rail (VOS)', 'Osnabrück': 'Osnabrück',
+    'Niedersachsen & Bremen': 'Lower Saxony & Bremen', 'Bus, Tram, Bahn (VBN, Ems-Jade …)': 'Bus, tram, rail (VBN, Ems-Jade …)', 'Züge Dänemark': 'Trains Denmark', 'Rejseplanen Züge': 'Rejseplanen trains',
     'Liechtenstein / Schweiz Nahverkehr': 'Liechtenstein / Switzerland local transit',
     'ÖBB Fernverkehr': 'ÖBB long-distance', 'ÖBB Regional': 'ÖBB regional', 'ÖBB Regionalverkehr': 'ÖBB regional',
     'ÖBB Regional NÖ': 'ÖBB regional Lower Austria', 'ÖBB Regional OÖ': 'ÖBB regional Upper Austria',
