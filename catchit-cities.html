@@ -19733,5 +19733,387 @@ window.addEventListener('DOMContentLoaded', () => {
 })();
 </script>
 
+<script>
+// ==================== I18N: ENGLISCHE OBERFLÄCHE (2026-08-29) ====================
+// EIN File, EIN Wörterbuch: Default-Sprache aus dem Browser (nicht-deutsch → EN),
+// manuell umschaltbar (Pill unten links), Wahl in localStorage ('catchit_lang').
+// Übersetzt werden DOM-Textknoten + placeholder/title/aria-label — auch für alles,
+// was die Seite später per innerHTML nachrendert (MutationObserver). Strings ohne
+// Eintrag bleiben deutsch (fail-safe, nie kaputte UI). Stations-/Netznamen sind
+// Eigennamen und werden bewusst NICHT übersetzt.
+(function () {
+  var LS_KEY = 'catchit_lang';
+  var stored = null;
+  try { stored = localStorage.getItem(LS_KEY); } catch (e) {}
+  // Quelle 1 (autoritativ): ?lang=de|en aus der Iframe-Adresse — die Geräte-Hülle (catch.local)
+  // liefert die Systemsprache mit. Quelle 2: manuelle Wahl (localStorage). Quelle 3: Browser-Sprache.
+  var urlLang = null;
+  try {
+    var qp = new URLSearchParams(location.search);
+    var ql = String(qp.get('lang') || '').toLowerCase();
+    if (ql === 'de' || ql === 'en') urlLang = ql;
+  } catch (e) {}
+  var lang = urlLang || stored || ((navigator.language || 'de').toLowerCase().indexOf('de') === 0 ? 'de' : 'en');
+
+  // ---- Umschalter (immer sichtbar, beide Sprachen) ----
+  function addToggle() {
+    var b = document.createElement('button');
+    b.id = 'i18nToggle';
+    b.textContent = (lang === 'en') ? 'DE' : 'EN';
+    b.title = (lang === 'en') ? 'Auf Deutsch umschalten' : 'Switch to English';
+    b.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:99999;padding:7px 13px;' +
+      'border:2px solid #191919;border-radius:999px;background:#faf6ec;color:#191919;' +
+      'font:700 13px Poppins,sans-serif;cursor:pointer;box-shadow:2px 2px 0 #191919;letter-spacing:.04em;';
+    b.onclick = function () {
+      var target = (lang === 'en') ? 'de' : 'en';
+      try { localStorage.setItem(LS_KEY, target); } catch (e) {}
+      // ?lang in der URL MIT umstellen — sonst gewinnt der (autoritative) Hüllen-Param
+      // beim Reload sofort wieder und der Toggle wäre wirkungslos.
+      try {
+        var u = new URL(location.href);
+        u.searchParams.set('lang', target);
+        location.replace(u.toString());
+      } catch (e) { location.reload(); }
+    };
+    document.body.appendChild(b);
+  }
+  if (document.body) addToggle(); else document.addEventListener('DOMContentLoaded', addToggle);
+  if (lang !== 'en') return;   // Deutsch = Original, nichts anfassen
+  document.documentElement.lang = 'en';
+
+  // ---- Wörterbuch (exakte Strings, getrimmt) ----
+  var D = {
+    // Start / Grundgerüst
+    'Lade Konfiguration …': 'Loading configuration …', 'Lade…': 'Loading…', 'Lade Abfahrten...': 'Loading departures...',
+    'Was möchtest du ändern?': 'What would you like to change?',
+    'Dein catch-it ist schon eingerichtet. Wähle, was du anpassen willst.': 'Your catch-it is already set up. Choose what you want to adjust.',
+    'Linien ändern': 'Change lines', 'Einstellungen ändern': 'Change settings',
+    'Haltestellen und Linien hinzufügen, entfernen oder bearbeiten.': 'Add, remove or edit stops and lines.',
+    'Design, Reihenfolge, Helligkeit, Gehweg und mehr im Feintuning.': 'Design, order, brightness, walking time and more in fine-tuning.',
+    'Städte & Netze': 'Cities & networks',
+    'Wähle Stationen aus verschiedenen Verkehrsnetzen': 'Choose stations from different transit networks',
+    'Wo bist du unterwegs?': 'Where are you traveling?',
+    'Region': 'Region', 'Region wählen': 'Choose region', 'Bundesland wählen': 'Choose state',
+    'Land wählen…': 'Choose country…', 'Netzwerk wählen': 'Choose network', 'Verkehrsart wählen': 'Choose transit type',
+    'Weitere Bundesländer folgen…': 'More states coming soon…',
+    'Zurück': 'Back', 'Weiter': 'Next', 'Fertig': 'Done', 'Abbrechen': 'Cancel', 'Schließen': 'Close',
+    'Speichern': 'Save', 'Bearbeiten': 'Edit', 'Löschen': 'Delete', 'Loeschen': 'Delete', 'Wechseln': 'Switch',
+    'Erneut versuchen': 'Try again', 'Alle': 'All', 'oder': 'or', 'bis': 'to', 'ändern': 'change', 'Uhr': '', 'min': 'min', 'Min': 'min',
+    // Stationen
+    'Station suchen': 'Search station', 'Station wählen': 'Choose station', 'Station hinzufügen': 'Add station',
+    '+ Weitere Station hinzufügen': '+ Add another station', 'Weitere Station hinzufügen': 'Add another station',
+    'Noch keine Stationen hinzugefügt': 'No stations added yet', 'Keine Stationen': 'No stations',
+    'Keine Station gefunden': 'No station found', 'Keine Stationen gefunden': 'No stations found',
+    'Diese Station ist bereits hinzugefügt!': 'This station has already been added!',
+    'Diese Auswahl ist bereits hinzugefügt!': 'This selection has already been added!',
+    'Diese Verbindung ist bereits hinzugefügt!': 'This connection has already been added!',
+    'Keine Stationen ausgewählt — kann nicht speichern.': 'No stations selected — cannot save.',
+    // Linien / Richtungen
+    'Linie': 'Line', 'Linien': 'Lines', 'Linie wählen': 'Choose line', 'Linien wählen': 'Choose lines',
+    'Linien auswählen': 'Select lines', 'Linien auswählen:': 'Select lines:',
+    'Linien für dein catch-it': 'Lines for your catch-it',
+    'Alle auswählen': 'Select all', 'Alle abwählen': 'Deselect all', 'Abwählen': 'Deselect',
+    'Alle Abfahrten': 'All departures', 'Alle Linien': 'All lines', 'Alle Richtungen': 'All directions',
+    'Einzelne Linien': 'Individual lines', 'Nach Linie filtern': 'Filter by line',
+    'Richtung wählen': 'Choose direction', 'Richtung(en) wählen': 'Choose direction(s)',
+    'Richtungen werden geladen...': 'Loading directions...', 'Ziele werden geladen...': 'Loading destinations...',
+    'Keine Linie gefunden': 'No line found', 'Keine Linien verfügbar': 'No lines available',
+    'Keine Abfahrten gefunden': 'No departures found',
+    'Aktuell keine Abfahrten für diese Station verfügbar.': 'No departures currently available for this station.',
+    'Keine weiteren Richtungen verfuegbar': 'No further directions available',
+    'Verfügbare Richtungen:': 'Available directions:',
+    'Bitte mindestens eine Richtung auswählen!': 'Please select at least one direction!',
+    'Bitte mindestens eine Zuggattung auswählen!': 'Please select at least one train type!',
+    'Bitte mindestens einen Bahnsteig wählen.': 'Please choose at least one platform.',
+    '📍 Andere Linien an dieser Station': '📍 Other lines at this station',
+    'Andere Linien an dieser Station': 'Other lines at this station',
+    '✓ Ausgewählt': '✓ Selected', 'auswählbar': 'selectable',
+    'Bahnsteig / Richtung': 'Platform / direction', 'Bahnsteig/Richtung': 'Platform/direction',
+    'Gattung': 'Train type', 'Zuggattungen': 'Train types', 'Zugkategorien': 'Train categories',
+    'Zugtypen auf dieser Verbindung': 'Train types on this connection',
+    'Linien auf dieser Verbindung': 'Lines on this connection',
+    'Nur Fernverkehr': 'Long-distance only', 'Nur Regional': 'Regional only',
+    'Züge nach...': 'Trains to...', 'Wohin soll es gehen?': 'Where would you like to go?',
+    'Weiteres Ziel hinzufügen?': 'Add another destination?', 'Was anzeigen?': 'What to display?',
+    'Kein Ziel gefunden': 'No destination found', 'Kein Fernverkehrs-Ziel gefunden': 'No long-distance destination found',
+    'Ziel': 'Destination', 'Ziel:': 'Destination:', 'Von': 'From', 'Von:': 'From:', 'Nach': 'To', 'Nach:': 'To:', '✓ Von': '✓ From',
+    'Nach Richtung': 'By direction', 'Richtung Wien': 'Towards Vienna', 'Richtung Westen': 'Westbound',
+    'Richtung Floridsdorf': 'Towards Floridsdorf', 'Richtung Meidling': 'Towards Meidling',
+    '→ Zeigt nur Abfahrten, die dorthin fahren.': '→ Only shows departures heading there.',
+    'Kurzwenden (z.B. nur bis Heiligenstadt) werden automatisch mitgezählt.': 'Short-turn services (e.g. only to Heiligenstadt) are included automatically.',
+    ': antippen zum Hinzufügen oder Entfernen.': ': tap to add or remove.',
+    // Gehweg
+    'Gehweg': 'Walking time', 'Gehweg zur Haltestelle': 'Walking time to the stop',
+    'Gehweg-Filter aktivieren': 'Enable walking-time filter', 'Gehweg ✓': 'Walking time ✓',
+    'Abfahrten unter dieser Minutenzahl werden ausgeblendet': 'Departures below this number of minutes are hidden',
+    'Blendet unerreichbare Abfahrten aus. Max. 15 Minuten.': 'Hides departures you cannot reach. Max. 15 minutes.',
+    'Gehzeit pro Haltestelle in Minuten (0 = kein Filter, max. 15):': 'Walking time per stop in minutes (0 = no filter, max. 15):',
+    'Noch keine Haltestellen ausgewählt': 'No stops selected yet',
+    // Feintuning / Design
+    'Feintuning': 'Fine-tuning', 'Feintuning öffnen': 'Open fine-tuning', 'Feintuning-Dashboard': 'Fine-tuning dashboard',
+    'Pro-Display Feintuning →': 'Per-display fine-tuning →',
+    'Passe dein Display individuell an': 'Customize your display',
+    'Anzeige-Stil': 'Display style', 'Display-Stil': 'Display style', 'Anzeige-Modus': 'Display mode',
+    'Design': 'Design', 'Display': 'Display', 'Dein Display': 'Your display',
+    'In welchem Stil alles angezeigt wird': 'The style everything is shown in',
+    'Wie soll dein Display aussehen?': 'How should your display look?',
+    'Wie soll dein catch-it aussehen?': 'How should your catch-it look?',
+    'Wie soll dein BVG-Display aussehen?': 'How should your BVG display look?',
+    'Wähle die Darstellung. Du kannst das später im Feintuning ändern.': 'Choose the look. You can change it later in fine-tuning.',
+    'Du kannst es später jederzeit ändern.': 'You can change it anytime later.',
+    'Nach Städten gruppieren': 'Group by city',
+    'Stationen derselben Stadt teilen sich ein Display': 'Stations in the same city share one display',
+    'Wien-Bahnsteige bleiben immer zusammen auf einem Display.': 'Vienna platforms always stay together on one display.',
+    'Displays im Detail': 'Displays in detail',
+    'Jedes Stadt-Display einzeln anpassen — tippe auf eine Box zum Aufklappen.': 'Adjust each city display individually — tap a box to expand.',
+    'Jedes Stadt-Display einzeln anpassen (Zeilen, Farben, Niederflur …)': 'Adjust each city display individually (rows, colors, low-floor …)',
+    'Display-Typ pro Haltestelle wählen:': 'Choose display type per stop:',
+    'Zeilen': 'Rows', 'Schriftgröße': 'Font size', 'Schriftart': 'Font', 'Textfarbe': 'Text color',
+    'Hintergrund': 'Background', 'Hintergrundfarbe': 'Background color',
+    'Farbe der Schrift auf dem Display.': 'Color of the text on the display.',
+    'Helligkeit': 'Brightness', 'Display-Helligkeit': 'Display brightness',
+    'Wie hell das Display strahlt.': 'How bright the display shines.',
+    'Dunkel': 'Dark', 'Mittel': 'Medium', 'Hell': 'Bright', 'Klein': 'Small', 'Groß': 'Large', 'Normal': 'Normal', 'Kompakt': 'Compact',
+    'Klein · 4 Zeilen': 'Small · 4 rows', 'Groß · 3 Zeilen': 'Large · 3 rows', 'Ganze Zeile': 'Full row',
+    'Dünn': 'Thin', 'Gelb': 'Yellow', 'Weiß': 'White', 'Schwarz': 'Black', 'Orange': 'Orange', 'Grün': 'Green', 'Amber': 'Amber',
+    'Weiß/Schwarz': 'White/black', 'Weiß/Hellgrau': 'White/light gray', 'Komplett weiß': 'All white',
+    'Schwarz/Weiß Matrix': 'Black/white matrix', 'Grüne Dot Matrix': 'Green dot matrix', 'Matrix Grün': 'Matrix green',
+    'Eigene Farben': 'Custom colors', 'Eigene Farbe (Farbpicker)': 'Custom color (picker)',
+    'Sortierung': 'Sorting', 'Statisch': 'Static', 'Zeit': 'Time', 'Chronologisch': 'Chronological',
+    'Statisch: feste, selbst gewählte Reihenfolge.': 'Static: fixed order chosen by you.',
+    'Chronologisch sortiert, keine weiteren Einstellungen nötig.': 'Sorted chronologically, no further settings needed.',
+    'Reihenfolge': 'Order', 'Zuordnung': 'Assignment', 'Automatisch': 'Automatic', 'Manuell': 'Manual',
+    'Gruppierung': 'Grouping', 'Gruppe erstellen': 'Create group', 'Neue Gruppe': 'New group',
+    '+ Neue Gruppe erstellen': '+ Create new group', 'Linien gruppiert': 'lines grouped',
+    'Alle Richtungen sind gruppiert': 'All directions are grouped',
+    'Linien hierher ziehen': 'Drag lines here', 'Getrennt': 'Separate', 'trennen': 'separate',
+    'Richtungen zusammenfassen die gleiche Strecke fahren': 'Group directions that run the same route',
+    'Wähle mindestens 2 Richtungen aus dem Pool': 'Choose at least 2 directions from the pool',
+    'Waehle mindestens 2 Richtungen aus dem Pool': 'Choose at least 2 directions from the pool',
+    'Anzeigedauer': 'Display duration', 'Wie lange jedes Blatt dieser Ansicht steht': 'How long each page of this view stays',
+    'Langsam': 'Slow', 'Schnell': 'Fast', 'Sehr schnell': 'Very fast', 'Slideshow': 'Slideshow', 'Gemischt': 'Mixed',
+    'Zeitfenster': 'Time window', 'Zeitraum': 'Time range', 'Uhrzeit': 'Time',
+    'Nur in bestimmten Stunden anzeigen': 'Only show during certain hours',
+    'Außerhalb dieser Zeit wird diese Ansicht übersprungen.': 'Outside this time range, this view is skipped.',
+    'Nachtmodus': 'Night mode', 'Nachtmodus aktivieren': 'Enable night mode', 'Nachtmodus ✓': 'Night mode ✓',
+    'Display nachts ausschalten': 'Turn display off at night',
+    'Display aus zwischen 22–7 Uhr': 'Display off between 22:00–7:00',
+    'Display geht im gewählten Zeitraum komplett aus.': 'The display turns off completely during the chosen time range.',
+    'Extras': 'Extras', 'Erweiterte Einstellungen': 'Advanced settings', 'Aktivierte Funktionen': 'Enabled features',
+    'Spaß-Nachrichten': 'Fun messages', 'Zeigt witzige Meldungen bei langen Wartezeiten': 'Shows funny messages during long waits',
+    'Niederflur-Hinweis blinken': 'Blink low-floor hint', 'Hochflurer markieren': 'Mark high-floor vehicles',
+    'Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht': 'Marker pulses when a low-floor vehicle approaches',
+    'Verspätung hervorheben': 'Highlight delays', 'Verspätung herausstechend': 'Delays stand out',
+    'Einfahr-Ansicht': 'Arrival view',
+    'Eine bald abfahrende Bahn (0 Min) wird gross angezeigt.': 'A train about to depart (0 min) is shown large.',
+    'U-Bahn Badges': 'Metro badges', 'Linien-Badges': 'Line badges',
+    'Farbige U-Bahn-Linien (U1 rot, U2 lila …) wie auf den echten Anzeigen': 'Colored metro lines (U1 red, U2 purple …) like the real displays',
+    'Name des Displays': 'Display name',
+    '+ Eigenes Display erstellen': '+ Create custom display', '+ Neues Display': '+ New display',
+    'Eigenes Display erstellen': 'Create custom display', 'Eigenes Display bearbeiten': 'Edit custom display',
+    'Badge-Text und Badge-Hintergrund dürfen nicht gleich sein': 'Badge text and badge background must not be the same',
+    'Schrift- und Hintergrundfarbe dürfen nicht gleich sein': 'Text and background color must not be the same',
+    'Ein einheitlicher Look — immer gleich lesbar, ruhig auf dem Schreibtisch.': 'One consistent look — always equally readable, calm on your desk.',
+    'Ein einheitlicher Look — immer gleich lesbar.': 'One consistent look — always equally readable.',
+    'Display wechselt je Betreiber — WL gelb/schwarz, ÖBB weiß/blau …': 'Display changes per operator — WL yellow/black, ÖBB white/blue …',
+    'Display wechselt komplett je nach Betreiber — Wiener Linien gelb auf schwarz, ÖBB weiß auf blau, …': 'Display fully changes per operator — Wiener Linien yellow on black, ÖBB white on blue, …',
+    'Mehr Abfahrten gleichzeitig — kompakte Schrift, sehr viele Linien auf einen Blick.': 'More departures at once — compact type, many lines at a glance.',
+    'Größere LED-Punkte — auch aus der Distanz gut lesbar, weniger Linien auf einmal.': 'Bigger LED dots — readable from a distance, fewer lines at once.',
+    'Straba Ansicht': 'Straba view', 'Spielerisch': 'Playful',
+    'Du hast Stationen aus verschiedenen Netzwerken ausgewählt.': 'You selected stations from different networks.',
+    // Speichern / Verbindung
+    'Erfolgreich gespeichert!': 'Saved successfully!', 'Speichere Einstellungen...': 'Saving settings...',
+    'Neustart läuft...': 'Restarting...',
+    'Dein catch-it startet neu und übernimmt die neuen Einstellungen.': 'Your catch-it restarts and applies the new settings.',
+    'Dies dauert etwa 10-15 Sekunden.': 'This takes about 10-15 seconds.',
+    'Verbindung fehlgeschlagen': 'Connection failed',
+    'straba.local ist nicht erreichbar.': 'straba.local cannot be reached.',
+    'Stelle sicher, dass dein catch-it eingeschaltet ist': 'Make sure your catch-it is switched on',
+    'Prüfe, ob du mit dem catch-it-WLAN verbunden bist': 'Check that you are connected to the catch-it Wi-Fi',
+    'Versuche die Seite neu zu laden': 'Try reloading the page',
+    'Fehler bei der Suche': 'Search failed', 'Fehler beim Laden der Linien': 'Failed to load lines',
+    'Fehler: Keine Konfiguration berechnet': 'Error: no configuration computed',
+    'Falsches Passwort.': 'Wrong password.',
+    'Noch keine Daten gesammelt.': 'No data collected yet.',
+    'gespeicherte Konfigurationen': 'saved configurations',
+    // Länder (Dropdown, Flaggen-Emoji wird in tr() abgetrennt)
+    'Deutschland': 'Germany', 'Schweiz': 'Switzerland', 'Tschechien': 'Czechia', 'Frankreich': 'France',
+    'Niederlande': 'Netherlands', 'Belgien': 'Belgium', 'Luxemburg': 'Luxembourg', 'Italien': 'Italy',
+    'Ungarn': 'Hungary', 'Slowenien': 'Slovenia', 'Norwegen': 'Norway', 'Schweden': 'Sweden',
+    'Finnland': 'Finland', 'Estland': 'Estonia', 'Irland': 'Ireland', 'Georgien': 'Georgia',
+    'Australien': 'Australia', 'Neuseeland': 'New Zealand',
+    // Netz-/Regions-Beschreibungen (Kacheln)
+    'Österreich': 'Austria', 'Dänemark': 'Denmark', 'Rumänien': 'Romania', 'Großbritannien': 'Great Britain',
+    'Niederösterreich': 'Lower Austria', 'Oberösterreich': 'Upper Austria', 'Kärnten': 'Carinthia',
+    'Niederösterreich & Burgenland': 'Lower Austria & Burgenland',
+    'Süddeutschland': 'Southern Germany', 'Süd-Niedersachsen': 'South Lower Saxony', 'Mittelthüringen': 'Central Thuringia',
+    'Stadtverkehr': 'City transit', 'Fernverkehr': 'Long-distance', 'Regionalverkehr': 'Regional',
+    'U-Bahn, Straßenbahn, Bus': 'Metro, tram, bus', 'U-Bahn, S-Bahn, Bus, Fähre': 'Metro, S-Bahn, bus, ferry',
+    'Straßenbahn, Bus': 'Tram, bus', 'Metro, Tram, Bus, Fähre – live': 'Metro, tram, bus, ferry – live',
+    'Nahverkehr Dänemark': 'Local transit Denmark', 'Züge Dänemark': 'Trains Denmark', 'Rejseplanen Züge': 'Rejseplanen trains',
+    'Liechtenstein / Schweiz Nahverkehr': 'Liechtenstein / Switzerland local transit',
+    'ÖBB Fernverkehr': 'ÖBB long-distance', 'ÖBB Regional': 'ÖBB regional', 'ÖBB Regionalverkehr': 'ÖBB regional',
+    'ÖBB Regional NÖ': 'ÖBB regional Lower Austria', 'ÖBB Regional OÖ': 'ÖBB regional Upper Austria',
+    'S-Bahn/Regional NÖ': 'S-Bahn/regional Lower Austria', 'S-Bahn/Regional OÖ': 'S-Bahn/regional Upper Austria',
+    'S-Bahn, REX, Regionalzug in NÖ': 'S-Bahn, REX, regional trains in Lower Austria',
+    'S-Bahn, REX, Regionalzug in OÖ': 'S-Bahn, REX, regional trains in Upper Austria',
+    'ÖBB Stammstrecke': 'ÖBB core line (Stammstrecke)', 'S-Bahn Stammstrecke': 'S-Bahn core line',
+    'DB/ÖBB Fernverkehr': 'DB/ÖBB long-distance', 'DB/ÖBB Regional': 'DB/ÖBB regional',
+    'Gemischte Zug-Verbindungen': 'Mixed train connections', 'DB Fernverkehr': 'DB long-distance',
+    'DB Station': 'DB station', 'Kärntner Linien': 'Carinthian Lines',
+    'Optimiert für ICE, IC, RJ, RJX Anzeige': 'Optimized for ICE, IC, RJ, RJX display',
+    'Optimiert für RE, REX, RB Anzeige': 'Optimized for RE, REX, RB display',
+    'Optimiert für Railjet, ICE, IC Anzeige': 'Optimized for Railjet, ICE, IC display',
+    'Optimiert für S-Bahn Anzeige': 'Optimized for S-Bahn display',
+    'Optimiert für S-Bahn, REX Anzeige': 'Optimized for S-Bahn, REX display',
+    'Optimiert für Westbahn Anzeige': 'Optimized for Westbahn display',
+    'Öffi': 'Public transit',
+    'Spart Strom: das Display schaltet sich nachts automatisch ab.': 'Saves power: the display turns off automatically at night.',
+    'An = 1. & 2. Abfahrt im Wechsel · Aus = nur die 1. Abfahrt': 'On = 1st & 2nd departure alternating · Off = only the 1st departure',
+    'Aus = Linienname als großer Text (wie Wien)': 'Off = line name as large text (like Vienna)',
+    'Groß = 1-3 große Zeilen · Klein = 4': 'Large = 1-3 big rows · Small = 4',
+    'Pro Display: Zeilen, Helligkeit, Textfarbe, Sortierung …': 'Per display: rows, brightness, text color, sorting …',
+    'Wien': 'Vienna', 'Steiermark': 'Styria', 'Tirol': 'Tyrol', 'Tirol & Vorarlberg': 'Tyrol & Vorarlberg',
+    // Sweep-Rest 2026-08-29
+    'Alle Abfahrten/Linien wählen': 'Choose all departures/lines',
+    'Alle Öffis (Bus, Tram, Zug)': 'All public transit (bus, tram, train)',
+    'Anonyme Auswertung, welche Display-Einstellungen die User beim Speichern wählen. Nur Display-Konfig, keine Städte oder Stops.': 'Anonymous stats about which display settings users choose when saving. Display config only, no cities or stops.',
+    'Bahnsteige/Linien gerade nicht ladbar (DB-Echtzeit ist manchmal kurz leer). Bitte nochmal versuchen.': 'Platforms/lines currently unavailable (DB realtime is sometimes briefly empty). Please try again.',
+    'Bus (Kärntner Linien)': 'Bus (Carinthian Lines)',
+    'Bus (Kärntner Linien, ganz Kärnten)': 'Bus (Carinthian Lines, all of Carinthia)',
+    'Dick = fette Zielschrift (nicht bei Matrix)': 'Bold = bold destination text (not for Matrix)',
+    'Eigene Seite in der Slideshow. Design-Einstellungen teilt sich dieses Display mit dem gleichnamigen Display oben.': 'Its own page in the slideshow. This display shares its design settings with the display of the same name above.',
+    'Einzelnen Linien eigene Badge-Farben geben (z.B. U1 rot, U2 grün). Aus = globale Badge-Farben.': 'Give individual lines their own badge colors (e.g. U1 red, U2 green). Off = global badge colors.',
+    'Konfiguration konnte nicht berechnet werden.': 'Configuration could not be computed.',
+    'Linien ändern / Einstellungen ändern': 'Change lines / change settings',
+    'Max. 10 Zeichen, erscheint überall statt "Eigenes Display"': 'Max. 10 characters, shown everywhere instead of "Custom display"',
+    'Optimiert für ÖBB Anzeige (EC, IC, S-Bahn, REX)': 'Optimized for ÖBB display (EC, IC, S-Bahn, REX)',
+    'Optional — diese Werte hat dein catch-it schon vernünftig vorgewählt. Du kannst sie hier oder später anpassen.': 'Optional: your catch-it has already chosen sensible defaults. You can adjust them here or later.',
+    'Region in Österreich wählen': 'Choose region in Austria',
+    'Sortiert nach Zeit': 'Sorted by time',
+    'Von · Startbahnhof wählen': 'From · choose departure station',
+    'Zeile 1 = oben · ziehen zum Umsortieren': 'Row 1 = top · drag to reorder',
+    'Zeit: einfach die nächsten Abfahrten, chronologisch.': 'Time: simply the next departures, chronological.',
+    'ZeitGruppe: Linien gruppiert, geordnet nach der frühesten Abfahrt.': 'TimeGroup: lines grouped, ordered by earliest departure.',
+    'Erreichbare Ziele werden ermittelt…': 'Finding reachable destinations…',
+    'Es wird der planmäßige Bahnsteig genommen. Außerplanmäßige Bahnsteigsänderungen berücksichtigt der Server automatisch, dadurch bleibt die Richtung stabil.': 'The scheduled platform is used. Unplanned platform changes are handled automatically by the server, so the direction stays stable.',
+    '← Andere Station wählen': '← Choose another station',
+    'wählen.': 'choose.',
+    // Netz-Kacheln / Region
+    'Diese Verkehrsnetze sind für dein catch-it relevant. Tipp eines an, um Linien hinzuzufügen.': 'These transit networks are relevant for your catch-it. Tap one to add lines.',
+    'Andere Region wählen': 'Choose another region', 'Andere Region wählen →': 'Choose another region →',
+    'U-Bahn, S-Bahn, Tram, Bus': 'Metro, S-Bahn, tram, bus',
+    'U-Bahn, S-Bahn, Bus, Fähre (Hamburg)': 'Metro, S-Bahn, bus, ferry (Hamburg)',
+    // Gehweg-Hint
+    'Trag ein, wie lange du zur Haltestelle brauchst — Abfahrten, die du sowieso nicht mehr erreichst, blendet dein catch-it aus.': 'Enter how long you need to reach the stop. Departures you cannot catch anyway are hidden by your catch-it.',
+    // Weitere Hints
+    'Ein Display pro Stadt. Hier stellst du den Look jeder Stadt um.': 'One display per city. Adjust the look of each city here.',
+    'Jede Haltestelle bekommt ihr eigenes Display (eigene Seite). Du kannst Stationen auch auf ein gemeinsames Display legen.': 'Each stop gets its own display (its own page). You can also put stations on a shared display.',
+    'Noch keine Stationen gewählt, daher keine Linien. Diesen Schritt kannst du überspringen.': 'No stations chosen yet, so no lines. You can skip this step.',
+    'Helligkeit wird beim Reload nicht gespeichert': 'Brightness is not saved on reload',
+    'Nachtmodus wird im Wizard nicht gespeichert': 'Night mode is not saved in the wizard',
+    'Alle Busse in Wien sind schon klimatisiert.': 'All buses in Vienna are already air-conditioned.',
+    // Feintuning-Reste
+    'Schriftfarbe': 'Text color', 'Aus': 'Off', 'Ein': 'On', 'Abfahrten': 'Departures',
+    'Automatisch = catch-it ordnet selbst. Manuell = selbst festlegen.': 'Automatic = catch-it arranges itself. Manual = set your own order.',
+    'Schwarz = kontrastreicher · Grün = schlicht/realistisch': 'Black = higher contrast · green = simple/realistic',
+    '2 = groß mit Zwischenstopps · 3 = drei Abfahrten': '2 = large with stopovers · 3 = three departures',
+    'Abfahrten pro Linie': 'Departures per line', 'Nächste Abfahrt': 'Next departure',
+    // Diverses
+    'Modus:': 'Mode:', 'Danach:': 'Then:', 'Gestrichelte sind': 'Dashed ones are',
+    'planmäßige Bahnsteig': 'scheduled platform', 'Ziel-Text': 'Destination text', 'ZeitGruppe': 'TimeGroup',
+    'Nächste abwechselnd': 'Next alternating', 'gehört zu Gruppe': 'belongs to group'
+  };
+
+  // ---- Regex-Regeln für zusammengesetzte Strings ----
+  var RX = [
+    [/^Deine Stationen \((\d+)\)$/, 'Your stations ($1)'],
+    [/^Deine Stationen \($/, 'Your stations ('],
+    [/^Deine Stationen$/, 'Your stations'],
+    [/^Schritt (\d+) von (\d+)$/, 'Step $1 of $2'],
+    [/^\((\d+) ausgewählt\)$/, '($1 selected)'],
+    [/^(\d+) Stationen$/, '$1 stations'], [/^(\d+) Station$/, '$1 station'],
+    [/^(\d+) Richtungen$/, '$1 directions'], [/^1 Richtung$/, '1 direction'],
+    [/^(\d+) Linien$/, '$1 lines'], [/^1 Linie$/, '1 line'],
+    [/^Station suchen\.{2,3}$/, 'Search station...'],
+    [/^Aktuell: /, 'Current: '],
+    [/^Linie (.+?) - Wähle die Richtung\(en\)$/, 'Line $1 · choose direction(s)'],
+    [/^Linie (\d+\S*)$/, 'Line $1'],
+    [/^Richtung (.+)$/, 'Towards $1'],
+    [/ wird bald unterstützt — die Schnittstelle ist in Arbeit\.$/, ' will be supported soon — the integration is in progress.'],
+    [/^Wähle dein Land – .*$/, 'Choose your country – we will show you the matching regions, networks & lines right away.'],
+    [/^Wähle eine andere Variante in der Suche /, 'Choose another variant in the search '],
+    [/^Diese Station wird vom Bahn-Netz nicht bedient\. /, 'This station is not served by the rail network. '],
+    [/^Fehler beim Laden: /, 'Failed to load: '],
+    [/(\d+) Linien geladen/, '$1 lines loaded']
+  ];
+
+  function tr(s) {
+    var m = s.match(/^(\s*)([\s\S]*?)(\s*)$/);
+    var core = m[2];
+    if (!core) return null;
+    if (D.hasOwnProperty(core)) return m[1] + D[core] + m[3];
+    for (var i = 0; i < RX.length; i++) {
+      if (RX[i][0].test(core)) return m[1] + core.replace(RX[i][0], RX[i][1]) + m[3];
+    }
+    // Führendes Emoji abtrennen (Länder-Dropdown "🇦🇹 Österreich", Kacheln "🚊 …"):
+    // der Textknoten enthält Symbol + Text als EINEN String → Symbol behalten, Rest übersetzen.
+    var fm = core.match(/^((?:\uD83C[\uDDE6-\uDDFF]){2}\s*|[\uD83C-\uDBFF][\uDC00-\uDFFF]️?\s*|[☀-➿]️?\s*)([\s\S]+)$/);
+    if (fm) {
+      var inner = tr(fm[2]);
+      if (inner !== null) return m[1] + fm[1] + inner + m[3];
+    }
+    return null;
+  }
+
+  var ATTRS = ['placeholder', 'title', 'aria-label'];
+  function translateTree(root) {
+    if (!root) return;
+    if (root.nodeType === 3) { var t0 = tr(root.nodeValue); if (t0 !== null && t0 !== root.nodeValue) root.nodeValue = t0; return; }
+    if (root.nodeType !== 1 && root.nodeType !== 11) return;
+    if (root.nodeType === 1) {
+      var tag = root.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE') return;
+      for (var a = 0; a < ATTRS.length; a++) {
+        var v = root.getAttribute && root.getAttribute(ATTRS[a]);
+        if (v) { var tv = tr(v); if (tv !== null && tv !== v) root.setAttribute(ATTRS[a], tv); }
+      }
+    }
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (n) {
+        var p = n.parentNode && n.parentNode.tagName;
+        return (p === 'SCRIPT' || p === 'STYLE') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var n2;
+    while ((n2 = w.nextNode())) { var t = tr(n2.nodeValue); if (t !== null && t !== n2.nodeValue) n2.nodeValue = t; }
+    // Attribute in Kind-Elementen
+    if (root.querySelectorAll) {
+      var sel = root.querySelectorAll('[placeholder],[title],[aria-label]');
+      for (var q = 0; q < sel.length; q++) {
+        for (var a2 = 0; a2 < ATTRS.length; a2++) {
+          var v2 = sel[q].getAttribute(ATTRS[a2]);
+          if (v2) { var tv2 = tr(v2); if (tv2 !== null && tv2 !== v2) sel[q].setAttribute(ATTRS[a2], tv2); }
+        }
+      }
+    }
+  }
+
+  function boot() {
+    translateTree(document.body);
+    // Nachgerenderte Inhalte (die Seite baut fast alles per innerHTML) live übersetzen.
+    // Ersetzen nur bei echter Änderung → keine Observer-Endlosschleife.
+    var mo = new MutationObserver(function (muts) {
+      for (var i = 0; i < muts.length; i++) {
+        var mu = muts[i];
+        if (mu.type === 'characterData') { var t = tr(mu.target.nodeValue); if (t !== null && t !== mu.target.nodeValue) mu.target.nodeValue = t; }
+        for (var j = 0; j < mu.addedNodes.length; j++) translateTree(mu.addedNodes[j]);
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+  if (document.body) boot(); else document.addEventListener('DOMContentLoaded', boot);
+})();
+</script>
 </body>
 </html>
