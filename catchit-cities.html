@@ -7596,6 +7596,13 @@ function addWienStation() {
   editingStationIndex = null;
   var _newName = (typeof normalizeStationName === 'function')
     ? normalizeStationName((wienSelectedStation && wienSelectedStation.name) || '') : '';
+  // Bestehende Auswahl derselben Station EINSAMMELN statt wegwerfen (Kunde 2026-08-29:
+  // "Linie 18 und 57A Gumpendorfer Straße separat eingegeben — der neue Eintrag ersetzte
+  // den alten"). Die alten stations-Objekte werden weiterhin entfernt (Anti-Duplikat wie
+  // gehabt), aber ihre Linien/Richtungen/Bahnsteige wandern in den NEUEN Eintrag → separat
+  // eintragen ERGÄNZT jetzt. Bewusstes Entfernen läuft weiter über Stift/×.
+  var _inheritedDirs = [];
+  var _inheritedLines = [];
   for (var _i = stations.length - 1; _i >= 0; _i--) {
     var _s = stations[_i];
     if (!_s || _s.network !== 'WL') continue;
@@ -7603,14 +7610,39 @@ function addWienStation() {
       && normalizeStationName(_s.stopName || '') === _newName;
     var _sIds = String(_s.stopId || '').split(',').map(function(x){ return x.trim(); });
     var _overlap = _sIds.some(function(id){ return id && stopIds.indexOf(id) >= 0; });
-    if (_sameName || _overlap) stations.splice(_i, 1);
+    if (_sameName || _overlap) {
+      (_s.directions || []).forEach(function(d) {
+        if (!d || !d.line) return;
+        // Bestands-Directions tragen nach Config-Load oft KEINE stopId — dann den rbl der
+        // Alt-Station anheften (eindeutig, wenn sie genau einen hat), sonst baut der Save
+        // ihr Token ins falsche Segment und der alte Bahnsteig fällt aus der masterrow.
+        if (!d.stopId && _sIds.length === 1 && _sIds[0]) d.stopId = _sIds[0];
+        _inheritedDirs.push(d);
+      });
+      String(_s.filter || '').split(',').forEach(function(f) {
+        f = f.trim();
+        if (f && _inheritedLines.indexOf(f) < 0) _inheritedLines.push(f);
+      });
+      // Auch die Bahnsteig-rbls der Alt-Station übernehmen (Bestands-Directions tragen nach
+      // einem Config-Load oft KEIN stopId-Feld — ohne das verlöre der Merge den alten rbl,
+      // z.B. den 18er-Bahnsteig, wenn der 57A separat dazukommt).
+      _sIds.forEach(function(id) { if (id && stopIds.indexOf(id) < 0) stopIds.push(id); });
+      stations.splice(_i, 1);
+    }
   }
+  // Geerbte Bahnsteige mit in die Stop-Liste (rbl/fullId), sonst verlöre der gemergte
+  // Eintrag die Bahnsteige der zuvor separat gewählten Linie.
+  _inheritedDirs.forEach(function(d) {
+    var sid = String(d.stopId || '').trim();
+    if (sid && stopIds.indexOf(sid) < 0) stopIds.push(sid);
+  });
 
-  // Liniennamen sammeln
+  // Liniennamen sammeln (inkl. der von der ersetzten Alt-Station geerbten)
   const lineNames = [wienSelectedLine.lineName];
   wienOtherLines.forEach(ol => {
     if (!lineNames.includes(ol.lineName)) lineNames.push(ol.lineName);
   });
+  _inheritedLines.forEach(function(n) { if (!lineNames.includes(n)) lineNames.push(n); });
 
   // fullId für Wien: nur die numerischen StopIDs (so erwartet der ESP32)
   const fullId = stopIds.join(',');
@@ -7639,6 +7671,15 @@ function addWienStation() {
       stopId: String(ol.stopId || '')  // Einzelner Bahnsteig
     });
   });
+  // Geerbte Richtungen der ersetzten Alt-Station ergänzen (dedup: Linie+Ziel+Bahnsteig).
+  (function() {
+    var have = {};
+    selectedDirections.forEach(function(d) { have[d.line + '|' + (d.towards || '') + '|' + (d.stopId || '')] = 1; });
+    _inheritedDirs.forEach(function(d) {
+      var k = d.line + '|' + (d.towards || '') + '|' + (d.stopId || '');
+      if (!have[k]) { have[k] = 1; selectedDirections.push(d); }
+    });
+  })();
 
   stations.push({
     network: 'WL',
