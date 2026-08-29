@@ -3805,7 +3805,7 @@ const REGIONS = {
   NL: {
     name: 'Niederlande',
     // Zwei Live-Optionen (Trainboard): Amsterdam Öffis ODER Züge NS landesweit.
-    networks: ['GVB', 'NS']
+    networks: ['GVB', 'NL_OEFFI', 'NS']
   },
   LI: {
     name: 'Liechtenstein',
@@ -4164,6 +4164,7 @@ const CITY_CAPABILITIES = {
   INSA:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SACHSEN:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   ROSTOCK:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  NL_OEFFI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   GB_LOCAL:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   NVV:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   VMT:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
@@ -4629,6 +4630,7 @@ const NETWORKS = {
   INSA:       { name: 'Sachsen-Anhalt (INSA)', shortName: 'INSA', region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/insa' }, placeholder: 'z.B. Magdeburg, Halle, Dessau...', isJourneyBased: false },
   SACHSEN:    { name: 'Sachsen', shortName: 'SN', region: 'DE', desc: 'Tram, Bus, S-Bahn (Leipzig, Dresden, Chemnitz)', searchType: 'trainboard', trainboard: { path: '/de/sachsen' }, placeholder: 'z.B. Leipzig Hbf, Dresden, Chemnitz...', isJourneyBased: false },
   ROSTOCK:    { name: 'Rostock', shortName: 'HRO', region: 'DE', desc: 'Tram, Bus, S-Bahn (RSAG)', searchType: 'trainboard', trainboard: { path: '/de/rostock' }, placeholder: 'z.B. Neuer Markt, Hauptbahnhof, Doberaner Platz...', isJourneyBased: false },
+  NL_OEFFI:   { name: 'Niederlande Nahverkehr', shortName: 'NL', region: 'NL', desc: 'Bus, Tram landesweit (OVapi)', searchType: 'trainboard', trainboard: { path: '/nl/oeffi' }, placeholder: 'z.B. Arnhem Willemsplein, Utrecht, Den Haag...', isJourneyBased: false },
   GB_LOCAL:   { name: 'Großbritannien (Bus, Tram)', shortName: 'GB', region: 'GB', desc: 'Bus, Tram (u.a. Edinburgh Tram): Fahrplan', searchType: 'trainboard', trainboard: { path: '/gb/local' }, placeholder: 'z.B. St Andrew Square, Edinburgh Park, York Place...', isJourneyBased: false },
   NVV:        { name: 'Nordhessen (NVV)',       shortName: 'NVV',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/nvv' }, placeholder: 'z.B. Kassel, Fulda, Marburg...', isJourneyBased: false },
   VMT:        { name: 'Mittelthüringen (VMT)',  shortName: 'VMT',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vmt' }, placeholder: 'z.B. Erfurt, Weimar, Jena, Gotha...', isJourneyBased: false },
@@ -5715,6 +5717,7 @@ var NETWORK_BRANDS = {
   INSA:          { bg: '#005CA9', fg: '#fff' }, // INSA Sachsen-Anhalt Blau
   SACHSEN:       { bg: '#e2001a', fg: '#fff' }, // Sachsen (LVB Rot)
   ROSTOCK:       { bg: '#009ee0', fg: '#fff' }, // Rostock (RSAG Cyan-Blau)
+  NL_OEFFI:      { bg: '#ff7700', fg: '#fff' }, // NL Nahverkehr (OV-Orange)
   GB_LOCAL:      { bg: '#8d122a', fg: '#fff' }, // Großbritannien Bus/Tram (Edinburgh Trams Maroon)
   NVV:           { bg: '#009A45', fg: '#fff' }, // NVV Nordhessen Grün
   VMT:           { bg: '#E2001A', fg: '#fff' }, // VMT Mittelthüringen Rot
@@ -11612,6 +11615,7 @@ const NETWORK_COLORS = {
   INSA: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },      // Sachsen-Anhalt (INSA) → orange Matrix
   SACHSEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Sachsen (Leipzig/Dresden/Chemnitz) → orange Matrix
   ROSTOCK: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Rostock (RSAG Tram/Bus) → orange Matrix
+  NL_OEFFI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // NL Nahverkehr → orange Matrix
   GB_LOCAL: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // Großbritannien Bus/Tram (Edinburgh Tram) → orange Matrix
   NVV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Nordhessen (NVV) → orange Matrix
   VMT: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Mittelthüringen (VMT) → orange Matrix
@@ -20036,7 +20040,8 @@ window.addEventListener('DOMContentLoaded', () => {
     'Stadtverkehr': 'City transit', 'Fernverkehr': 'Long-distance', 'Regionalverkehr': 'Regional',
     'U-Bahn, Straßenbahn, Bus': 'Metro, tram, bus', 'U-Bahn, S-Bahn, Bus, Fähre': 'Metro, S-Bahn, bus, ferry',
     'Straßenbahn, Bus': 'Tram, bus', 'Metro, Tram, Bus, Fähre – live': 'Metro, tram, bus, ferry – live',
-    'Nahverkehr Dänemark': 'Local transit Denmark', 'Züge Dänemark': 'Trains Denmark', 'Rejseplanen Züge': 'Rejseplanen trains',
+    'Nahverkehr Dänemark': 'Local transit Denmark',
+    'Niederlande Nahverkehr': 'Netherlands local transit', 'Bus, Tram landesweit (OVapi)': 'Bus, tram nationwide (OVapi)', 'Züge Dänemark': 'Trains Denmark', 'Rejseplanen Züge': 'Rejseplanen trains',
     'Liechtenstein / Schweiz Nahverkehr': 'Liechtenstein / Switzerland local transit',
     'ÖBB Fernverkehr': 'ÖBB long-distance', 'ÖBB Regional': 'ÖBB regional', 'ÖBB Regionalverkehr': 'ÖBB regional',
     'ÖBB Regional NÖ': 'ÖBB regional Lower Austria', 'ÖBB Regional OÖ': 'ÖBB regional Upper Austria',
