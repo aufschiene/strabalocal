@@ -3221,9 +3221,10 @@
             <div style="font-size:14px;font-weight:600;">Wechseln</div>
           </div>
           <div class="toggle-row" id="quickSpeed" style="gap:0;">
-            <button class="toggle-btn" data-value="5" onclick="setFtToggleVal('quickSpeed',5)" style="border-radius:8px 0 0 8px;">Schnell</button>
-            <button class="toggle-btn active" data-value="10" onclick="setFtToggleVal('quickSpeed',10)">Normal</button>
-            <button class="toggle-btn" data-value="20" onclick="setFtToggleVal('quickSpeed',20)" style="border-radius:0 8px 8px 0;">Langsam</button>
+            <button class="toggle-btn" data-value="5" onclick="setFtToggleVal('quickSpeed',5)" style="border-radius:8px 0 0 8px;">5s<span style="display:block;font-size:10px;font-weight:400;">Sehr schnell</span></button>
+            <button class="toggle-btn" data-value="8" onclick="setFtToggleVal('quickSpeed',8)">8s<span style="display:block;font-size:10px;font-weight:400;">Schnell</span></button>
+            <button class="toggle-btn active" data-value="12" onclick="setFtToggleVal('quickSpeed',12)">12s<span style="display:block;font-size:10px;font-weight:400;">Normal</span></button>
+            <button class="toggle-btn" data-value="15" onclick="setFtToggleVal('quickSpeed',15)" style="border-radius:0 8px 8px 0;">15s<span style="display:block;font-size:10px;font-weight:400;">Langsam</span></button>
           </div>
         </div>
       </div>
@@ -3477,10 +3478,10 @@
           <div class="name">Wechsel-Intervall</div>
         </div>
         <div class="toggle-row" id="advInterval">
-          <button class="toggle-btn" data-value="5" onclick="setAdv('interval','5')">5s</button>
-          <button class="toggle-btn active" data-value="10" onclick="setAdv('interval','10')">10s</button>
-          <button class="toggle-btn" data-value="15" onclick="setAdv('interval','15')">15s</button>
-          <button class="toggle-btn" data-value="30" onclick="setAdv('interval','30')">30s</button>
+          <button class="toggle-btn" data-value="5" onclick="setAdv('interval','5')">5s<span style="display:block;font-size:10px;font-weight:400;">Sehr schnell</span></button>
+          <button class="toggle-btn" data-value="8" onclick="setAdv('interval','8')">8s<span style="display:block;font-size:10px;font-weight:400;">Schnell</span></button>
+          <button class="toggle-btn active" data-value="12" onclick="setAdv('interval','12')">12s<span style="display:block;font-size:10px;font-weight:400;">Normal</span></button>
+          <button class="toggle-btn" data-value="15" onclick="setAdv('interval','15')">15s<span style="display:block;font-size:10px;font-weight:400;">Langsam</span></button>
         </div>
       </div>
     </div>
@@ -3715,7 +3716,7 @@
       <button class="toggle-btn active" data-value="1">Gemischt</button>
     </div>
     <div id="ftStopIntervalToggle" style="display:none;">
-      <button class="toggle-btn active" data-value="10">10s</button>
+      <button class="toggle-btn active" data-value="12">12s</button>
     </div>
 
     <!-- Spacer für Bottom Actions -->
@@ -6522,7 +6523,7 @@ var advancedSettings = {
   textcolor:  'amber',
   brightness: 'bright',
   mode:       'mixed',
-  interval:   '10'
+  interval:   '12'
 };
 
 // Seedet advancedSettings (Helligkeit/Textfarbe/Modus/Interval) aus einer geladenen
@@ -6536,7 +6537,12 @@ function seedAdvancedFromConfig(cfg) {
   if (cfg.displayLight != null && BR[cfg.displayLight]) advancedSettings.brightness = BR[cfg.displayLight];
   if (cfg.textColor != null && TC[cfg.textColor]) advancedSettings.textcolor = TC[cfg.textColor];
   if (cfg.displayMode != null && MD[cfg.displayMode]) advancedSettings.mode = MD[cfg.displayMode];
-  if (cfg.stopInterval != null) advancedSettings.interval = String(cfg.stopInterval);
+  if (cfg.stopInterval != null) {
+    // Auf Standardwerte 5/8/12/15 snappen (Alt-Configs: 10->8, 20->15), sonst hat der
+    // Erweitert-Regler keinen aktiven Button.
+    var _iv = parseInt(cfg.stopInterval, 10) || 12;
+    advancedSettings.interval = String((_iv <= 6) ? 5 : (_iv <= 10) ? 8 : (_iv <= 13) ? 12 : 15);
+  }
 }
 
 function setAdv(field, value) {
@@ -11871,7 +11877,7 @@ function calculateRecommendedConfig() {
 
     // Erweiterte Einstellungen
     displayMode: 1,        // Gemischt
-    stopInterval: 10,
+    stopInterval: 12,
     gehweg: gehwegValues,
     showFunMessages: true,
     sortMode: (stammstreckeSortMode || stations.some(s => s.allDepartures) || isTrainNetwork) ? 2 : 1,  // dynamisch wenn Zug-Netzwerk, Stammstrecke oder "Alle Abfahrten"
@@ -12258,12 +12264,14 @@ function goToDisplayConfig() {
     }
   }
 
-  // Wechselgeschwindigkeit aus bestehender Config initialisieren
+  // Wechselgeschwindigkeit aus bestehender Config initialisieren — auf den nächsten
+  // Standardwert (5/8/12/15) snappen; Alt-Configs mit 10 oder 20 landen auf 8 bzw. 15.
   if (recommendedConfig.stopInterval) {
     var speedVal = recommendedConfig.stopInterval;
-    if (speedVal <= 5) setFtToggleVal('quickSpeed', 5);
-    else if (speedVal >= 20) setFtToggleVal('quickSpeed', 20);
-    else setFtToggleVal('quickSpeed', 10);
+    if (speedVal <= 6) setFtToggleVal('quickSpeed', 5);
+    else if (speedVal <= 10) setFtToggleVal('quickSpeed', 8);
+    else if (speedVal <= 13) setFtToggleVal('quickSpeed', 12);
+    else setFtToggleVal('quickSpeed', 15);
   }
 
   // Der alte Quick-Config-Screen (stepDisplayConfig) existiert nicht mehr im Flow —
@@ -13010,7 +13018,7 @@ function sendWithSuggestion() {
   // Wechselgeschwindigkeit
   var speedVal = getFtToggleVal('quickSpeed');
   if (speedVal && recommendedConfig.multiDisplay) {
-    recommendedConfig.stopInterval = parseInt(speedVal) || 10;
+    recommendedConfig.stopInterval = parseInt(speedVal) || 12;
   }
 
   // Nachtmodus
@@ -14714,14 +14722,19 @@ function renderDisplayTypeSections() {
       html += '<p class="form-hint">Chronologisch sortiert, keine weiteren Einstellungen nötig.</p>';
     }
 
-    // Anzeigedauer (nur bei Multi-Display)
+    // Anzeigedauer (nur bei Multi-Display) — Standardwerte 5/8/12/15 mit Tempo-Label,
+    // Default 12 s (Paul 2026-08-29; Alt-Werte 10/20 snappen auf den nächsten Standard).
     if (types.length > 1) {
       var iDs = dsVal(dt.colour, 'i');
-      var iSel = (iDs !== undefined) ? iDs : 10;   // gespeicherte Dauer, sonst Default 10s
-      html += '<div class="form-row"><div><div class="form-label">Anzeigedauer</div><div class="form-hint">Wie lange diese Ansicht angezeigt wird</div></div>';
+      var iSel = (iDs !== undefined) ? iDs : 12;   // gespeicherte Dauer, sonst Default 12s
+      if (iSel !== 5 && iSel !== 8 && iSel !== 12 && iSel !== 15) {
+        iSel = (iSel <= 6) ? 5 : (iSel <= 10) ? 8 : (iSel <= 13) ? 12 : 15;
+      }
+      var iLabels = { 5: 'Sehr schnell', 8: 'Schnell', 12: 'Normal', 15: 'Langsam' };
+      html += '<div class="form-row"><div><div class="form-label">Anzeigedauer</div><div class="form-hint">Wie lange jedes Blatt dieser Ansicht steht</div></div>';
       html += '<div class="toggle-row" id="ftInterval_' + dt.colour + '">';
-      [5, 10, 15, 20].forEach(function(sec) {
-        html += '<button class="toggle-btn' + (sec === iSel ? ' active' : '') + '" data-value="' + sec + '" onclick="setFtToggleVal(\'ftInterval_' + dt.colour + '\',' + sec + ')">' + sec + 's</button>';
+      [5, 8, 12, 15].forEach(function(sec) {
+        html += '<button class="toggle-btn' + (sec === iSel ? ' active' : '') + '" data-value="' + sec + '" onclick="setFtToggleVal(\'ftInterval_' + dt.colour + '\',' + sec + ')">' + sec + 's<span style="display:block;font-size:10px;font-weight:400;">' + iLabels[sec] + '</span></button>';
       });
       html += '</div></div>';
     }
@@ -15510,7 +15523,7 @@ async function initFinetuningStep() {
     displayModeSection.style.display = isWienOrBodo ? 'block' : 'none';
   }
   setFtDisplayMode(config.displayMode || 1);
-  setFtStopInterval(config.stopInterval || 10);
+  setFtStopInterval(config.stopInterval || 12);
 
   // Preview aktualisieren
   updateFinetuningPreview();
@@ -15623,7 +15636,7 @@ function getFtTextColor() {
 
 // ==================== ANZEIGE-MODUS (GEMISCHT/SLIDESHOW) ====================
 let ftDisplayMode = 1;   // 1=Gemischt, 2=Slideshow
-let ftStopInterval = 10; // Sekunden pro Stop bei Slideshow
+let ftStopInterval = 12; // Sekunden pro Stop bei Slideshow
 
 function setFtDisplayMode(value) {
   ftDisplayMode = value;
@@ -17721,7 +17734,7 @@ function applyDisplaySettingsToConfig(str) {
   if (o.d !== undefined) recommendedConfig.delayHighlight = num(o.d, 0);
   if (o.a !== undefined) recommendedConfig.alternateNext = (num(o.a, 1) === 1);
   if (o.s !== undefined) recommendedConfig.sortMode = num(o.s, 1);
-  if (o.i !== undefined) recommendedConfig.stopInterval = num(o.i, 10);
+  if (o.i !== undefined) recommendedConfig.stopInterval = num(o.i, 12);
 }
 
 function collectFtLineGroups() {
@@ -19180,6 +19193,19 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           else if (cn > 0) { line = t.substring(0, cn).trim(); ref = t.substring(cn + 1).trim(); }
           else { line = t; ref = ''; }
           if (!line || union.has(line + '|' + ref)) continue;
+          // BARE Tokens ("1" ohne Richtung, v.a. Wien: Richtung steckt im Bahnsteig-rbl) NICHT
+          // zusätzlich anhängen, wenn die Linie bereits MIT einer Richtung rekonstruiert wurde —
+          // sonst entsteht ein Doppel-Token ("1>2,1" → lineGroups "14:1,14:1" → dieselbe Abfahrt
+          // wird ZWEIMAL gerendert; Paul/Wien 2026-08-29). Umgekehrt genauso: steht die Linie
+          // schon BAR im State (= alle Richtungen), deckt das jedes spezifische Token ab.
+          // Heilt bestehende Doppel-Configs beim nächsten Re-Save gleich mit.
+          if (ref === '') {
+            let lineCovered = false;
+            union.forEach(k => { if (k === line + '|' || k.indexOf(line + '|') === 0) lineCovered = true; });
+            if (lineCovered) continue;
+          } else if (union.has(line + '|')) {
+            continue;
+          }
           // Ziel-Station via /lines bestimmen (nur bei mehreren Stationen im Segment nötig)
           let target = segStations[0];
           if (segStations.length > 1) {
@@ -19398,7 +19424,7 @@ async function handleConfigMessage(data) {
       recommendedConfig.displayMode = parseInt(data.config.display_mode) || 1;
     }
     if (data.config.stop_interval !== undefined) {
-      recommendedConfig.stopInterval = parseInt(data.config.stop_interval) || 10;
+      recommendedConfig.stopInterval = parseInt(data.config.stop_interval) || 12;
     }
     // Weitere Feintuning-Einstellungen
     if (data.config.colour !== undefined) {
