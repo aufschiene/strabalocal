@@ -19808,6 +19808,142 @@ window.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script>
+// ==================== STÖRUNGS-BANNER (2026-08-29) ====================
+// Zeigt bekannte Netz-Ausfälle (api.straba.at/api/v1/networkstatus, handgepflegte JSON auf
+// dem Server) als Banner GANZ OBEN — aber NUR, wenn die geladene Config mindestens eine
+// Station des betroffenen Netzes enthält. Wegklicken merkt sich die Meldung pro Session.
+// networks-Einträge matchen exakt; 'XY*' matcht als Prefix (z.B. 'OEBB*' = ganze Familie).
+(function () {
+  var API = 'https://api.straba.at/api/v1/networkstatus';
+  var outages = null;
+  var lang = 'de';
+  try {
+    var qp = new URLSearchParams(location.search);
+    var ql = String(qp.get('lang') || '').toLowerCase();
+    lang = (ql === 'en' || ql === 'de') ? ql
+      : (localStorage.getItem('catchit_lang') || ((navigator.language || 'de').toLowerCase().indexOf('de') === 0 ? 'de' : 'en'));
+  } catch (e) {}
+
+  function netMatches(outNet, stationNet) {
+    if (!outNet || !stationNet) return false;
+    if (outNet.slice(-1) === '*') return stationNet.indexOf(outNet.slice(0, -1)) === 0;
+    return outNet === stationNet;
+  }
+
+  function render() {
+    if (!outages || !outages.length) return;
+    if (typeof stations === 'undefined' || !stations || !stations.length) return;
+    var myNets = {};
+    stations.forEach(function (s) { if (s && s.network) myNets[s.network] = 1; });
+    var hits = outages.filter(function (o) {
+      return (o.networks || []).some(function (n) {
+        return Object.keys(myNets).some(function (mn) { return netMatches(String(n), mn); });
+      });
+    });
+    var host = document.getElementById('netOutageBanner');
+    if (!hits.length) { if (host) { host.remove(); syncPad(); } return; }
+    var dismissed = {};
+    try { dismissed = JSON.parse(sessionStorage.getItem('catchit_outage_dismissed') || '{}'); } catch (e) {}
+    hits = hits.filter(function (o) { return !dismissed[bKey(o)]; });
+    if (!hits.length) { if (host) { host.remove(); syncPad(); } return; }
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'netOutageBanner';
+      // Floating-Karte im catch-it-Look statt Vollflächen-Block: sticky mit Abstand,
+      // zentriert auf Karten-Breite, Einblend-Animation einmalig registrieren.
+      // Vollbreiter Balken GANZ oben (fixed; die Wizard-Screens liegen nicht im normalen
+      // Fluss, darum schafft syncPad per body-padding den Platz — nichts wird überlappt).
+      host.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99998;transition:opacity .25s;';
+      document.body.insertBefore(host, document.body.firstChild);
+    }
+    // Bei MEHREREN Störungen wird DURCHGEWECHSELT (ein Balken, alle 7s die nächste
+    // Meldung, Punkte zeigen die Position). Nur neu zeichnen, wenn sich die angezeigte
+    // Meldung ändert (render läuft zyklisch, sonst würde der Fade flackern).
+    _rotIdx = _rotIdx % hits.length;
+    var o = hits[_rotIdx];
+    var curKey = bKey(o) + '|' + _rotIdx + '/' + hits.length;
+    if (hits.length > 1 && !_rotTimer) {
+      _rotTimer = setInterval(function () {
+        _rotIdx++;
+        var el = document.getElementById('netOutageBanner');
+        if (el) {
+          el.style.opacity = '0';
+          setTimeout(function () { render(); var e2 = document.getElementById('netOutageBanner'); if (e2) e2.style.opacity = '1'; }, 250);
+        } else { render(); }
+      }, 7000);
+    } else if (hits.length <= 1 && _rotTimer) { clearInterval(_rotTimer); _rotTimer = null; }
+    if (host.getAttribute('data-cur') === curKey) return;
+    host.setAttribute('data-cur', curKey);
+    var title = (lang === 'en' && o.title_en) ? o.title_en : (o.title || '');
+    var msg = (lang === 'en' && o.message_en) ? o.message_en : (o.message || '');
+    // severity 'partial' = Teilstörung (orange), sonst Komplett-Ausfall (rot)
+    var bg = (o.severity === 'partial') ? '#d97706' : '#c0392b';
+    var dots = hits.length > 1
+      ? '<div style="position:absolute;bottom:5px;right:16px;font-size:9px;letter-spacing:3px;opacity:.85;">' +
+        hits.map(function (_, i) { return i === _rotIdx ? '●' : '○'; }).join('') + '</div>'
+      : '';
+    host.innerHTML = '<div data-okey="' + bKey(o) + '" style="background:' + bg + ';color:#fff;padding:12px 44px 12px 16px;' +
+      'font-family:Poppins,sans-serif;position:relative;border-bottom:2px solid #191919;">' +
+      '<div style="font-weight:700;font-size:14px;">⚠️ ' + esc(title) + '</div>' +
+      (msg ? '<div style="font-size:13px;margin-top:2px;opacity:.95;">' + esc(msg) + '</div>' : '') +
+      dots +
+      '<button onclick="window._dismissOutage(this)" style="position:absolute;top:10px;right:10px;background:rgba(255,255,255,.18);' +
+      'border:none;color:#fff;border-radius:6px;width:26px;height:26px;font-size:15px;cursor:pointer;line-height:1;">✕</button></div>';
+    syncPad();
+  }
+  var _basePad = null;
+  var _rotIdx = 0;
+  var _rotTimer = null;
+  function syncPad() {
+    var host = document.getElementById('netOutageBanner');
+    if (_basePad === null) _basePad = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
+    var h = (host && host.children.length) ? host.offsetHeight : 0;
+    document.body.style.paddingTop = h ? (_basePad + h) + 'px' : '';
+    // Der "Was möchtest du ändern?"-Screen ist ein Vollbild-Overlay (fixed, inset:0) und
+    // ignoriert body-padding → seine Oberkante unter den Balken schieben.
+    var ov = document.getElementById('configChoiceOverlay');
+    if (ov) ov.style.top = h ? h + 'px' : '';
+  }
+  function bKey(o) { return String((o.networks || []).join(',')) + '|' + String(o.title || ''); }
+  function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  window._dismissOutage = function (btn) {
+    var row = btn.closest('[data-okey]');
+    if (!row) return;
+    try {
+      var d = JSON.parse(sessionStorage.getItem('catchit_outage_dismissed') || '{}');
+      d[row.getAttribute('data-okey')] = 1;
+      sessionStorage.setItem('catchit_outage_dismissed', JSON.stringify(d));
+    } catch (e) {}
+    row.remove();
+    var host = document.getElementById('netOutageBanner');
+    if (host) { host.removeAttribute('data-cur'); if (!host.children.length) host.remove(); }
+    syncPad();
+    render();   // nächste (nicht weggeklickte) Störung sofort zeigen
+  };
+
+  function boot() {
+    var tries = 0;
+    (function load() {
+      tries++;
+      fetch(API, { cache: 'no-store' }).then(function (r) {
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.json();
+      }).then(function (j) {
+        outages = (j && Array.isArray(j.outages)) ? j.outages : [];
+        render();
+        // Config lädt asynchron (postMessage) → eine Weile nachprüfen, danach sparsam weiter.
+        var n = 0;
+        var t = setInterval(function () { n++; render(); if (n > 20) { clearInterval(t); setInterval(render, 30000); } }, 1500);
+      }).catch(function () {
+        // Fehlschlag (z.B. kurzes 429/Netzproblem) → nach 30s erneut, max. 5 Versuche.
+        if (tries < 5) setTimeout(load, 30000);
+      });
+    })();
+  }
+  if (document.body) boot(); else document.addEventListener('DOMContentLoaded', boot);
+})();
+</script>
+<script>
 // ==================== I18N: ENGLISCHE OBERFLÄCHE (2026-08-29) ====================
 // EIN File, EIN Wörterbuch: Default-Sprache aus dem Browser (nicht-deutsch → EN),
 // manuell umschaltbar (Pill unten links), Wahl in localStorage ('catchit_lang').
