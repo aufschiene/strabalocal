@@ -3791,7 +3791,7 @@ const REGIONS = {
   },
   DE: {
     name: 'Deutschland',
-    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'SACHSEN', 'ROSTOCK', 'NVV', 'VMT', 'SAARVV']
+    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'MDV', 'SACHSEN', 'ROSTOCK', 'NVV', 'VMT', 'SAARVV']
   },
   CH: {
     name: 'Schweiz',
@@ -4162,6 +4162,7 @@ const CITY_CAPABILITIES = {
   NAHSH:      { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   VSN:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   INSA:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  MDV:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SACHSEN:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   ROSTOCK:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   NL_OEFFI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
@@ -4628,7 +4629,11 @@ const NETWORKS = {
   NAHSH:      { name: 'Schleswig-Holstein (NAH.SH)', shortName: 'NAH.SH', region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/nahsh' }, placeholder: 'z.B. Kiel, Lübeck, Flensburg...', isJourneyBased: false },
   VSN:        { name: 'Süd-Niedersachsen (VSN)', shortName: 'VSN', region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vsn' }, placeholder: 'z.B. Göttingen, Northeim, Duderstadt...', isJourneyBased: false },
   INSA:       { name: 'Sachsen-Anhalt (INSA)', shortName: 'INSA', region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/insa' }, placeholder: 'z.B. Magdeburg, Halle, Dessau...', isJourneyBased: false },
-  SACHSEN:    { name: 'Sachsen', shortName: 'SN', region: 'DE', desc: 'Tram, Bus, S-Bahn (Leipzig, Dresden, Chemnitz)', searchType: 'trainboard', trainboard: { path: '/de/sachsen' }, placeholder: 'z.B. Leipzig Hbf, Dresden, Chemnitz...', isJourneyBased: false },
+  // Leipzig-ÖPNV kommt NICHT über SACHSEN/global (DELFI liefert für LVB-Trams nur Müll:
+  // Linie '?', 3 Fahrten), sondern über den INSA-Feed, der den ganzen MDV abdeckt.
+  // Serverseitig ist MDV nur ein Redirect auf INSA (NETWORK_REDIRECT).
+  MDV:        { name: 'Leipzig & Halle (MDV)', shortName: 'MDV', region: 'DE', desc: 'Tram, Bus, S-Bahn (LVB, Leipzig, Halle)', searchType: 'trainboard', trainboard: { path: '/de/insa' }, placeholder: 'z.B. Leipzig Augustusplatz, Halle Markt...', isJourneyBased: false },
+  SACHSEN:    { name: 'Sachsen', shortName: 'SN', region: 'DE', desc: 'Tram, Bus, S-Bahn (Dresden, Chemnitz)', searchType: 'trainboard', trainboard: { path: '/de/sachsen' }, placeholder: 'z.B. Dresden Postplatz, Chemnitz...', isJourneyBased: false },
   ROSTOCK:    { name: 'Rostock', shortName: 'HRO', region: 'DE', desc: 'Tram, Bus, S-Bahn (RSAG)', searchType: 'trainboard', trainboard: { path: '/de/rostock' }, placeholder: 'z.B. Neuer Markt, Hauptbahnhof, Doberaner Platz...', isJourneyBased: false },
   NL_OEFFI:   { name: 'Niederlande Nahverkehr', shortName: 'NL', region: 'NL', desc: 'Bus, Tram landesweit (OVapi)', searchType: 'trainboard', trainboard: { path: '/nl/oeffi' }, placeholder: 'z.B. Arnhem Willemsplein, Utrecht, Den Haag...', isJourneyBased: false },
   GB_LOCAL:   { name: 'Großbritannien (Bus, Tram)', shortName: 'GB', region: 'GB', desc: 'Bus, Tram (u.a. Edinburgh Tram): Fahrplan', searchType: 'trainboard', trainboard: { path: '/gb/local' }, placeholder: 'z.B. St Andrew Square, Edinburgh Park, York Place...', isJourneyBased: false },
@@ -5149,6 +5154,7 @@ const NETWORK_HERO = {
   NAHSH:  { photo: 'fotos/Schleswig.jpg',   title: 'Schleswig-Holstein' },
   VSN:    { photo: 'fotos/Göttingen.jpg',   title: 'Süd-Niedersachsen' },
   INSA:   { photo: 'fotos/INSA.jpg',        title: 'Sachsen-Anhalt' },
+  MDV:    { photo: 'fotos/Leipzig.jpg',     title: 'Leipzig & Halle' },
   SACHSEN: { photo: 'fotos/INSA.jpg',       title: 'Sachsen' },
   ROSTOCK: { photo: 'fotos/Rostock.jpg',    title: 'Rostock' },
   GB_LOCAL: { photo: 'fotos/LONDON .jpg',   title: 'Großbritannien' },
@@ -5715,6 +5721,8 @@ var NETWORK_BRANDS = {
   NAHSH:         { bg: '#009EE0', fg: '#fff' }, // NAH.SH Hellblau
   VSN:           { bg: '#E2001A', fg: '#fff' }, // VSN Süd-Nds Rot
   INSA:          { bg: '#005CA9', fg: '#fff' }, // INSA Sachsen-Anhalt Blau
+  MDV:           { bg: '#009036', fg: '#fff' }, // MDV Grün (Leipzig & Halle)
+  VVO:           { bg: '#fdc300', fg: '#000' }, // DVB Dresden Gelb, schwarze Schrift
   SACHSEN:       { bg: '#e2001a', fg: '#fff' }, // Sachsen (LVB Rot)
   ROSTOCK:       { bg: '#009ee0', fg: '#fff' }, // Rostock (RSAG Cyan-Blau)
   NL_OEFFI:      { bg: '#ff7700', fg: '#fff' }, // NL Nahverkehr (OV-Orange)
@@ -5870,37 +5878,17 @@ DISPLAY_PRESETS.westbahn = {
   ]
 };
 
-// Deutschland-Bundesländer
-DISPLAY_PRESETS.berlin = {
-  name: 'Berlin',
-  parent: 'DE',
-  photo: 'fotos/berlin.jpg',
-  networks: [
-    { id: 'BERLIN', jumpTo: { region: 'DE' } },
-    { id: 'DB',     label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
-  ]
-};
+// Deutschland-Bundesländer — wie Österreich: EINE Kachel pro Bundesland, darin die
+// Netz-Buttons (Verbünde + DB Regio). Buttons ohne label/desc ziehen NETWORKS[id] automatisch.
 DISPLAY_PRESETS.bw = {
   name: 'Baden-Württemberg',
   parent: 'DE',
   photo: 'fotos/baden württemberg.jpg',
   photoPos: 'center top', // Foto-Inhalt soll oben gezeigt werden
   networks: [
-    { id: 'BWEGT', label: 'Tram/Bus/S-Bahn', desc: 'Stuttgart, Karlsruhe, Freiburg, Bodensee …', jumpTo: { region: 'DE' } },
-    { id: 'DB',   label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
-  ]
-};
-// Köln-Kachel entfernt: KVB Köln (Netz KOELN, colour 19) hatte instabile Bus-Richtungen
-// (kein platform/Steig → volatiler Hash). Köln läuft jetzt über das NRW-Netz (DELFI, stabile
-// Steig-Richtungen). NETWORKS.KOELN + displayStyles[19] bleiben definiert, damit bestehende
-// KVB-Configs beim Laden nicht crashen; nur neu wählbar ist es nicht mehr.
-DISPLAY_PRESETS.nrw = {
-  name: 'NRW',
-  parent: 'DE',
-  photo: 'fotos/NRW .jpg',
-  networks: [
-    { id: 'NRW', label: 'Nahverkehr', desc: 'Bus, Tram, Stadtbahn, U-Bahn', jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',               jumpTo: { region: 'DE' } }
+    { id: 'BWEGT', label: 'Tram/Bus/S-Bahn',    desc: 'Stuttgart, Karlsruhe, Freiburg, Bodensee …', jumpTo: { region: 'DE' } },
+    { id: 'VRN',   label: 'Rhein-Neckar (VRN)', desc: 'Mannheim, Heidelberg …',                     jumpTo: { region: 'DE' } },
+    { id: 'DB',    label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                              jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.bayern = {
@@ -5912,6 +5900,15 @@ DISPLAY_PRESETS.bayern = {
     { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',             jumpTo: { region: 'DE' } }
   ]
 };
+DISPLAY_PRESETS.berlin = {
+  name: 'Berlin & Brandenburg',
+  parent: 'DE',
+  photo: 'fotos/berlin.jpg',
+  networks: [
+    { id: 'BERLIN', jumpTo: { region: 'DE' } },
+    { id: 'DB',     label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
+  ]
+};
 DISPLAY_PRESETS.hamburg = {
   name: 'Hamburg',
   parent: 'DE',
@@ -5921,34 +5918,25 @@ DISPLAY_PRESETS.hamburg = {
     { id: 'DB',      label: 'DB Regio',  desc: 'RE, RB, S-Bahn',              jumpTo: { region: 'DE' } }
   ]
 };
-DISPLAY_PRESETS.rmv = {
-  name: 'Rhein-Main (RMV)',
+DISPLAY_PRESETS.hessen = {
+  name: 'Hessen',
   parent: 'DE',
   photo: 'fotos/DB.jpg',
   networks: [
-    { id: 'RMV', label: 'Nahverkehr', desc: 'S-Bahn, U-Bahn, Tram, Bus', jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',             jumpTo: { region: 'DE' } }
+    { id: 'RMV', label: 'Rhein-Main (RMV)',  desc: 'S-Bahn, U-Bahn, Tram, Bus (Frankfurt …)', jumpTo: { region: 'DE' } },
+    { id: 'NVV', label: 'Nordhessen (NVV)',  desc: 'Bus, Tram, Bahn (Kassel …)',              jumpTo: { region: 'DE' } },
+    { id: 'DB',  label: 'DB Regio',          desc: 'RE, RB, S-Bahn',                           jumpTo: { region: 'DE' } }
   ]
 };
-DISPLAY_PRESETS.vvo = {
-  name: 'Dresden (VVO)',
+DISPLAY_PRESETS.rostock = {
+  name: 'Mecklenburg-Vorpommern',
   parent: 'DE',
-  photo: 'fotos/dresden foto.jpg',
+  photo: 'fotos/Rostock.jpg',
   networks: [
-    { id: 'VVO', label: 'Nahverkehr', desc: 'S-Bahn, Tram, Bus', jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',     jumpTo: { region: 'DE' } }
+    { id: 'ROSTOCK', label: 'Rostock (RSAG)', desc: 'Tram, Bus, S-Bahn', jumpTo: { region: 'DE' } },
+    { id: 'DB',      label: 'DB Regio',       desc: 'RE, RB, S-Bahn',    jumpTo: { region: 'DE' } }
   ]
 };
-DISPLAY_PRESETS.aachen = {
-  name: 'Aachen',
-  parent: 'DE',
-  photo: 'fotos/aaachen.jpg',
-  networks: [
-    { id: 'AACHEN', jumpTo: { region: 'DE' } },
-    { id: 'DB',     label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
-  ]
-};
-// Neue deutsche Verbünde (Trainboard /de/*)
 DISPLAY_PRESETS.niedersachsen = {
   name: 'Niedersachsen & Bremen',
   parent: 'DE',
@@ -5960,67 +5948,78 @@ DISPLAY_PRESETS.niedersachsen = {
     { id: 'DB',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
   ]
 };
-DISPLAY_PRESETS.rostock = {
-  name: 'Rostock (RSAG)',
+// Köln-Kachel entfernt: KVB Köln (Netz KOELN, colour 19) hatte instabile Bus-Richtungen
+// (kein platform/Steig → volatiler Hash). Köln läuft jetzt über das NRW-Netz (DELFI, stabile
+// Steig-Richtungen). NETWORKS.KOELN + displayStyles[19] bleiben definiert, damit bestehende
+// KVB-Configs beim Laden nicht crashen; nur neu wählbar ist es nicht mehr. Aachen (AVV) ist
+// als Button hier eingezogen (früher eigene Kachel).
+DISPLAY_PRESETS.nrw = {
+  name: 'NRW',
   parent: 'DE',
-  photo: 'fotos/Rostock.jpg',
+  photo: 'fotos/NRW .jpg',
   networks: [
-    { id: 'ROSTOCK', label: 'Nahverkehr', desc: 'Tram, Bus, S-Bahn', jumpTo: { region: 'DE' } },
-    { id: 'DB',      label: 'DB Regio',  desc: 'RE, RB, S-Bahn',     jumpTo: { region: 'DE' } }
+    { id: 'NRW',    label: 'Nahverkehr', desc: 'Bus, Tram, Stadtbahn, U-Bahn', jumpTo: { region: 'DE' } },
+    { id: 'AACHEN', jumpTo: { region: 'DE' } },
+    { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',               jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.vrn = {
-  name: 'Rhein-Neckar (VRN)',
+  name: 'Rheinland-Pfalz',
   parent: 'DE',
   photo: 'fotos/Rhein-Nekar.jpg',
   networks: [
-    { id: 'VRN', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn', jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',   jumpTo: { region: 'DE' } }
-  ]
-};
-DISPLAY_PRESETS.nahsh = {
-  name: 'Schleswig-Holstein (NAH.SH)',
-  parent: 'DE',
-  photo: 'fotos/Schleswig.jpg',
-  networks: [
-    { id: 'NAHSH', label: 'Nahverkehr', desc: 'Bus, Bahn',     jumpTo: { region: 'DE' } },
-    { id: 'DB',    label: 'DB Regio',  desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
-  ]
-};
-DISPLAY_PRESETS.insa = {
-  name: 'Sachsen-Anhalt (INSA)',
-  parent: 'DE',
-  photo: 'fotos/INSA.jpg',
-  networks: [
-    { id: 'INSA', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn', jumpTo: { region: 'DE' } },
-    { id: 'DB',   label: 'DB Regio',  desc: 'RE, RB, S-Bahn',   jumpTo: { region: 'DE' } }
-  ]
-};
-DISPLAY_PRESETS.nvv = {
-  name: 'Nordhessen (NVV)',
-  parent: 'DE',
-  photo: 'fotos/NVV.jpg',
-  networks: [
-    { id: 'NVV', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Kassel …)', jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',              jumpTo: { region: 'DE' } }
-  ]
-};
-DISPLAY_PRESETS.vmt = {
-  name: 'Mittelthüringen (VMT)',
-  parent: 'DE',
-  photo: 'fotos/VMT.jpg',
-  networks: [
-    { id: 'VMT', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Erfurt, Weimar, Jena …)', jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                              jumpTo: { region: 'DE' } }
+    { id: 'VRN', label: 'Rhein-Neckar (VRN)', desc: 'Ludwigshafen, Kaiserslautern …', jumpTo: { region: 'DE' } },
+    { id: 'RMV', label: 'Rhein-Main (RMV)',   desc: 'Mainz, Worms …',                 jumpTo: { region: 'DE' } },
+    { id: 'DB',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.saarvv = {
-  name: 'Saarland (SaarVV)',
+  name: 'Saarland',
   parent: 'DE',
   photo: 'fotos/SAARLAND.webp',
   networks: [
     { id: 'SAARVV', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Saarbrücken …)', jumpTo: { region: 'DE' } },
     { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                    jumpTo: { region: 'DE' } }
+  ]
+};
+// Sachsen: drei Verbund-Buttons — Leipzig läuft über den INSA-Feed (MDV-Redirect, /global-DELFI
+// ist für LVB-Trams unbrauchbar), Dresden über VVO, Chemnitz & Umland über SACHSEN (/global).
+DISPLAY_PRESETS.sachsen = {
+  name: 'Sachsen',
+  parent: 'DE',
+  photo: 'fotos/Leipzig.jpg',
+  networks: [
+    { id: 'MDV',     label: 'Leipzig & Halle (MDV)', desc: 'Tram, Bus (LVB, Leipzig, Halle)', jumpTo: { region: 'DE' } },
+    { id: 'VVO',     label: 'Dresden (VVO)',         desc: 'S-Bahn, Tram, Bus',               jumpTo: { region: 'DE' } },
+    { id: 'SACHSEN', label: 'Chemnitz & Region',     desc: 'Tram, Bus (CVAG …)',              jumpTo: { region: 'DE' } },
+    { id: 'DB',      label: 'DB Regio',              desc: 'RE, RB, S-Bahn',                   jumpTo: { region: 'DE' } }
+  ]
+};
+DISPLAY_PRESETS.insa = {
+  name: 'Sachsen-Anhalt',
+  parent: 'DE',
+  photo: 'fotos/INSA.jpg',
+  networks: [
+    { id: 'INSA', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Magdeburg, Halle …)', jumpTo: { region: 'DE' } },
+    { id: 'DB',   label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                        jumpTo: { region: 'DE' } }
+  ]
+};
+DISPLAY_PRESETS.nahsh = {
+  name: 'Schleswig-Holstein',
+  parent: 'DE',
+  photo: 'fotos/Schleswig.jpg',
+  networks: [
+    { id: 'NAHSH', label: 'Nahverkehr', desc: 'Bus, Bahn (NAH.SH)', jumpTo: { region: 'DE' } },
+    { id: 'DB',    label: 'DB Regio',  desc: 'RE, RB, S-Bahn',      jumpTo: { region: 'DE' } }
+  ]
+};
+DISPLAY_PRESETS.vmt = {
+  name: 'Thüringen',
+  parent: 'DE',
+  photo: 'fotos/VMT.jpg',
+  networks: [
+    { id: 'VMT', label: 'Mittelthüringen (VMT)', desc: 'Bus, Tram, Bahn (Erfurt, Weimar, Jena …)', jumpTo: { region: 'DE' } },
+    { id: 'DB',  label: 'DB Regio',              desc: 'RE, RB, S-Bahn',                            jumpTo: { region: 'DE' } }
   ]
 };
 
@@ -11597,6 +11596,7 @@ const NETWORK_COLORS = {
   NAHSH: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },     // Schleswig-Holstein (NAH.SH) → orange Matrix
   VSN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Süd-Nds (VSN) → orange Matrix
   INSA: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },      // Sachsen-Anhalt (INSA) → orange Matrix
+  MDV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Leipzig & Halle (MDV) → orange Matrix
   SACHSEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Sachsen (Leipzig/Dresden/Chemnitz) → orange Matrix
   ROSTOCK: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Rostock (RSAG Tram/Bus) → orange Matrix
   NL_OEFFI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // NL Nahverkehr → orange Matrix
@@ -13841,6 +13841,14 @@ function dsStrVal(cid, key) {
 // Defaults = Blau/Gelb (DisplayBodo); G=Hintergrund (1 Simpel, 2 Pixel),
 // F=Schriftart (1 Modern/Poppins, 2 Classic/ÖBB, 3 Matrix DACH, 4 Matrix CZ).
 var FC_DEFAULTS = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff', G: '1', F: '1', A: '1', W: '0' };  // A: Linien-Badges (1=an, FW-Default) · W: Ziel-Text dick (0=dünn)
+// Offizielle MVG-Linienfarben (U-Bahn + Tram, Netzplan/MVGO). Tram 14 aus dem offiziellen
+// Tramnetz-Plan (März 2026) gesampelt, Rest = publizierte MVG-Palette. Nachtlinien = Taglinie.
+var MVG_LINE_COLORS = {
+  U1: '438136', U2: 'c8024c', U3: 'ed6720', U4: '00a984', U5: 'bc7a00', U6: '0065ae', U7: '438136', U8: 'c8024c',
+  '12': '8f3f96', '14': 'd22d7c', '16': '006cb4', '17': '875a45', '18': '20b14a', '19': 'ee1c25',
+  '20': '17c0e9', '21': 'bc7a00', '23': '92c71f', '25': 'f48e99', '27': 'fca61d', '28': 'fca61d', '29': 'ee1d23',
+  N17: '875a45', N19: 'ee1c25', N20: '17c0e9', N27: 'fca61d'
+};
 var FC_MIN_COLOUR = 101, FC_MAX_COLOUR = 103;   // 3 Slots im Konfigurator (Firmware kann 101-109)
 var customRowBySlot = {};   // slot -> { N,B,T,U,H,V,P,G,F,A } (raw, Hex ohne '#'; A=Badges 1/0)
 
@@ -14306,11 +14314,13 @@ function fcOpenWizard(cid, opts) {
   h += '<div id="fcWizStep2" style="display:none;">';
   var fcLines = [];
   var fcSeen = {};
+  var fcMucLines = {};   // Linien an Münchner Stops (AGS de:09162) → offizielle MVG-Farbe als Default
   (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    var isMuc = String(s.stopId || '').indexOf('09162') !== -1;
     var arr = [];
     if (s.directions && s.directions.length > 0) s.directions.forEach(function(d) { if (d.line) arr.push(String(d.line)); });
     else if (s.filter) s.filter.split(',').forEach(function(l) { if (l.trim()) arr.push(l.trim()); });
-    arr.forEach(function(l) { if (!fcSeen[l]) { fcSeen[l] = true; fcLines.push(l); } });
+    arr.forEach(function(l) { if (!fcSeen[l]) { fcSeen[l] = true; fcLines.push(l); } if (isMuc) fcMucLines[l] = true; });
   });
   if (fcLines.length > 0) {
     h += '<div class="form-hint" style="margin-bottom:8px;">Einzelnen Linien eigene Badge-Farben geben (z.B. U1 rot, U2 gr&uuml;n). Aus = globale Badge-Farben.</div>';
@@ -14319,10 +14329,14 @@ function fcOpenWizard(cid, opts) {
     fcLines.forEach(function(ln) {
       var lnAttr = escapeHtmlFt(ln).replace(/"/g, '');
       var st = fcStoredP[ln];
-      var on = !!st;
-      var bg = '#' + ((st && st.bg) || fcVal(cid, 'H'));
-      var tx = '#' + ((st && st.tx) || fcVal(cid, 'V'));
-      var ol = '#' + ((st && st.ol) || (st && st.bg) || fcVal(cid, 'U'));
+      // Münchner Linien (U-Bahn + Tram) kriegen die OFFIZIELLE MVG-Netzplan-Farbe als
+      // Default und sind direkt aktiv — der User muss nichts mehr zusammenklicken
+      // (Kunde Patrick 2026-08-31: Tram 14 rosa, 18 grün wie in der MVGO-App).
+      var mvg = fcMucLines[ln] ? MVG_LINE_COLORS[String(ln).toUpperCase()] : null;
+      var on = !!st || !!mvg;
+      var bg = '#' + ((st && st.bg) || mvg || fcVal(cid, 'H'));
+      var tx = '#' + ((st && st.tx) || (mvg ? 'ffffff' : fcVal(cid, 'V')));
+      var ol = '#' + ((st && st.ol) || (st && st.bg) || mvg || fcVal(cid, 'U'));
       h += '<div class="fc-line-row" data-cid="' + cid + '" data-line="' + lnAttr + '" style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #eee;">';
       h += '<span style="font-weight:700;background:' + bg + ';color:' + tx + ';border:2px solid ' + ol + ';padding:2px 8px;border-radius:5px;font-size:12px;min-width:26px;text-align:center;">' + escapeHtmlFt(ln) + '</span>';
       h += '<span style="font-size:12px;color:#888;margin-right:auto;">Eigene Farben</span>';
@@ -16191,7 +16205,9 @@ function updateFinetuningPreview() {
     // MVG München: helles Blau, U-Bahn-Badges (MVG-Farben), sonst weiße Schrift, "Min"-Header
     previewEl.style.background = '#126fc8';
     previewEl.style.backgroundImage = 'none';
-    const uColors = { U1:'#438136', U2:'#c8024c', U3:'#ed6720', U4:'#00a984', U5:'#bc7a00', U6:'#0065ae', U7:'#438136', U8:'#c8024c' };
+    // U-Bahn UND Tram in offiziellen MVG-Farben (gleiche Tabelle wie der Custom-Wizard)
+    const uColors = {};
+    Object.keys(MVG_LINE_COLORS).forEach(function(k){ uColors[k] = '#' + MVG_LINE_COLORS[k]; });
     html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Poppins',sans-serif;color:#fff;">
       <div style="height:13px;display:flex;align-items:center;justify-content:flex-end;padding:0 6px;font-size:8px;border-bottom:2px solid #fff;">Min</div>
       <div style="flex:1;display:flex;flex-direction:column;">
@@ -19832,9 +19848,16 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function render() {
     if (!outages || !outages.length) return;
-    if (typeof stations === 'undefined' || !stations || !stations.length) return;
+    // Auch OHNE gespeicherte Config zählt das Netz, das der User gerade im Wizard zum
+    // Suchen geöffnet hat — sonst sucht er im gestörten Netz (z.B. Schweiz), findet nichts
+    // und weiß nicht warum. Banner erscheint beim Betreten, verschwindet beim Verlassen.
+    var wizNet = '';
+    try { if (typeof selectedNetwork !== 'undefined' && selectedNetwork) wizNet = String(selectedNetwork); } catch (e) {}
+    var hasStations = (typeof stations !== 'undefined' && stations && stations.length);
+    if (!hasStations && !wizNet) { var h0 = document.getElementById('netOutageBanner'); if (h0) { h0.remove(); syncPad(); } return; }
     var myNets = {};
-    stations.forEach(function (s) { if (s && s.network) myNets[s.network] = 1; });
+    if (hasStations) stations.forEach(function (s) { if (s && s.network) myNets[s.network] = 1; });
+    if (wizNet) myNets[wizNet] = 1;
     var hits = outages.filter(function (o) {
       return (o.networks || []).some(function (n) {
         return Object.keys(myNets).some(function (mn) { return netMatches(String(n), mn); });
@@ -19906,6 +19929,19 @@ window.addEventListener('DOMContentLoaded', () => {
   var _basePad = null;
   var _rotIdx = 0;
   var _rotTimer = null;
+  // Wizard-Netz-Wechsel sofort erkennen (Banner beim Betreten eines gestörten Netzes
+  // direkt zeigen, beim Verlassen direkt wegräumen — nicht erst beim 30s-Tick).
+  var _lastWizNet = '';
+  setInterval(function () {
+    var w = '';
+    try { if (typeof selectedNetwork !== 'undefined' && selectedNetwork) w = String(selectedNetwork); } catch (e) {}
+    if (w !== _lastWizNet) {
+      _lastWizNet = w;
+      var h = document.getElementById('netOutageBanner');
+      if (h) h.removeAttribute('data-cur');
+      render();
+    }
+  }, 1000);
   function syncPad() {
     var host = document.getElementById('netOutageBanner');
     if (_basePad === null) _basePad = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
@@ -20170,6 +20206,21 @@ window.addEventListener('DOMContentLoaded', () => {
     'Nahverkehr Dänemark': 'Local transit Denmark',
     'Niederlande Nahverkehr': 'Netherlands local transit', 'Bus, Tram landesweit (OVapi)': 'Bus, tram nationwide (OVapi)',
     'Nordwest & Bremen': 'Northwest & Bremen', 'Bus, Tram, Bahn (VBN, Ems-Jade)': 'Bus, tram, rail (VBN, Ems-Jade)',
+    'Tram, Bus, S-Bahn (LVB, Leipzig, Halle)': 'Tram, bus, S-Bahn (LVB, Leipzig, Halle)',
+    'Tram, Bus (LVB, Leipzig, Halle)': 'Tram, bus (LVB, Leipzig, Halle)',
+    // Deutschland-Bundesländer-Kacheln
+    'Hessen': 'Hesse', 'Sachsen': 'Saxony', 'Sachsen-Anhalt': 'Saxony-Anhalt',
+    'Thüringen': 'Thuringia', 'Rheinland-Pfalz': 'Rhineland-Palatinate',
+    'Mecklenburg-Vorpommern': 'Mecklenburg-Western Pomerania',
+    'Chemnitz & Region': 'Chemnitz & region',
+    'Tram, Bus (CVAG …)': 'Tram, bus (CVAG …)',
+    'Bus, Bahn (NAH.SH)': 'Bus, rail (NAH.SH)',
+    'Bus, Tram, Bahn (Kassel …)': 'Bus, tram, rail (Kassel …)',
+    'Bus, Tram, Bahn (Magdeburg, Halle …)': 'Bus, tram, rail (Magdeburg, Halle …)',
+    'Bus, Tram, Bahn (Saarbrücken …)': 'Bus, tram, rail (Saarbrücken …)',
+    'Bus, Tram, Bahn (Erfurt, Weimar, Jena …)': 'Bus, tram, rail (Erfurt, Weimar, Jena …)',
+    'S-Bahn, U-Bahn, Tram, Bus (Frankfurt …)': 'S-Bahn, U-Bahn, tram, bus (Frankfurt …)',
+    'Tram, Bus, S-Bahn (Dresden, Chemnitz)': 'Tram, bus, S-Bahn (Dresden, Chemnitz)',
     'Süd-Niedersachsen': 'South Lower Saxony', 'Bus, Bahn (Göttingen, VSN)': 'Bus, rail (Göttingen, VSN)',
     'Bus, Bahn (VOS)': 'Bus, rail (VOS)', 'Osnabrück': 'Osnabrück',
     'Niedersachsen & Bremen': 'Lower Saxony & Bremen', 'Bus, Tram, Bahn (VBN, Ems-Jade …)': 'Bus, tram, rail (VBN, Ems-Jade …)', 'Züge Dänemark': 'Trains Denmark', 'Rejseplanen Züge': 'Rejseplanen trains',
