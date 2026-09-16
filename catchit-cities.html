@@ -119,6 +119,9 @@
     .selection-btn.brand-btn .name { color: inherit; }
     .selection-btn.brand-btn .desc { color: inherit; opacity: 0.9; }
     .selection-btn.brand-btn:hover { filter: brightness(0.9); transform: translateY(-2px); }
+    /* ÖBB-Startseite: sekundärer Knopf „Weitere lokale Stationen" unter den Brand-Buttons */
+    .preset-leave-btn { display: block; width: 100%; box-sizing: border-box; padding: 14px 16px; border-radius: 12px; border: 2px solid var(--ink, #1b1b1b); background: #fff; color: var(--ink, #1b1b1b); font-size: 14px; font-weight: 600; text-decoration: none; text-align: center; transition: transform 0.2s, box-shadow 0.2s; }
+    .preset-leave-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 
     /* Region-Auswahl als Foto-Cards (Top-Level Länderauswahl) */
     .region-photo-grid {
@@ -2931,7 +2934,7 @@
     <div class="selection-grid" id="bundeslandGrid"></div>
     <p id="bundeslandComingSoon" style="text-align:center;color:#aaa;font-size:12px;font-style:italic;margin-top:14px;display:none;"></p>
     <div style="margin-top:18px;text-align:center;">
-      <a href="#" onclick="leaveBundesland();return false;" style="color:#0055a4;font-size:13px;text-decoration:none;font-weight:500;">
+      <a href="#" id="bundeslandLeave" onclick="leaveBundesland();return false;" style="color:#0055a4;font-size:13px;text-decoration:none;font-weight:500;">
         Andere Region wählen →
       </a>
     </div>
@@ -2940,12 +2943,12 @@
   <!-- Step 0: Display-Preset (Auto-Jump für ein bestimmtes Display, z.B. Wien) -->
   <div class="card hidden" id="stepDisplayPreset">
     <h2 id="displayPresetTitle">Linien für dein catch-it</h2>
-    <p style="color:#666;font-size:13px;margin-bottom:16px;">
+    <p id="displayPresetIntro" style="color:#666;font-size:13px;margin-bottom:16px;">
       Diese Verkehrsnetze sind für dein catch-it relevant. Tipp eines an, um Linien hinzuzufügen.
     </p>
     <div class="selection-grid" id="displayPresetGrid"></div>
     <div style="margin-top:18px;text-align:center;">
-      <a href="#" onclick="leaveDisplayPreset();return false;" style="color:#0055a4;font-size:13px;text-decoration:none;font-weight:500;">
+      <a href="#" id="displayPresetLeave" onclick="leaveDisplayPreset();return false;" style="color:#0055a4;font-size:13px;text-decoration:none;font-weight:500;">
         Andere Region wählen →
       </a>
     </div>
@@ -3791,7 +3794,7 @@ const REGIONS = {
   },
   DE: {
     name: 'Deutschland',
-    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'AACHEN', 'VBN', 'VRN', 'VOS', 'NAHSH', 'VSN', 'INSA', 'MDV', 'SACHSEN', 'ROSTOCK', 'NVV', 'VMT', 'SAARVV']
+    networks: ['NRW', 'BAYERN', 'BWEGT', 'HAMBURG', 'RMV', 'VVO', 'DB', 'BERLIN', 'AACHEN', 'VBN', 'VRN', 'RLP', 'VOS', 'NAHSH', 'VSN', 'INSA', 'MDV', 'SACHSEN', 'ROSTOCK', 'NVV', 'VMT', 'SAARVV']
   },
   CH: {
     name: 'Schweiz',
@@ -4163,6 +4166,7 @@ const CITY_CAPABILITIES = {
   VSN:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   INSA:       { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   MDV:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
+  RLP:        { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SACHSEN:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   ROSTOCK:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   NL_OEFFI:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
@@ -4634,6 +4638,9 @@ const NETWORKS = {
   // Serverseitig ist MDV nur ein Redirect auf INSA (NETWORK_REDIRECT).
   MDV:        { name: 'Leipzig & Halle (MDV)', shortName: 'MDV', region: 'DE', desc: 'Tram, Bus, S-Bahn (LVB, Leipzig, Halle)', searchType: 'trainboard', trainboard: { path: '/de/insa' }, placeholder: 'z.B. Leipzig Augustusplatz, Halle Markt...', isJourneyBased: false },
   SACHSEN:    { name: 'Sachsen', shortName: 'SN', region: 'DE', desc: 'Tram, Bus, S-Bahn (Dresden, Chemnitz)', searchType: 'trainboard', trainboard: { path: '/de/sachsen' }, placeholder: 'z.B. Dresden Postplatz, Chemnitz...', isJourneyBased: false },
+  // RLP-Nahverkehr: DELFI-Suche auf Rheinland-Pfalz (AGS de:07) begrenzt, Echtzeit kommt
+  // serverseitig aus der VRN-EFA (MOVE-RLP-Landesauskunft) — Züge UND Busse (Kunde Konz).
+  RLP:        { name: 'Trier & Koblenz (RLP)', shortName: 'RLP', region: 'DE', desc: 'Bus, Bahn (auch Eifel, Hunsrück, Westerwald)', searchType: 'trainboard', trainboard: { path: '/de/rlp' }, placeholder: 'z.B. Konz, Trier Porta Nigra, Koblenz...', isJourneyBased: false },
   ROSTOCK:    { name: 'Rostock', shortName: 'HRO', region: 'DE', desc: 'Tram, Bus, S-Bahn (RSAG)', searchType: 'trainboard', trainboard: { path: '/de/rostock' }, placeholder: 'z.B. Neuer Markt, Hauptbahnhof, Doberaner Platz...', isJourneyBased: false },
   NL_OEFFI:   { name: 'Niederlande Nahverkehr', shortName: 'NL', region: 'NL', desc: 'Bus, Tram landesweit (OVapi)', searchType: 'trainboard', trainboard: { path: '/nl/oeffi' }, placeholder: 'z.B. Arnhem Willemsplein, Utrecht, Den Haag...', isJourneyBased: false },
   GB_LOCAL:   { name: 'Großbritannien (Bus, Tram)', shortName: 'GB', region: 'GB', desc: 'Bus, Tram (u.a. Edinburgh Tram): Fahrplan', searchType: 'trainboard', trainboard: { path: '/gb/local' }, placeholder: 'z.B. St Andrew Square, Edinburgh Park, York Place...', isJourneyBased: false },
@@ -5155,6 +5162,7 @@ const NETWORK_HERO = {
   VSN:    { photo: 'fotos/Göttingen.jpg',   title: 'Süd-Niedersachsen' },
   INSA:   { photo: 'fotos/INSA.jpg',        title: 'Sachsen-Anhalt' },
   MDV:    { photo: 'fotos/Leipzig.jpg',     title: 'Leipzig & Halle' },
+  RLP:    { photo: 'fotos/Rhein-Nekar.jpg', title: 'Trier & Koblenz' },
   SACHSEN: { photo: 'fotos/INSA.jpg',       title: 'Sachsen' },
   ROSTOCK: { photo: 'fotos/Rostock.jpg',    title: 'Rostock' },
   GB_LOCAL: { photo: 'fotos/LONDON .jpg',   title: 'Großbritannien' },
@@ -5722,6 +5730,7 @@ var NETWORK_BRANDS = {
   VSN:           { bg: '#E2001A', fg: '#fff' }, // VSN Süd-Nds Rot
   INSA:          { bg: '#005CA9', fg: '#fff' }, // INSA Sachsen-Anhalt Blau
   MDV:           { bg: '#009036', fg: '#fff' }, // MDV Grün (Leipzig & Halle)
+  RLP:           { bg: '#c1002a', fg: '#fff' }, // RLP Rot (Landesfarbe)
   VVO:           { bg: '#fdc300', fg: '#000' }, // DVB Dresden Gelb, schwarze Schrift
   SACHSEN:       { bg: '#e2001a', fg: '#fff' }, // Sachsen (LVB Rot)
   ROSTOCK:       { bg: '#009ee0', fg: '#fff' }, // Rostock (RSAG Cyan-Blau)
@@ -5878,6 +5887,26 @@ DISPLAY_PRESETS.westbahn = {
   ]
 };
 
+// ÖBB-gebrandete Geräte (Firmware-Brand OEBB, siehe isOebbDevice): eigene Startseite statt
+// Länder-/Bundesland-Auswahl. Titel + zwei Knöpfe Regional-/Fernverkehr, kein Westbahn-Knopf;
+// „Weitere lokale Stationen" führt in die normale Österreich-Ansicht. Nicht im Bundesland-
+// Chooser (hideInChooser). Foto: ÖBB-Intercity (Stadt fotos/neue fotos/oebb_intercity.png).
+DISPLAY_PRESETS.oebb = {
+  name: 'ÖBB',
+  parent: 'AT',
+  hideInChooser: true,
+  photo: 'fotos/oebb.jpg',
+  photoPos: 'center 65%',
+  title: 'Deinen ÖBB-Bahnhof einstellen',
+  intro: 'Wähle, welche Züge an deinem Bahnhof angezeigt werden.',
+  leaveLabel: 'Weitere lokale Stationen (Straßenbahn/Bus) einstellen',
+  leaveAsButton: true,
+  networks: [
+    { id: 'OEBB_REGIONAL', label: 'Regionalverkehr', desc: 'S-Bahn, REX, Regionalzug',     color: { bg: '#E2001A', fg: '#fff' }, jumpTo: { region: 'AT' } },
+    { id: 'WESTBAHN',      label: 'Fernverkehr',     desc: 'Railjet, Intercity, Nightjet', color: { bg: '#E2001A', fg: '#fff' }, jumpTo: { region: 'AT' } }
+  ]
+};
+
 // Deutschland-Bundesländer — wie Österreich: EINE Kachel pro Bundesland, darin die
 // Netz-Buttons (Verbünde + DB Regio). Buttons ohne label/desc ziehen NETWORKS[id] automatisch.
 DISPLAY_PRESETS.bw = {
@@ -5968,6 +5997,7 @@ DISPLAY_PRESETS.vrn = {
   parent: 'DE',
   photo: 'fotos/Rhein-Nekar.jpg',
   networks: [
+    { id: 'RLP', label: 'Trier & Koblenz',    desc: 'Bus, Bahn (auch Eifel, Hunsrück, Westerwald)', jumpTo: { region: 'DE' } },
     { id: 'VRN', label: 'Rhein-Neckar (VRN)', desc: 'Ludwigshafen, Kaiserslautern …', jumpTo: { region: 'DE' } },
     { id: 'RMV', label: 'Rhein-Main (RMV)',   desc: 'Mainz, Worms …',                 jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
@@ -6097,7 +6127,17 @@ function renderDisplayPreset(displayKey) {
 
   activeDisplayPreset = displayKey;
   var title = document.getElementById('displayPresetTitle');
-  if (title) title.textContent = 'Linien für dein catch-it';
+  if (title) title.textContent = preset.title || 'Linien für dein catch-it';
+  // Preset-eigene Texte (z.B. ÖBB-Startseite), sonst Standard. Bei jedem Render neu setzen,
+  // damit die Bundesland-Presets nach der ÖBB-Seite wieder normal aussehen.
+  var intro = document.getElementById('displayPresetIntro');
+  if (intro) intro.textContent = preset.intro || 'Diese Verkehrsnetze sind für dein catch-it relevant. Tipp eines an, um Linien hinzuzufügen.';
+  var leave = document.getElementById('displayPresetLeave');
+  if (leave) {
+    leave.textContent = preset.leaveLabel || 'Andere Region wählen →';
+    leave.className = preset.leaveAsButton ? 'preset-leave-btn' : '';
+    leave.style.cssText = preset.leaveAsButton ? '' : 'color:#0055a4;font-size:13px;text-decoration:none;font-weight:500;';
+  }
 
   var grid = document.getElementById('displayPresetGrid');
   if (!grid) return false;
@@ -6106,7 +6146,7 @@ function renderDisplayPreset(displayKey) {
     .map(function(entry) {
       var net = (typeof NETWORKS !== 'undefined') ? NETWORKS[entry.id] : null;
       if (!net) return '';
-      var brand = NETWORK_BRANDS[entry.id];
+      var brand = entry.color || NETWORK_BRANDS[entry.id];
       var jumpJson = JSON.stringify(entry.jumpTo).replace(/"/g, '&quot;');
       var styleAttr = brand
         ? ' style="background:' + brand.bg + ';color:' + brand.fg + ';border-color:' + brand.bg + ';"'
@@ -6201,7 +6241,7 @@ function renderBundeslandChooser(parentRegion) {
   parentRegion = parentRegion || 'AT';
   // 'westbahn' (Fernverkehr-Kachel) NICHT als eigene Region zeigen — Fernverkehr ist kein
   // Bundesland. Stattdessen hat jedes Bundesland einen eigenen „Fernverkehr"-Button (WESTBAHN).
-  var presets = Object.entries(DISPLAY_PRESETS).filter(function(e) { return e[1].parent === parentRegion && e[0] !== 'westbahn'; });
+  var presets = Object.entries(DISPLAY_PRESETS).filter(function(e) { return e[1].parent === parentRegion && e[0] !== 'westbahn' && !e[1].hideInChooser; });
 
   // Title + Subtitle: lokales Wording je nach Land
   var title = document.getElementById('bundeslandTitle');
@@ -6252,6 +6292,9 @@ function renderBundeslandChooser(parentRegion) {
   });
   document.getElementById('stepBundesland')?.classList.remove('hidden');
   _hideHero();
+  // ÖBB-Geräte: zurück zur ÖBB-Startseite statt zur Länderwahl
+  var bLeave = document.getElementById('bundeslandLeave');
+  if (bLeave) bLeave.textContent = isOebbDevice() ? 'Zurück zur ÖBB-Auswahl' : 'Andere Region wählen →';
   // currentStep auf 'region' lassen, damit die saveBtn-Logik nichts macht
   if (typeof currentStep !== 'undefined') currentStep = 'region';
 }
@@ -6262,6 +6305,7 @@ function showRegionComingSoon(name) {
 
 function leaveBundesland() {
   document.getElementById('stepBundesland')?.classList.add('hidden');
+  if (isOebbDevice()) { showOebbStart(); return; }
   if (typeof showStep === 'function') showStep('region');
   else document.getElementById('stepRegion')?.classList.remove('hidden');
 }
@@ -6286,6 +6330,46 @@ function leaveBundesland() {
     return orig(region);
   };
 })();
+
+// ==================== ÖBB-GERÄTE (Brand OEBB) ====================
+// ÖBB-gebrandete Geräte (der Masseninstaller setzt den Firmware-Brand OEBB) bekommen statt der
+// Länder-/Bundesland-Auswahl eine eigene Startseite (DISPLAY_PRESETS.oebb). Westbahn wird dort
+// nur aus der AUSWAHL genommen (Knopf, Zugtyp-Chip, Design, Texte); was das Gerät anzeigt,
+// bleibt unverändert (Paul, 16.09.2026).
+// Quellen: ?brand=oebb (Vorschau/Test) > brand aus der Geräte-Config (postMessage, seit FW 2.4.x).
+var _deviceBrand = '';
+function isOebbDevice() {
+  try {
+    var b = (new URLSearchParams(window.location.search).get('brand') || '').trim().toUpperCase();
+    if (b) return b === 'OEBB';
+  } catch (e) {}
+  return _deviceBrand === 'OEBB';
+}
+function applyOebbDeviceTexts() {
+  if (!isOebbDevice()) return;
+  if (typeof NETWORKS !== 'undefined' && NETWORKS.WESTBAHN) NETWORKS.WESTBAHN.desc = 'Railjet, Intercity, Nightjet';
+}
+function showOebbStart() {
+  applyOebbDeviceTexts();
+  renderDisplayPreset('oebb');
+  window.scrollTo(0, 0);
+}
+// Brand aus der Geräte-Config übernehmen. Die Info kommt im Geräte-iFrame erst NACH dem
+// Seitenstart → ÖBB-Startseite nachziehen, solange der User noch am Einstieg steht
+// (Länder-/Bundesland-/Preset-Auswahl, kein Auswahl-Overlay, kein Feintuning).
+function noteDeviceBrand(brand) {
+  if (typeof brand !== 'string') return;
+  var was = isOebbDevice();
+  _deviceBrand = brand.trim().toUpperCase();
+  if (was || !isOebbDevice()) return;
+  applyOebbDeviceTexts();
+  var overlay = document.getElementById('configChoiceOverlay');
+  var ft = document.getElementById('stepFinetuning');
+  var atEntry = (typeof currentStep === 'undefined' || currentStep === 'region') &&
+                !(overlay && overlay.style.display === 'block') &&
+                !(ft && !ft.classList.contains('hidden'));
+  if (atEntry) showOebbStart();
+}
 
 function detectDisplayPreset() {
   // TODO: aus der Firmware-Config (z.B. via postMessage loadExistingConfig) auslesen.
@@ -6367,6 +6451,8 @@ function detectCountryExplicit() {
 (function() {
   function tryAutoJump() {
     populateCountrySelect();
+    // 0) ÖBB-Gerät (?brand=oebb) → eigene ÖBB-Startseite
+    if (isOebbDevice()) { showOebbStart(); return; }
     // 1) Konkretes Display-Preset (?display=) hat Vorrang
     var d = detectDisplayPreset();
     if (d) { renderDisplayPreset(d); return; }
@@ -8884,6 +8970,9 @@ function renderLines() {
     // (Graz Puntigam: InterRegio fährt dort, „Südstrecke" listete IR aber nicht →
     // nicht wählbar). Lieber alle anbieten; ein Chip ohne echte Züge zeigt halt nichts.
     let chipCats = FV_CATS.slice();
+    // ÖBB-Geräte: kein Westbahn-Chip. Nur aus der Auswahl: ein schon aktiver WB-Filter
+    // bleibt unverändert, das Display zeigt dieselben Züge wie bisher.
+    if (isOebbDevice()) chipCats = chipCats.filter(function(c) { return c !== 'WB'; });
 
     // Zugtypen erst NACH Zielwahl. IMMER alle Gattungen anbieten (einheitlich an
     // jedem FV-Bahnhof): die frühere Einengung auf fvServingCats() (nur beobachtete
@@ -11146,6 +11235,7 @@ function goToRegionSelectionEmpty() {
   if (addMore) addMore.classList.add('hidden');
   if (weiter)  weiter.classList.add('hidden');
   var bb = document.querySelector('.bottom-bar'); if (bb) bb.style.display = '';
+  if (isOebbDevice()) { showOebbStart(); return; }  // ÖBB-Gerät → ÖBB-Startseite
   var country = (typeof detectCountry === 'function' && detectCountry()) ||
                 (typeof DEFAULT_COUNTRY !== 'undefined' ? DEFAULT_COUNTRY : 'AT');
   var hasBundeslaender = country && typeof DISPLAY_PRESETS !== 'undefined' &&
@@ -11190,6 +11280,7 @@ function chooseEditLines() {
   const ft = document.getElementById('stepFinetuning');
   if (ft) ft.classList.add('hidden');
 
+  if (isOebbDevice()) { showOebbStart(); return; }  // ÖBB-Gerät → ÖBB-Startseite
   var country = (typeof detectCountry === 'function' && detectCountry()) ||
                 (typeof DEFAULT_COUNTRY !== 'undefined' ? DEFAULT_COUNTRY : 'AT');
   var hasBundeslaender = country &&
@@ -11293,6 +11384,7 @@ function addMoreStations() {
   var weiter  = document.getElementById('openFinetuningBtn');
   if (addMore) addMore.classList.add('hidden');
   if (weiter)  weiter.classList.add('hidden');
+  if (isOebbDevice()) { showOebbStart(); updateStationsList(); return; }  // ÖBB-Gerät → ÖBB-Startseite
   var b = pickBundeslandFromStations();
   if (b.preset && typeof renderDisplayPreset === 'function') {
     renderDisplayPreset(b.preset);          // klare Mehrheit → direkt ins Bundesland
@@ -11597,6 +11689,7 @@ const NETWORK_COLORS = {
   VSN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Süd-Nds (VSN) → orange Matrix
   INSA: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },      // Sachsen-Anhalt (INSA) → orange Matrix
   MDV: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // Leipzig & Halle (MDV) → orange Matrix
+  RLP: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },       // RLP-Nahverkehr → orange Matrix
   SACHSEN: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Sachsen (Leipzig/Dresden/Chemnitz) → orange Matrix
   ROSTOCK: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },   // Rostock (RSAG Tram/Bus) → orange Matrix
   NL_OEFFI: { id: 23, name: 'Matrix Orange', color: '#FF8C00', variant: 3 },  // NL Nahverkehr → orange Matrix
@@ -11725,7 +11818,7 @@ function calculateRecommendedConfig() {
     });
     displayType = allWbOnly ? 14 : 12;
     displayName = allWbOnly ? 'Westbahn' : 'ÖBB';
-    description = allWbOnly ? 'Westbahn Anzeige' : 'ÖBB Fernverkehr (Railjet, IC, EC, Nightjet, Westbahn)';
+    description = allWbOnly ? 'Westbahn Anzeige' : (isOebbDevice() ? 'ÖBB Fernverkehr (Railjet, IC, EC, Nightjet)' : 'ÖBB Fernverkehr (Railjet, IC, EC, Nightjet, Westbahn)');
   }
 
   // Spezialfall OEBB Regionalverkehr
@@ -11763,7 +11856,7 @@ function calculateRecommendedConfig() {
     } else {
       displayType = 12;
       displayName = 'ÖBB';
-      description = 'Railjet, IC/EC, Nightjet, Westbahn';
+      description = isOebbDevice() ? 'Railjet, IC/EC, Nightjet' : 'Railjet, IC/EC, Nightjet, Westbahn';
     }
   }
 
@@ -13475,6 +13568,8 @@ function displayTypeOptionsHtml(selectedCid) {
   var html = '';
   Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
     if (DISPLAY_TYPE_FEATURES[k].offline) return;
+    // ÖBB-Geräte: kein Westbahn-Design zur Auswahl (außer es ist schon gewählt)
+    if (parseInt(k) === 14 && isOebbDevice() && parseInt(selectedCid) !== 14) return;
     if (typeof fcSlotVisible === 'function' && !fcSlotVisible(parseInt(k))) return;
     html += '<option value="' + k + '"' + (parseInt(k) === parseInt(selectedCid) ? ' selected' : '') + '>' + escapeHtmlFt(ftDisplayName(parseInt(k))) + '</option>';
   });
@@ -19437,6 +19532,8 @@ function extractDestTokensFromRows(masterrow, timerow) {
 
 // ==================== ESP32 COMMUNICATION ====================
 async function handleConfigMessage(data) {
+  // ÖBB-gebrandete Geräte erkennen: die Geräteseite schickt brand in loadExistingConfig mit.
+  if (data.type === 'loadExistingConfig' && typeof noteDeviceBrand === 'function') noteDeviceBrand(data.brand);
 
   if (data.type === 'loadExistingConfig') {
     // Load Wien data first if any WL stations.
@@ -19648,8 +19745,15 @@ function resolveStartup() {
   if (Array.isArray(stations) && stations.length > 0) {
     hasExistingConfig = true;  // Stationen geladen ⇒ es gibt eine Config
     maybeShowConfigChoice();   // bestehende Config → Linie/Feintuning
+  } else if (isOebbDevice()) {
+    showOebbStart();           // ÖBB-Gerät → eigene ÖBB-Startseite
   } else {
-    showStep('region');        // nichts geladen → direkt zur Auswahl
+    // Steht der Einstieg schon (Display-Preset per ?display= oder Bundesland-Auswahl),
+    // NICHT zusätzlich die Länderwahl einblenden, sonst stehen beide untereinander.
+    var _bl = document.getElementById('stepBundesland');
+    if (!activeDisplayPreset && !(_bl && !_bl.classList.contains('hidden'))) {
+      showStep('region');      // nichts geladen → direkt zur Auswahl
+    }
   }
 }
 // Fallback: spätestens nach 8s entscheiden (kein Parent / keine Antwort → Auswahl).
@@ -20049,6 +20153,13 @@ window.addEventListener('DOMContentLoaded', () => {
     'Region': 'Region', 'Region wählen': 'Choose region', 'Bundesland wählen': 'Choose state',
     'Land wählen…': 'Choose country…', 'Netzwerk wählen': 'Choose network', 'Verkehrsart wählen': 'Choose transit type',
     'Weitere Bundesländer folgen…': 'More states coming soon…',
+    // ÖBB-Geräte (Brand OEBB): eigene Startseite
+    'Deinen ÖBB-Bahnhof einstellen': 'Set up your ÖBB station',
+    'Wähle, welche Züge an deinem Bahnhof angezeigt werden.': 'Choose which trains are shown at your station.',
+    'S-Bahn, REX, Regionalzug': 'S-Bahn, REX, regional trains',
+    'Weitere lokale Stationen (Straßenbahn/Bus) einstellen': 'Add local stops (tram/bus)',
+    'Zurück zur ÖBB-Auswahl': 'Back to ÖBB selection',
+    'ÖBB Fernverkehr (Railjet, IC, EC, Nightjet)': 'ÖBB long-distance (Railjet, IC, EC, Nightjet)',
     'Zurück': 'Back', 'Weiter': 'Next', 'Fertig': 'Done', 'Abbrechen': 'Cancel', 'Schließen': 'Close',
     'Speichern': 'Save', 'Bearbeiten': 'Edit', 'Löschen': 'Delete', 'Loeschen': 'Delete', 'Wechseln': 'Switch',
     'Erneut versuchen': 'Try again', 'Alle': 'All', 'oder': 'or', 'bis': 'to', 'ändern': 'change', 'Uhr': '', 'min': 'min', 'Min': 'min',
@@ -20208,6 +20319,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Nordwest & Bremen': 'Northwest & Bremen', 'Bus, Tram, Bahn (VBN, Ems-Jade)': 'Bus, tram, rail (VBN, Ems-Jade)',
     'Tram, Bus, S-Bahn (LVB, Leipzig, Halle)': 'Tram, bus, S-Bahn (LVB, Leipzig, Halle)',
     'Tram, Bus (LVB, Leipzig, Halle)': 'Tram, bus (LVB, Leipzig, Halle)',
+    'Bus, Bahn (auch Eifel, Hunsrück, Westerwald)': 'Bus, rail (incl. Eifel, Hunsrück, Westerwald)',
     // Deutschland-Bundesländer-Kacheln
     'Hessen': 'Hesse', 'Sachsen': 'Saxony', 'Sachsen-Anhalt': 'Saxony-Anhalt',
     'Thüringen': 'Thuringia', 'Rheinland-Pfalz': 'Rhineland-Palatinate',
