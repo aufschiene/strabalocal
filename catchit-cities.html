@@ -4727,6 +4727,16 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
   // Generell für alle Netze AUSSER Wien (WL hat eigene Regel über wien_json).
   // Der Server liefert für Nicht-Trainboard-Netze einfach eine leere Liste → No-Op.
   if (!network || network === 'WL') return;
+  // VBB/Berlin-Kachel = nur Nahverkehr: S-Bahn, RB/RE und IC/ICE in der AUSWAHL ausblenden
+  // (Paul 2026-09-18). Bestehende Configs mit S-Bahn laufen weiter, der Server liefert sie noch.
+  const hideBerlinRail = () => {
+    if (network !== 'BERLIN') return;
+    for (let i = availableLines.length - 1; i >= 0; i--) {
+      const t = availableLines[i] && availableLines[i].type;
+      if (t === 'ptTrainS' || t === 'ptTrain') availableLines.splice(i, 1);
+    }
+  };
+  hideBerlinRail();
   try {
     const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(network) + '&stopId=' + encodeURIComponent(stopId) + '&_=' + Date.now(), { cache: 'no-store' });
     const data = await r.json();
@@ -4769,6 +4779,7 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
         availableLines.push({ name: ln.name, towards: d.towards || '', type: ln.type || '', richtungsId: d.richtungsId || '', stopovers: [] });
       });
     });
+    hideBerlinRail();
     availableLines.sort(compareLinesForDisplay);
   } catch (e) { /* Endpunkt-/Netzfehler ignorieren — Departures-Liste bleibt bestehen */ }
 }
