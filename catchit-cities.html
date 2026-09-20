@@ -4754,6 +4754,41 @@ function rememberLineColoursFrom(network, json) {
     });
   });
 }
+
+// TRENNT DIE RICHTUNGS-ID ÜBERHAUPT? (Regel Paul 20.09.2026)
+// Normalfall: die richtungsId ist die physische Richtung, mehrere Zieltexte darunter sind
+// Verzweigungen EINER Richtung und gehören zusammen (Frankfurt, Kunde Leonard: M36 nach
+// Westbf und nach Eschenheimer Tor teilen den Steig ...905:1:1lM36).
+// Ausnahme: an manchen Halten fährt ALLES von einem Steig, auch die Gegenrichtung
+// (Stockholm/Trafiklab, Kunde Alex: 80 nach Ropsten und nach Nybroplan beide "p1").
+// Dann verschmolz die rid zwei echte Richtungen zu einer.
+// Unterscheidung datengetrieben am ROHEN Feed: hat die Linie an diesem Halt MEHRERE rids,
+// trennt die rid und bleibt maßgeblich. Gibt es nur EINE rid für die Linie, trennt sie
+// nichts, und die Zieltexte sind die Richtungen. Der rohe Feed zählt (nicht die gefilterte
+// Auswahl), sonst sähe eine einseitig konfigurierte Linie ihre Gegenrichtung nie.
+var _ridsByStopLine = {};
+function rememberRidsFrom(network, stopId, json) {
+  var mons = (json && json.data && json.data.monitors) || [];
+  mons.forEach(function(mo) {
+    ((mo && mo.lines) || []).forEach(function(l) {
+      if (!l || !l.name) return;
+      var rid = String(l.richtungsId || '').trim();
+      if (!rid) return;
+      var k = network + ':' + stopId + '|' + String(l.name).trim();
+      if (!_ridsByStopLine[k]) _ridsByStopLine[k] = {};
+      _ridsByStopLine[k][rid] = 1;
+    });
+  });
+}
+// true = rid ist maßgeblich (mehrere rids gesehen), false = nach Zieltext gruppieren.
+// Unbekannt (noch kein Feed gesehen) gilt als maßgeblich, damit sich am Bestandsverhalten
+// nichts ändert, solange wir es nicht besser wissen.
+function ridSeparatesDirections(network, stopId, line) {
+  var k = network + ':' + stopId + '|' + String(line || '').trim();
+  var set = _ridsByStopLine[k];
+  if (!set) return true;
+  return Object.keys(set).length > 1;
+}
 function lineColourFor(network, name) {
   var hit = _lineColourMem[network + '|' + String(name || '').trim()];
   if (hit) return hit;
@@ -4787,8 +4822,9 @@ async function fetchDeparturesUnified(fullId) {
       const r = await fetch(DEPARTURES_API + '?stopId=' + encodeURIComponent(apiFullId) + '&_=' + Date.now(), { cache: 'no-store' });
       if (r.ok) {
         const j = await r.json();
-        // Offizielle Linienfarben nebenbei einsammeln (ein Ort für Picker UND Restore)
+        // Linienfarben und rid-Struktur nebenbei einsammeln (ein Ort für Picker UND Restore)
         try { rememberLineColoursFrom(network, j); } catch (e) { /* nie den Fetch stören */ }
+        try { rememberRidsFrom(network, stopId, j); } catch (e) { /* dito */ }
         return j;
       }
       if ((r.status === 429 || r.status >= 500) && attempt < MAX - 1) {
@@ -21231,9 +21267,13 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
                   // lieferte der Feed mehrere towards-Varianten desselben rids → die Linie
                   // stand doppelt in der Auswahl mit "Richtungen, die nie gewählt wurden"
                   // (Kunde Leonard, 20.09.2026). Ein rid = eine Zeile.
+                  // …ABER nur, wenn die rid an diesem Halt überhaupt Richtungen trennt
+                  // (ridSeparatesDirections): wo alles von einem Steig fährt, sind zwei
+                  // Zieltexte unter einer rid zwei echte Richtungen (Alex/Stockholm).
+                  const _ridZaehlt = ridSeparatesDirections(network, bareStopId, lineName);
                   const exists = station.directions.some(d =>
                     d.line === lineName && (d.towards === towards ||
-                      (!!line.richtungsId && !!d.richtungsId &&
+                      (_ridZaehlt && !!line.richtungsId && !!d.richtungsId &&
                        String(d.richtungsId) === String(line.richtungsId)))
                   );
                   if (!exists) {
@@ -21480,9 +21520,19 @@ function dedupeDirectionsByRid(quelle) {
     if (!st || !Array.isArray(st.directions) || st.directions.length < 2) return;
     var byKey = {};
     var before = st.directions.length;
+    var _net = st.network || '';
+    var _sid = String(st.stopId || (st.fullId || '').split(':').slice(1).join(':') || '');
     st.directions = st.directions.filter(function(d) {
       var ridS = String(d.richtungsId || '');
       if (!ridS) return true;                      // ohne rid nichts zusammenlegen
+      // Trennt die rid an diesem Halt keine Richtungen (alles ein Steig), sind
+      // verschiedene Zieltexte echte Richtungen und bleiben getrennt.
+      if (!ridSeparatesDirections(_net, _sid, d.line)) {
+        var kD = d.line + '|' + ridS + '|' + String(d.towards || '').trim();
+        if (byKey[kD]) return false;               // exakte Dublette (Linie+rid+Ziel)
+        byKey[kD] = d;
+        return true;
+      }
       var key = d.line + '|' + ridS;
       var first = byKey[key];
       if (first) {
