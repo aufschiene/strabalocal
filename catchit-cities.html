@@ -2294,6 +2294,13 @@
       max-width: 100%;
       zoom: 0.72;
     }
+    /* Handy: noch eine Stufe kleiner, die Sticky-Leiste soll nur ein schmales Band
+       sein (Paul 20.09.2026, Foto vom iPhone: Vorschau war riesig). */
+    @media (max-width: 480px) {
+      .finetuning-step .preview-bezel { zoom: 0.55; }
+      .finetuning-step .preview-container { padding: 4px 0 8px; }
+      .finetuning-step .preview-container #ftPreviewToggleBtn { padding: 0 8px 4px; }
+    }
     .finetuning-step .preview-display {
       width: 320px;
       max-width: 100%;
