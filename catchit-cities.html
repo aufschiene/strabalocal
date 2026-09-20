@@ -4767,6 +4767,12 @@ function rememberLineColoursFrom(network, json) {
 // nichts, und die Zieltexte sind die Richtungen. Der rohe Feed zählt (nicht die gefilterte
 // Auswahl), sonst sähe eine einseitig konfigurierte Linie ihre Gegenrichtung nie.
 var _ridsByStopLine = {};
+// Mindestanteil an den Fahrten einer Linie, ab dem ein abweichendes Ziel als EIGENE
+// Richtung gilt (Paul 20.09.2026). Darunter ist es eine Kurzführung (Einrücker,
+// "Betriebshof", verkürzte Schulfahrt) und gehört zur Hauptrichtung — genau dafür ist
+// die Steig-/rid-Gruppierung ja da. 40 Prozent lässt echte Gegenrichtungen durch
+// (typisch etwa halbe/halbe, auch bei 60:40-Takten) und hält Einzelfahrten draußen.
+var DIR_SPLIT_MIN_SHARE = 0.4;
 function rememberRidsFrom(network, stopId, json) {
   var mons = (json && json.data && json.data.monitors) || [];
   mons.forEach(function(mo) {
@@ -4775,19 +4781,64 @@ function rememberRidsFrom(network, stopId, json) {
       var rid = String(l.richtungsId || '').trim();
       if (!rid) return;
       var k = network + ':' + stopId + '|' + String(l.name).trim();
-      if (!_ridsByStopLine[k]) _ridsByStopLine[k] = {};
-      _ridsByStopLine[k][rid] = 1;
+      var e = _ridsByStopLine[k];
+      if (!e) { e = _ridsByStopLine[k] = { rids: {}, dests: {}, total: 0 }; }
+      e.rids[rid] = 1;
+      // Zusätzlich alle rids DER HALTESTELLE (über alle Linien) — siehe ridSeparatesDirections
+      var ks = network + ':' + stopId + '|*';
+      if (!_ridsByStopLine[ks]) _ridsByStopLine[ks] = { rids: {}, dests: {}, total: 0 };
+      _ridsByStopLine[ks].rids[rid] = 1;
+      // Fahrten je Ziel zählen (der Server liefert pro Linie+Ziel einen Eintrag mit
+      // seinen Abfahrten). Ohne Abfahrten zählt der Eintrag als eine Fahrt, damit ein
+      // Ziel aus dem Linien-Index nicht komplett unsichtbar bleibt.
+      var tw = String(l.towards || '').trim();
+      if (!tw) return;
+      var deps = (l.departures && l.departures.departure) || [];
+      var n = Array.isArray(deps) ? Math.max(deps.length, 1) : 1;
+      e.dests[tw] = (e.dests[tw] || 0) + n;
+      e.total += n;
     });
   });
 }
-// true = rid ist maßgeblich (mehrere rids gesehen), false = nach Zieltext gruppieren.
+// Ist die richtungsId für diese Linie+Ziel maßgeblich?
+//   true  = gleiche rid bedeutet dieselbe Richtung (Normalfall, auch bei Verzweigungen
+//           und Kurzführungen unter einer rid)
+//   false = die rid trennt hier nichts UND dieses Ziel fährt regelmäßig genug, um eine
+//           eigene Richtung zu sein → nach Zieltext gruppieren
 // Unbekannt (noch kein Feed gesehen) gilt als maßgeblich, damit sich am Bestandsverhalten
 // nichts ändert, solange wir es nicht besser wissen.
-function ridSeparatesDirections(network, stopId, line) {
+function ridSeparatesDirections(network, stopId, line, towards) {
+  // Wien/WLB: die rbl IST die Richtung (ein Bahnsteig = eine Fahrtrichtung), mehrere Ziele
+  // darunter sind immer Äste oder Kurzführungen. Nie auftrennen.
+  if (network === 'WL' || network === 'WLB') return true;
   var k = network + ':' + stopId + '|' + String(line || '').trim();
-  var set = _ridsByStopLine[k];
-  if (!set) return true;
-  return Object.keys(set).length > 1;
+  var e = _ridsByStopLine[k];
+  if (!e) return true;
+  if (Object.keys(e.rids).length > 1) return true;    // rid trennt → maßgeblich
+  if (!e.total) return true;
+  // Entscheidend ist die GANZE Haltestelle: kennt sie über alle Linien nur EINE rid, ist
+  // der Steig dort kein Unterscheidungsmerkmal (Stockholm: alles fährt von "1"). Gibt es
+  // mehrere, trennt der Steig sehr wohl, und mehrere Ziele einer Linie an EINEM Steig sind
+  // Äste derselben Richtung (Graz 311: Karlsplatz und Schäffernsteg ab Steig 0:2).
+  var alle = _ridsByStopLine[network + ':' + stopId + '|*'];
+  if (alle && Object.keys(alle.rids).length > 1) return true;
+  // ECHTE Richtungsangaben wiegen schwerer als ein Steig (Paul): Graz/STV liefert H/R,
+  // der Fernverkehr w<id>/e<id>/d<id>, die Stammstrecke 1/2 — das sind Fahrtrichtungen,
+  // keine Bahnsteig-Artefakte, und bleiben immer maßgeblich. Auftrennen kommt nur bei
+  // einer reinen Bahnsteig-Nummer in Frage ("p1"), denn genau dort entsteht das Problem:
+  // fährt alles von einem Steig, trägt auch die Gegenrichtung dieselbe Nummer.
+  var einzige = Object.keys(e.rids)[0] || '';
+  if (!/^p\d+$/.test(einzige)) return true;
+  // Wie viele Ziele fahren regelmäßig (>= Mindestanteil)? Erst ab zweien ist es eine
+  // echte Gegenrichtung; ein einziges regelmäßiges Ziel plus Kurzführungen bleibt eine.
+  var regulaer = Object.keys(e.dests).filter(function(z) {
+    return (e.dests[z] / e.total) >= DIR_SPLIT_MIN_SHARE;
+  });
+  if (regulaer.length < 2) return true;
+  // Das konkrete Ziel muss selbst regelmäßig fahren, sonst ist es die Kurzführung
+  var tw = String(towards || '').trim();
+  if (!tw) return true;
+  return regulaer.indexOf(tw) < 0;
 }
 function lineColourFor(network, name) {
   var hit = _lineColourMem[network + '|' + String(name || '').trim()];
@@ -21270,7 +21321,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
                   // …ABER nur, wenn die rid an diesem Halt überhaupt Richtungen trennt
                   // (ridSeparatesDirections): wo alles von einem Steig fährt, sind zwei
                   // Zieltexte unter einer rid zwei echte Richtungen (Alex/Stockholm).
-                  const _ridZaehlt = ridSeparatesDirections(network, bareStopId, lineName);
+                  const _ridZaehlt = ridSeparatesDirections(network, bareStopId, lineName, towards);
                   const exists = station.directions.some(d =>
                     d.line === lineName && (d.towards === towards ||
                       (_ridZaehlt && !!line.richtungsId && !!d.richtungsId &&
@@ -21527,7 +21578,7 @@ function dedupeDirectionsByRid(quelle) {
       if (!ridS) return true;                      // ohne rid nichts zusammenlegen
       // Trennt die rid an diesem Halt keine Richtungen (alles ein Steig), sind
       // verschiedene Zieltexte echte Richtungen und bleiben getrennt.
-      if (!ridSeparatesDirections(_net, _sid, d.line)) {
+      if (!ridSeparatesDirections(_net, _sid, d.line, d.towards)) {
         var kD = d.line + '|' + ridS + '|' + String(d.towards || '').trim();
         if (byKey[kD]) return false;               // exakte Dublette (Linie+rid+Ziel)
         byKey[kD] = d;
@@ -21633,6 +21684,15 @@ async function resolveStationName(network, stopId) {
       const dep = await fetchDeparturesUnified(`${network}:${stopId}`);
       const title = dep?.data?.monitors?.[0]?.locationStop?.properties?.title;
       if (title && !/^Station\s/i.test(String(title))) return title;
+    } catch (e) {}
+    // Letzter Weg: der Linien-Endpunkt liefert den Namen mit (er holt ihn notfalls über
+    // einen festen Fahrplan-Zeitpunkt). Deckt Netze ab, deren Suche keine IDs kennt und
+    // deren Feed abends leer ist — sonst stand dort "Station <id>" (Alex/Stockholm).
+    try {
+      const lr = await fetch(`${STATION_LINES_API}?network=${encodeURIComponent(apiNet)}&stopId=${encodeURIComponent(stopId)}&_=${Date.now()}`, { cache: 'no-store' });
+      const ld = await lr.json();
+      const nm = ld && ld.name ? String(ld.name).trim() : '';
+      if (nm && !/^Station\s/i.test(nm)) return nm;
     } catch (e) {}
     return null;
   } catch (e) {
