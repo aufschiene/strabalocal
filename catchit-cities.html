@@ -2284,13 +2284,15 @@
       box-shadow: 0 14px 16px -14px rgba(0,0,0,0.5);
     }
     /* Bezel wie im Design-Wizard: dunkler Rahmen, das Display darin 1:1 in
-       Gerätepixeln (320x170), damit die Nachbildungen nicht gestaucht werden. */
+       Gerätepixeln (320x170) GERENDERT, aber per zoom verkleinert dargestellt,
+       damit die Sticky-Leiste nicht den halben Bildschirm frisst (Paul 20.09.2026). */
     .finetuning-step .preview-bezel {
       background: #111;
       border-radius: 14px;
-      padding: 10px 12px;
+      padding: 8px 10px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.3);
       max-width: 100%;
+      zoom: 0.72;
     }
     .finetuning-step .preview-display {
       width: 320px;
@@ -3615,7 +3617,7 @@
 
     <!-- 2. Pro-Display-Sektionen (dynamisch, zum Aufklappen) -->
     <h3 style="margin:20px 4px 8px;color:#333;font-size:15px;">Displays im Detail</h3>
-    <p class="form-hint" style="margin:0 4px 12px;">Jedes Stadt-Display einzeln anpassen — tippe auf eine Box zum Aufklappen.</p>
+    <p class="form-hint" style="margin:0 4px 12px;">Designs und Einstellungen pro Display findest du im Zuweisungs-Wizard.</p>
     <div id="ftDisplayTypeSections">
       <!-- Wird von renderDisplayTypeSections() gefüllt -->
     </div>
@@ -13261,7 +13263,7 @@ function goToFinetuning() {
 // bleibt erhalten, damit interne Lookups/Auto-Mapping nicht brechen).
 const DISPLAY_TYPE_FEATURES = {
   1:  { rows: true, sorting: true, grouping: true, textColor: true, chopper: true, silberpfeil: true, altNext: true, name: 'Wiener Linien' },
-  2:  { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Grüne Dot Matrix', offline: true },
+  2:  { rows: true, sorting: true, grouping: true, maxRows: 4, altNext: true, delayHighlight: true, name: 'Grüne Dot Matrix', offline: true },
   3:  { rows: true, sorting: true, grouping: true, name: 'VBB Berlin', offline: true },
   4:  { rows: true, sorting: true, grouping: true, altNext: true, name: 'WLB Badner Bahn', offline: true },
   5:  { rows: false, sorting: false, grouping: false, name: 'DB S-Bahn' },
@@ -13274,10 +13276,10 @@ const DISPLAY_TYPE_FEATURES = {
   12: { rows: true, minRows: 2, maxRows: 3, defaultRows: 2, sorting: false, grouping: false, delayHighlight: true, name: 'ÖBB S-Bahn' },
   13: { rows: true, sorting: true, grouping: true, maxRows: 4, altNext: true, name: 'Holding Graz', offline: true },
   14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
-  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
+  15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, altNext: true, delayHighlight: true, name: 'Orange Matrix', offline: true },
   16: { rows: true, sorting: true, grouping: true, altNext: true, name: 'Prag / CZ-HU' },
-  18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
-  21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, fontExt: true, name: 'Schwarz/Weiß Matrix', offline: true },
+  18: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, altNext: true, delayHighlight: true, name: 'Orange Matrix', offline: true },
+  21: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, fontExt: true, altNext: true, delayHighlight: true, name: 'Schwarz/Weiß Matrix', offline: true },
   22: { rows: true, sorting: true, grouping: true, minRows: 3, maxRows: 3, defaultRows: 3, arrival: true, name: 'MVG' },
   23: { rows: true, sorting: true, grouping: true, maxRows: 5, bigText: true, defaultRows: 4, textColor: true, altNext: true, fontExt: true, delayHighlight: true, name: 'Matrix' },
   24: { rows: true, sorting: true, grouping: true, maxRows: 4, defaultRows: 3, textColor: true, altNext: true, name: 'Paper White' },
@@ -13552,7 +13554,8 @@ function awRenderPreview(net) {
   var st = _awPending && _awPending[net];
   var cid = awEffColour(grp);
   var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
-  var rows = f.defaultRows || 3;
+  var rows = (st && st.look && st.look.r != null) ? parseInt(st.look.r)
+           : ((dsVal(cid, 'r') != null) ? dsVal(cid, 'r') : (f.defaultRows || 3));
   if (f.minRows) rows = Math.max(rows, f.minRows);
   if (f.maxRows) rows = Math.min(rows, f.maxRows);
   var data = awGroupData(grp);
@@ -13588,17 +13591,34 @@ function awSettingsHtml(net, cid) {
     return h + '</div></div>';
   }
   var inner = '';
+  var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
+  // Zeilen für alle Typen mit Zeilen-Einstellung (min..max aus den Features)
+  if (f.rows) {
+    var rMin = f.minRows || 1, rMax = f.maxRows || 3;
+    var rCur = (st.look.r != null) ? parseInt(st.look.r) : ((dsVal(cid, 'r') != null) ? dsVal(cid, 'r') : (f.defaultRows || 3));
+    rCur = Math.min(Math.max(rCur, rMin), rMax);
+    var rOpts = [];
+    for (var rr = rMin; rr <= rMax; rr++) rOpts.push([rr, String(rr)]);
+    inner += tgl('Zeilen', rOpts, rCur, 'awSetLookR');
+  }
   var mv = awMatrixVariantOf(cid, st.look);
   if (mv) {
     inner += tgl('Farbton', [['weiss', 'Wei&szlig;'], ['gruen', 'Gr&uuml;n'], ['orange', 'Orange']], mv, 'awSetMatrixVariant');
-  } else if (cid === 1) {
+  }
+  // Verspätung farbig hervorheben (d-Token): Matrix-Familie, ÖBB, alle mit delayHighlight
+  if (f.delayHighlight) {
+    var dCur = (st.look.d != null) ? st.look.d : (dsVal(cid, 'd') || 0);
+    inner += tgl('Versp&auml;tung farbig', [[0, 'Aus'], [1, 'An']], dCur, 'awSetLookD');
+  }
+  if (cid === 1) {
     var tCur = (st.look.t != null) ? st.look.t : (dsVal(1, 't') || 1);
     var bCur = (st.look.b != null) ? st.look.b : (dsVal(1, 'b') || 0);
     var uCur = (st.look.u != null) ? st.look.u : (dsVal(1, 'u') || 0);
     inner += tgl('Schriftfarbe', [[1, 'Gelb'], [2, 'Wei&szlig;'], [3, 'Orange']], tCur, 'awSetLookT');
     inner += tgl('Hintergrund', [[0, 'Schwarz'], [1, 'Gr&uuml;n']], bCur, 'awSetLookB');
     inner += tgl('U-Bahn Badges', [[0, 'Aus'], [1, 'Linie'], [2, 'Ganze Zeile']], uCur, 'awSetLookU');
-  } else if (cid === 24) {
+  }
+  if (cid === 24) {
     var tP = (st.look.t != null) ? st.look.t : (dsVal(24, 't') || 1);
     inner += tgl('Farbton', [[1, 'Komplett wei&szlig;'], [2, 'Wei&szlig;/Schwarz'], [3, 'Wei&szlig;/Hellgrau']], tP, 'awSetLookT');
   }
@@ -13645,6 +13665,8 @@ function awSetMatrixVariant(netId, variant) {
   awRefreshCard(grp.net);
 }
 function awSetLookT(netId, val) { var g = awNetByNetId(netId); if (!g) return; awState(g.net).look.t = parseInt(val); awRefreshCard(g.net); }
+function awSetLookR(netId, val) { var g = awNetByNetId(netId); if (!g) return; awState(g.net).look.r = parseInt(val); awRefreshCard(g.net); }
+function awSetLookD(netId, val) { var g = awNetByNetId(netId); if (!g) return; awState(g.net).look.d = parseInt(val); awRefreshCard(g.net); }
 function awSetLookB(netId, val) { var g = awNetByNetId(netId); if (!g) return; awState(g.net).look.b = parseInt(val); awRefreshCard(g.net); }
 function awSetLookU(netId, val) { var g = awNetByNetId(netId); if (!g) return; awState(g.net).look.u = parseInt(val); awRefreshCard(g.net); }
 
@@ -13692,6 +13714,9 @@ function awFinish() {
         if (!dsByCid[lookCid]) dsByCid[lookCid] = {};
         dsByCid[lookCid][k] = String(st.look[k]);
       });
+      // Zeilen zusätzlich in den persistenten UI-Merker: rowsForColour liest
+      // ftRowsByCid VOR dsVal, ein alter Wert dort würde die Wahl überstimmen.
+      if (st.look.r != null && typeof ftRowsByCid !== 'undefined') ftRowsByCid[lookCid] = parseInt(st.look.r);
     }
   });
   closeAssignWizard();
@@ -15494,6 +15519,19 @@ function renderDisplayTypeSections() {
   // jetzt über den gleichnamigen Eintrag in JEDEM Display-Typ-Dropdown
   // (displayTypeOptionsHtml → openCustomDisplayWizard) — der Button war doppelt.
 
+  // Umbau (Paul 20.09.2026): "Displays im Detail" zeigt die Sektionen NICHT mehr, nur
+  // noch einen Hinweis mit "Designs öffnen" (führt in den Zuweisungs-Wizard, dort sitzen
+  // die Einstellungen pro Display) und darunter die Karte "Eigene Displays". Die
+  // Sektionen bleiben UNSICHTBAR im DOM, damit sämtliche Speicher- und Restore-Pfade
+  // (Toggles, Wechselzeiten, Wien-Features, Reihenfolge) unverändert weiterlaufen.
+  var ftSectionsHtml = html;
+  html = '';
+  html += '<div class="config-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">';
+  html += '<div style="flex:1 1 200px;min-width:0;"><div class="form-label" style="margin:0;">Design pro Display</div>';
+  html += '<div class="form-hint" style="margin:0;">Zeilen, Farbton und mehr stellst du pro Display im Zuweisungs-Wizard ein.</div></div>';
+  html += '<button onclick="openAssignWizard()" style="flex:0 0 auto;padding:10px 18px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,0.2);">Designs &ouml;ffnen</button>';
+  html += '</div>';
+
   // Eigene Displays verwalten: Umbenennen und Löschen für ALLE gespeicherten Designs,
   // auch die gerade nicht verwendeten. Ohne diese Karte ließe sich ein belegter Slot
   // nie wieder freigeben (nach 3 Designs war endgültig Schluss), und Umbenennen ging
@@ -15529,6 +15567,7 @@ function renderDisplayTypeSections() {
     html += '</div>';
   }
 
+  html += '<div id="ftSectionsHidden" style="display:none;">' + ftSectionsHtml + '</div>';
   container.innerHTML = html;
 
   // Reihenfolge initial rendern + initiale Sichtbarkeit (Panel versteckt bei Auto)
@@ -17723,13 +17762,16 @@ function updateFinetuningPreview() {
   // weiterblättern, wie die Slideshow am Gerät. Bei Kompakt oder nur einem Display
   // passiert nichts, dann steht der Termin auf null.
   if (_ftSlideTimer) { clearTimeout(_ftSlideTimer); _ftSlideTimer = null; }
-  var _slideList = (ftIsMultiDisplay && typeof getUniqueDisplayTypes === 'function') ? (getUniqueDisplayTypes() || []) : [];
+  // Nur an der Typen-Anzahl festmachen (nicht am Stil-Flag): getUniqueDisplayTypes
+  // liefert im Kompakt-Fall ohnehin genau einen Typ, und ein hängendes ftIsMultiDisplay
+  // darf das Blättern nicht verhindern (Paul: "wechselt nicht automatisch").
+  var _slideList = (typeof getUniqueDisplayTypes === 'function') ? (getUniqueDisplayTypes() || []) : [];
   if (_slideList.length > 1) {
     if (_ftSlideNextAt == null) _ftSlideNextAt = Date.now() + ftSlideDwellMs(colour);
     _ftSlideTimer = setTimeout(function() {
       var st = document.getElementById('stepFinetuning');
       if (!st || st.classList.contains('hidden')) { _ftSlideNextAt = null; return; }
-      var list = (ftIsMultiDisplay && typeof getUniqueDisplayTypes === 'function') ? (getUniqueDisplayTypes() || []) : [];
+      var list = (typeof getUniqueDisplayTypes === 'function') ? (getUniqueDisplayTypes() || []) : [];
       if (list.length < 2) { _ftSlideNextAt = null; return; }
       var cur = parseInt(document.getElementById('ftColorSelect').value);
       var idx = -1;
@@ -21517,6 +21559,10 @@ window.addEventListener('DOMContentLoaded', () => {
     'Niederflur-Hinweis blinken': 'Blink low-floor hint', 'Hochflurer markieren': 'Mark high-floor vehicles',
     'Wien-Features': 'Vienna features', 'Hochflurer, Niederflur, Klima': 'High-floor, low-floor, A/C',
     'Nach Städten gruppiert': 'Grouped by city', 'Zuweisen': 'Assign', 'Displays zuweisen': 'Assign displays',
+    'Design pro Display': 'Design per display', 'Designs öffnen': 'Open designs',
+    'Zeilen, Farbton und mehr stellst du pro Display im Zuweisungs-Wizard ein.': 'Rows, color tone and more are set per display in the assign wizard.',
+    'Designs und Einstellungen pro Display findest du im Zuweisungs-Wizard.': 'Designs and settings per display live in the assign wizard.',
+    'Verspätung farbig': 'Delay highlighted', 'Farbton': 'Color tone',
     'Ein Display pro Stadt. Die Vorschau zeigt sofort, wie es aussieht.': 'One display per city. The preview instantly shows how it looks.',
     'Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht': 'Marker pulses when a low-floor vehicle approaches',
     'Verspätung hervorheben': 'Highlight delays', 'Verspätung herausstechend': 'Delays stand out',
