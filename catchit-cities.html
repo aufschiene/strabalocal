@@ -11910,12 +11910,15 @@ function seedSavedRowsByColour(colourStr, rowsStr) {
 function calculateRecommendedConfig() {
   if (stations.length === 0) return null;
 
-  // DEDUP: Entferne Stationen mit doppelter fullId (kann durch Race Conditions bei Config-Laden entstehen)
+  // DEDUP: Entferne Stationen mit doppelter fullId (kann durch Race Conditions bei Config-Laden
+  // entstehen). Instanz gehört in den Schlüssel: beim Linien-Split trägt dieselbe rbl bewusst
+  // mehrere Teil-Stationen auf verschiedenen Seiten (displayInstance).
   const seenFullIds = new Set();
   const beforeCount = stations.length;
   stations = stations.filter(s => {
-    if (seenFullIds.has(s.fullId)) return false;
-    seenFullIds.add(s.fullId);
+    const k = s.fullId + '#' + (s.displayInstance == null ? '' : s.displayInstance);
+    if (seenFullIds.has(k)) return false;
+    seenFullIds.add(k);
     return true;
   });
   if (stations.length !== beforeCount) {
@@ -13653,14 +13656,15 @@ function awGroups() {
 }
 
 // Seiten-Zuordnung einer Stadt-Gruppe (Kunde Alex, Stockholm 2026-09: drei Haltestellen
-// desselben Netzes sollen drei eigene Slideshow-Seiten sein, gleiche Optik; Paul will
-// dabei nach LINIE zuordnen können, darum zeigt jede Zeile ihre Linien). Die Firmware
-// hält gleichfarbige Fremdnetz-Segmente bewusst als getrennte Seiten, der Weg dorthin ist
-// der Instanz-Modus (ftGroupByCity=false, displayInstance pro Station = ein Segment).
-// Granularität ist die HALTESTELLE: der ganze Lade-Pfad (masterDirsByRbl, colourByRbl,
-// segInfoByToken, dedupeStationsByFullId) ist rbl-gekeyt, dieselbe rbl in zwei Segmenten
-// überlebt den Roundtrip nicht. Wien (WL/WLB) bleibt außen vor: dort haben Instanzen
-// keinen Effekt auf die masterrow.
+// desselben Netzes sollen drei eigene Slideshow-Seiten sein, gleiche Optik; Paul:
+// Zuordnung nach LINIE, nicht nur nach Haltestelle). Die Firmware hält gleichfarbige
+// Fremdnetz-Segmente bewusst als getrennte Seiten, der Weg dorthin ist der Instanz-Modus
+// (ftGroupByCity=false, displayInstance pro Seite = ein Segment). Granularität ist die
+// LINIE: Linien derselben Haltestelle auf verschiedenen Seiten zerlegen die Station in
+// Teil-Objekte (gleiche rbl, verschiedene Instanzen); der Lade-Pfad liest solche
+// rbl-Duplikate über Vorkommens-Listen (masterDirsByRbl & Co.) zurück, alle
+// fullId-Dedups tragen die Instanz im Schlüssel. Wien (WL/WLB) bleibt außen vor:
+// dort haben Instanzen keinen Effekt auf die masterrow.
 function awPagesFixed(grp) { return grp.net === 'WL' || grp.net === 'WLB'; }
 function awGroupInstanceCount(grp) {
   var seen = {}, n = 0;
@@ -13675,25 +13679,47 @@ function awPagesModeOf(grp) {
   return (typeof instanceModeActive === 'function' && instanceModeActive()
           && awGroupInstanceCount(grp) > 1) ? 'split' : 'city';
 }
-// Schlüssel einer Station innerhalb der Gruppe (fullId ist nach dedupeStationsByFullId eindeutig)
+// Schlüssel einer Station innerhalb der Gruppe (beim Linien-Split trägt dieselbe fullId
+// mehrere Teil-Stationen, darum gehört die Instanz mit in den Stations-Schlüssel nicht:
+// die ZEILEN laufen ohnehin pro Linie, siehe awPageRows).
 function awStationKey(s) { return String(s.fullId || (s.network + ':' + s.stopId)); }
+// Zeilen der Seiten-Zuteilung: EINE pro (Haltestelle, Linie) — Paul will nach Linie
+// zuordnen. Stationen ohne Linien (Alle Abfahrten) bleiben eine Zeile ('*').
+function awPageRows(grp) {
+  var rows = [];
+  grp.stations.forEach(function(s) {
+    var lines = [];
+    (s.directions || []).forEach(function(d) { if (d.line && lines.indexOf(String(d.line)) < 0) lines.push(String(d.line)); });
+    if (!lines.length) rows.push({ key: awStationKey(s) + '|*', s: s, line: null });
+    else lines.forEach(function(ln) { rows.push({ key: awStationKey(s) + '|' + ln, s: s, line: ln }); });
+  });
+  return rows;
+}
 // Seiten-Nummern der Gruppe: aus pending-Auswahl, sonst aus den Ist-Instanzen (normalisiert
-// auf 1..n in Auftrittsreihenfolge), im Nicht-Split-Zustand jede Haltestelle ihre eigene
-// Seite als Startvorschlag (= Alex' Wunschbild beim ersten Umschalten).
+// auf 1..n in Auftrittsreihenfolge, ein bestehender Linien-Split bleibt so sichtbar), im
+// Nicht-Split-Zustand jede Haltestelle eine eigene Seite als Startvorschlag (Alex' Bild).
 function awPageMap(grp) {
   var st = awState(grp.net);
   if (!st.pageOf) {
     st.pageOf = {};
-    if (awPagesModeOf(grp) === 'split') {
-      var norm = {}, next = 1;
-      grp.stations.forEach(function(s) {
+    var split = (awPagesModeOf(grp) === 'split');
+    var norm = {}, next = 1, seq = {};
+    grp.stations.forEach(function(s) {
+      var page;
+      if (split) {
         var k = String(s.displayInstance);
         if (!norm[k]) norm[k] = next++;
-        st.pageOf[awStationKey(s)] = norm[k];
-      });
-    } else {
-      grp.stations.forEach(function(s, i) { st.pageOf[awStationKey(s)] = i + 1; });
-    }
+        page = norm[k];
+      } else {
+        var fk = awStationKey(s);
+        if (!seq[fk]) seq[fk] = next++;
+        page = seq[fk];
+      }
+      var lines = [];
+      (s.directions || []).forEach(function(d) { if (d.line && lines.indexOf(String(d.line)) < 0) lines.push(String(d.line)); });
+      if (!lines.length) st.pageOf[awStationKey(s) + '|*'] = page;
+      else lines.forEach(function(ln) { st.pageOf[awStationKey(s) + '|' + ln] = page; });
+    });
   }
   return st.pageOf;
 }
@@ -13709,11 +13735,23 @@ function awSetStationPage(netId, key, val) {
   awPageMap(grp)[key] = parseInt(val) || 1;
   awRefreshCard(grp.net);
 }
+// Gruppen-Stationen im globalen stations-Array durch eine neue Liste ersetzen (an der
+// Position des ersten Gruppen-Mitglieds) — für Linien-Split (mehr Objekte) und Merge.
+function _awReplaceGroupStations(net, list) {
+  var first = -1;
+  for (var i = stations.length - 1; i >= 0; i--) {
+    if ((stations[i].network || '') === net) { first = i; stations.splice(i, 1); }
+  }
+  if (first < 0) first = stations.length;
+  Array.prototype.splice.apply(stations, [first, 0].concat(list));
+}
 
 // Seiten-Block einer Karte: Toggle "Eine Seite/Aufteilen" + bei Aufteilen die
 // Haltestellen-Liste (mit ihren Linien beschriftet) samt Seiten-Auswahl.
 function awPagesHtml(grp) {
-  if (awPagesFixed(grp) || grp.stations.length < 2) return '';
+  // Ab zwei zuteilbaren Zeilen anbieten: auch EINE Haltestelle mit mehreren Linien
+  // lässt sich auf Seiten aufteilen (Linien-Ebene).
+  if (awPagesFixed(grp) || awPageRows(grp).length < 2) return '';
   var netId = awNetId(grp.net);
   var st = awState(grp.net);
   var mode = (st.pages != null) ? st.pages : awPagesModeOf(grp);
@@ -13726,17 +13764,22 @@ function awPagesHtml(grp) {
   h += '</div></div>';
   if (mode === 'split') {
     var pageOf = awPageMap(grp);
-    var n = grp.stations.length;
+    var rows = awPageRows(grp);
+    var n = Math.max(rows.length, 1);
     h += '<div style="background:#f8f9fa;border:1px solid #eee;border-radius:10px;padding:8px 10px;margin:4px 0 2px;">';
-    grp.stations.forEach(function(s) {
-      var key = awStationKey(s);
-      var lines = [];
-      (s.directions || []).forEach(function(d) { if (d.line && lines.indexOf(String(d.line)) < 0) lines.push(String(d.line)); });
-      var lbl = (lines.length ? lines.join(', ') : 'Alle Linien') + ' · ' + (s.stopName || s.stopId || '');
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">';
-      h += '<span style="flex:1;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlFt(lbl) + '</span>';
-      h += '<select onchange="awSetStationPage(\'' + netId + '\',\'' + escapeHtmlFt(key).replace(/'/g, '') + '\',this.value)" style="flex:0 0 auto;padding:5px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;font-family:inherit;">';
-      for (var p = 1; p <= n; p++) h += '<option value="' + p + '"' + ((pageOf[key] || 1) === p ? ' selected' : '') + '>Seite ' + p + '</option>';
+    rows.forEach(function(row) {
+      // Linien-Kästchen in der offiziellen Linienfarbe (gleiche Optik wie die Stationsliste)
+      var chip;
+      if (row.line) {
+        var c = (typeof lineColourFor === 'function') ? lineColourFor(row.s.network, row.line) : null;
+        chip = '<span style="display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;height:19px;padding:0 6px;min-width:19px;border-radius:6px;background:' + (c ? c.bg : '#e9e9e9') + ';color:' + (c ? c.fg : '#444') + ';font-weight:700;font-size:11px;">' + escapeHtmlFt(String(row.line)) + '</span>';
+      } else {
+        chip = '<span style="flex:0 0 auto;font-size:11px;font-weight:600;color:#666;">Alle Linien</span>';
+      }
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">' + chip;
+      h += '<span style="flex:1;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlFt(row.s.stopName || row.s.stopId || '') + '</span>';
+      h += '<select onchange="awSetStationPage(\'' + netId + '\',\'' + escapeHtmlFt(row.key).replace(/'/g, '') + '\',this.value)" style="flex:0 0 auto;padding:5px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;font-family:inherit;">';
+      for (var p = 1; p <= n; p++) h += '<option value="' + p + '"' + ((pageOf[row.key] || 1) === p ? ' selected' : '') + '>Seite ' + p + '</option>';
       h += '</select></div>';
     });
     h += '<div class="form-hint" style="margin-top:4px;">Gleiche Seite = zusammen auf dem Display, zwischen den Seiten bl&auml;ttert das Ger&auml;t automatisch</div>';
@@ -13755,11 +13798,21 @@ function awGroupData(grp) {
   var _grpStations = grp.stations;
   var _pst = _awPending && _awPending[grp.net];
   var _pMode = (_pst && _pst.pages != null) ? _pst.pages : awPagesModeOf(grp);
-  if (_pMode === 'split' && !awPagesFixed(grp) && grp.stations.length >= 2) {
+  if (_pMode === 'split' && !awPagesFixed(grp)) {
     var _pOf = awPageMap(grp);
     var _min = null;
-    _grpStations.forEach(function(s) { var p = _pOf[awStationKey(s)] || 1; if (_min == null || p < _min) _min = p; });
-    _grpStations = _grpStations.filter(function(s) { return (_pOf[awStationKey(s)] || 1) === _min; });
+    awPageRows(grp).forEach(function(r) { var p = _pOf[r.key] || 1; if (_min == null || p < _min) _min = p; });
+    // Nur Linien der ersten Seite zeigen (Linien-genau, nicht pro Haltestelle)
+    _grpStations = _grpStations.map(function(s) {
+      var all = s.directions || [];
+      if (!all.length) return ((_pOf[awStationKey(s) + '|*'] || 1) === _min) ? s : null;
+      var dirs = all.filter(function(d) { return (_pOf[awStationKey(s) + '|' + String(d.line)] || 1) === _min; });
+      if (!dirs.length) return null;
+      if (dirs.length === all.length) return s;
+      var c = Object.assign({}, s);
+      c.directions = dirs;
+      return c;
+    }).filter(Boolean);
   }
   _grpStations.forEach(function(st) {
     var arr = [];
@@ -13960,31 +14013,76 @@ function awFinish() {
   // Gruppe wieder zusammen. Nicht angefasste Karten behalten ihre Instanzen unverändert.
   var touchedPages = false;
   awGroups().forEach(function(grp) {
-    if (awPagesFixed(grp) || grp.stations.length < 2) return;
+    if (awPagesFixed(grp) || awPageRows(grp).length < 2) return;
     var stp = pending[grp.net];
     if (!stp || (stp.pages == null && stp.pageOf == null)) return;
     var mode = (stp.pages != null) ? stp.pages : awPagesModeOf(grp);
     if (mode === 'city') {
-      if (awGroupInstanceCount(grp) <= 1 && !grp.stations.some(function(s) { return s.displayInstance == null; })) return;
+      // Zusammenlegen: Linien-Splits derselben Haltestelle wieder zu EINEM Objekt
+      // vereinen, dann eine gemeinsame Instanz für die ganze Stadt-Gruppe.
+      var mergedList = [], byId = {};
+      grp.stations.forEach(function(s) {
+        var k = awStationKey(s);
+        var tgt = byId[k];
+        if (!tgt) { byId[k] = s; mergedList.push(s); return; }
+        (s.directions || []).forEach(function(d) {
+          var dup = (tgt.directions || []).some(function(e) {
+            return String(e.line) === String(d.line) &&
+                   String(e.richtungsId || e.towards || '') === String(d.richtungsId || d.towards || '');
+          });
+          if (!dup) (tgt.directions = tgt.directions || []).push(d);
+        });
+        if (s.filter && tgt.filter !== s.filter) {
+          var fl = String(tgt.filter || '').split(',').concat(String(s.filter).split(','))
+            .map(function(x) { return x.trim(); }).filter(Boolean);
+          tgt.filter = fl.filter(function(x, i) { return fl.indexOf(x) === i; }).join(',');
+        }
+      });
+      var changedMerge = mergedList.length !== grp.stations.length;
+      var needShared = awGroupInstanceCount(grp) > 1 || grp.stations.some(function(s) { return s.displayInstance == null; });
+      if (!changedMerge && !needShared) return;
       var shared = _nextInstanceId++;
-      grp.stations.forEach(function(s) { s.displayInstance = shared; });
+      mergedList.forEach(function(s) { s.displayInstance = shared; });
+      _awReplaceGroupStations(grp.net, mergedList);
       touchedPages = true;
       return;
     }
-    // Aufteilen: Instanz je Seiten-Nummer; Stationen im stations-Array stabil nach Seite
-    // umsortieren, damit Segment- und Blätter-Reihenfolge der Auswahl entspricht.
+    // Aufteilen: Zeilen laufen pro (Haltestelle, Linie). Linien derselben Haltestelle auf
+    // verschiedenen Seiten zerlegen die Station in Teil-Objekte (je Seite eines, eigene
+    // directions und filter); der Lade-Pfad liest solche rbl-Duplikate seit heute über
+    // Vorkommens-Listen korrekt zurück. Reihenfolge im stations-Array = Seitenreihenfolge.
     var pageOf = awPageMap(grp);
     var instOf = {};
+    var instFor = function(p) { if (!instOf[p]) instOf[p] = _nextInstanceId++; return instOf[p]; };
+    var outList = [];
     grp.stations.forEach(function(s) {
-      var p = pageOf[awStationKey(s)] || 1;
-      if (!instOf[p]) instOf[p] = _nextInstanceId++;
-      s.displayInstance = instOf[p];
+      var dirs = s.directions || [];
+      if (!dirs.length) {
+        s._awPg = pageOf[awStationKey(s) + '|*'] || 1;
+        s.displayInstance = instFor(s._awPg);
+        outList.push(s);
+        return;
+      }
+      var byPage = {};
+      dirs.forEach(function(d) {
+        var p = pageOf[awStationKey(s) + '|' + String(d.line)] || 1;
+        (byPage[p] = byPage[p] || []).push(d);
+      });
+      var pages = Object.keys(byPage).map(Number).sort(function(a, b) { return a - b; });
+      pages.forEach(function(p, i) {
+        var t = (i === 0) ? s : Object.assign({}, s);
+        t.directions = byPage[p];
+        var fl = [];
+        t.directions.forEach(function(d) { if (d.line && fl.indexOf(String(d.line)) < 0) fl.push(String(d.line)); });
+        if (fl.length) t.filter = fl.join(',');
+        t._awPg = p;
+        t.displayInstance = instFor(p);
+        outList.push(t);
+      });
     });
-    var idxs = [];
-    stations.forEach(function(s, i) { if ((s.network || '') === grp.net) idxs.push(i); });
-    var sorted = idxs.map(function(i) { return stations[i]; })
-      .sort(function(a, b) { return (pageOf[awStationKey(a)] || 1) - (pageOf[awStationKey(b)] || 1); });
-    idxs.forEach(function(i, k) { stations[i] = sorted[k]; });
+    outList.sort(function(a, b) { return (a._awPg || 1) - (b._awPg || 1); });
+    outList.forEach(function(t) { delete t._awPg; });
+    _awReplaceGroupStations(grp.net, outList);
     touchedPages = true;
   });
   if (touchedPages) {
@@ -19324,8 +19422,12 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     }
 
     rblOrder.forEach(function(rbl) {
-      if (_emittedRbls[rbl]) return;  // doppelte Station überspringen (kein Gehweg-Artefakt)
-      _emittedRbls[rbl] = true;
+      // Dedup pro INSTANZ statt global: beim Linien-Split erzeugt dieselbe rbl bewusst
+      // mehrere Segmente (verschiedene Instanzen). Innerhalb einer Instanz (und im
+      // Städte-Merge, gleicher instKey) bleibt der Dubletten-Schutz erhalten.
+      var _emitKey = (instKey || 'g') + '|' + rbl;
+      if (_emittedRbls[_emitKey]) return;  // doppelte Station überspringen (kein Gehweg-Artefakt)
+      _emittedRbls[_emitKey] = true;
       var data = rblData[rbl];
       // Eintrag pro Station: rbl|lines|c<colour>|g<gehweg>[|m...]. Per-Display-Settings
       // (rows/interval/…) liegen separat in displaysettings (gekeyt nach colour).
@@ -19877,11 +19979,13 @@ function saveFromFinetuning() {
   if (!lineFilterDestStr) lineFilterDestStr = buildLineFilterDestination(stations);
 
   // WICHTIG: rbl und filter IMMER frisch aus stations berechnen (nicht stale Werte verwenden!)
-  // Dedupliziere stations zuerst (Sicherheitsnetz gegen Race Conditions)
+  // Dedupliziere stations zuerst (Sicherheitsnetz gegen Race Conditions). Instanz im
+  // Schlüssel: Linien-Split-Teilstationen derselben rbl dürfen nicht verschwinden.
   const seenIds = new Set();
   stations = stations.filter(s => {
-    if (seenIds.has(s.fullId)) return false;
-    seenIds.add(s.fullId);
+    const k = s.fullId + '#' + (s.displayInstance == null ? '' : s.displayInstance);
+    if (seenIds.has(k)) return false;
+    seenIds.add(k);
     return true;
   });
   // Wien IMMER mit WL:-Prefix senden (auch nackte numerische IDs wie "4131" →
@@ -20696,39 +20800,43 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // linefilterdestination/roworderdestination NICHT mit → ohne das fiele der Richtungs-Filter
   // auf reine Liniennamen zurück und der Reload selektierte ALLE Richtungen (Gegenrichtung
   // kommt dazu, masterrow wächst bei jedem Re-Save).
+  // VORKOMMENS-LISTEN statt Einzelwerten: dieselbe rbl darf in MEHREREN Segmenten
+  // stehen (Linien-Split, Paul/Alex 2026-09: Linien einer Haltestelle auf eigene
+  // Slideshow-Seiten). Pro Segment-Vorkommen ein Eintrag, auch für '*'-Segmente
+  // (null), sonst verrutscht die Zählung. Der Leser unten zählt pro rbl_id-Token mit.
   const masterDirsByRbl = {};
   if (masterRowStr) {
+    const pushDirs = (tok, dirs) => { (masterDirsByRbl[tok] = masterDirsByRbl[tok] || []).push(dirs); };
     String(masterRowStr).split(';').forEach(seg => {
       seg = seg.trim(); if (!seg) return;
       const fields = seg.split('|');
       const segRbl = (fields[0] || '').trim();
       const linesField = (fields[1] || '').trim();
-      if (!segRbl || !linesField || linesField === '*') return;  // '*' = Alle Abfahrten
-      const dirs = [];
-      linesField.split(',').forEach(tok => {
-        (tok || '').split('+').forEach(t => {   // '+' = Merge-Gruppe → einzeln
-          t = t.trim(); if (!t) return;
-          const gt = t.indexOf('>');   // richtungsId (Vorrang)
-          const cn = t.indexOf(':');   // Zieltext
-          let line, towards;
-          if (gt > 0) { line = t.substring(0, gt); towards = t.substring(gt + 1); }
-          else if (cn > 0) { line = t.substring(0, cn); towards = t.substring(cn + 1); }
-          else { line = t; towards = ''; }
-          line = line.trim(); towards = towards.trim();
-          if (line && !dirs.some(d => d.line === line && d.towards === towards)) dirs.push({ line, towards });
-        });
-      });
-      if (dirs.length) {
-        masterDirsByRbl[segRbl] = dirs;
-        // Merged Segment (komma-gejointe rbls, fw>=2.3.18): dieselben Richtungen für
-        // jeden Stop-Token hinterlegen — die API-Abfrage pro Station behält unten nur
-        // die Richtungen, die an diesem Stop tatsächlich vorkommen.
-        if (segRbl.indexOf(',') >= 0) {
-          segRbl.split(',').forEach(tok => {
-            tok = tok.trim();
-            if (tok && !masterDirsByRbl[tok]) masterDirsByRbl[tok] = dirs;
+      if (!segRbl) return;
+      let dirs = null;
+      if (linesField && linesField !== '*') {  // '*' = Alle Abfahrten → kein Richtungs-Filter
+        dirs = [];
+        linesField.split(',').forEach(tok => {
+          (tok || '').split('+').forEach(t => {   // '+' = Merge-Gruppe → einzeln
+            t = t.trim(); if (!t) return;
+            const gt = t.indexOf('>');   // richtungsId (Vorrang)
+            const cn = t.indexOf(':');   // Zieltext
+            let line, towards;
+            if (gt > 0) { line = t.substring(0, gt); towards = t.substring(gt + 1); }
+            else if (cn > 0) { line = t.substring(0, cn); towards = t.substring(cn + 1); }
+            else { line = t; towards = ''; }
+            line = line.trim(); towards = towards.trim();
+            if (line && !dirs.some(d => d.line === line && d.towards === towards)) dirs.push({ line, towards });
           });
-        }
+        });
+        if (!dirs.length) dirs = null;
+      }
+      pushDirs(segRbl, dirs);
+      // Merged Segment (komma-gejointe rbls, fw>=2.3.18): dieselben Richtungen für
+      // jeden Stop-Token hinterlegen — die API-Abfrage pro Station behält unten nur
+      // die Richtungen, die an diesem Stop tatsächlich vorkommen.
+      if (segRbl.indexOf(',') >= 0) {
+        segRbl.split(',').forEach(tok => { tok = tok.trim(); if (tok) pushDirs(tok, dirs); });
       }
     });
   }
@@ -20737,17 +20845,20 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // Design-Zuordnung. Ohne das fiel JEDE Station beim erneuten Öffnen auf den Netz-Default
   // zurück (Kunde 2026-07-13: zweite Station stand immer wieder auf "Paper White", die
   // manuelle Zuordnung musste bei jedem Öffnen neu getätigt werden).
-  const colourByRbl = {};
+  const colourByRbl = {};  // ebenfalls Vorkommens-Listen (ein Eintrag je Segment, null ohne c-Feld)
   if (masterRowStr) {
     String(masterRowStr).split(';').forEach(seg => {
       seg = seg.trim(); if (!seg) return;
       const segRbl = (seg.split('|')[0] || '').trim();
+      if (!segRbl) return;
       const cm = seg.match(/\|c(\d+)/);
+      const cVal = cm ? parseInt(cm[1], 10) : null;
       // Merged Segmente: das c-Feld gilt für jeden Stop-Token des Segments.
-      if (segRbl && cm) {
-        const cVal = parseInt(cm[1], 10);
-        segRbl.split(',').forEach(tok => { tok = tok.trim(); if (tok) colourByRbl[tok] = cVal; });
-      }
+      segRbl.split(',').forEach(tok => {
+        tok = tok.trim(); if (!tok) return;
+        (colourByRbl[tok] = colourByRbl[tok] || []).push(cVal);
+      });
+      if (segRbl.indexOf(',') >= 0) (colourByRbl[segRbl] = colourByRbl[segRbl] || []).push(cVal);
     });
   }
 
@@ -20756,7 +20867,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // die Firmware das filter-Feld generiert (EIN |-Segment pro masterrow-Segment). Merged
   // Segmente (Komma-rbls) lösen sich damit in einzelne Stations-Objekte MIT gemeinsamer
   // Display-Instanz (displayInstance = segIdx+1) auf.
-  const segInfoByToken = {};
+  const segInfoByToken = {};  // Vorkommens-Listen, synchron zu masterDirsByRbl/colourByRbl
   {
     let _segCount = 0;
     if (masterRowStr) {
@@ -20767,11 +20878,20 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         const toks = segRbl.split(',').map(t => t.trim()).filter(Boolean);
         const segIdx = _segCount++;
         toks.forEach(tok => {
-          if (segInfoByToken[tok] === undefined) segInfoByToken[tok] = { segIdx: segIdx, tokenCount: toks.length };
+          (segInfoByToken[tok] = segInfoByToken[tok] || []).push({ segIdx: segIdx, tokenCount: toks.length });
         });
       });
     }
   }
+  // Vorkommens-Zähler des Lesers: das n-te Auftreten eines rbl-Tokens in rbl_id liest
+  // aus allen drei Segment-Maps den n-ten Eintrag (Überhang: letzter Eintrag gewinnt).
+  const _rblOcc = {};
+  const _pickBySeg = (map, tok, occ) => {
+    const l = map[tok];
+    if (!l || !l.length) return undefined;
+    const v = l[Math.min(occ, l.length - 1)];
+    return (v === null) ? undefined : v;
+  };
 
   // Parse linefilterdestination ODER roworderdestination (beide haben gleiches Format)
   // roworderdestination hat Priorität für Wien (enthält die Richtungen)
@@ -20843,7 +20963,15 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     }
 
     const fullId = `${network}:${stopId}`;
-    if (stations.some(s => s.fullId === fullId)) continue;
+    // Vorkommens-Index + Segment VOR dem Dubletten-Check: beim Linien-Split steht dieselbe
+    // rbl bewusst mehrfach in rbl_id (ein Vorkommen je Segment). Nur echte Dubletten
+    // überspringen (gleiche rbl UND gleiche Instanz, z.B. Race-Doppellauf) — der Zähler
+    // zählt auch Übersprungene mit, sonst verrutschen die Folge-Vorkommen.
+    const _occ = (_rblOcc[part] = (_rblOcc[part] || 0) + 1) - 1;
+    const _segInfo = _pickBySeg(segInfoByToken, part, _occ);
+    const _instId = (_segInfo !== undefined) ? _segInfo.segIdx + 1 : null;
+    if (stations.some(s => s.fullId === fullId
+        && (s.displayInstance == null ? null : s.displayInstance) === _instId)) continue;
 
     // Check if it's a journey (has > in stopId)
     const isJourney = stopId.includes('>');
@@ -20876,12 +21004,13 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // Das filter-Feld hat EIN |-Segment pro masterrow-SEGMENT (nicht pro Stop) — bei
     // merged Segmenten daher über den Segment-Index zugreifen, sonst verrutscht die
     // Zuordnung sobald ein Segment mehrere komma-gejointe rbls trägt.
-    const _segInfo = segInfoByToken[part];
+    // _occ/_segInfo wurden oben vor dem Dubletten-Check gelesen — alle Segment-Maps
+    // (Filter, Richtungen, colour) synchron über dasselbe Vorkommen ablesen.
     const stationFilter = (_segInfo !== undefined) ? (filterParts[_segInfo.segIdx] || '') : (filterParts[idx] || '');
     const filterLines = stationFilter ? stationFilter.split(',').map(f => f.trim()) : [];
     // Richtungs-Filter dieser Station: PRIMÄR aus der masterrow (richtungsId-genau), sonst der
     // global geparste linefilterdestination/linegroups-Fallback.
-    const stationDests = masterDirsByRbl[part] || lineDestinations;
+    const stationDests = _pickBySeg(masterDirsByRbl, part, _occ) || lineDestinations;
     const bareStopId = isJourney ? stopId.split('>')[0] : stopId;
     // "Alle Abfahrten"-Station? Primär am "*"-Marker der masterrow erkennen; Fallback:
     // gar kein Filter UND keine Richtungs-Filter irgendwo (reine alle-Abfahrten-Config).
@@ -20905,7 +21034,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     };
     // Gespeicherten Display-Typ (|cNN aus der masterrow) als Zuordnung wiederherstellen —
     // exakter Round-Trip statt Netz-Default (siehe colourByRbl oben).
-    if (colourByRbl[part] != null) station.colourOverride = colourByRbl[part];
+    { const _cOv = _pickBySeg(colourByRbl, part, _occ); if (_cOv != null) station.colourOverride = _cOv; }
     // Display-Instanz = masterrow-Segment: Stationen desselben (merged) Segments teilen
     // sich eine Instanz — Grundlage für den Zuordnungs-Wizard und die Toggle-Ableitung.
     if (_segInfo !== undefined) station.displayInstance = _segInfo.segIdx + 1;
@@ -21263,7 +21392,10 @@ function dedupeStationsByFullId() {
   var seen = new Set();
   var before = stations.length;
   stations = stations.filter(function(s) {
-    var k = s.fullId || (s.network + ':' + s.stopId);
+    // Instanz gehört in den Schlüssel: beim Linien-Split steht dieselbe rbl bewusst in
+    // mehreren Segmenten (eigene Seiten). Race-Dubletten haben dieselbe Instanz und
+    // werden weiter entfernt.
+    var k = (s.fullId || (s.network + ':' + s.stopId)) + '#' + (s.displayInstance == null ? '' : s.displayInstance);
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
