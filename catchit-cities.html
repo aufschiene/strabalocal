@@ -2990,7 +2990,7 @@
       </svg>
     </div>
     <h2>Wo bist du unterwegs?</h2>
-    <p class="country-intro-sub">Wähle dein Land – wir zeigen dir sofort die passenden Regionen, Netze &amp; Linien.</p>
+    <p class="country-intro-sub">Wähle dein Land. Wir zeigen dir sofort die passenden Regionen, Netze &amp; Linien.</p>
     <select id="countrySelect" class="country-select" onchange="onCountrySelectChange(this.value)">
       <option value="">Land wählen…</option>
     </select>
@@ -3701,6 +3701,24 @@
           <div class="form-hint">Zeigt witzige Meldungen bei langen Wartezeiten</div>
         </div>
         <div class="toggle-switch" id="ftFunMessagesToggle" onclick="toggleFtSwitch('ftFunMessagesToggle')"></div>
+      </div>
+    </div>
+
+    <!-- Sicherung: Konfiguration als Datei exportieren/importieren (Kunde Alex 2026-09,
+         nach mehrfach zerschossenen Configs). Export = exakt die Felder, die auch ans
+         Gerät gehen; Import läuft über denselben loadFullConfig-Pfad wie das Gerät. -->
+    <div class="config-card">
+      <h3>Sicherung</h3>
+      <div class="form-row">
+        <div>
+          <div class="form-label">Konfiguration als Datei</div>
+          <div class="form-hint">Sichert alle Einstellungen auf diesem Gerät, zum Wiederherstellen oder Übertragen</div>
+        </div>
+        <div style="display:flex;gap:8px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;">
+          <button onclick="exportConfigBackup()" style="padding:9px 14px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Sichern</button>
+          <button onclick="document.getElementById('cfgBackupFile').click()" style="padding:9px 14px;border:1px solid #ccc;background:#fff;color:#333;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Laden</button>
+          <input type="file" id="cfgBackupFile" accept=".json,application/json,text/plain" style="display:none" onchange="importConfigBackup(this)">
+        </div>
       </div>
     </div>
 
@@ -4720,6 +4738,32 @@ const WIEN_DATA_URL = 'https://straba-983965425140.europe-west3.run.app/search/'
 // (api.straba.at), der Trainboard & Co. mit Caching proxyt. Liefert das
 // "monitors"-Format, das der restliche Code erwartet.
 // fullId-Format: "NETWORK:stopId" (z.B. "WL:490012345" oder "BERLIN:900100711").
+// Linienfarben-Gedächtnis (network|linie → {bg, fg}) aus allen verarbeiteten Abfahrten.
+// Die Stationsliste und Auswahl-Ansichten zeigen damit die offiziellen Linienfarben des
+// Servers (Line-Colors-API). Wien liefert keine Serverfarben → U-Bahn-Tabelle als Seed.
+var _lineColourMem = {};
+var _WIEN_UBAHN_COLOURS = { U1: '#e2001a', U2: '#a862a4', U3: '#f39200', U4: '#008d3d', U5: '#00b8aa', U6: '#944210' };
+function rememberLineColoursFrom(network, json) {
+  var mons = (json && json.data && json.data.monitors) || [];
+  mons.forEach(function(mo) {
+    ((mo && mo.lines) || []).forEach(function(l) {
+      var bg = (typeof dvLineColorCss === 'function') ? dvLineColorCss(l && l.lineColor) : null;
+      if (!bg || !l || !l.name) return;
+      var fg = (typeof dvLineColorCss === 'function') ? dvLineColorCss(l.lineTextColor) : null;
+      _lineColourMem[network + '|' + String(l.name).trim()] = { bg: bg, fg: fg || '#ffffff' };
+    });
+  });
+}
+function lineColourFor(network, name) {
+  var hit = _lineColourMem[network + '|' + String(name || '').trim()];
+  if (hit) return hit;
+  if (network === 'WL' || network === 'WLB') {
+    var w = _WIEN_UBAHN_COLOURS[String(name || '').trim().toUpperCase()];
+    if (w) return { bg: w, fg: '#ffffff' };
+  }
+  return null;
+}
+
 async function fetchDeparturesUnified(fullId) {
   if (!fullId) return { data: { monitors: [] } };
   const colonIdx = fullId.indexOf(':');
@@ -4741,7 +4785,12 @@ async function fetchDeparturesUnified(fullId) {
   for (let attempt = 0; attempt < MAX; attempt++) {
     try {
       const r = await fetch(DEPARTURES_API + '?stopId=' + encodeURIComponent(apiFullId) + '&_=' + Date.now(), { cache: 'no-store' });
-      if (r.ok) return await r.json();
+      if (r.ok) {
+        const j = await r.json();
+        // Offizielle Linienfarben nebenbei einsammeln (ein Ort für Picker UND Restore)
+        try { rememberLineColoursFrom(network, j); } catch (e) { /* nie den Fetch stören */ }
+        return j;
+      }
       if ((r.status === 429 || r.status >= 500) && attempt < MAX - 1) {
         const ra = parseInt(r.headers.get('retry-after') || '', 10);
         const wait = (ra > 0 ? ra * 1000 : 400 * Math.pow(2, attempt)) + Math.random() * 250;
@@ -11272,12 +11321,41 @@ function updateStationsList() {
       }
     }
 
+    // Kompaktes Farb-Layout (Paul 20.09.2026): Linien als Kästchen in der offiziellen
+    // Linienfarbe des Servers (lineColourFor, gefüllt aus den Abfahrten) statt "80+1",
+    // darunter je Linie eine Zeile mit ihren Zielen. Spezialfälle (Alle Abfahrten,
+    // Journey, Fernverkehr, ÖBB, Stammstrecke) behalten ihr bisheriges Label.
+    let chipHead = null, chipDetails = null;
+    if (!isAllDeps && !group.isJourney && !isFv && group.network !== 'OEBB'
+        && group.network !== 'OEBB_STAMM_SBAHN' && group.directions && group.directions.length > 0) {
+      const chipLines = [...new Set(group.directions.map(d => d.line).filter(Boolean))];
+      if (chipLines.length > 0) {
+        const lc = (ln, small) => {
+          const c = lineColourFor(group.network, ln);
+          const bg = c ? c.bg : '#e9e9e9';
+          const fg = c ? c.fg : '#444';
+          const sz = small ? 'height:17px;padding:0 5px;font-size:10.5px;min-width:17px;border-radius:5px;'
+                           : 'height:24px;padding:0 7px;font-size:13px;min-width:24px;border-radius:7px;';
+          return '<span style="display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;' + sz
+               + 'background:' + bg + ';color:' + fg + ';font-weight:700;">' + escapeHtmlFt(String(ln)) + '</span>';
+        };
+        const headChips = chipLines.slice(0, 3).map(l => lc(l, false)).join('');
+        const more = chipLines.length > 3 ? '<span style="font-size:11px;color:#888;font-weight:600;align-self:center;">+' + (chipLines.length - 3) + '</span>' : '';
+        chipHead = '<span style="display:inline-flex;gap:4px;flex:0 0 auto;max-width:110px;flex-wrap:wrap;align-items:center;">' + headChips + more + '</span>';
+        chipDetails = chipLines.map(ln => {
+          const dests = [...new Set(group.directions.filter(d => d.line === ln).map(d => String(d.towards || '').trim()).filter(Boolean))];
+          return '<div style="display:flex;align-items:center;gap:6px;margin-top:3px;min-width:0;">' + lc(ln, true)
+               + '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+               + (dests.length ? '&rarr; ' + dests.map(escapeHtmlFt).join(' &middot; ') : 'Alle Richtungen') + '</span></div>';
+        }).join('');
+      }
+    }
     return `
       <div class="station-chip ${group.isExisting ? 'existing' : ''} ${group.isJourney ? 'journey' : ''}">
-        <span class="network-badge ${badgeClass}">${badgeLabel}</span>
+        ${chipHead || `<span class="network-badge ${badgeClass}">${badgeLabel}</span>`}
         <div class="info">
           <div class="stop-name">${group.stopName}</div>
-          <div class="stop-details">${filterLabel}</div>
+          <div class="stop-details">${chipDetails || filterLabel}</div>
         </div>
         <div class="buttons">
           <button class="edit" onclick="editStation(${firstIdx})" title="Bearbeiten">✎</button>
@@ -13574,12 +13652,116 @@ function awGroups() {
   return order;
 }
 
+// Seiten-Zuordnung einer Stadt-Gruppe (Kunde Alex, Stockholm 2026-09: drei Haltestellen
+// desselben Netzes sollen drei eigene Slideshow-Seiten sein, gleiche Optik; Paul will
+// dabei nach LINIE zuordnen können, darum zeigt jede Zeile ihre Linien). Die Firmware
+// hält gleichfarbige Fremdnetz-Segmente bewusst als getrennte Seiten, der Weg dorthin ist
+// der Instanz-Modus (ftGroupByCity=false, displayInstance pro Station = ein Segment).
+// Granularität ist die HALTESTELLE: der ganze Lade-Pfad (masterDirsByRbl, colourByRbl,
+// segInfoByToken, dedupeStationsByFullId) ist rbl-gekeyt, dieselbe rbl in zwei Segmenten
+// überlebt den Roundtrip nicht. Wien (WL/WLB) bleibt außen vor: dort haben Instanzen
+// keinen Effekt auf die masterrow.
+function awPagesFixed(grp) { return grp.net === 'WL' || grp.net === 'WLB'; }
+function awGroupInstanceCount(grp) {
+  var seen = {}, n = 0;
+  grp.stations.forEach(function(s) {
+    var k = (s.displayInstance == null) ? '∅' : String(s.displayInstance);
+    if (!seen[k]) { seen[k] = 1; n++; }
+  });
+  return n;
+}
+// Ist-Modus fürs Toggle: aufgeteilt nur im aktiven Instanz-Modus mit mehreren Instanzen
+function awPagesModeOf(grp) {
+  return (typeof instanceModeActive === 'function' && instanceModeActive()
+          && awGroupInstanceCount(grp) > 1) ? 'split' : 'city';
+}
+// Schlüssel einer Station innerhalb der Gruppe (fullId ist nach dedupeStationsByFullId eindeutig)
+function awStationKey(s) { return String(s.fullId || (s.network + ':' + s.stopId)); }
+// Seiten-Nummern der Gruppe: aus pending-Auswahl, sonst aus den Ist-Instanzen (normalisiert
+// auf 1..n in Auftrittsreihenfolge), im Nicht-Split-Zustand jede Haltestelle ihre eigene
+// Seite als Startvorschlag (= Alex' Wunschbild beim ersten Umschalten).
+function awPageMap(grp) {
+  var st = awState(grp.net);
+  if (!st.pageOf) {
+    st.pageOf = {};
+    if (awPagesModeOf(grp) === 'split') {
+      var norm = {}, next = 1;
+      grp.stations.forEach(function(s) {
+        var k = String(s.displayInstance);
+        if (!norm[k]) norm[k] = next++;
+        st.pageOf[awStationKey(s)] = norm[k];
+      });
+    } else {
+      grp.stations.forEach(function(s, i) { st.pageOf[awStationKey(s)] = i + 1; });
+    }
+  }
+  return st.pageOf;
+}
+function awSetPages(netId, val) {
+  var grp = awNetByNetId(netId);
+  if (!grp) return;
+  awState(grp.net).pages = String(val);
+  awRefreshCard(grp.net);
+}
+function awSetStationPage(netId, key, val) {
+  var grp = awNetByNetId(netId);
+  if (!grp) return;
+  awPageMap(grp)[key] = parseInt(val) || 1;
+  awRefreshCard(grp.net);
+}
+
+// Seiten-Block einer Karte: Toggle "Eine Seite/Aufteilen" + bei Aufteilen die
+// Haltestellen-Liste (mit ihren Linien beschriftet) samt Seiten-Auswahl.
+function awPagesHtml(grp) {
+  if (awPagesFixed(grp) || grp.stations.length < 2) return '';
+  var netId = awNetId(grp.net);
+  var st = awState(grp.net);
+  var mode = (st.pages != null) ? st.pages : awPagesModeOf(grp);
+  var h = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0 2px;">';
+  h += '<span style="font-size:12.5px;font-weight:600;">Seiten</span>';
+  h += '<div class="toggle-row" style="flex:0 0 auto;">';
+  [['city', 'Eine Seite'], ['split', 'Aufteilen']].forEach(function(o) {
+    h += '<button class="toggle-btn' + (mode === o[0] ? ' active' : '') + '" style="padding:6px 10px;font-size:12px;" onclick="awSetPages(\'' + netId + '\',\'' + o[0] + '\')">' + o[1] + '</button>';
+  });
+  h += '</div></div>';
+  if (mode === 'split') {
+    var pageOf = awPageMap(grp);
+    var n = grp.stations.length;
+    h += '<div style="background:#f8f9fa;border:1px solid #eee;border-radius:10px;padding:8px 10px;margin:4px 0 2px;">';
+    grp.stations.forEach(function(s) {
+      var key = awStationKey(s);
+      var lines = [];
+      (s.directions || []).forEach(function(d) { if (d.line && lines.indexOf(String(d.line)) < 0) lines.push(String(d.line)); });
+      var lbl = (lines.length ? lines.join(', ') : 'Alle Linien') + ' · ' + (s.stopName || s.stopId || '');
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">';
+      h += '<span style="flex:1;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlFt(lbl) + '</span>';
+      h += '<select onchange="awSetStationPage(\'' + netId + '\',\'' + escapeHtmlFt(key).replace(/'/g, '') + '\',this.value)" style="flex:0 0 auto;padding:5px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;font-family:inherit;">';
+      for (var p = 1; p <= n; p++) h += '<option value="' + p + '"' + ((pageOf[key] || 1) === p ? ' selected' : '') + '>Seite ' + p + '</option>';
+      h += '</select></div>';
+    });
+    h += '<div class="form-hint" style="margin-top:4px;">Gleiche Seite = zusammen auf dem Display, zwischen den Seiten bl&auml;ttert das Ger&auml;t automatisch</div>';
+    h += '</div>';
+  }
+  return h;
+}
+
 // Beispieldaten einer Stadt-Gruppe: echte Linien/Ziele der Gruppen-Stationen,
 // deterministische Zeiten wie in der Feintuning-Vorschau.
 function awGroupData(grp) {
   var data = [];
   var tramNo = 0;
-  grp.stations.forEach(function(st) {
+  // Bei aufgeteilten Seiten zeigt die Karten-Vorschau die ERSTE Seite (das Gerät
+  // blättert; alle Seiten zugleich wären ein falsches Bild der Zeilenzahl).
+  var _grpStations = grp.stations;
+  var _pst = _awPending && _awPending[grp.net];
+  var _pMode = (_pst && _pst.pages != null) ? _pst.pages : awPagesModeOf(grp);
+  if (_pMode === 'split' && !awPagesFixed(grp) && grp.stations.length >= 2) {
+    var _pOf = awPageMap(grp);
+    var _min = null;
+    _grpStations.forEach(function(s) { var p = _pOf[awStationKey(s)] || 1; if (_min == null || p < _min) _min = p; });
+    _grpStations = _grpStations.filter(function(s) { return (_pOf[awStationKey(s)] || 1) === _min; });
+  }
+  _grpStations.forEach(function(st) {
     var arr = [];
     if (st.directions && st.directions.length > 0) st.directions.forEach(function(d) { if (d.line) arr.push({ l: String(d.line), z: d.towards || st.stopName || '' }); });
     else if (st.filter) st.filter.split(',').forEach(function(l) { l = l.trim(); if (l) arr.push({ l: l, z: st.stopName || '' }); });
@@ -13662,10 +13844,13 @@ function awSettingsHtml(net, cid) {
   if (cid === 1) {
     var tCur = (st.look.t != null) ? st.look.t : (dsVal(1, 't') || 1);
     var bCur = (st.look.b != null) ? st.look.b : (dsVal(1, 'b') || 0);
-    var uCur = (st.look.u != null) ? st.look.u : (dsVal(1, 'u') || 0);
     inner += tgl('Schriftfarbe', [[1, 'Gelb'], [2, 'Wei&szlig;'], [3, 'Orange']], tCur, 'awSetLookT');
     inner += tgl('Hintergrund', [[0, 'Schwarz'], [1, 'Gr&uuml;n']], bCur, 'awSetLookB');
-    inner += tgl('U-Bahn Badges', [[0, 'Aus'], [1, 'Linie'], [2, 'Ganze Zeile']], uCur, 'awSetLookU');
+  }
+  // Linien-Badges für alle Badge-fähigen Typen (Wien-Renderer-Familie 1/3/16)
+  if (dtSupportsBadges(cid)) {
+    var uCur = (st.look.u != null) ? st.look.u : (dsVal(cid, 'u') || 0);
+    inner += tgl('Linien-Badges', [[0, 'Aus'], [1, 'Linie'], [2, 'Ganze Zeile']], uCur, 'awSetLookU');
   }
   if (cid === 24) {
     var tP = (st.look.t != null) ? st.look.t : (dsVal(24, 't') || 1);
@@ -13690,6 +13875,8 @@ function awRefreshCard(net) {
   if (!grp) return;
   var box = document.getElementById('awSetBox_' + awNetId(net));
   if (box) box.innerHTML = awSettingsHtml(net, awEffColour(grp));
+  var pg = document.getElementById('awPages_' + awNetId(net));
+  if (pg) pg.innerHTML = awPagesHtml(grp);
   awRenderPreview(net);
 }
 function awToggleSettings(netId) {
@@ -13768,6 +13955,56 @@ function awFinish() {
       if (st.look.r != null && typeof ftRowsByCid !== 'undefined') ftRowsByCid[lookCid] = parseInt(st.look.r);
     }
   });
+  // Seiten-Zuordnung übernehmen: "Aufteilen" macht jede Seite zur eigenen Display-Instanz
+  // (= eigenes masterrow-Segment = eigene Slideshow-Seite am Gerät), "Eine Seite" legt die
+  // Gruppe wieder zusammen. Nicht angefasste Karten behalten ihre Instanzen unverändert.
+  var touchedPages = false;
+  awGroups().forEach(function(grp) {
+    if (awPagesFixed(grp) || grp.stations.length < 2) return;
+    var stp = pending[grp.net];
+    if (!stp || (stp.pages == null && stp.pageOf == null)) return;
+    var mode = (stp.pages != null) ? stp.pages : awPagesModeOf(grp);
+    if (mode === 'city') {
+      if (awGroupInstanceCount(grp) <= 1 && !grp.stations.some(function(s) { return s.displayInstance == null; })) return;
+      var shared = _nextInstanceId++;
+      grp.stations.forEach(function(s) { s.displayInstance = shared; });
+      touchedPages = true;
+      return;
+    }
+    // Aufteilen: Instanz je Seiten-Nummer; Stationen im stations-Array stabil nach Seite
+    // umsortieren, damit Segment- und Blätter-Reihenfolge der Auswahl entspricht.
+    var pageOf = awPageMap(grp);
+    var instOf = {};
+    grp.stations.forEach(function(s) {
+      var p = pageOf[awStationKey(s)] || 1;
+      if (!instOf[p]) instOf[p] = _nextInstanceId++;
+      s.displayInstance = instOf[p];
+    });
+    var idxs = [];
+    stations.forEach(function(s, i) { if ((s.network || '') === grp.net) idxs.push(i); });
+    var sorted = idxs.map(function(i) { return stations[i]; })
+      .sort(function(a, b) { return (pageOf[awStationKey(a)] || 1) - (pageOf[awStationKey(b)] || 1); });
+    idxs.forEach(function(i, k) { stations[i] = sorted[k]; });
+    touchedPages = true;
+  });
+  if (touchedPages) {
+    var anySplit = awGroups().some(function(g) { return !awPagesFixed(g) && awGroupInstanceCount(g) > 1; });
+    if (anySplit) {
+      ftGroupByCity = false;
+      // Instanz-Modus verlangt überall Instanzen: unberührte Städte behalten EIN
+      // gemeinsames Display (ensureInstanceIds würde sie ungefragt einzeln zerlegen).
+      awGroups().forEach(function(g) {
+        if (awPagesFixed(g)) return;
+        if (g.stations.some(function(s) { return s.displayInstance == null; }) && awGroupInstanceCount(g) <= 1) {
+          var sh = _nextInstanceId++;
+          g.stations.forEach(function(s) { s.displayInstance = sh; });
+        }
+      });
+    } else {
+      ftGroupByCity = true;
+    }
+    if (typeof updateStyleAssignmentUI === 'function') updateStyleAssignmentUI();
+  }
   closeAssignWizard();
   renderDisplayTypeSections();
   if (typeof updateGroupByCityUI === 'function') updateGroupByCityUI();
@@ -13782,7 +14019,7 @@ function openAssignWizard() {
   h += '<div style="background:#fff;border-radius:18px;max-width:460px;width:100%;max-height:92vh;overflow:auto;padding:0 0 20px;box-shadow:0 20px 60px rgba(0,0,0,0.35);" onclick="event.stopPropagation()">';
   h += '<div style="display:flex;align-items:center;padding:18px 22px 8px;">';
   h += '<div><div style="font-weight:700;font-size:17px;">Displays zuweisen</div>';
-  h += '<div style="font-size:12px;color:#888;">Ein Display pro Stadt. Die Vorschau zeigt sofort, wie es aussieht.</div></div>';
+  h += '<div style="font-size:12px;color:#888;">Ein Display pro Stadt, Seiten frei aufteilbar. Die Vorschau zeigt sofort, wie es aussieht.</div></div>';
   h += '<button onclick="closeAssignWizard()" style="margin-left:auto;border:none;background:#f0f0f0;width:32px;height:32px;border-radius:50%;font-size:15px;cursor:pointer;color:#555;flex:0 0 auto;">&#10005;</button>';
   h += '</div>';
   h += '<div style="padding:6px 22px 0;">';
@@ -13801,6 +14038,7 @@ function openAssignWizard() {
     h += '<div style="background:#111;border-radius:12px;padding:8px 10px;">';
     h += '<div id="awPrev_' + netId + '" style="width:320px;max-width:100%;height:170px;border-radius:4px;overflow:hidden;background:#000;margin:0 auto;"></div>';
     h += '</div>';
+    h += '<div id="awPages_' + netId + '">' + awPagesHtml(grp) + '</div>';
     h += '<div id="awSetBox_' + netId + '">' + awSettingsHtml(grp.net, parseInt(grp.colour)) + '</div>';
     h += '</div>';
   });
@@ -15398,17 +15636,33 @@ function renderDisplayTypeSections() {
         html += '<button class="toggle-btn ft-color-btn active" data-value="0" onclick="setFtWienBg(' + dt.colour + ',0)" style="background:#000;color:#FFD700">Schwarz</button>';
         html += '<button class="toggle-btn ft-color-btn" data-value="1" onclick="setFtWienBg(' + dt.colour + ',1)" style="background:#0a3d1f;color:#FFD700">Grün</button>';
         html += '</div></div>';
-
-        // Wien U-Bahn-Badges (farbige Linien-Badges wie im echten Wiener-Linien-Stil)
-        var wbVal = dsVal(dt.colour, 'u');
-        if (wbVal === undefined) wbVal = (recommendedConfig && recommendedConfig.wienBadges) || 0;
-        html += '<div class="form-row"><div><div class="form-label">U-Bahn Badges</div><div class="form-hint">Farbige U-Bahn-Linien (U1 rot, U2 lila …) wie auf den echten Anzeigen</div></div>';
-        html += '<div class="toggle-row" id="ftWienBadges_' + dt.colour + '">';
-        html += '<button class="toggle-btn' + (wbVal === 0 ? ' active' : '') + '" data-value="0" onclick="setFtWienBadges(' + dt.colour + ',0)">Aus</button>';
-        html += '<button class="toggle-btn' + (wbVal === 1 ? ' active' : '') + '" data-value="1" onclick="setFtWienBadges(' + dt.colour + ',1)">Linie</button>';
-        html += '<button class="toggle-btn' + (wbVal === 2 ? ' active' : '') + '" data-value="2" onclick="setFtWienBadges(' + dt.colour + ',2)">Ganze Zeile</button>';
-        html += '</div></div>';
       }
+    }
+    // Linien-Badges: für alle Typen, deren Renderer die Badge-Maschine wirklich zeichnet
+    // (display_wien.cpp-Familie, DT_BADGE_COLOURS). Firmware-Vertrag: ds 'u' = Stil
+    // (0 aus, 1 Linie, 2 ganze Zeile), ds 'v' = Fahrzeugarten-Bitmaske (1 Tram, 2 Bus,
+    // 4 U-Bahn, 8 Zug/S-Bahn); ohne v-Token gilt 4 = nur U-Bahn, das bisherige Verhalten.
+    if (dtSupportsBadges(dt.colour)) {
+      var wbVal = dsVal(dt.colour, 'u');
+      if (wbVal === undefined) wbVal = (recommendedConfig && recommendedConfig.wienBadges) || 0;
+      html += '<div class="form-row"><div><div class="form-label">Linien-Badges</div><div class="form-hint">Farbige Linien-K&auml;stchen in der offiziellen Linienfarbe, wie auf den echten Anzeigen</div></div>';
+      html += '<div class="toggle-row" id="ftWienBadges_' + dt.colour + '">';
+      html += '<button class="toggle-btn' + (wbVal === 0 ? ' active' : '') + '" data-value="0" onclick="setFtWienBadges(' + dt.colour + ',0)">Aus</button>';
+      html += '<button class="toggle-btn' + (wbVal === 1 ? ' active' : '') + '" data-value="1" onclick="setFtWienBadges(' + dt.colour + ',1)">Linie</button>';
+      html += '<button class="toggle-btn' + (wbVal === 2 ? ' active' : '') + '" data-value="2" onclick="setFtWienBadges(' + dt.colour + ',2)">Ganze Zeile</button>';
+      html += '</div></div>';
+      // Fahrzeugarten-Auswahl (v-Bitmaske), nur sichtbar solange Badges an sind
+      var vhCur = dsVal(dt.colour, 'v');
+      if (vhCur === undefined) vhCur = (recommendedConfig && recommendedConfig.badgeVehicles != null) ? parseInt(recommendedConfig.badgeVehicles) : 4;
+      html += '<div id="ftBadgeVeh_' + dt.colour + '" style="display:' + (wbVal > 0 ? '' : 'none') + ';background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:10px 12px;margin:0 0 10px;">';
+      html += '<div style="font-size:12.5px;font-weight:600;margin-bottom:6px;">Badges f&uuml;r</div>';
+      html += '<div style="display:flex;gap:14px;flex-wrap:wrap;">';
+      BADGE_VEHICLES.forEach(function(bv) {
+        html += '<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer;"><input type="checkbox" data-bit="' + bv[0] + '" ' + ((vhCur & bv[0]) ? 'checked ' : '') + 'onchange="ftBadgeVehChanged(' + dt.colour + ')" style="accent-color:#4285f4;width:15px;height:15px;">' + bv[1] + '</label>';
+      });
+      html += '</div>';
+      html += '<div class="form-hint" style="margin-top:6px;">Nur Linien mit hinterlegter Linienfarbe bekommen ein Badge. F&uuml;r die Wiener U-Bahn sind die Farben fest eingebaut</div>';
+      html += '</div>';
     }
     if (f.altNext) {
       var aDs = dsVal(dt.colour, 'a');
@@ -15837,10 +16091,40 @@ function setFtWienBg(cid, val) {
   if (recommendedConfig) recommendedConfig.wienBg = parseInt(val);
 }
 
-// Wien U-Bahn-Badges: 0=Aus, 1=Linie, 2=Ganze Zeile
+// Linien-Badges (ds 'u'): nur diese Typen zeichnen die Badge-Maschine wirklich
+// (display_wien.cpp: Wien 1, VBB-Legacy 3, Prag/CZHU 16 per Erbschaft). Alle anderen
+// Renderer ignorieren 'u'/'v', dort darf die Einstellung nicht auftauchen. MVG, Bodo,
+// Köln/Aachen, S-Bahn Berlin und eigene Displays (customrow P/A) haben EIGENE Badges.
+var DT_BADGE_COLOURS = [1, 3, 16];
+function dtSupportsBadges(cid) { return DT_BADGE_COLOURS.indexOf(parseInt(cid)) >= 0; }
+// Fahrzeugarten-Bitmaske (ds 'v'): addierbar, ohne Token gilt 4 = nur U-Bahn (Bestand).
+var BADGE_VEHICLES = [[1, 'Tram'], [2, 'Bus'], [4, 'U-Bahn'], [8, 'Zug/S-Bahn']];
+
+// Linien-Badges: 0=Aus, 1=Linie, 2=Ganze Zeile (historisch "wienBadges", Token bleibt 'u')
 function setFtWienBadges(cid, val) {
   setFtToggleVal('ftWienBadges_' + cid, val);
   if (recommendedConfig) recommendedConfig.wienBadges = parseInt(val);
+  // Fahrzeugarten-Karte nur zeigen, solange Badges an sind
+  var veh = document.getElementById('ftBadgeVeh_' + cid);
+  if (veh) veh.style.display = (parseInt(val) > 0) ? '' : 'none';
+}
+
+// Aktuelle Fahrzeugarten-Maske eines Typs: offene Checkboxen > gespeicherte Config > Default 4
+function ftBadgeVehMask(cid) {
+  var box = document.getElementById('ftBadgeVeh_' + cid);
+  if (box) {
+    var m = 0;
+    box.querySelectorAll('input[type=checkbox]').forEach(function(c) { if (c.checked) m += parseInt(c.dataset.bit) || 0; });
+    return m;
+  }
+  var l = dsVal(cid, 'v');
+  if (l !== undefined) return l;
+  if (recommendedConfig && recommendedConfig.badgeVehicles != null) return parseInt(recommendedConfig.badgeVehicles);
+  return 4;
+}
+function ftBadgeVehChanged(cid) {
+  if (recommendedConfig) recommendedConfig.badgeVehicles = ftBadgeVehMask(cid);
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
 }
 
 // Wien Schriftfarbe: analog persistieren (gleiches Re-Render-Reset-Problem)
@@ -16873,9 +17157,9 @@ function getRowOrderDestinationString() {
 // Beispiel-Abfahrten je Display-Typ: für die Feintuning-Vorschau ohne passende
 // Stationsdaten UND für die Vorschau-Galerie (?vorschau). Ehemals fallbackData.
 var DV_DEMO_DATA = {
-  1: [{ line: 'U6', dest: 'Floridsdorf', time: 3, hf: false }, { line: '2', dest: 'Ottakring', time: 6, hf: true }, { line: '13A', dest: 'Hauptbahnhof', time: 8, hf: false }],
+  1: [{ line: 'U6', dest: 'Floridsdorf', time: 3, hf: false, vt: 'metro' }, { line: '2', dest: 'Ottakring', time: 6, hf: true, vt: 'tram' }, { line: '13A', dest: 'Hauptbahnhof', time: 8, hf: false, vt: 'bus' }],
   2: [{ line: '1', dest: 'Auwiesen', time: 4 }, { line: '3', dest: 'Landgutstr.', time: 7 }, { line: '46', dest: 'Hauptbahnhof', time: 11 }],
-  3: [{ line: 'U6', dest: 'Alt-Tegel', time: 2 }, { line: 'S1', dest: 'Oranienburg', time: 5 }, { line: 'M10', dest: 'Warschauer', time: 8 }],
+  3: [{ line: 'U6', dest: 'Alt-Tegel', time: 2, vt: 'metro', lineColor: '#7a64af' }, { line: 'S1', dest: 'Oranienburg', time: 5, vt: 'train', lineColor: '#dd4da6' }, { line: 'M10', dest: 'Warschauer', time: 8, vt: 'tram', lineColor: '#e8862d' }],
   4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden', time: 19 }],
   5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'REX', dest: 'Linz Hbf', time: 5 }, { line: 'RE', dest: 'München', time: 9 }],
   6: [{ line: 'RJX', dest: 'Wien Hbf', time: 8 }, { line: 'ICE', dest: 'Berlin Hbf', time: 15 }, { line: 'NJ', dest: 'Hamburg', time: 32 }],
@@ -17012,6 +17296,30 @@ function dvSetting(colour, domPrefix, dsKey, def) {
   var l = dsVal(colour, dsKey);
   return (l !== undefined) ? l : def;
 }
+// Server-Linienfarbe ("#RRGGBB" oder "RRGGBB") als CSS-Farbe, sonst null
+// (Gegenstück zu lineColorFromHex der Firmware: ungültig = keine Farbe).
+function dvLineColorCss(hex) {
+  var h = String(hex || '').trim();
+  if (h.charAt(0) === '#') h = h.substring(1);
+  return /^[0-9a-fA-F]{6}$/.test(h) ? ('#' + h) : null;
+}
+// Fahrzeugart einer (Demo-)Abfahrt als v-Bit; 0 = unbekannt und damit Badge erlaubt,
+// exakt wie badgeAllowedFor der Firmware (Feed ohne Typ-Angabe verliert kein Badge).
+function dvVehicleBit(dep) {
+  var t = String((dep && dep.vt) || '').toLowerCase();
+  if (t.indexOf('tram') >= 0) return 1;
+  if (t.indexOf('bus') >= 0) return 2;
+  if (t.indexOf('metro') >= 0 || t.indexOf('subway') >= 0) return 4;
+  if (t.indexOf('train') >= 0 || t.indexOf('rail') >= 0) return 8;
+  if (t) return 0;
+  // Ohne vt-Feld: grobe Demo-Heuristik über den Liniennamen
+  var l = String((dep && dep.line) || '');
+  if (/^U\d/i.test(l)) return 4;
+  if (/^S\d/i.test(l)) return 8;
+  if (/^\d+$/.test(l)) return 1;
+  if (/^\d+[A-B]$/i.test(l)) return 2;
+  return 0;
+}
 // ÖBB/Westbahn: Zugtyp vom Liniennamen trennen ("REX3" → ["REX","3"])
 function dvSplitTrainType(line) {
   var l = String(line || '').trim();
@@ -17038,12 +17346,14 @@ function dvOebbBox(w, h) {
 
 // ---------- Wien / VBB / CZ-HU (display_wien.cpp; CZHU = schwarz/weiß-Ableger) ----------
 function dvWienHTML(colour, data, rows, previewEl, fixed) {
-  // Einstellungen live (nur Wien colour 1 hat b/t/u-Regler): t = Schriftfarbe
-  // (1 gelb #fff05d, 2 weiß, 3 orange 0xFD20 ≈ #f8a400), b = Hintergrund (0 schwarz
-  // rgb(0,5,0), 1 grün rgb(5,30,15)), u = U-Bahn-Badges (0 aus, 1 Linie, 2 ganze Zeile).
+  // Einstellungen live: t = Schriftfarbe (1 gelb #fff05d, 2 weiß, 3 orange 0xFD20 ≈
+  // #f8a400) und b = Hintergrund (0 schwarz rgb(0,5,0), 1 grün rgb(5,30,15)) nur Wien;
+  // u = Linien-Badges (0 aus, 1 Linie, 2 ganze Zeile) und v = Fahrzeugarten-Maske für
+  // die ganze Wien-Renderer-Familie (1/3/16).
   var wTc = dvSetting(colour, 'ftTxtCol_', 't', 1);
   var wBgV = dvSetting(colour, 'ftWienBg_', 'b', 0);
   var wBadgeV = dvSetting(colour, 'ftWienBadges_', 'u', 0);
+  var wVehMask = (typeof ftBadgeVehMask === 'function') ? ftBadgeVehMask(colour) : 4;
   var bgColor = fixed ? fixed.bg : ((wBgV === 1) ? '#051e0f' : '#000500');
   var textColor = fixed ? fixed.text : ((wTc === 2) ? '#ffffff' : (wTc === 3 ? '#f8a400' : '#fff05d'));
   // Marker wie am Gerät: Rollstuhl an Niederflur-Trams (Hochflurer-Toggle), Klima-Stern
@@ -17061,17 +17371,23 @@ function dvWienHTML(colour, data, rows, previewEl, fixed) {
   var destX = margin + lineW + 6;
   var destW = 320 - destX - 50;
   var html = data.map(function(dep, i) {
-    var bCol = (!fixed && WIEN_BADGE[String(dep.line || '').toUpperCase()]) || null;
+    // Badge-Farbe wie badgeColorFor der Firmware: Server-Linienfarbe gewinnt, die
+    // eingebaute Wien-U-Bahn-Tabelle bleibt Rückfall (gilt per Erbschaft auch für
+    // VBB/CZHU). Die Fahrzeugarten-Maske entscheidet, wer überhaupt eines bekommt.
+    var vBit = dvVehicleBit(dep);
+    var vOk = (vBit === 0) || ((wVehMask & vBit) !== 0);
+    var bCol = vOk ? (dvLineColorCss(dep.lineColor) || WIEN_BADGE[String(dep.line || '').toUpperCase()] || null) : null;
+    var bTxt = dvLineColorCss(dep.lineTextColor) || '#ffffff';
     var fullRow = (wBadgeV === 2 && bCol);
     var lineBadge = (wBadgeV === 1 && bCol);
-    var color = fullRow ? '#ffffff' : textColor;
+    var color = fullRow ? bTxt : textColor;
     var isTramLine = /^\d+$/.test(String(dep.line || ''));
     var marker = '';
     if (wChopper && isTramLine && !dep.hf) marker = ' <span style="font-weight:400;font-size:22px;">&#9855;</span>';
     else if (wKlima && /^U[256]$/i.test(String(dep.line || ''))) marker = ' <span style="font-weight:400;font-size:24px;">*</span>';
     var wBadgeH = Math.min(rowH - 4, Math.round(rowH * 52 / 56));
     var lineHtml = lineBadge
-      ? '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';"><span style="background:' + bCol + ';color:#fff;border-radius:8px;height:' + wBadgeH + 'px;display:flex;align-items:center;padding:0 8px;font-weight:700;font-size:28px;">' + escapeHtmlFt(dep.line) + '</span>' + marker + '</div>'
+      ? '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';"><span style="background:' + bCol + ';color:' + bTxt + ';border-radius:8px;height:' + wBadgeH + 'px;display:flex;align-items:center;padding:0 8px;font-weight:700;font-size:28px;">' + escapeHtmlFt(dep.line) + '</span>' + marker + '</div>'
       : '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';font-weight:700;font-size:' + lineFs + 'px;">' + escapeHtmlFt(dep.line) + marker + '</div>';
     var d2 = dvDest2(destX, rowH, destW, 20, 4, destFs, color, 700);   // fontHeight 20 + lineSpacing 4
     return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;' + (fullRow ? 'background:' + bCol + ';' : '') + '">'
@@ -19198,12 +19514,13 @@ function buildDisplaySettings() {
         if (_lb !== undefined) parts.push('b' + _lb);
       }
     }
-    // Wien U-Bahn-Badges (nur Wien colour 1): u0=Aus, u1=Linie, u2=Ganze Zeile.
-    if (cid === 1) {
+    // Linien-Badges (Badge-fähige Typen 1/3/16): u0=Aus, u1=Linie, u2=Ganze Zeile.
+    if (dtSupportsBadges(cid)) {
+      var _uOn = 0;
       if (document.getElementById('ftWienBadges_' + cid)) {
         // Feintuning offen → exakte User-Wahl übernehmen (auch "Aus").
         var ub = parseInt(getFtToggleVal('ftWienBadges_' + cid));
-        if (!isNaN(ub)) parts.push('u' + ub);
+        if (!isNaN(ub)) { parts.push('u' + ub); _uOn = ub; }
       } else {
         // Quick-Save (Feintuning nie geöffnet): NICHT standardmäßig setzen. Nur erhalten,
         // wenn Badges AN sind (aus geladener Config bzw. vorheriger Auswahl) — sonst ging
@@ -19211,7 +19528,14 @@ function buildDisplaySettings() {
         var su = dsVal(cid, 'u');
         if (su === undefined && recommendedConfig && recommendedConfig.wienBadges != null)
           su = parseInt(recommendedConfig.wienBadges);
-        if (su !== undefined && !isNaN(su) && su > 0) parts.push('u' + su);
+        if (su !== undefined && !isNaN(su) && su > 0) { parts.push('u' + su); _uOn = su; }
+      }
+      // Fahrzeugarten-Maske 'v' nur mit aktiven Badges und abweichend vom Default 4
+      // schreiben — ohne Token nimmt die Firmware 4 (nur U-Bahn), Bestands-Configs
+      // bleiben dadurch byte-gleich.
+      if (_uOn > 0) {
+        var _vm = ftBadgeVehMask(cid);
+        if (!isNaN(_vm) && _vm !== 4) parts.push('v' + _vm);
       }
     }
     // Zeitfenster: Feintuning offen → Toggle-Zustand; sonst gespeicherten Wert behalten.
@@ -19293,6 +19617,7 @@ function applyDisplaySettingsToConfig(str) {
   if (o.t !== undefined) recommendedConfig.textColor = num(o.t, 1);
   if (o.b !== undefined) recommendedConfig.wienBg = num(o.b, 0);
   if (o.u !== undefined) recommendedConfig.wienBadges = num(o.u, 0);
+  if (o.v !== undefined) recommendedConfig.badgeVehicles = num(o.v, 4);
   if (o.h !== undefined) recommendedConfig.chopper = num(o.h, 0);
   if (o.n !== undefined) recommendedConfig.niederflurBlink = num(o.n, 0);
   if (o.k !== undefined) recommendedConfig.silberpfeil = num(o.k, 0);
@@ -19668,6 +19993,75 @@ function sendWithCustomConfig() {
 // ==================== DIREKT AN GERÄT SENDEN ====================
 let saveRetryCount = 0;
 const MAX_SAVE_RETRIES = 3;
+
+// Sicherung als Datei (Kunde Alex 2026-09): exakt die Geräte-Felder, gebaut aus denselben
+// Buildern wie beim Speichern. Die Datei entspricht dem /debug-Format und lässt sich
+// darum auch mit einem Debug-Abzug vom Gerät wiederherstellen.
+function exportConfigBackup() {
+  var en = false;
+  try { en = (localStorage.getItem('catchit_lang') || 'de') === 'en'; } catch (e) {}
+  try {
+    var rows = buildMasterAndTimeRows();
+    if (!rows || !rows.masterrow) { alert(en ? 'Nothing to back up yet, add a station first.' : 'Noch nichts zu sichern, bitte zuerst eine Station hinzufügen.'); return; }
+    var ds = (typeof buildDisplaySettings === 'function') ? buildDisplaySettings() : '';
+    var cr = '';
+    try { cr = (typeof buildCustomRow === 'function') ? (buildCustomRow() || '') : ''; } catch (e) {}
+    var rblId = rows.masterrow.split(';').concat((rows.timerow || '').split(';'))
+      .map(function(seg) { return (seg.split('|')[0] || '').trim(); }).filter(Boolean).join(',');
+    var rc = recommendedConfig || {};
+    var cfg = {
+      rbl_id: rblId,
+      colour: (typeof colourListFromRows === 'function') ? colourListFromRows(rows.masterrow, rows.timerow, rc.colour != null ? rc.colour : '1') : String(rc.colour != null ? rc.colour : '1'),
+      sort_mode: (rc.sortMode != null) ? parseInt(rc.sortMode) : 1,
+      stop_interval: (rc.stopInterval != null) ? parseInt(rc.stopInterval) : 12,
+      displaylight: (rc.displayLight != null) ? parseInt(rc.displayLight) : 3,
+      display_mode: (rc.displayMode != null) ? parseInt(rc.displayMode) : 1,
+      chopper: rc.chopper ? 1 : 0,
+      night_mode_enabled: !!rc.nightMode,
+      night_mode_start: (rc.nightStart != null) ? parseInt(rc.nightStart) : 22,
+      night_mode_end: (rc.nightEnd != null) ? parseInt(rc.nightEnd) : 6,
+      masterrow: rows.masterrow,
+      timerow: rows.timerow || '',
+      displaysettings: ds,
+      customrow: cr
+    };
+    var d = new Date();
+    var name = 'catch-it-sicherung-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json';
+    var blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  } catch (e) {
+    console.error('[BACKUP] Export-Fehler:', e);
+    alert(en ? 'Backup failed, please try again.' : 'Sicherung fehlgeschlagen, bitte noch einmal versuchen.');
+  }
+}
+function importConfigBackup(inp) {
+  var en = false;
+  try { en = (localStorage.getItem('catchit_lang') || 'de') === 'en'; } catch (e) {}
+  var f = inp && inp.files && inp.files[0];
+  if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function() {
+    try {
+      var cfg = JSON.parse(String(rd.result || ''));
+      if (!cfg || (!cfg.rbl_id && !cfg.rbl) || !cfg.masterrow) {
+        alert(en ? 'This is not a catch-it backup file.' : 'Das ist keine catch-it Sicherungsdatei.');
+        return;
+      }
+      // Gleicher Weg wie eine Geräte-Config: der loadFullConfig-Handler stellt alles wieder her.
+      window.postMessage({ type: 'loadFullConfig', config: cfg }, '*');
+    } catch (e) {
+      console.error('[BACKUP] Import-Fehler:', e);
+      alert(en ? 'Could not read this file.' : 'Die Datei konnte nicht gelesen werden.');
+    }
+    try { inp.value = ''; } catch (e) {}
+  };
+  rd.readAsText(f);
+}
 
 function sendConfigToDeviceDirect(config) {
   // Baue die Gehweg-String im neuen Format: "stopId:value|stopId:value"
@@ -21724,6 +22118,22 @@ window.addEventListener('DOMContentLoaded', () => {
     'Du kannst es später jederzeit ändern.': 'You can change it anytime later.',
     'Nach Städten gruppieren': 'Group by city',
     'Stationen derselben Stadt teilen sich ein Display': 'Stations in the same city share one display',
+    // Seiten-Zuordnung im Zuweisen-Dialog (Kunde Alex 2026-09)
+    'Seiten': 'Pages', 'Eine Seite': 'One page', 'Aufteilen': 'Split up',
+    'Gleiche Seite = zusammen auf dem Display, zwischen den Seiten blättert das Gerät automatisch':
+      'Same page = together on the display, the device flips between pages automatically',
+    // Linien-Badges mit Fahrzeugarten-Auswahl
+    'Linien-Badges': 'Line badges',
+    'Farbige Linien-Kästchen in der offiziellen Linienfarbe, wie auf den echten Anzeigen':
+      'Colored line badges in the official line color, like on the real displays',
+    'Badges für': 'Badges for', 'Zug/S-Bahn': 'Train/S-Bahn',
+    // Sicherung (Export/Import als Datei)
+    'Sicherung': 'Backup', 'Konfiguration als Datei': 'Configuration as a file',
+    'Sichert alle Einstellungen auf diesem Gerät, zum Wiederherstellen oder Übertragen':
+      'Saves all settings on this device, for restoring or transferring',
+    'Sichern': 'Save', 'Laden': 'Load',
+    'Nur Linien mit hinterlegter Linienfarbe bekommen ein Badge. Für die Wiener U-Bahn sind die Farben fest eingebaut':
+      'Only lines with a stored line color get a badge. Vienna metro colors are built in',
     'Wien-Bahnsteige bleiben immer zusammen auf einem Display.': 'Vienna platforms always stay together on one display.',
     'Displays im Detail': 'Displays in detail',
     'Jedes Stadt-Display einzeln anpassen — tippe auf eine Box zum Aufklappen.': 'Adjust each city display individually — tap a box to expand.',
@@ -21773,6 +22183,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     'Verspätung farbig': 'Delay highlighted', 'Farbton': 'Color tone',
     'Ein Display pro Stadt. Die Vorschau zeigt sofort, wie es aussieht.': 'One display per city. The preview instantly shows how it looks.',
+    'Ein Display pro Stadt, Seiten frei aufteilbar. Die Vorschau zeigt sofort, wie es aussieht.': 'One display per city, pages can be split freely. The preview instantly shows how it looks.',
     'Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht': 'Marker pulses when a low-floor vehicle approaches',
     'Verspätung hervorheben': 'Highlight delays', 'Verspätung herausstechend': 'Delays stand out',
     'Einfahr-Ansicht': 'Arrival view',
@@ -21925,6 +22336,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ---- Regex-Regeln für zusammengesetzte Strings ----
   var RX = [
     [/^Deine Stationen \((\d+)\)$/, 'Your stations ($1)'],
+    [/^Seite (\d+)$/, 'Page $1'],
     [/^Deine Stationen \($/, 'Your stations ('],
     [/^Deine Stationen$/, 'Your stations'],
     [/^Schritt (\d+) von (\d+)$/, 'Step $1 of $2'],
@@ -21938,7 +22350,7 @@ window.addEventListener('DOMContentLoaded', () => {
     [/^Linie (\d+\S*)$/, 'Line $1'],
     [/^Richtung (.+)$/, 'Towards $1'],
     [/ wird bald unterstützt — die Schnittstelle ist in Arbeit\.$/, ' will be supported soon — the integration is in progress.'],
-    [/^Wähle dein Land – .*$/, 'Choose your country – we will show you the matching regions, networks & lines right away.'],
+    [/^Wähle dein Land\. .*$/, 'Choose your country. We will show you the matching regions, networks & lines right away.'],
     [/^Wähle eine andere Variante in der Suche /, 'Choose another variant in the search '],
     [/^Diese Station wird vom Bahn-Netz nicht bedient\. /, 'This station is not served by the rail network. '],
     [/^Fehler beim Laden: /, 'Failed to load: '],
