@@ -3607,12 +3607,17 @@
       <!-- Nach Städten gruppieren (PRO): Stationen derselben Stadt/desselben Netzes teilen
            sich EIN Display (ein masterrow-Segment mit komma-gejointen rbls). Braucht
            Firmware >= 2.3.18 (?fw= in der iframe-URL), sonst ausgegraut. -->
+      <!-- Umbau (Paul 20.09.2026): kein Schalter mehr, nur die Feststellung "Nach
+           Städten gruppiert" plus ein Zuweisen-Knopf, der den Zuweisungs-Wizard mit
+           Gerätevorschau pro Stadt öffnet. Der alte Instanz-Modus (Gruppieren AUS)
+           bleibt für bereits so gespeicherte Configs erhalten, ist aber nicht mehr
+           einschaltbar. -->
       <div class="form-row" id="ftGroupByCityRow" style="display:none;">
         <div>
-          <div class="form-label">Nach Städten gruppieren<span class="pro-badge">PRO</span></div>
+          <div class="form-label">Nach Städten gruppiert<span class="pro-badge">PRO</span></div>
           <div class="form-hint" id="ftGroupByCityHint">Stationen derselben Stadt teilen sich ein Display</div>
         </div>
-        <div class="toggle-switch active" id="ftGroupByCityToggle" onclick="toggleGroupByCity()"></div>
+        <button id="ftAssignBtn" onclick="openAssignWizard()" style="flex:0 0 auto;padding:10px 18px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,0.2);">Zuweisen</button>
       </div>
       <!-- Toggle AN (Spielerisch): ein Typ-Dropdown pro Stadt/Provider.
            Toggle AUS: Zuordnungs-Wizard Station → Display-Instanz (eigene Slideshow-Seite). -->
@@ -13422,19 +13427,17 @@ function toggleGroupByCity() {
 // (nichts zu gruppieren); ohne fw>=2.3.18 ausgegraut mit Hinweis "Firmware-Update nötig".
 function updateGroupByCityUI() {
   var row = document.getElementById('ftGroupByCityRow');
-  var tgl = document.getElementById('ftGroupByCityToggle');
+  var btn = document.getElementById('ftAssignBtn');
   var hint = document.getElementById('ftGroupByCityHint');
   var assign = document.getElementById('ftInstanceAssignment');
-  if (!row || !tgl) return;
+  if (!row) return;
   var multi = (typeof stations !== 'undefined' && stations.length >= 2);
   row.style.display = multi ? '' : 'none';
   if (assign) assign.style.display = 'none';
   if (!multi) return;
   if (!mergedSegmentsSupported()) {
     ftGroupByCity = true;  // altes Verhalten erzwingen (ein Segment pro Station)
-    tgl.classList.remove('active');
-    tgl.style.opacity = '0.35';
-    tgl.style.pointerEvents = 'none';
+    if (btn) btn.style.display = 'none';
     if (hint) hint.textContent = 'Firmware-Update nötig (ab Version 2.3.18)';
     // Display-Typ PRO STATION geht trotzdem (per-Station c-Tokens kann auch die alte
     // Firmware — nur das Zusammenlegen braucht 2.3.18). Liste nur zeigen, wenn nicht
@@ -13448,24 +13451,19 @@ function updateGroupByCityUI() {
     }
     return;
   }
-  tgl.style.opacity = '';
-  tgl.style.pointerEvents = '';
-  tgl.classList.toggle('active', ftGroupByCity !== false);
-  if (hint) hint.textContent = (ftGroupByCity !== false)
-    ? 'Stationen derselben Stadt teilen sich ein Display'
-    : 'Aus: jede Haltestelle bekommt ihr eigenes Display';
+  if (btn) btn.style.display = '';
   var intro = document.getElementById('ftInstanceIntroHint');
   if (assign && ftGroupByCity === false) {
-    // Toggle AUS: Zuordnung pro STATION (Display-Instanzen).
+    // Alt-Modus (Gruppieren AUS, nur aus gespeicherten Configs): Zuordnung pro
+    // STATION (Display-Instanzen) bleibt als Inline-Liste erhalten.
+    if (hint) hint.textContent = 'Aus: jede Haltestelle bekommt ihr eigenes Display';
     assign.style.display = '';
     if (intro) intro.textContent = 'Jede Haltestelle bekommt ihr eigenes Display (eigene Seite). Du kannst Stationen auch auf ein gemeinsames Display legen.';
     renderStationInstanceList();
-  } else if (assign && typeof ftIsMultiDisplay !== 'undefined' && ftIsMultiDisplay) {
-    // Toggle AN + Spielerisch: ein Typ-Dropdown pro Stadt/Provider (Wien → Wiener
-    // Linien, ÖBB Regio → ÖBB …) — sichtbar und für die ganze Gruppe umstellbar.
-    assign.style.display = '';
-    if (intro) intro.textContent = 'Ein Display pro Stadt. Hier stellst du den Look jeder Stadt um.';
-    renderCityGroupList();
+  } else {
+    // Standard: Zuweisung läuft über den Zuweisen-Wizard (Knopf rechts), keine
+    // Inline-Liste mehr.
+    if (hint) hint.textContent = 'Stationen derselben Stadt teilen sich ein Display';
   }
 }
 
@@ -13496,6 +13494,140 @@ function renderCityGroupList() {
     html += '</select></div>';
   });
   container.innerHTML = html;
+}
+
+// ===== Zuweisungs-Wizard (Paul 20.09.2026): Knopf "Zuweisen" statt Inline-Liste =====
+// Eine Karte pro Stadt/Provider: Gerätevorschau (echte Nachbildung mit den Linien der
+// Gruppe) + Display-Picker. Der Picker wirkt sofort auf die Vorschau der Karte,
+// übernommen wird erst mit "Fertig" (Abbrechen lässt alles unverändert).
+var _awPending = null;   // net -> gewählte colour (nur solange der Wizard offen ist)
+
+function awGroups() {
+  var order = [], byNet = {};
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+    var net = s.network || '';
+    if (!byNet[net]) { byNet[net] = { net: net, colour: stationDisplayColour(s), stations: [] }; order.push(byNet[net]); }
+    byNet[net].stations.push(s);
+  });
+  return order;
+}
+
+// Beispieldaten einer Stadt-Gruppe: echte Linien/Ziele der Gruppen-Stationen,
+// deterministische Zeiten wie in der Feintuning-Vorschau.
+function awGroupData(grp) {
+  var data = [];
+  var tramNo = 0;
+  grp.stations.forEach(function(st) {
+    var arr = [];
+    if (st.directions && st.directions.length > 0) st.directions.forEach(function(d) { if (d.line) arr.push({ l: String(d.line), z: d.towards || st.stopName || '' }); });
+    else if (st.filter) st.filter.split(',').forEach(function(l) { l = l.trim(); if (l) arr.push({ l: l, z: st.stopName || '' }); });
+    arr.forEach(function(e) {
+      var isWienTram = st.network === 'WL' && !e.l.startsWith('U') && /^\d+$/.test(e.l);
+      var t = [7, 3, 12, 5, 9, 4, 15, 6][data.length % 8];
+      data.push({ line: e.l, dest: e.z, time: t, time2: t + 4 + (data.length % 3) * 2, hf: isWienTram && (tramNo++ % 2 === 0) });
+    });
+  });
+  if (data.length === 0) data = (DV_DEMO_DATA[grp.colour] || DV_DEMO_DATA[1]).slice();
+  return data;
+}
+
+// Vorschau EINER Zuweisungs-Karte zeichnen (Custom über den Design-Renderer)
+function awRenderPreview(net) {
+  var cell = document.getElementById('awPrev_' + net.replace(/[^A-Za-z0-9]/g, '_'));
+  if (!cell) return;
+  var grp = null;
+  awGroups().forEach(function(g) { if (g.net === net) grp = g; });
+  if (!grp) return;
+  var cid = parseInt((_awPending && _awPending[net] != null) ? _awPending[net] : grp.colour);
+  var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
+  var rows = f.defaultRows || 3;
+  if (f.minRows) rows = Math.max(rows, f.minRows);
+  if (f.maxRows) rows = Math.min(rows, f.maxRows);
+  var data = awGroupData(grp);
+  var html;
+  if (fcIsCustomColour(cid)) {
+    var cfg = fcPreviewConfig(cid);
+    fcApplyPreviewBg(cell, cfg);
+    html = fcDevicePreviewHTML(cfg, data.slice());
+  } else {
+    html = dvPreviewHTML(cid, data.slice(0, Math.max(rows, 1)), rows, cell);
+  }
+  cell.innerHTML = html || '';
+}
+
+function awPickerChanged(net, val) {
+  if (val === 'newcustom') {
+    // Eigenes Display direkt aus dem Zuweisungs-Wizard erstellen: diesen Wizard
+    // schließen (ohne zu übernehmen) und den Design-Wizard mit Stadt-Ziel öffnen,
+    // der weist das neue Display nach "Fertig" selbst zu (fcWizardTarget type city).
+    closeAssignWizard();
+    openCustomDisplayWizard({ type: 'city', net: net });
+    return;
+  }
+  if (!_awPending) _awPending = {};
+  _awPending[net] = parseInt(val);
+  awRenderPreview(net);
+}
+
+function closeAssignWizard() {
+  var ov = document.getElementById('awOverlay');
+  if (ov) ov.remove();
+  _awPending = null;
+}
+
+function awFinish() {
+  var pending = _awPending || {};
+  Object.keys(pending).forEach(function(net) {
+    var cid = parseInt(pending[net]);
+    if (isNaN(cid)) return;
+    stations.forEach(function(s) { if ((s.network || '') === net) s.colourOverride = cid; });
+  });
+  closeAssignWizard();
+  renderDisplayTypeSections();
+  if (typeof updateGroupByCityUI === 'function') updateGroupByCityUI();
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
+}
+
+function openAssignWizard() {
+  closeAssignWizard();
+  _awPending = {};
+  var groups = awGroups();
+  var h = '';
+  h += '<div style="background:#fff;border-radius:18px;max-width:460px;width:100%;max-height:92vh;overflow:auto;padding:0 0 20px;box-shadow:0 20px 60px rgba(0,0,0,0.35);" onclick="event.stopPropagation()">';
+  h += '<div style="display:flex;align-items:center;padding:18px 22px 8px;">';
+  h += '<div><div style="font-weight:700;font-size:17px;">Displays zuweisen</div>';
+  h += '<div style="font-size:12px;color:#888;">Ein Display pro Stadt. Die Vorschau zeigt sofort, wie es aussieht.</div></div>';
+  h += '<button onclick="closeAssignWizard()" style="margin-left:auto;border:none;background:#f0f0f0;width:32px;height:32px;border-radius:50%;font-size:15px;cursor:pointer;color:#555;flex:0 0 auto;">&#10005;</button>';
+  h += '</div>';
+  h += '<div style="padding:6px 22px 0;">';
+  groups.forEach(function(grp) {
+    var label = (typeof NETWORKS !== 'undefined' && NETWORKS[grp.net] && NETWORKS[grp.net].name)
+                || (grp.stations[0] && grp.stations[0].networkName) || grp.net;
+    var names = grp.stations.map(function(st) { return st.stopName || ''; }).filter(Boolean).slice(0, 3).join(', ');
+    var netId = grp.net.replace(/[^A-Za-z0-9]/g, '_');
+    h += '<div style="border:1px solid #eee;border-radius:12px;padding:12px;margin:0 0 12px;">';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+    h += '<div style="min-width:0;"><div style="font-weight:600;font-size:13.5px;">' + escapeHtmlFt(label) + '</div>';
+    h += (names ? '<div style="font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlFt(names) + '</div>' : '') + '</div>';
+    h += '<select onchange="awPickerChanged(\'' + escapeHtmlFt(grp.net).replace(/'/g, '') + '\', this.value)" style="margin-left:auto;flex:0 0 auto;max-width:180px;padding:8px 10px;border-radius:8px;border:1px solid #ddd;font-size:12.5px;font-family:inherit;">';
+    h += displayTypeOptionsHtml(grp.colour);
+    h += '</select></div>';
+    h += '<div style="background:#111;border-radius:12px;padding:8px 10px;">';
+    h += '<div id="awPrev_' + netId + '" style="width:320px;max-width:100%;height:170px;border-radius:4px;overflow:hidden;background:#000;margin:0 auto;"></div>';
+    h += '</div></div>';
+  });
+  h += '<div style="display:flex;gap:10px;margin-top:4px;">';
+  h += '<button onclick="closeAssignWizard()" style="flex:1;padding:12px;border:none;background:#f0f0f0;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;">Abbrechen</button>';
+  h += '<button onclick="awFinish()" style="flex:2;padding:12px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Fertig</button>';
+  h += '</div>';
+  h += '</div></div>';
+  var ov = document.createElement('div');
+  ov.id = 'awOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ov.onclick = closeAssignWizard;
+  ov.innerHTML = h;
+  document.body.appendChild(ov);
+  groups.forEach(function(grp) { awRenderPreview(grp.net); });
 }
 
 function setCityGroupColour(net, val) {
@@ -15422,6 +15554,7 @@ function anyCZHUStation() {
 function ftFocusPreview(cid) {
   var sel = document.getElementById('ftColorSelect');
   if (sel && cid != null && !isNaN(parseInt(cid))) sel.value = parseInt(cid);
+  _ftSlideNextAt = null;   // bewusst fokussiert → volle Seitendauer ab jetzt
   if (typeof updateFinetuningPreview === 'function') updateFinetuningPreview();
 }
 
@@ -17278,6 +17411,19 @@ function ftApplyPreviewCollapsed() {
 // Standzeiten wie eingestellt (Manuell = Regler, sonst Firmware-Automatik 4,0/1,5 s).
 var _ftAltFlipTimer = null;
 var _ftAltShowSecond = false;
+
+// Spielerisch: die Vorschau blättert wie das Gerät durch die Displays (Seitendauer =
+// Anzeigedauer des jeweiligen Displays, Standard 12 s). _ftSlideNextAt ist ein fester
+// Zieltermin: die häufigen Zwischen-Renders (Abfahrten-Wechsel, Live-Toggles) planen
+// den Blätter-Timer neu, verschieben den Termin aber nicht — sonst käme die nächste
+// Seite nie, weil jeder 4-s-Wechsel den 12-s-Takt wieder auf null stellte.
+var _ftSlideTimer = null;
+var _ftSlideNextAt = null;
+function ftSlideDwellMs(cid) {
+  var iv = document.getElementById('ftInterval_' + cid) ? parseInt(getFtToggleVal('ftInterval_' + cid)) : NaN;
+  if (!iv || isNaN(iv)) { var l = dsVal(cid, 'i'); iv = (l !== undefined) ? l : 12; }
+  return Math.max(3, iv) * 1000;
+}
 function ftAltPreviewState(colour) {
   var el = document.getElementById('ftAltNext_' + colour);
   var aDs = dsVal(colour, 'a');
@@ -17451,6 +17597,31 @@ function updateFinetuningPreview() {
     }, _altAnim.showSecond ? _altAnim.yMs : _altAnim.xMs);
   } else {
     _ftAltShowSecond = false;
+  }
+
+  // Blätter-Takt (Spielerisch, mehrere Displays): zum Zieltermin aufs nächste Display
+  // weiterblättern, wie die Slideshow am Gerät. Bei Kompakt oder nur einem Display
+  // passiert nichts, dann steht der Termin auf null.
+  if (_ftSlideTimer) { clearTimeout(_ftSlideTimer); _ftSlideTimer = null; }
+  var _slideList = (ftIsMultiDisplay && typeof getUniqueDisplayTypes === 'function') ? (getUniqueDisplayTypes() || []) : [];
+  if (_slideList.length > 1) {
+    if (_ftSlideNextAt == null) _ftSlideNextAt = Date.now() + ftSlideDwellMs(colour);
+    _ftSlideTimer = setTimeout(function() {
+      var st = document.getElementById('stepFinetuning');
+      if (!st || st.classList.contains('hidden')) { _ftSlideNextAt = null; return; }
+      var list = (ftIsMultiDisplay && typeof getUniqueDisplayTypes === 'function') ? (getUniqueDisplayTypes() || []) : [];
+      if (list.length < 2) { _ftSlideNextAt = null; return; }
+      var cur = parseInt(document.getElementById('ftColorSelect').value);
+      var idx = -1;
+      for (var li = 0; li < list.length; li++) { if (parseInt(list[li].colour) === cur) { idx = li; break; } }
+      var next = list[(idx + 1) % list.length].colour;
+      _ftAltShowSecond = false;   // neue Seite beginnt mit der ersten Abfahrtszeit
+      _ftSlideNextAt = null;      // nächster Termin ab der neuen Seite
+      setFtColorSelectValue(String(next));
+      updateFinetuningPreview();
+    }, Math.max(50, _ftSlideNextAt - Date.now()));
+  } else {
+    _ftSlideNextAt = null;
   }
 
   // Wien-Optionen ein/ausblenden basierend auf Display-Typ
@@ -21225,6 +21396,8 @@ window.addEventListener('DOMContentLoaded', () => {
     'Spaß-Nachrichten': 'Fun messages', 'Zeigt witzige Meldungen bei langen Wartezeiten': 'Shows funny messages during long waits',
     'Niederflur-Hinweis blinken': 'Blink low-floor hint', 'Hochflurer markieren': 'Mark high-floor vehicles',
     'Wien-Features': 'Vienna features', 'Hochflurer, Niederflur, Klima': 'High-floor, low-floor, A/C',
+    'Nach Städten gruppiert': 'Grouped by city', 'Zuweisen': 'Assign', 'Displays zuweisen': 'Assign displays',
+    'Ein Display pro Stadt. Die Vorschau zeigt sofort, wie es aussieht.': 'One display per city. The preview instantly shows how it looks.',
     'Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht': 'Marker pulses when a low-floor vehicle approaches',
     'Verspätung hervorheben': 'Highlight delays', 'Verspätung herausstechend': 'Delays stand out',
     'Einfahr-Ansicht': 'Arrival view',
