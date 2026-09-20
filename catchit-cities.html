@@ -9375,7 +9375,19 @@ function renderLines() {
       // (Linie, richtungsId) zu einer Card zusammenfassen. Mehrere Endhalte
       // werden im Anzeige-Text aggregiert ("Hofgut / Schmalegg Ortsmitte").
       // Klick toggelt alle Endhalte derselben Richtung gleichzeitig.
-      const stableNet = hasStableRichtungsId(selectedNetwork);
+      // Trennt die Richtungs-Id an dieser Haltestelle nichts (Stockholm: alles fährt von
+      // Steig 1, beide Richtungen tragen "p1"), darf hier NICHT nach ihr zusammengefasst
+      // werden — sonst stünde in einer einzigen Karte "Näset / Högsätra" und die beiden
+      // Richtungen wären nicht einzeln wählbar (Paul 20.09.2026).
+      // Entschieden wird an den Daten, die hier ohnehin vorliegen (die Live-Abfahrten
+      // allein reichen nicht: abends fährt nur eine Richtung, der Linien-Index kennt aber
+      // beide). Kennt die GANZE Haltestelle über alle Linien nur eine einzige Id und ist
+      // die eine reine Bahnsteig-Nummer, dann trennt sie nichts. Echte Richtungen (H/R,
+      // Steig-Ids, Fernverkehr) und Halte mit mehreren Bahnsteigen bleiben unberührt.
+      const _alleRids = new Set((availableLines || []).map(l => String(l.richtungsId || '')).filter(Boolean));
+      const _steigTrenntNicht = _alleRids.size === 1 && /^p\d+$/.test([..._alleRids][0] || '');
+      const _mehrereZiele = new Set(directions.map(d => String(d.towards || '').trim()).filter(Boolean)).size > 1;
+      const stableNet = hasStableRichtungsId(selectedNetwork) && !(_steigTrenntNicht && _mehrereZiele);
       let renderDirs = directions;
       if (stableNet) {
         const byRid = new Map();
