@@ -4916,6 +4916,18 @@ async function fetchStopLinesCached(network, stopId) {
           if (r.ok) {
             const d = await r.json();
             const ls = ((d && d.lines) || []).map(l => String(l.name || '').trim().toLowerCase()).filter(Boolean);
+            // Volle Richtungen (Linie + rid → Zieltext) separat merken: der Nachtrag unten
+            // soll nicht nur die Linie kennen, sondern auch ihr Ziel benennen können.
+            if (!window._dirTextByStop) window._dirTextByStop = {};
+            const dt = {};
+            ((d && d.lines) || []).forEach(l => {
+              (l.directions || []).forEach(dd => {
+                const rid = String(dd.richtungsId || '').trim();
+                const tw = String(dd.towards || '').trim();
+                if (rid && tw) dt[String(l.name || '').trim() + '|' + rid] = tw;
+              });
+            });
+            window._dirTextByStop[k] = dt;
             window._linesByStopCache[k] = ls.length ? ls : null;
             return window._linesByStopCache[k];
           }
@@ -13807,13 +13819,22 @@ function awPagesModeOf(grp) {
 function awStationKey(s) { return String(s.fullId || (s.network + ':' + s.stopId)); }
 // Zeilen der Seiten-Zuteilung: EINE pro (Haltestelle, Linie) — Paul will nach Linie
 // zuordnen. Stationen ohne Linien (Alle Abfahrten) bleiben eine Zeile ('*').
+function awDirKey(d) {
+  return String(d.line) + '>' + String(d.richtungsId || d.towards || '');
+}
 function awPageRows(grp) {
   var rows = [];
   grp.stations.forEach(function(s) {
-    var lines = [];
-    (s.directions || []).forEach(function(d) { if (d.line && lines.indexOf(String(d.line)) < 0) lines.push(String(d.line)); });
-    if (!lines.length) rows.push({ key: awStationKey(s) + '|*', s: s, line: null });
-    else lines.forEach(function(ln) { rows.push({ key: awStationKey(s) + '|' + ln, s: s, line: ln }); });
+    var seen = {};
+    (s.directions || []).forEach(function(d) {
+      if (!d.line) return;
+      var k = awDirKey(d);
+      if (seen[k]) return;
+      seen[k] = 1;
+      rows.push({ key: awStationKey(s) + '|' + k, s: s, line: String(d.line), dir: d,
+                  ziel: String(d.towards || '').trim() });
+    });
+    if (!Object.keys(seen).length) rows.push({ key: awStationKey(s) + '|*', s: s, line: null, dir: null, ziel: '' });
   });
   return rows;
 }
@@ -13837,10 +13858,13 @@ function awPageMap(grp) {
         if (!seq[fk]) seq[fk] = next++;
         page = seq[fk];
       }
-      var lines = [];
-      (s.directions || []).forEach(function(d) { if (d.line && lines.indexOf(String(d.line)) < 0) lines.push(String(d.line)); });
-      if (!lines.length) st.pageOf[awStationKey(s) + '|*'] = page;
-      else lines.forEach(function(ln) { st.pageOf[awStationKey(s) + '|' + ln] = page; });
+      var hat = false;
+      (s.directions || []).forEach(function(d) {
+        if (!d.line) return;
+        hat = true;
+        st.pageOf[awStationKey(s) + '|' + awDirKey(d)] = page;
+      });
+      if (!hat) st.pageOf[awStationKey(s) + '|*'] = page;
     });
   }
   return st.pageOf;
@@ -13851,6 +13875,42 @@ function awSetPages(netId, val) {
   awState(grp.net).pages = String(val);
   awRefreshCard(grp.net);
 }
+// Display-Typ je SEITE (Paul 20.09.2026): eine Seite ist ein eigenes Display, also darf
+// sie auch ein eigenes Design haben — Seite 1 als eigenes Display, Seite 2 im
+// Wiener-Linien-Look. Ohne Eintrag gilt der Typ der Stadt-Gruppe (Dropdown oben).
+function awPageTypes(grp) {
+  var st = awState(grp.net);
+  if (!st.typeOf) {
+    st.typeOf = {};
+    // Ist-Zustand übernehmen: die colour der Stationen dieser Seite
+    var pageOf = awPageMap(grp);
+    grp.stations.forEach(function(sx) {
+      var p = pageOf[awStationKey(sx) + '|*'];
+      if (p == null) {
+        (sx.directions || []).some(function(d) { var q = pageOf[awStationKey(sx) + '|' + String(d.line)]; if (q != null) { p = q; return true; } return false; });
+      }
+      if (p != null && st.typeOf[p] == null) st.typeOf[p] = stationDisplayColour(sx);
+    });
+  }
+  return st.typeOf;
+}
+function awPageTypeOf(grp, page) {
+  var t = awPageTypes(grp)[page];
+  return (t != null) ? parseInt(t) : awEffColour(grp);
+}
+function awSetPageType(netId, page, val) {
+  var grp = awNetByNetId(netId);
+  if (!grp) return;
+  if (val === 'newcustom') {
+    if (typeof openCustomDisplayWizard === 'function') openCustomDisplayWizard({ type: 'city', net: grp.net });
+    return;
+  }
+  var cid = parseInt(val);
+  if (isNaN(cid)) return;
+  awPageTypes(grp)[parseInt(page)] = cid;
+  awRefreshCard(grp.net);
+}
+
 function awSetStationPage(netId, key, val) {
   var grp = awNetByNetId(netId);
   if (!grp) return;
@@ -13888,23 +13948,38 @@ function awPagesHtml(grp) {
     var pageOf = awPageMap(grp);
     var rows = awPageRows(grp);
     var n = Math.max(rows.length, 1);
+    // Belegte Seiten und ihr Display-Typ: pro Seite eine Kopfzeile mit Typ-Auswahl,
+    // damit Seite 1 und Seite 2 verschiedene Designs haben können (Paul).
+    var belegt = [];
+    rows.forEach(function(r) { var p = pageOf[r.key] || 1; if (belegt.indexOf(p) < 0) belegt.push(p); });
+    belegt.sort(function(a, b) { return a - b; });
     h += '<div style="background:#f8f9fa;border:1px solid #eee;border-radius:10px;padding:8px 10px;margin:4px 0 2px;">';
-    rows.forEach(function(row) {
-      // Linien-Kästchen in der offiziellen Linienfarbe (gleiche Optik wie die Stationsliste)
-      var chip;
-      if (row.line) {
-        var c = (typeof lineColourFor === 'function') ? lineColourFor(row.s.network, row.line) : null;
-        chip = '<span style="display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;height:19px;padding:0 6px;min-width:19px;border-radius:6px;background:' + (c ? c.bg : '#e9e9e9') + ';color:' + (c ? c.fg : '#444') + ';font-weight:700;font-size:11px;">' + escapeHtmlFt(String(row.line)) + '</span>';
-      } else {
-        chip = '<span style="flex:0 0 auto;font-size:11px;font-weight:600;color:#666;">Alle Linien</span>';
-      }
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;">' + chip;
-      h += '<span style="flex:1;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtmlFt(row.s.stopName || row.s.stopId || '') + '</span>';
-      h += '<select onchange="awSetStationPage(\'' + netId + '\',\'' + escapeHtmlFt(row.key).replace(/'/g, '') + '\',this.value)" style="flex:0 0 auto;padding:5px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;font-family:inherit;">';
-      for (var p = 1; p <= n; p++) h += '<option value="' + p + '"' + ((pageOf[row.key] || 1) === p ? ' selected' : '') + '>Seite ' + p + '</option>';
+    belegt.forEach(function(p) {
+      var tCid = awPageTypeOf(grp, p);
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0 4px;border-top:1px solid #ececec;margin-top:4px;">';
+      h += '<span style="flex:0 0 auto;font-size:12.5px;font-weight:700;">Seite ' + p + '</span>';
+      h += '<select onchange="awSetPageType(\'' + netId + '\',' + p + ',this.value)" style="margin-left:auto;flex:0 1 auto;max-width:190px;padding:6px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;font-family:inherit;">';
+      h += displayTypeOptionsHtml(tCid);
       h += '</select></div>';
+      rows.forEach(function(row) {
+        if ((pageOf[row.key] || 1) !== p) return;
+        var chipP;
+        if (row.line) {
+          var cP = (typeof lineColourFor === 'function') ? lineColourFor(row.s.network, row.line) : null;
+          chipP = '<span style="display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;height:19px;padding:0 6px;min-width:19px;border-radius:6px;background:' + (cP ? cP.bg : '#e9e9e9') + ';color:' + (cP ? cP.fg : '#444') + ';font-weight:700;font-size:11px;">' + escapeHtmlFt(String(row.line)) + '</span>';
+        } else {
+          chipP = '<span style="flex:0 0 auto;font-size:11px;font-weight:600;color:#666;">Alle Linien</span>';
+        }
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0 4px 6px;">' + chipP;
+        var lbl = row.ziel ? ('&rarr; ' + escapeHtmlFt(row.ziel)) : escapeHtmlFt(row.s.stopName || row.s.stopId || '');
+        var sub = row.ziel ? ('<span style="color:#999;"> &middot; ' + escapeHtmlFt(row.s.stopName || '') + '</span>') : '';
+        h += '<span style="flex:1;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + lbl + sub + '</span>';
+        h += '<select onchange="awSetStationPage(\'' + netId + '\',\'' + escapeHtmlFt(row.key).replace(/'/g, '') + '\',this.value)" style="flex:0 0 auto;padding:5px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;font-family:inherit;">';
+        for (var q = 1; q <= n; q++) h += '<option value="' + q + '"' + ((pageOf[row.key] || 1) === q ? ' selected' : '') + '>Seite ' + q + '</option>';
+        h += '</select></div>';
+      });
     });
-    h += '<div class="form-hint" style="margin-top:4px;">Gleiche Seite = zusammen auf dem Display, zwischen den Seiten bl&auml;ttert das Ger&auml;t automatisch</div>';
+    h += '<div class="form-hint" style="margin-top:8px;">Jede Seite ist ein eigenes Display und kann ihr eigenes Design haben. Zwischen den Seiten bl&auml;ttert das Ger&auml;t automatisch</div>';
     h += '</div>';
   }
   return h;
@@ -13928,7 +14003,7 @@ function awGroupData(grp) {
     _grpStations = _grpStations.map(function(s) {
       var all = s.directions || [];
       if (!all.length) return ((_pOf[awStationKey(s) + '|*'] || 1) === _min) ? s : null;
-      var dirs = all.filter(function(d) { return (_pOf[awStationKey(s) + '|' + String(d.line)] || 1) === _min; });
+      var dirs = all.filter(function(d) { return (_pOf[awStationKey(s) + '|' + awDirKey(d)] || 1) === _min; });
       if (!dirs.length) return null;
       if (dirs.length === all.length) return s;
       var c = Object.assign({}, s);
@@ -13943,7 +14018,13 @@ function awGroupData(grp) {
     arr.forEach(function(e) {
       var isWienTram = st.network === 'WL' && !e.l.startsWith('U') && /^\d+$/.test(e.l);
       var t = [7, 3, 12, 5, 9, 4, 15, 6][data.length % 8];
-      data.push({ line: e.l, dest: e.z, time: t, time2: t + 4 + (data.length % 3) * 2, hf: isWienTram && (tramNo++ % 2 === 0) });
+      // Linienfarbe + Fahrzeugart auch hier (siehe updateFinetuningPreview)
+      var c = (typeof lineColourFor === 'function') ? lineColourFor(st.network, e.l) : null;
+      var dd = (st.directions || []).find(function(d) { return String(d.line) === String(e.l); });
+      data.push({ line: e.l, dest: e.z, time: t, time2: t + 4 + (data.length % 3) * 2,
+                  hf: isWienTram && (tramNo++ % 2 === 0),
+                  lineColor: c ? c.bg : undefined, lineTextColor: c ? c.fg : undefined,
+                  vt: (dd && dd.type) || '' });
     });
   });
   if (data.length === 0) data = (DV_DEMO_DATA[grp.colour] || DV_DEMO_DATA[1]).slice();
@@ -14119,7 +14200,7 @@ function awPageFieldCollision(grp, pending) {
     var dirs = s.directions || [];
     var pages = {};
     if (!dirs.length) pages[pageOf[fid + '|*'] || 1] = 1;
-    else dirs.forEach(function(d) { pages[pageOf[fid + '|' + String(d.line)] || 1] = 1; });
+    else dirs.forEach(function(d) { pages[pageOf[fid + '|' + awDirKey(d)] || 1] = 1; });
     Object.keys(pages).forEach(function(p) {
       if (!byPage[p]) byPage[p] = [];
       if (byPage[p].indexOf(fid) < 0) byPage[p].push(fid);
@@ -14153,7 +14234,10 @@ function awFinish() {
     var st = pending[net];
     if (!st) return;
     var cid = (st.colour != null) ? parseInt(st.colour) : NaN;
-    if (!isNaN(cid)) {
+    // Sind einzelnen Seiten eigene Designs zugewiesen, gewinnen diese — das Dropdown oben
+    // setzt dann nur die Seiten ohne eigene Wahl (wird unten beim Aufteilen angewandt).
+    var _hatSeitenTypen = st.typeOf && Object.keys(st.typeOf).length > 0 && st.pages === 'split';
+    if (!isNaN(cid) && !_hatSeitenTypen) {
       stations.forEach(function(s) { if ((s.network || '') === net) s.colourOverride = cid; });
     }
     // Karten-Einstellungen (t/b/u) in den per-Typ-Speicher schreiben: dsByCid ist die
@@ -14219,6 +14303,7 @@ function awFinish() {
     // directions und filter); der Lade-Pfad liest solche rbl-Duplikate seit heute über
     // Vorkommens-Listen korrekt zurück. Reihenfolge im stations-Array = Seitenreihenfolge.
     var pageOf = awPageMap(grp);
+    var typeOf = awPageTypes(grp);
     var instOf = {};
     var instFor = function(p) { if (!instOf[p]) instOf[p] = _nextInstanceId++; return instOf[p]; };
     var outList = [];
@@ -14227,12 +14312,13 @@ function awFinish() {
       if (!dirs.length) {
         s._awPg = pageOf[awStationKey(s) + '|*'] || 1;
         s.displayInstance = instFor(s._awPg);
+        if (typeOf[s._awPg] != null) s.colourOverride = parseInt(typeOf[s._awPg]);
         outList.push(s);
         return;
       }
       var byPage = {};
       dirs.forEach(function(d) {
-        var p = pageOf[awStationKey(s) + '|' + String(d.line)] || 1;
+        var p = pageOf[awStationKey(s) + '|' + awDirKey(d)] || 1;
         (byPage[p] = byPage[p] || []).push(d);
       });
       var pages = Object.keys(byPage).map(Number).sort(function(a, b) { return a - b; });
@@ -14244,6 +14330,8 @@ function awFinish() {
         if (fl.length) t.filter = fl.join(',');
         t._awPg = p;
         t.displayInstance = instFor(p);
+        // Design der Seite übernehmen (Paul: Seite 1 eigenes Display, Seite 2 Wiener Linien)
+        if (typeOf[p] != null) t.colourOverride = parseInt(typeOf[p]);
         outList.push(t);
       });
     });
@@ -15917,13 +16005,18 @@ function renderDisplayTypeSections() {
       html += '<button class="toggle-btn' + (wbVal === 2 ? ' active' : '') + '" data-value="2" onclick="setFtWienBadges(' + dt.colour + ',2)">Ganze Zeile</button>';
       html += '</div></div>';
       // Fahrzeugarten-Auswahl (v-Bitmaske), nur sichtbar solange Badges an sind
+      // Default IMMER U-Bahn (Bit 4): eine leere Auswahl gäbe es sonst gar nicht zu sehen,
+      // dann wären die Badges an, aber nichts bekäme eines (Paul 20.09.2026).
       var vhCur = dsVal(dt.colour, 'v');
-      if (vhCur === undefined) vhCur = (recommendedConfig && recommendedConfig.badgeVehicles != null) ? parseInt(recommendedConfig.badgeVehicles) : 4;
+      if (vhCur === undefined && recommendedConfig && recommendedConfig.badgeVehicles != null) vhCur = parseInt(recommendedConfig.badgeVehicles);
+      if (vhCur === undefined || isNaN(vhCur) || vhCur === 0) vhCur = 4;
       html += '<div id="ftBadgeVeh_' + dt.colour + '" style="display:' + (wbVal > 0 ? '' : 'none') + ';background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:10px 12px;margin:0 0 10px;">';
-      html += '<div style="font-size:12.5px;font-weight:600;margin-bottom:6px;">Badges f&uuml;r</div>';
-      html += '<div style="display:flex;gap:14px;flex-wrap:wrap;">';
+      html += '<div style="font-size:12.5px;font-weight:600;margin-bottom:8px;">Badges f&uuml;r</div>';
+      // Untereinander statt nebeneinander, mit großen Kästchen (Paul): am Handy waren die
+      // vier Haken nebeneinander gequetscht und die Kästchen zu klein zum Treffen.
+      html += '<div style="display:flex;flex-direction:column;gap:2px;">';
       BADGE_VEHICLES.forEach(function(bv) {
-        html += '<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer;"><input type="checkbox" data-bit="' + bv[0] + '" ' + ((vhCur & bv[0]) ? 'checked ' : '') + 'onchange="ftBadgeVehChanged(' + dt.colour + ')" style="accent-color:#4285f4;width:15px;height:15px;">' + bv[1] + '</label>';
+        html += '<label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;padding:7px 0;"><input type="checkbox" data-bit="' + bv[0] + '" ' + ((vhCur & bv[0]) ? 'checked ' : '') + 'onchange="ftBadgeVehChanged(' + dt.colour + ')" style="accent-color:#4285f4;width:24px;height:24px;flex:0 0 auto;margin:0;">' + bv[1] + '</label>';
       });
       html += '</div>';
       html += '<div class="form-hint" style="margin-top:6px;">Nur Linien mit hinterlegter Linienfarbe bekommen ein Badge. F&uuml;r die Wiener U-Bahn sind die Farben fest eingebaut</div>';
@@ -16384,8 +16477,11 @@ function ftBadgeVehMask(cid) {
   }
   var l = dsVal(cid, 'v');
   if (l !== undefined) return l;
-  if (recommendedConfig && recommendedConfig.badgeVehicles != null) return parseInt(recommendedConfig.badgeVehicles);
-  return 4;
+  if (recommendedConfig && recommendedConfig.badgeVehicles != null) {
+    var rc = parseInt(recommendedConfig.badgeVehicles);
+    if (!isNaN(rc) && rc > 0) return rc;
+  }
+  return 4;   // Default U-Bahn
 }
 function ftBadgeVehChanged(cid) {
   if (recommendedConfig) recommendedConfig.badgeVehicles = ftBadgeVehMask(cid);
@@ -17633,6 +17729,14 @@ function dvWienHTML(colour, data, rows, previewEl, fixed) {
   var margin = 8;
   var lineFs = 34, destFs = 14, cdFs = 34;   // Poppins Bold 24pt / Bold 12pt / Bold 24pt
   var lineW = Math.max.apply(null, data.map(function(d) { return Math.ceil(String(d.line || '').length * lineFs * 0.62); }).concat([42]));
+  // Im Badge-Modus ist das Badge mindestens quadratisch (Höhe = wBadgeH, siehe unten) und
+  // trägt links/rechts Innenabstand. Die Linien-Spalte muss das reservieren, sonst liegt
+  // der Zieltext über dem Badge (Paul 20.09.2026, Foto Graz Linie 1).
+  if (wBadgeV === 1) {
+    var _rowH0 = Math.floor(170 / rows);
+    var _bH = Math.min(_rowH0 - 4, Math.round(_rowH0 * 52 / 56));
+    lineW = Math.max(lineW + 16, _bH);
+  }
   var destX = margin + lineW + 6;
   var destW = 320 - destX - 50;
   var html = data.map(function(dep, i) {
@@ -17652,7 +17756,7 @@ function dvWienHTML(colour, data, rows, previewEl, fixed) {
     else if (wKlima && /^U[256]$/i.test(String(dep.line || ''))) marker = ' <span style="font-weight:400;font-size:24px;">*</span>';
     var wBadgeH = Math.min(rowH - 4, Math.round(rowH * 52 / 56));
     var lineHtml = lineBadge
-      ? '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';"><span style="background:' + bCol + ';color:' + bTxt + ';border-radius:8px;height:' + wBadgeH + 'px;display:flex;align-items:center;padding:0 8px;font-weight:700;font-size:28px;">' + escapeHtmlFt(dep.line) + '</span>' + marker + '</div>'
+      ? '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';"><span style="background:' + bCol + ';color:' + bTxt + ';border-radius:8px;height:' + wBadgeH + 'px;min-width:' + wBadgeH + 'px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:0 8px;font-weight:700;font-size:28px;">' + escapeHtmlFt(dep.line) + '</span>' + marker + '</div>'
       : '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';font-weight:700;font-size:' + lineFs + 'px;">' + escapeHtmlFt(dep.line) + marker + '</div>';
     var d2 = dvDest2(destX, rowH, destW, 20, 4, destFs, color, 700);   // fontHeight 20 + lineSpacing 4
     return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;' + (fullRow ? 'background:' + bCol + ';' : '') + '">'
@@ -18335,13 +18439,21 @@ function updateFinetuningPreview() {
         // den Unterschied zwischen Statisch (gewählte Reihenfolge) und Zeit-Sortierung.
         // time2 = zweite Abfahrt derselben Linie (für den Abfahrten-Wechsel-Takt).
         const demoT = [7, 3, 12, 5, 9, 4, 15, 6][data.length % 8];
+        // Linienfarbe und Fahrzeugart mitgeben, damit die Vorschau die Linien-Badges
+        // genauso zeichnen kann wie das Gerät (Paul 20.09.2026). Farbe aus dem
+        // Farb-Gedächtnis der Abfahrten, Fahrzeugart aus dem Typ der Richtung.
+        const _pc = (typeof lineColourFor === 'function') ? lineColourFor(station.network, lineName) : null;
+        const _pd = (station.directions || []).find(d => String(d.line) === String(lineName));
         data.push({
           line: lineName,
           dest: station.stopName,
           time: demoT,
           time2: demoT + 4 + (data.length % 3) * 2,
           timeStr: `${String(14 + Math.floor(demoT / 60)).padStart(2, '0')}:${String(20 + (demoT % 60)).padStart(2, '0')}`,
-          hf: isHochflurer
+          hf: isHochflurer,
+          lineColor: _pc ? _pc.bg : undefined,
+          lineTextColor: _pc ? _pc.fg : undefined,
+          vt: (_pd && _pd.type) || ''
         });
         timeCounter += 3;
       });
@@ -21376,6 +21488,34 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         const has = station.directions.some(d => d.line === sd.line && String(d.richtungsId || '') === rid);
         if (!has) station.directions.push({ line: sd.line, towards: '', type: '', richtungsId: rid });
       });
+    }
+
+    // MERGED SEGMENT: die Config-Tokens gelten für ALLE Stops des Segments, die Live-
+    // Abfahrten entscheiden, welcher Stop welche bekommt. Fährt eine Linie gerade nicht
+    // (abends, Wochenende), fiel sie an diesem Stop komplett weg, obwohl sie dort verkehrt
+    // — im Seiten-Dialog fehlte dann die Zeile (Paul 20.09.2026: 238 an Lidingö/Dalénum).
+    // Der Linien-Index der Haltestelle weiß es besser: Tokens, deren Linie hier verkehrt,
+    // nachtragen. Ohne Index (offline) bleibt es beim bisherigen Verhalten.
+    if (!isAllDep && !isJourney && _segInfo !== undefined && _segInfo.tokenCount > 1
+        && Array.isArray(stationDests) && stationDests.length) {
+      const _idx = await fetchStopLinesCached(network, bareStopId);
+      if (_idx && _idx.length) {
+        const _hier = new Set(_idx);
+        stationDests.forEach(sd => {
+          if (!sd.line || !_hier.has(String(sd.line).trim().toLowerCase())) return;
+          const ref = String(sd.towards || '');
+          const has = station.directions.some(d => d.line === sd.line &&
+            (String(d.richtungsId || '') === ref || String(d.towards || '') === ref));
+          if (has) return;
+          const looksRid = /^d\d/.test(ref) || /^\d+$/.test(ref) || ref === 'H' || ref === 'R' ||
+                           /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref);
+          // Zieltext aus dem Index dazu, damit die Richtung benannt ist statt nur "p1"
+          const _dtMap = (window._dirTextByStop || {})[network + ':' + bareStopId] || {};
+          const _tw = looksRid ? (_dtMap[String(sd.line) + '|' + ref] || '') : ref;
+          station.directions.push({ line: sd.line, towards: _tw,
+                                    type: '', richtungsId: looksRid ? ref : '' });
+        });
+      }
     }
 
     // LETZTES NETZ (Kunde Moritz/Karlsruhe 2026-08-28, BWEGT "H"/"R"-rids): schlägt der
