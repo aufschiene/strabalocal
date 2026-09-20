@@ -15255,8 +15255,12 @@ function renderDisplayTypeSections() {
   var fcDesigns = fcExistingDesigns();
   if (fcDesigns.length > 0) {
     // Pro Design: Name als Eingabefeld oben (direkt änderbar), darunter Farbchips,
-    // rechts nur zwei Icon-Knöpfe: Stift = Design im Wizard bearbeiten, Müll = löschen.
-    var fcIcoStyle = 'width:38px;height:38px;border:none;border-radius:10px;font-size:16px;cursor:pointer;flex:0 0 auto;';
+    // rechts zwei VOLLFARBIGE Icon-Knöpfe (Paul 20.09.2026): Blau mit weißem Stift =
+    // Design im Wizard bearbeiten, Rot mit weißem Mülleimer = löschen. Inline-SVG statt
+    // Emoji, damit die Symbole überall gleich (und nicht als dünne Umrisse) erscheinen.
+    var fcIcoStyle = 'width:40px;height:40px;border:none;border-radius:10px;cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.2);';
+    var fcIcoPen = '<svg viewBox="0 0 24 24" width="19" height="19" fill="#fff" aria-hidden="true"><path d="M3 17.25V21h3.75L17.8 9.94l-3.75-3.75L3 17.25zM20.7 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+    var fcIcoTrash = '<svg viewBox="0 0 24 24" width="19" height="19" fill="#fff" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
     html += '<div class="config-card" id="fcManageCard">';
     html += '<h3>Eigene Displays</h3>';
     html += '<div class="form-hint" style="margin-bottom:2px;">Name antippen zum Ändern. Löschen macht den Platz für ein neues frei (max. 3).</div>';
@@ -15272,8 +15276,8 @@ function renderDisplayTypeSections() {
       html += inUse ? '<span class="form-hint" style="margin:0;">in Verwendung</span>' : '';
       html += '</div></div>';
       html += '<div style="display:flex;gap:6px;justify-content:flex-end;">';
-      html += '<button title="Design bearbeiten" aria-label="Design bearbeiten" onclick="fcOpenWizard(' + d.cid + ')" style="' + fcIcoStyle + 'background:#eef3fe;color:#4285f4;">&#9998;</button>';
-      html += '<button title="Löschen" aria-label="Löschen" onclick="fcDeleteDisplay(' + d.cid + ')" style="' + fcIcoStyle + 'background:#fdecec;color:#c62828;">&#128465;&#65039;</button>';
+      html += '<button title="Design bearbeiten" aria-label="Design bearbeiten" onclick="fcOpenWizard(' + d.cid + ')" style="' + fcIcoStyle + 'background:#4285f4;">' + fcIcoPen + '</button>';
+      html += '<button title="Löschen" aria-label="Löschen" onclick="fcDeleteDisplay(' + d.cid + ')" style="' + fcIcoStyle + 'background:#e04343;">' + fcIcoTrash + '</button>';
       html += '</div></div>';
     });
     html += '</div>';
@@ -15376,6 +15380,12 @@ function renderDisplayTypeSections() {
       setFtToggleVal('ftWienBg_' + dt.colour, savedBg);
     }
   });
+
+  // Zum Schluss die Geräte-Vorschau EINMAL mit den fertig wiederhergestellten Toggles
+  // zeichnen. Während des Neuaufbaus feuern die setFtToggleVal-Hooks zwischendurch mit
+  // halb restaurierten Werten (frisch eingesetztes HTML hat noch Default-Buttons aktiv);
+  // ohne Takt-Timer, etwa bei Zeit flach, bliebe sonst so ein Zwischenstand stehen.
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
 }
 
 function setFtToggleVal(containerId, val) {
@@ -15451,6 +15461,8 @@ function ftSetAltMode(cid, mode) {
 function ftAltSliderInput(cid, which, el) {
   var lab = document.getElementById('ftAlt' + which + 'Val_' + cid);
   if (lab) lab.textContent = el.value + ' s';
+  // Vorschau-Takt sofort mit den neuen Standzeiten neu planen
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
 }
 // Werte für den Save: Manuell → Sliderwerte in Zehntelsekunden (4 s → 40), Automatisch →
 // nichts (Firmware-Takt 4,0/1,5 s, Graz und Liechtenstein 5/5; Bestandsgeräte bleiben
@@ -17262,6 +17274,37 @@ function ftApplyPreviewCollapsed() {
   if (btn) btn.innerHTML = zu ? '&#9656; Display-Vorschau aufklappen' : '&#9662; Display-Vorschau zuklappen';
 }
 
+// Abfahrten-Wechsel in der Vorschau: zeigt abwechselnd erste und zweite Abfahrtszeit,
+// Standzeiten wie eingestellt (Manuell = Regler, sonst Firmware-Automatik 4,0/1,5 s).
+var _ftAltFlipTimer = null;
+var _ftAltShowSecond = false;
+function ftAltPreviewState(colour) {
+  var el = document.getElementById('ftAltNext_' + colour);
+  var aDs = dsVal(colour, 'a');
+  var on = el ? isFtToggleActive('ftAltNext_' + colour)
+              : ((aDs !== undefined) ? aDs === 1 : true);
+  // Zeit flach (s=3): am Gerät gibt es dort KEINE zweite Abfahrtszeit und damit
+  // keinen Wechsel (display_logic.h prepareDataFlat), die Zeilen sind einfach die
+  // nächsten N Abfahrten. Statisch (1) und ZeitGruppe (2) wechseln normal.
+  var sv = document.getElementById('ftSort_' + colour)
+    ? parseInt(getFtToggleVal('ftSort_' + colour))
+    : (dsVal(colour, 's') || 1);
+  if (sv === 3) on = false;
+  var xMs = 4000, yMs = 1500;
+  var modeEl = document.getElementById('ftAltMode_' + colour);
+  if (modeEl && getFtToggleVal('ftAltMode_' + colour) === 'manual') {
+    var xs = document.getElementById('ftAltX_' + colour);
+    var ys = document.getElementById('ftAltY_' + colour);
+    if (xs && parseInt(xs.value) > 0) xMs = parseInt(xs.value) * 1000;
+    if (ys && parseInt(ys.value) > 0) yMs = parseInt(ys.value) * 1000;
+  } else {
+    var xl = dsVal(colour, 'x'), yl = dsVal(colour, 'y');
+    if (xl > 0) xMs = xl * 100;
+    if (yl > 0) yMs = yl * 100;
+  }
+  return { on: on, showSecond: _ftAltShowSecond, xMs: xMs, yMs: yMs };
+}
+
 // Jede Bedienung im offenen Feintuning sofort in der Geräte-Vorschau zeigen. Der
 // Busy-Guard verhindert Rekursion (updateFinetuningPreview stellt in einem Sonderfall
 // selbst Toggles um, was sonst wieder hier landen würde).
@@ -17314,14 +17357,19 @@ function updateFinetuningPreview() {
         // Firmware markiert NIEDERFLUR mit Rollstuhl, Hochflurer bleiben ohne Icon).
         const isWienTram = station.network === 'WL' && !lineName.startsWith('U') && /^\d+$/.test(lineName);
         const isHochflurer = isWienTram && (previewTramNo++ % 2 === 0);
+        // Deterministische Beispielzeiten, bewusst NICHT aufsteigend: nur so sieht man
+        // den Unterschied zwischen Statisch (gewählte Reihenfolge) und Zeit-Sortierung.
+        // time2 = zweite Abfahrt derselben Linie (für den Abfahrten-Wechsel-Takt).
+        const demoT = [7, 3, 12, 5, 9, 4, 15, 6][data.length % 8];
         data.push({
           line: lineName,
           dest: station.stopName,
-          time: timeCounter,
-          timeStr: `${String(14 + Math.floor(timeCounter / 60)).padStart(2, '0')}:${String(20 + (timeCounter % 60)).padStart(2, '0')}`,
+          time: demoT,
+          time2: demoT + 4 + (data.length % 3) * 2,
+          timeStr: `${String(14 + Math.floor(demoT / 60)).padStart(2, '0')}:${String(20 + (demoT % 60)).padStart(2, '0')}`,
           hf: isHochflurer
         });
-        timeCounter += Math.floor(Math.random() * 4) + 2;
+        timeCounter += 3;
       });
     }
   });
@@ -17329,6 +17377,34 @@ function updateFinetuningPreview() {
   // Fallback wenn keine Daten vorhanden
   if (data.length === 0) {
     data = (DV_DEMO_DATA[colour] || DV_DEMO_DATA[1]).slice();
+  }
+
+  // Sortierung LIVE wie am Gerät (display_logic.h): Statisch (1) = gewählte
+  // Reihenfolge, ZeitGruppe (2) und Zeit (3) = nach der nächsten Abfahrt geordnet
+  // (std::sort über countdown, die ERSTE Zeit; countdown2 sortiert nie mit).
+  // ZeitGruppe hält am Gerät zusätzlich Gruppen zusammen; die Vorschau hat keine
+  // Gruppen und zeigt die Zeit-Ordnung. Der Wechsel auf die zweite Zeit ändert die
+  // Zeilen-Reihenfolge nicht; bei Zeit flach (3) gibt es gar keinen Wechsel
+  // (ftAltPreviewState schaltet die Animation dort ab).
+  var _svLive = document.getElementById('ftSort_' + colour)
+    ? parseInt(getFtToggleVal('ftSort_' + colour))
+    : (dsVal(colour, 's') || 1);
+  if (_svLive === 2 || _svLive === 3) {
+    data = data.slice().sort(function(a, b) { return (parseFloat(a.time) || 0) - (parseFloat(b.time) || 0); });
+  }
+
+  // Abfahrten-Wechsel LIVE: bei AN pendelt jede Zeile zwischen erster und zweiter
+  // Abfahrtszeit, mit den Standzeiten aus dem Wechselzeiten-Bereich (Automatik
+  // 4,0 s / 1,5 s wie die Firmware). Der Takt wird am Ende dieser Funktion geplant.
+  var _altAnim = ftAltPreviewState(colour);
+  if (_altAnim.on && _altAnim.showSecond) {
+    data = data.map(function(d, i) {
+      var t2 = (d.time2 != null) ? d.time2 : ((parseFloat(d.time) || 0) + 4 + (i % 3) * 2);
+      var n = {};
+      for (var k in d) n[k] = d[k];
+      n.time = t2;
+      return n;
+    });
   }
 
   data = data.slice(0, rows);
@@ -17362,6 +17438,20 @@ function updateFinetuningPreview() {
     </div>`;
   }
   previewEl.innerHTML = html;
+
+  // Wechsel-Takt planen: nach Ablauf der Standzeit auf die andere Abfahrtszeit
+  // umschalten und neu zeichnen. Nur solange das Feintuning offen ist; jeder
+  // Render räumt den alten Timer ab (kein Stapeln).
+  if (_ftAltFlipTimer) { clearTimeout(_ftAltFlipTimer); _ftAltFlipTimer = null; }
+  if (_altAnim.on) {
+    _ftAltFlipTimer = setTimeout(function() {
+      _ftAltShowSecond = !_ftAltShowSecond;
+      var st = document.getElementById('stepFinetuning');
+      if (st && !st.classList.contains('hidden')) updateFinetuningPreview();
+    }, _altAnim.showSecond ? _altAnim.yMs : _altAnim.xMs);
+  } else {
+    _ftAltShowSecond = false;
+  }
 
   // Wien-Optionen ein/ausblenden basierend auf Display-Typ
   const wienOptions = document.getElementById('ftWienOptions');
