@@ -4811,6 +4811,40 @@ async function fetchDeparturesUnified(fullId) {
 
 const STATION_LINES_API = 'https://api.straba.at/api/v1/stops/lines';
 
+// /lines einer Haltestelle, robust: Cache + In-Flight-Bündelung (parallele Config-Läufe
+// fragen sonst dreifach) + Backoff bei 429/5xx. Fehler werden NICHT gecacht, damit der
+// nächste Lauf erneut versucht; eine echte Leer-Antwort wird als null gemerkt.
+async function fetchStopLinesCached(network, stopId) {
+  if (!window._linesByStopCache) window._linesByStopCache = {};
+  if (!window._linesInflight) window._linesInflight = {};
+  const k = network + ':' + stopId;
+  if (window._linesByStopCache[k] !== undefined) return window._linesByStopCache[k];
+  if (window._linesInflight[k]) return window._linesInflight[k];
+  const p = (async () => {
+    try {
+      for (let a = 0; a < 3; a++) {
+        try {
+          const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(network)
+            + '&stopId=' + encodeURIComponent(stopId) + '&_=' + Date.now(), { cache: 'no-store' });
+          if (r.ok) {
+            const d = await r.json();
+            const ls = ((d && d.lines) || []).map(l => String(l.name || '').trim().toLowerCase()).filter(Boolean);
+            window._linesByStopCache[k] = ls.length ? ls : null;
+            return window._linesByStopCache[k];
+          }
+          if (r.status !== 429 && r.status < 500) { window._linesByStopCache[k] = null; return null; }
+        } catch (e) { /* Netzwerkfehler → Backoff + Retry */ }
+        await new Promise(res => setTimeout(res, 350 * Math.pow(2, a) + Math.random() * 200));
+      }
+      return null;
+    } finally {
+      delete window._linesInflight[k];
+    }
+  })();
+  window._linesInflight[k] = p;
+  return p;
+}
+
 // Ergänzt availableLines um die GENERELL verkehrenden Linien (zeitunabhängig).
 // Nötig für Graz/STV: nachts liefern die Departures nichts, der /lines-Endpunkt aber
 // die ganze Linienliste (Trams 1/4/5/7 …) mit Richtungen (richtungsId R/H, passend zu
@@ -11910,20 +11944,9 @@ function seedSavedRowsByColour(colourStr, rowsStr) {
 function calculateRecommendedConfig() {
   if (stations.length === 0) return null;
 
-  // DEDUP: Entferne Stationen mit doppelter fullId (kann durch Race Conditions bei Config-Laden
-  // entstehen). Instanz gehört in den Schlüssel: beim Linien-Split trägt dieselbe rbl bewusst
-  // mehrere Teil-Stationen auf verschiedenen Seiten (displayInstance).
-  const seenFullIds = new Set();
-  const beforeCount = stations.length;
-  stations = stations.filter(s => {
-    const k = s.fullId + '#' + (s.displayInstance == null ? '' : s.displayInstance);
-    if (seenFullIds.has(k)) return false;
-    seenFullIds.add(k);
-    return true;
-  });
-  if (stations.length !== beforeCount) {
-    console.warn('[calculateRecommendedConfig] DEDUP: ' + beforeCount + ' -> ' + stations.length + ' Stationen (Duplikate entfernt)');
-  }
+  // DEDUP: Race-Kopien entfernen, legitime Linien-Splits (gleiche rbl, disjunkte Linien,
+  // eigene Instanzen) behalten — zentrale Logik in dedupeStationsByFullId.
+  dedupeStationsByFullId();
 
   // Dominantes Netzwerk finden
   const networkCounts = {};
@@ -20024,15 +20047,9 @@ function saveFromFinetuning() {
   if (!lineFilterDestStr) lineFilterDestStr = buildLineFilterDestination(stations);
 
   // WICHTIG: rbl und filter IMMER frisch aus stations berechnen (nicht stale Werte verwenden!)
-  // Dedupliziere stations zuerst (Sicherheitsnetz gegen Race Conditions). Instanz im
-  // Schlüssel: Linien-Split-Teilstationen derselben rbl dürfen nicht verschwinden.
-  const seenIds = new Set();
-  stations = stations.filter(s => {
-    const k = s.fullId + '#' + (s.displayInstance == null ? '' : s.displayInstance);
-    if (seenIds.has(k)) return false;
-    seenIds.add(k);
-    return true;
-  });
+  // Dedupliziere stations zuerst (Sicherheitsnetz gegen Race Conditions): zentrale,
+  // split-bewusste Logik — Linien-Split-Teilstationen derselben rbl bleiben erhalten.
+  dedupeStationsByFullId();
   // Wien IMMER mit WL:-Prefix senden (auch nackte numerische IDs wie "4131" →
   // "WL:4131"). So ist rbl konsistent mit masterrow und das Gerät erkennt Wien
   // eindeutig am Netz-Prefix statt am numerischen Format.
@@ -20931,6 +20948,10 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // Vorkommens-Zähler des Lesers: das n-te Auftreten eines rbl-Tokens in rbl_id liest
   // aus allen drei Segment-Maps den n-ten Eintrag (Überhang: letzter Eintrag gewinnt).
   const _rblOcc = {};
+  // Stationen DIESES Laufs (die Message-Handler feuern doppelt; global stations kann
+  // parallel halbfertige Objekte eines anderen Laufs mit gleichen Instanznummern tragen —
+  // der Geschwister-Filter unten darf nur die eigenen sehen, sonst frisst er Linien).
+  const _builtThisRun = [];
   const _pickBySeg = (map, tok, occ) => {
     const l = map[tok];
     if (!l || !l.length) return undefined;
@@ -21264,7 +21285,40 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // Tokens pro Stop ist korrekt — der Merge dedupliziert beim Re-Save wieder.
     if (!isAllDep && !isJourney && station.directions.length === 0
         && Array.isArray(stationDests) && stationDests.length) {
-      stationDests.forEach(sd => {
+      // Merged Segment: die Union NICHT blind übernehmen (Paul/Alex 2026-09: bei 429 oder
+      // Betriebspause bekam der letzte Stop ALLE Segment-Linien, "Station 740072327" zeigte
+      // 21/80/238). Erst über den /lines-Endpunkt auf die Linien DIESER Haltestelle
+      // einschränken; nur wenn auch der nichts weiß (offline), bleibt die volle Union der
+      // letzte Rettungsanker (Moritz-Fall, tokenCount 1, bleibt ohnehin unangetastet).
+      let _destPool = stationDests;
+      if (_segInfo !== undefined && _segInfo.tokenCount > 1) {
+        let allowedLines = null;
+        const _takenBySiblings = new Set();
+        const _ls = await fetchStopLinesCached(network, bareStopId);
+        if (_ls) allowedLines = new Set(_ls);
+        // Zweite Verteidigungslinie, wenn /lines den Stop nicht kennt: Linien, die LIVE
+        // schon an einem Geschwister-Stop dieses Segments hängen, gehören nicht auch
+        // noch hierher. Fehlt eine Linie danach ganz, trägt der Segment-Heiler unten
+        // sie ohnehin an der passendsten Station nach.
+        if (!allowedLines && _instId != null) {
+          _builtThisRun.forEach(sb => {
+            if (sb.displayInstance === _instId)
+              (sb.directions || []).forEach(d => { if (d.line) _takenBySiblings.add(String(d.line).trim().toLowerCase()); });
+          });
+        }
+        const _filtered = stationDests.filter(sd => {
+          if (!sd.line) return false;
+          const _ln = String(sd.line).trim().toLowerCase();
+          if (allowedLines && !allowedLines.has(_ln)) return false;
+          if (!allowedLines && _takenBySiblings.size && _takenBySiblings.has(_ln)) return false;
+          return true;
+        });
+        // Der Filter darf NIE bis zur leeren Station durchgreifen: /lines ist zeitabhängig
+        // unvollständig (657 meldete abends nur "80" und hätte die 238er-Teilstation
+        // geleert, die der Dedup dann entsorgt). Lieber die volle Segment-Union behalten.
+        if (_filtered.length) _destPool = _filtered;
+      }
+      _destPool.forEach(sd => {
         if (!sd.line) return;
         const ref = String(sd.towards || '');
         const looksRid = /^d\d/.test(ref) || /^\d+$/.test(ref) || ref === 'H' || ref === 'R' ||
@@ -21282,6 +21336,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     }
 
     stations.push(station);
+    _builtThisRun.push(station);
   }
 
   // KEIN masterrow-TOKEN DARF VERLOREN GEHEN (Moritz-Klasse, partielle Variante):
@@ -21434,17 +21489,44 @@ function dedupeDirectionsByRid(quelle) {
 
 // Entfernt doppelte Stationen (gleiche fullId) aus dem globalen stations-Array.
 function dedupeStationsByFullId() {
-  var seen = new Set();
+  // Race-Kopien von LEGITIMEN Linien-Splits unterscheiden (Paul 2026-09: der alte
+  // Geräte-Message-Pfad ohne masterrow erzeugte Instanz-lose "Alle Linien"-Geister
+  // neben den echten Stationen). Regeln pro fullId-Gruppe:
+  //   gleiche Instanz               → exakte Dublette, weg (auch null == null)
+  //   ohne Instanz neben MIT Instanz → Alt-Pfad-Kopie, weg (egal welche zuerst kam)
+  //   beide mit Instanz, ÜBERLAPPENDE Linien oder leere Linienliste → Race-Kopie, weg
+  //   beide mit Instanz, disjunkte Linien → legitimer Linien-Split, BEIDE behalten
   var before = stations.length;
-  stations = stations.filter(function(s) {
-    // Instanz gehört in den Schlüssel: beim Linien-Split steht dieselbe rbl bewusst in
-    // mehreren Segmenten (eigene Seiten). Race-Dubletten haben dieselbe Instanz und
-    // werden weiter entfernt.
-    var k = (s.fullId || (s.network + ':' + s.stopId)) + '#' + (s.displayInstance == null ? '' : s.displayInstance);
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
+  var keep = [];
+  var byId = {};
+  stations.forEach(function(s) {
+    var fid = s.fullId || (s.network + ':' + s.stopId);
+    var g = byId[fid];
+    if (!g) { byId[fid] = [s]; keep.push(s); return; }
+    var inst = (s.displayInstance == null) ? null : s.displayInstance;
+    var myLines = {};
+    (s.directions || []).forEach(function(d) { if (d.line) myLines[String(d.line)] = 1; });
+    var myLineCount = Object.keys(myLines).length;
+    var drop = false;
+    for (var i = 0; i < g.length && !drop; i++) {
+      var o = g[i];
+      var oInst = (o.displayInstance == null) ? null : o.displayInstance;
+      if (oInst === inst) { drop = true; break; }
+      if (inst === null) { drop = true; break; }
+      if (oInst === null) {
+        // das ÄLTERE ist die Instanz-lose Kopie → raus, das neue übernimmt
+        var ki = keep.indexOf(o);
+        if (ki >= 0) keep.splice(ki, 1);
+        g.splice(i, 1); i--;
+        continue;
+      }
+      var overlap = false;
+      (o.directions || []).forEach(function(d) { if (d.line && myLines[String(d.line)]) overlap = true; });
+      if (overlap || myLineCount === 0) { drop = true; break; }
+    }
+    if (!drop) { g.push(s); keep.push(s); }
   });
+  stations = keep;
   if (stations.length !== before) {
     console.log('[dedupeStations] ' + before + ' → ' + stations.length + ' (Dubletten entfernt)');
   }
