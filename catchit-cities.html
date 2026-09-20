@@ -501,12 +501,12 @@
     .line-badge { border: 1.5px solid #1a1a1a; box-sizing: border-box; }
     /* Tram/Straßenbahn - Rot */
     .line-badge.type-tram {
-      background: #c41e3a;
+      background: #c00808; /* offizielles WL-Tram-Rot (wienerlinien.at Widget) */
       color: #fff;
     }
-    /* Bus - Blau */
+    /* Bus - Dunkelblau (offizielles WL-Bus-Blau) */
     .line-badge.type-bus {
-      background: #0055a4;
+      background: #0a295d;
       color: #fff;
     }
     /* U-Bahn - Fallback Schwarz; einzelne Linien in ihren offiziellen Farben */
@@ -514,14 +514,16 @@
       background: #1a1a1a;
       color: #fff;
     }
-    .line-badge.type-u1 { background: #c6052e; color: #fff; } /* U1 rot */
-    .line-badge.type-u2 { background: #a82e8e; color: #fff; } /* U2 violett */
-    .line-badge.type-u3 { background: #ee7d00; color: #fff; } /* U3 orange */
-    .line-badge.type-u4 { background: #009a3d; color: #fff; } /* U4 grün */
-    .line-badge.type-u6 { background: #a96b2e; color: #fff; } /* U6 braun */
-    /* S-Bahn - Grün */
+    /* Offizielle WL-Widget-Farben (wienerlinien.at, 2026-09) */
+    .line-badge.type-u1 { background: #e3000f; color: #fff; } /* U1 rot */
+    .line-badge.type-u2 { background: #a862a4; color: #fff; } /* U2 violett */
+    .line-badge.type-u3 { background: #db7609; color: #fff; } /* U3 orange */
+    .line-badge.type-u4 { background: #00963f; color: #fff; } /* U4 grün */
+    .line-badge.type-u5 { background: #00889f; color: #fff; } /* U5 türkis */
+    .line-badge.type-u6 { background: #9d6830; color: #fff; } /* U6 braun */
+    /* S-Bahn - WL-S-Bahn-Badge-Blau */
     .line-badge.type-suburban {
-      background: #0055A4;
+      background: #0089c4;
       color: #fff;
     }
     /* Wien S-Bahn Stammstrecke - Pink/Magenta */
@@ -4789,6 +4791,7 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
     // (z.B. nachts, wenn gerade nichts fährt).
     const seen = new Set(availableLines.map(l => norm(l.name) + '|' + norm(l.towards)));
     lines.forEach(ln => {
+      rememberLineColor(ln.name, ln.lineColor, ln.lineTextColor);  // offizielle Badge-Farbe
       const dirs = ln.directions || [];
       // Steig-Netze (VOR/OÖVV/Kärnten/VVT/VVV): der Server liefert die Linie mit LEERER
       // richtungsId (reine Linien-Angabe — ihr /lines hat keine brauchbaren Richtungen).
@@ -7495,7 +7498,7 @@ function wienBadgeClass(name) {
   var n = String(name || '').trim().toUpperCase();
   if (/^U\d/.test(n)) {
     var u = n.substring(0, 2);
-    if (u === 'U1' || u === 'U2' || u === 'U3' || u === 'U4' || u === 'U6') return 'type-' + u.toLowerCase();
+    if (u === 'U1' || u === 'U2' || u === 'U3' || u === 'U4' || u === 'U5' || u === 'U6') return 'type-' + u.toLowerCase();
     return 'type-metro';
   }
   if (n.charAt(0) === 'N') return 'type-bus';   // Nightline
@@ -8487,6 +8490,7 @@ async function selectStop(id, name) {
   selectedStop = { id, name };
   selectedLines = new Set();
   availableLines = [];
+  _lineColorMap = {};  // Linienfarben pro Station neu ("1" kollidiert zwischen Netzen)
   regionalLinks = {}; regionalLinkModeLine = null; regionalLinkSel = [];
   editingStationIndex = null;  // Sicherstellen dass wir nicht im Bearbeiten-Modus sind
 
@@ -8741,6 +8745,7 @@ function extractLines(data) {
             return;
           }
 
+          rememberLineColor(name, line.lineColor, line.lineTextColor);  // offizielle Badge-Farbe
           if (!linesMap.has(key)) {
             linesMap.set(key, {
               name,
@@ -9145,7 +9150,7 @@ function renderLines() {
 
       html += `<div class="line-group">
         <div class="line-group-header">
-          <div class="line-badge ${badgeClass}">${lineName}</div>
+          <div class="line-badge ${badgeClass}" style="${badgeColorStyle(lineName)}">${lineName}</div>
           <div class="line-name">${lineName}</div>
         </div>
         <div class="line-directions">`;
@@ -9230,7 +9235,7 @@ function renderLines() {
       html += `
         <div class="line-group">
           <div class="line-group-header">
-            <div class="line-badge ${badgeClass}">${lineName}</div>
+            <div class="line-badge ${badgeClass}" style="${badgeColorStyle(lineName)}">${lineName}</div>
             <div class="line-name">Linie ${lineName}</div>
             <button class="line-toggle" onclick="toggleLineGroup('${lineName}')">${allSelected ? 'Abwählen' : 'Alle'}</button>
           </div>
@@ -9401,6 +9406,28 @@ function changeBisStop(lineName, rid, selectedIdx) {
   selectedLines.add(selectedIdx);
 
   renderLines();
+}
+
+// ===== OFFIZIELLE LINIENFARBEN (Trainboard Line-Colors, via api.straba.at) =====
+// Der Server reicht lineColor/lineTextColor pro Linie durch (Departures-Monitore und
+// /stops/lines). Hier zentral gemerkt (Key = Linienname wie angezeigt) und als
+// Inline-Style auf die Badges gelegt. Inline schlägt die CSS-Klassen-Fallbacks,
+// ohne Farbe bleibt alles beim bisherigen Klassen-Look (tram rot, bus blau, ...).
+// Karte wird pro Station neu befüllt (Namen wie "1" kollidieren zwischen Netzen).
+let _lineColorMap = {};
+function rememberLineColor(name, c, t) {
+  const n = String(name == null ? '' : name).trim();
+  if (!n || !c || !/^#[0-9a-fA-F]{6}$/.test(String(c))) return;
+  if (!_lineColorMap[n]) {
+    _lineColorMap[n] = {
+      c: String(c).toLowerCase(),
+      t: (t && /^#[0-9a-fA-F]{6}$/.test(String(t))) ? String(t).toLowerCase() : '#ffffff'
+    };
+  }
+}
+function badgeColorStyle(lineName) {
+  const e = _lineColorMap[String(lineName == null ? '' : lineName).trim()];
+  return e ? 'background:' + e.c + ';color:' + e.t + ';' : '';
 }
 
 function getLineTypeClass(type, lineName) {
@@ -11616,6 +11643,7 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
   selectedStop = { id, name };
   selectedLines = new Set();
   availableLines = [];
+  _lineColorMap = {};  // Linienfarben pro Station neu
   regionalLinkModeLine = null; regionalLinkSel = [];
   // Gespeicherte Richtungs-Verknüpfungen der Station wiederherstellen (Datengrundlage-Popup)
   const _editStation = editingStationIndex !== null ? stations[editingStationIndex] : null;
@@ -15604,8 +15632,17 @@ function renderDisplayTypeSections() {
       // Gruppen einmalig aus der gespeicherten Config seeden (überlebt Re-Render
       // dank _dtSeededCids-Guard → manuelle Änderungen werden nicht überschrieben).
       if (!_dtSeededCids.has(cidS)) {
-        var seededGroups = seedDtGroupFromConfig(cidS, (window._dtAllDirs && window._dtAllDirs[cidS]) || []);
-        _dtSeededCids.add(cidS);
+        var _seedDirs = (window._dtAllDirs && window._dtAllDirs[cidS]) || [];
+        var _seedRes = seedDtGroupFromConfig(cidS, _seedDirs);
+        var seededGroups = _seedRes.hatGruppen;
+        // Guard erst setzen, wenn das Seeding seine Quelle auch verarbeiten konnte:
+        // frühe Render-Läufe sehen leere/unvollständige Richtungen (die laden asynchron),
+        // matchen nichts und der Guard zementierte sonst den Stand ohne die m-Gruppen
+        // der Geräte-Config (Leonard-Fix). Ohne Quelle gibt es nichts zu seeden → Guard
+        // sofort, damit manuelle Änderungen nicht überschrieben werden.
+        var _guardOk = !_seedRes.hatQuelle
+                     || (_seedRes.quelleMitGruppen ? _seedRes.hatGruppen : _seedRes.matched > 0);
+        if (_seedDirs.length > 0 && _guardOk) _dtSeededCids.add(cidS);
         // Default = Automatisch. NUR wenn Gruppen aus der Config kommen ⇒ Manuell +
         // Statisch + Gruppierung An (damit die Gruppen sichtbar bleiben & gespeichert
         // werden). Beim manuellen Gruppieren/Umsortieren schalten confirmDtGroup/
@@ -15616,6 +15653,7 @@ function renderDisplayTypeSections() {
         // wenn die station.directions zum Seed-Zeitpunkt noch nicht vollständig geladen
         // waren (die Gruppe materialisiert sich dann beim Re-Seed nach initFtGrouping).
         var cfgHasGroups = ((((recommendedConfig && recommendedConfig.lineGroups) || '').indexOf('+') >= 0) ||
+                            (((typeof window !== 'undefined' && window._mrGroupSeed) || '').indexOf('+') >= 0) ||
                             (((recommendedConfig && recommendedConfig.rowOrderDestination) || '').indexOf('+') >= 0));
         // Manuelle Reihenfolge OHNE Gruppen: weicht die geseedete Reihenfolge von der
         // natürlichen (aufsteigenden) allDirs-Folge ab, hat der User umsortiert → Manuell.
@@ -15970,12 +16008,27 @@ function seedDtGroupFromConfig(cid, allDirs) {
   }
 
   var lg  = (recommendedConfig && recommendedConfig.lineGroups) || '';
-  var rod = (recommendedConfig && recommendedConfig.rowOrderDestination) || '';
+  // masterrow-Saat (Reihenfolge + m-Gruppen aus der Geräte-Config, Leonard-Fix): hat
+  // Vorrang vor rowOrderDestination, weil spätere Serialisierungen rod flach und in
+  // Stations-Reihenfolge neu aufbauen und die Gruppen damit verwerfen würden.
+  var mrSeed = (typeof window !== 'undefined' && window._mrGroupSeed) || '';
+  var rod = mrSeed || ((recommendedConfig && recommendedConfig.rowOrderDestination) || '');
   // Primär lineGroups (richtungsId-Tokens). Falls dort NICHTS matcht (z.B. weil die
   // nachgeladenen Richtungen keine/andere richtungsId haben → Token "1:Auwiesen" statt
   // "1:R"), Fallback auf rowOrderDestination (Ziel-Tokens).
-  var res = processSrc(lg);
-  if (res.matched === 0 && rod && rod !== lg) res = processSrc(rod);
+  // masterrow-Saat mit m-Gruppen schlägt ALLE anderen Quellen: diverse Serialisierungen
+  // befüllen lineGroups/rowOrderDestination nach dem Laden FLACH neu (Einzel-Tokens in
+  // Stations-Reihenfolge) — darüber gingen die Gruppen der Geräte-Config verloren,
+  // obwohl die Saat sie korrekt trug (Leonard, 20.09.2026).
+  var res = null;
+  if (mrSeed && mrSeed.indexOf('+') >= 0) {
+    res = processSrc(mrSeed);
+    if (res.matched === 0) res = null;   // Saat passt (noch) nicht → normale Quellen
+  }
+  if (!res) {
+    res = processSrc(lg);
+    if (res.matched === 0 && rod && rod !== lg) res = processSrc(rod);
+  }
 
   // Nicht abgedeckte (neue) Richtungen als Einzel-Einträge anhängen
   (allDirs || []).forEach(function(d, idx) {
@@ -15987,7 +16040,16 @@ function seedDtGroupFromConfig(cid, allDirs) {
   gd.orderList = res.orderItems;
   gd.creating = false;
   gd.selected = [];
-  return res.groups.length > 0;
+  // Rückgabe fürs Guard-Handling des Aufrufers: erst endgültig als "geseedet" markieren,
+  // wenn die vorhandene Quelle auch wirklich verarbeitet werden konnte (Leonard-Fix:
+  // frühe Render-Läufe sehen unvollständige Richtungen, ein zu früh gesetzter Guard
+  // zementierte den Stand ohne die m-Gruppen der Geräte-Config).
+  return {
+    hatGruppen: res.groups.length > 0,
+    matched: res.matched || 0,
+    hatQuelle: !!(lg || rod),
+    quelleMitGruppen: (String(lg).indexOf('+') >= 0) || (String(rod).indexOf('+') >= 0)
+  };
 }
 
 function startDtGroup(cid) {
@@ -16598,7 +16660,7 @@ function renderRowOrderList() {
       const line = dirInfo ? dirInfo.line : key.split(':')[0];
       const type = dirInfo ? dirInfo.type : '';
       const badgeClass = getLineTypeClass(type, line);
-      return `<span class="line-badge ${badgeClass}">${line}</span>`;
+      return `<span class="line-badge ${badgeClass}" style="${badgeColorStyle(line)}">${line}</span>`;
     }).join('');
 
     // Zieltext aus der ersten Richtung
@@ -18260,7 +18322,7 @@ function renderFtGroups() {
 
         return `
           <div class="ft-direction-chip" data-group-idx="${gIdx}" data-dir-idx="${dIdx}" data-action="remove-from-group">
-            <span class="line-badge ${badgeClass}">${lineName}</span>
+            <span class="line-badge ${badgeClass}" style="${badgeColorStyle(lineName)}">${lineName}</span>
             ${towards ? `<span class="dir-dest">${towards}</span>` : ''}
             <span class="chip-remove">x</span>
           </div>
@@ -18290,7 +18352,7 @@ function renderFtGroups() {
 
       return `
         <div class="ft-direction-chip selected" data-selection-idx="${idx}" data-action="toggle-selection">
-          <span class="line-badge ${badgeClass}">${lineName}</span>
+          <span class="line-badge ${badgeClass}" style="${badgeColorStyle(lineName)}">${lineName}</span>
           ${towards ? `<span class="dir-dest">${towards}</span>` : ''}
         </div>
       `;
@@ -18356,7 +18418,7 @@ function renderFtPool() {
     // Immer klickbar - Gruppierungsmodus startet automatisch beim ersten Klick
     return `
       <div class="ft-direction-chip clickable" data-pool-idx="${poolIdx}">
-        <span class="line-badge ${badgeClass}">${line}</span>
+        <span class="line-badge ${badgeClass}" style="${badgeColorStyle(line)}">${line}</span>
         ${towards ? `<span class="dir-dest">${towards}</span>` : ''}
       </div>
     `;
@@ -18692,6 +18754,8 @@ function applyFinetuningOrderToStations() {
 }
 
 function buildMasterAndTimeRows(gehwegByStopId) {
+  // Doppelte rid-Richtungen dürfen NIE als doppelte Tokens in die masterrow laufen
+  if (typeof dedupeDirectionsByRid === 'function') dedupeDirectionsByRid('buildMasterAndTimeRows');
   // Noch nicht per onchange übernommene Gehweg-Eingaben aus dem DOM nachziehen (Wizard + Feintuning
   // haben data-stopids) — sonst ging der Gehweg beim "Weiter"-Klick verloren, wenn onchange nicht feuerte.
   try {
@@ -19917,7 +19981,12 @@ async function sendConfigDirectToDevice(configData, originalConfig) {
     formData.append('silberpfeil', configData.silberpfeil);
     formData.append('niederflurblink', configData.niederflurblink);
     formData.append('delayhighlight', configData.delayhighlight);
-    formData.append('colour', configData.colour);
+    // colour-Liste IMMER parallel zu den masterrow+timerow-Segmenten schicken. Kompakt
+    // mit ZWEI gleichfarbigen Segmenten (Kunde Johann, Tempelhof: BVG-U6 + DB-alle,
+    // beide c101) schrieb sonst nur "101" ohne Komma, und Firmware vor 2.5.3 erkannte
+    // die Config am fehlenden Komma nicht als Multi-Display → nur das erste Segment
+    // lief. "101,101" ist eindeutig und funktioniert auch auf älterer Firmware.
+    formData.append('colour', colourListFromRows(configData.masterrow, configData.timerow, configData.colour));
     formData.append('displaylight', configData.displaylight);
     formData.append('textcolor', configData.textcolor);  // Wien Schriftfarbe
     formData.append('wienbg', configData.wienbg);          // Wien BG (1=Grün, 0=Schwarz)
@@ -20567,9 +20636,16 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
                 }
 
                 if (shouldInclude) {
-                  // Duplikate vermeiden
+                  // Duplikate vermeiden. WICHTIG: gleiche richtungsId = DIESELBE Auswahl.
+                  // An Verzweigungs-Steigen (Frankfurt U2: Nieder-Eschbach und Bad Homburg
+                  // teilen sich rid st…921:1:1lU2; M36 Westbf/Eschenheimer Tor ebenso)
+                  // lieferte der Feed mehrere towards-Varianten desselben rids → die Linie
+                  // stand doppelt in der Auswahl mit "Richtungen, die nie gewählt wurden"
+                  // (Kunde Leonard, 20.09.2026). Ein rid = eine Zeile.
                   const exists = station.directions.some(d =>
-                    d.line === lineName && d.towards === towards
+                    d.line === lineName && (d.towards === towards ||
+                      (!!line.richtungsId && !!d.richtungsId &&
+                       String(d.richtungsId) === String(line.richtungsId)))
                   );
                   if (!exists) {
                     station.directions.push({
@@ -20733,6 +20809,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // landen. Hier final per fullId deduplizieren (erste behalten).
   dedupeStationsByFullId();
 
+  // Richtungs-Dubletten mit identischer richtungsId zusammenlegen (Leonard-Fall).
+  dedupeDirectionsByRid('loadExistingConfig');
+
   // „Nach Städten gruppieren"-Zustand aus der Config ableiten: mehrere Stationen derselben
   // Stadt-Gruppe (Netz+colour) in GETRENNTEN Segmenten = Toggle AUS (Instanz-Modus).
   // Sonst Default AN. Nur relevant wenn die Firmware merged Segmente überhaupt kann.
@@ -20752,6 +20831,37 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   if (stations.length > 0) {
     updateStationsList();
   }
+}
+
+// Richtungs-Dubletten mit IDENTISCHER richtungsId zusammenlegen: an Verzweigungs-
+// Steigen liefert der Feed mehrere towards-Varianten desselben rids (Frankfurt U2
+// Nieder-Eschbach/Bad Homburg auf st…921:1:1lU2, M36 Westbf/Eschenheimer Tor), und
+// die mehrfach anlaufenden Lade-Pfade (Retry/Backoff) konnten beide in die Auswahl
+// legen — der Kunde sah "Richtungen, die nie gewählt wurden" (Leonard, 20.09.2026).
+// Ein rid = eine Auswahl = eine Zeile; als Beschriftung bleibt das erste echte Ziel.
+// Idempotent, läuft beim Laden, am Handler-Ende und vor jedem masterrow-Bau.
+function dedupeDirectionsByRid(quelle) {
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(st) {
+    if (!st || !Array.isArray(st.directions) || st.directions.length < 2) return;
+    var byKey = {};
+    var before = st.directions.length;
+    st.directions = st.directions.filter(function(d) {
+      var ridS = String(d.richtungsId || '');
+      if (!ridS) return true;                      // ohne rid nichts zusammenlegen
+      var key = d.line + '|' + ridS;
+      var first = byKey[key];
+      if (first) {
+        if (!first.towards && d.towards) first.towards = d.towards;
+        return false;
+      }
+      byKey[key] = d;
+      return true;
+    });
+    if (st.directions.length !== before) {
+      console.log('[' + (quelle || 'dedupeDirections') + '] ' + (st.fullId || st.stopId) + ': ' +
+                  before + ' → ' + st.directions.length + ' Richtungen (gleiche richtungsId zusammengelegt)');
+    }
+  });
 }
 
 // Entfernt doppelte Stationen (gleiche fullId) aus dem globalen stations-Array.
@@ -20821,7 +20931,13 @@ async function resolveStationName(network, stopId) {
 // Stelle, wo die Richtung gespeichert ist. Wien (WL:/numerische RBL) wird übersprungen
 // (nutzt rowOrder stopId:Linie; der ">"-Wert ist dort nur ein Label).
 function extractDestTokensFromRows(masterrow, timerow) {
-  const tokens = [];
+  // Liefert die Richtungs-Tokens in masterrow-REIHENFOLGE und baut die Gruppen aus dem
+  // m-Feld des Segments wieder zusammen (m<tokenIdx>:<gid> → Tokens gleicher Gruppe mit
+  // "+" verbunden, an der Position des ersten Mitglieds). Vorher gingen Gruppen und
+  // Reihenfolge beim Laden einer Geräte-Config verloren: die Firmware-Debug-Config trägt
+  // weder linegroups noch roworderdestination, die masterrow ist die einzige Quelle
+  // (Kunde Leonard, 20.09.2026: "mal funktioniert die Gruppierung nicht").
+  const entries = [];
   const seen = new Set();
   [masterrow, timerow].forEach(function(row) {
     if (!row || typeof row !== 'string') return;
@@ -20830,6 +20946,21 @@ function extractDestTokensFromRows(masterrow, timerow) {
       if (parts.length < 2) return;
       const rbl = (parts[0] || '').trim();
       if (rbl.indexOf('WL:') === 0 || /^\d/.test(rbl)) return;  // Wien überspringen
+      // Gruppen-Feld des Segments: m0:1,1:1,5:2 … (Token-Index → Gruppen-Id)
+      const gidByIdx = {};
+      for (let pi = 2; pi < parts.length; pi++) {
+        const f = (parts[pi] || '').trim();
+        if (f.charAt(0) !== 'm') continue;
+        f.substring(1).split(',').forEach(function(pair) {
+          const ci = pair.indexOf(':');
+          if (ci <= 0) return;
+          const idx = parseInt(pair.substring(0, ci), 10);
+          const gid = pair.substring(ci + 1).trim();
+          if (!isNaN(idx) && gid) gidByIdx[idx] = gid;
+        });
+      }
+      // Tokens dieses Segments in Reihenfolge einsammeln
+      const segToks = [];
       parts[1].split(/[,+]/).forEach(function(lt) {
         lt = lt.trim();
         const gt = lt.indexOf('>');
@@ -20837,15 +20968,46 @@ function extractDestTokensFromRows(masterrow, timerow) {
         const line = lt.substring(0, gt).trim();
         const rid = lt.substring(gt + 1).trim();
         if (!line || !rid) return;
-        const tok = line + ':' + rid;
-        if (!seen.has(tok)) { seen.add(tok); tokens.push(tok); }
+        segToks.push(line + ':' + rid);
+      });
+      // Gruppen zusammenfassen: an der Position des ersten Mitglieds, Rest überspringen
+      const consumed = new Set();
+      segToks.forEach(function(tok, idx) {
+        if (consumed.has(idx)) return;
+        const gid = gidByIdx[idx];
+        if (gid) {
+          const member = [];
+          segToks.forEach(function(t2, i2) {
+            if (gidByIdx[i2] === gid && !consumed.has(i2)) { member.push(t2); consumed.add(i2); }
+          });
+          const joined = member.join('+');
+          if (joined && !seen.has(joined)) { seen.add(joined); entries.push(joined); }
+        } else {
+          consumed.add(idx);
+          if (!seen.has(tok)) { seen.add(tok); entries.push(tok); }
+        }
       });
     });
   });
-  return tokens.join(',');
+  return entries.join(',');
 }
 
 // ==================== ESP32 COMMUNICATION ====================
+// colour-Liste aus den Segment-Farben der master-/timerow ableiten (|c<N>| je Segment).
+// Fallback = bisheriger colour-Wert, wenn keine Segmente lesbar sind.
+function colourListFromRows(masterrow, timerow, fallback) {
+  var cols = [];
+  [masterrow, timerow].forEach(function(row) {
+    String(row || '').split(';').forEach(function(seg) {
+      seg = seg.trim();
+      if (!seg) return;
+      var m = seg.match(/\|c(\d+)(?:\||$)/);
+      if (m) cols.push(m[1]);
+    });
+  });
+  return cols.length ? cols.join(',') : String(fallback == null ? '' : fallback);
+}
+
 async function handleConfigMessage(data) {
   // ÖBB-gebrandete Geräte erkennen: die Geräteseite schickt brand in loadExistingConfig mit.
   if (data.type === 'loadExistingConfig' && typeof noteDeviceBrand === 'function') noteDeviceBrand(data.brand);
@@ -20866,10 +21028,13 @@ async function handleConfigMessage(data) {
     // Markiere, dass eine bestehende Config geladen wurde
     hasExistingConfig = true;
 
-    // WICHTIG: Bestehende Stationen löschen, da loadFullConfig vollständigere Daten hat
-    // (inkl. linefilterdestination). loadExistingConfig könnte vorher schon
-    // mit unvollständigen Daten gelaufen sein.
-    stations.length = 0;
+    // KEIN Früh-Clear mehr an dieser Stelle: loadExistingConfig(clearFirst=true) leert
+    // die Stationen INNERHALB der Serialisierung (Impl-Race-Fix). Der zusätzliche
+    // sofortige Clear hier riss bei den mehrfach anlaufenden Config-Messages
+    // (loadExistingConfig + loadFullConfig + Retries) laufenden Rekonstruktionen die
+    // Stationen unterm Hintern weg: je nach Timing fehlten danach ganze Stationen oder
+    // Richtungen standen doppelt (Kunde Leonard, 20.09.2026: "mal fehlt eine Zeile,
+    // beim Öffnen ist alles anders").
 
     // Unterstütze beide Feldnamen (rbl_id/rbl und lines_filter/filter)
     const rblId = data.config.rbl_id || data.config.rbl || '';
@@ -20886,6 +21051,12 @@ async function handleConfigMessage(data) {
       const fromRows = extractDestTokensFromRows(data.config.masterrow, data.config.timerow);
       if (fromRows) rowOrderDest = fromRows;
     }
+    // Gruppen-Saat SOFORT ablegen (vor loadExistingConfig): das Gruppen-Seeding der
+    // Display-Sektionen kann schon WÄHREND des Ladens laufen und sein Einmal-Guard
+    // (_dtSeededCids) zementiert sonst einen Stand ohne die m-Gruppen der Geräte-
+    // Config. Guard hier zurücksetzen: neue Config = frisch seeden (Leonard-Fix).
+    if (rowOrderDest) window._mrGroupSeed = rowOrderDest;
+    if (typeof _dtSeededCids !== 'undefined' && _dtSeededCids && _dtSeededCids.clear) _dtSeededCids.clear();
 
     // Load Wien data first if any WL stations (WL:-Prefix ODER nackte numerische Alt-IDs).
     if (rblId && rblId.split(',').some(function(p){ p=(p||'').trim(); return p.indexOf('WL:')===0 || /^\d/.test(p); })) {
@@ -20921,7 +21092,18 @@ async function handleConfigMessage(data) {
     }
     if (data.config.roworderdestination) {
       recommendedConfig.rowOrderDestination = data.config.roworderdestination;
+    } else if (rowOrderDest) {
+      // Aus der masterrow extrahierte Reihenfolge samt m-Gruppen ("+"-Tokens) als
+      // autoritative Quelle setzen: calculateRecommendedConfig hat rod eben aus der
+      // Stations-Reihenfolge FLACH neu aufgebaut und damit Gruppen und Ordnung der
+      // Geräte-Config verworfen (Leonard: "mal funktioniert die Gruppierung nicht,
+      // Einstellungen beim Öffnen wieder anders").
+      recommendedConfig.rowOrderDestination = rowOrderDest;
     }
+    // Zusätzlich UNVERLIERBAR für das Gruppen-Seeding ablegen: diverse spätere
+    // Serialisierungen bauen recommendedConfig.rowOrderDestination flach neu auf,
+    // seedDtGroupFromConfig greift dann auf diese masterrow-Saat zurück.
+    if (rowOrderDest) window._mrGroupSeed = rowOrderDest;
     // Anzeige-Modus (Gemischt/Slideshow)
     if (data.config.display_mode !== undefined) {
       recommendedConfig.displayMode = parseInt(data.config.display_mode) || 1;
