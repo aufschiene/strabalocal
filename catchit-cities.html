@@ -4811,6 +4811,24 @@ function ridSeparatesDirections(network, stopId, line, towards) {
   // Wien/WLB: die rbl IST die Richtung (ein Bahnsteig = eine Fahrtrichtung), mehrere Ziele
   // darunter sind immer Äste oder Kurzführungen. Nie auftrennen.
   if (network === 'WL' || network === 'WLB') return true;
+  // ZUERST der Linien-Index der Haltestelle: er ist tageszeit-unabhängig und hat die Regel
+  // bereits angewandt (der Server fasst zusammen, wo der Steig trennt). Führt er für diese
+  // Linie MEHRERE Ziele unter derselben Bahnsteig-Nummer, sind das echte Richtungen.
+  // Ohne diesen Vorrang urteilten die Live-Abfahrten, und die zeigen abends nur die eine
+  // Richtung, die gerade fährt (Paul 20.09.2026).
+  try {
+    var _ix = (window._dirTextByStop || {})[network + ':' + stopId];
+    if (_ix) {
+      var _ln = String(line || '').trim();
+      var _mehr = false;
+      Object.keys(_ix).forEach(function(k) {
+        var cut = k.lastIndexOf('|');
+        if (cut < 0 || k.substring(0, cut) !== _ln) return;
+        if (/^p\d+$/.test(k.substring(cut + 1)) && (_ix[k] || []).length > 1) _mehr = true;
+      });
+      if (_mehr) return false;
+    }
+  } catch (e) { /* Index optional */ }
   var k = network + ':' + stopId + '|' + String(line || '').trim();
   var e = _ridsByStopLine[k];
   if (!e) return true;
@@ -4919,12 +4937,17 @@ async function fetchStopLinesCached(network, stopId) {
             // Volle Richtungen (Linie + rid → Zieltext) separat merken: der Nachtrag unten
             // soll nicht nur die Linie kennen, sondern auch ihr Ziel benennen können.
             if (!window._dirTextByStop) window._dirTextByStop = {};
+            // Mehrere Ziele unter EINER rid sind möglich (Steig trennt nicht) — deshalb
+            // Listen, nicht Einzelwerte: sonst überschrieb Högsätra die Näset-Richtung.
             const dt = {};
             ((d && d.lines) || []).forEach(l => {
               (l.directions || []).forEach(dd => {
                 const rid = String(dd.richtungsId || '').trim();
                 const tw = String(dd.towards || '').trim();
-                if (rid && tw) dt[String(l.name || '').trim() + '|' + rid] = tw;
+                if (!rid || !tw) return;
+                const kk = String(l.name || '').trim() + '|' + rid;
+                if (!dt[kk]) dt[kk] = [];
+                if (dt[kk].indexOf(tw) < 0) dt[kk].push(tw);
               });
             });
             window._dirTextByStop[k] = dt;
@@ -13820,7 +13843,12 @@ function awStationKey(s) { return String(s.fullId || (s.network + ':' + s.stopId
 // Zeilen der Seiten-Zuteilung: EINE pro (Haltestelle, Linie) — Paul will nach Linie
 // zuordnen. Stationen ohne Linien (Alle Abfahrten) bleiben eine Zeile ('*').
 function awDirKey(d) {
-  return String(d.line) + '>' + String(d.richtungsId || d.towards || '');
+  // Richtungs-Id UND Ziel im Schlüssel: wo der Steig nicht trennt, tragen zwei echte
+  // Fahrtrichtungen dieselbe Id (Stockholm: 80 nach Ropsten und nach Nybroplan beide "p1").
+  // Nur die Id im Schlüssel warf sie zu EINER Zeile zusammen, dann fehlten Felder in der
+  // Seiten-Zuordnung (Paul 20.09.2026). Verzweigungen sind hier unkritisch: die sind zu
+  // diesem Zeitpunkt bereits zu einer Richtung zusammengelegt.
+  return String(d.line) + '>' + String(d.richtungsId || '') + '|' + String(d.towards || '');
 }
 function awPageRows(grp) {
   var rows = [];
@@ -21490,6 +21518,59 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       });
     }
 
+    // EIN TOKEN, MEHRERE RICHTUNGEN: Trennt der Steig an einem Halt nicht, deckt ein
+    // Token wie "238>p1" BEIDE Fahrtrichtungen ab (Näset und Högsätra fahren dort beide
+    // von Steig 1). Aus den Live-Abfahrten kam abends aber nur die eine, die gerade fährt,
+    // also fehlten Zeilen in der Seiten-Zuordnung (Paul 20.09.2026: "es sollten eig 6
+    // auswählbare felder sein"). Der Linien-Index der Haltestelle kennt beide — und er
+    // liefert sie bereits nach derselben Regel zusammengefasst, die auch hier gilt: wo der
+    // Steig trennt (Frankfurt, Graz), steht pro Richtung genau ein Eintrag.
+    if (!isAllDep && !isJourney && Array.isArray(stationDests) && stationDests.length) {
+      const _ix = await fetchStopLinesCached(network, bareStopId);
+      const _dtx = (window._dirTextByStop || {})[network + ':' + bareStopId] || {};
+      if (_ix && _ix.length && Object.keys(_dtx).length) {
+        // Index nach Linie+rid gruppieren: mehrere Ziele unter einer rid = mehrere Richtungen
+        stationDests.forEach(sd => {
+          if (!sd.line) return;
+          const rid = String(sd.towards || '');
+          if (!/^p\d+$/.test(rid)) return;          // nur reine Bahnsteig-Nummern (siehe Regel)
+          const ziele = _dtx[String(sd.line) + '|' + rid];
+          if (ziele && ziele.length > 1) {
+            // Der Steig deckt mehrere Richtungen ab → alle anlegen
+            ziele.forEach(tw => {
+              const da = station.directions.some(d => d.line === sd.line &&
+                String(d.richtungsId || '') === rid && String(d.towards || '') === tw);
+              if (!da) station.directions.push({ line: sd.line, towards: tw, type: '', richtungsId: rid });
+            });
+            return;
+          }
+          if (ziele) return;
+          // ÜBERGANG ALTER KONFIGURATIONEN: Der Server hat für manche Netze auf echte
+          // Richtungs-Ids umgestellt (Schweden, 20.09.2026: aus dem Bahnsteig "p1" wurde
+          // die Fahrtrichtung "sd0l80"). Ein altes Bahnsteig-Token findet dann nichts mehr,
+          // und die Station stünde ohne Richtungen da. Der Bahnsteig deckte ohnehin ALLE
+          // Richtungen der Linie ab, also alle aus dem Index anlegen — der Kunde sieht
+          // seine Auswahl wieder und schreibt sie beim nächsten Speichern neu fest.
+          var _neu = [];
+          Object.keys(_dtx).forEach(k => {
+            const cut = k.lastIndexOf('|');
+            if (cut < 0 || k.substring(0, cut) !== String(sd.line)) return;
+            (_dtx[k] || []).forEach(tw => _neu.push({ rid: k.substring(cut + 1), tw: tw }));
+          });
+          _neu.forEach(n => {
+            const da = station.directions.some(d => d.line === sd.line &&
+              String(d.richtungsId || '') === n.rid && String(d.towards || '') === n.tw);
+            if (!da) station.directions.push({ line: sd.line, towards: n.tw, type: '', richtungsId: n.rid });
+          });
+          if (_neu.length) {
+            // Das alte, nicht mehr gültige Token darf nicht als leere Richtung stehen bleiben
+            station.directions = station.directions.filter(d =>
+              !(d.line === sd.line && String(d.richtungsId || '') === rid && !String(d.towards || '').trim()));
+          }
+        });
+      }
+    }
+
     // MERGED SEGMENT: die Config-Tokens gelten für ALLE Stops des Segments, die Live-
     // Abfahrten entscheiden, welcher Stop welche bekommt. Fährt eine Linie gerade nicht
     // (abends, Wochenende), fiel sie an diesem Stop komplett weg, obwohl sie dort verkehrt
@@ -21511,7 +21592,8 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
                            /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref);
           // Zieltext aus dem Index dazu, damit die Richtung benannt ist statt nur "p1"
           const _dtMap = (window._dirTextByStop || {})[network + ':' + bareStopId] || {};
-          const _tw = looksRid ? (_dtMap[String(sd.line) + '|' + ref] || '') : ref;
+          const _twArr = _dtMap[String(sd.line) + '|' + ref];
+          const _tw = looksRid ? ((Array.isArray(_twArr) ? _twArr[0] : _twArr) || '') : ref;
           station.directions.push({ line: sd.line, towards: _tw,
                                     type: '', richtungsId: looksRid ? ref : '' });
         });
@@ -21577,6 +21659,32 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           station.directions.length + ')');
       }
     }
+
+    // AUFRÄUMEN NACH ALLEN NACHTRÄGEN: Hat der Server für ein Netz auf echte Richtungs-Ids
+    // umgestellt (Schweden 20.09.2026: Bahnsteig "p1" → Fahrtrichtung "sd0l80"), stehen alte
+    // Bahnsteig-Tokens neben den neuen Richtungen — einmal ohne Ziel, einmal als Dublette
+    // desselben Ziels. Kennt der Linien-Index die Linie, gewinnt er: Einträge mit einer Id,
+    // die es dort nicht mehr gibt, fliegen raus. Ohne Index bleibt alles unangetastet, damit
+    // offline nichts verloren geht.
+    try {
+      const _ixMap = (window._dirTextByStop || {})[network + ':' + bareStopId];
+      if (_ixMap && Object.keys(_ixMap).length && station.directions.length) {
+        const _gueltig = {};      // Linie → Set gültiger rids
+        Object.keys(_ixMap).forEach(k => {
+          const cut = k.lastIndexOf('|');
+          if (cut < 0) return;
+          const ln = k.substring(0, cut);
+          (_gueltig[ln] = _gueltig[ln] || {})[k.substring(cut + 1)] = 1;
+        });
+        station.directions = station.directions.filter(d => {
+          const g = _gueltig[String(d.line)];
+          if (!g) return true;                                  // Linie unbekannt → behalten
+          const rid = String(d.richtungsId || '');
+          if (!rid || g[rid]) return true;                      // gültige oder rid-lose Richtung
+          return false;                                          // veraltete Id → weg
+        });
+      }
+    } catch (e) { /* Aufräumen ist optional */ }
 
     stations.push(station);
     _builtThisRun.push(station);
@@ -21670,6 +21778,29 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           if (!target) target = segStations[0];
           const looksRid = /^d\d/.test(ref) || /^\d+$/.test(ref) || ref === 'H' || ref === 'R' ||
                            /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref);
+          // VERALTETE ID NICHT NACHTRAGEN: Hat der Server für dieses Netz auf echte
+          // Richtungs-Ids umgestellt (Schweden 20.09.2026), kennt der Linien-Index die alte
+          // Bahnsteig-Nummer nicht mehr. Sie hier einzutragen erzeugte eine Richtung ohne
+          // Ziel neben den echten. Nur überspringen, wenn der Index die Linie kennt UND die
+          // Richtungen bereits vorhanden sind — sonst ginge Konfiguriertes verloren.
+          if (looksRid) {
+            const _ixT = (window._dirTextByStop || {})[(target.network || '') + ':' + (target.stopId || '')];
+            if (_ixT) {
+              let _kennt = false, _veraltet = true;
+              Object.keys(_ixT).forEach(k => {
+                const cut = k.lastIndexOf('|');
+                if (cut < 0 || k.substring(0, cut) !== String(line)) return;
+                _kennt = true;
+                if (k.substring(cut + 1) === ref) _veraltet = false;
+              });
+              const _hatSchon = (target.directions || []).some(d => String(d.line) === String(line));
+              if (_kennt && _veraltet && _hatSchon) {
+                console.warn('[loadExistingConfig] Token "' + t + '" nutzt eine veraltete Richtungs-Id — ' +
+                             'die Linie ist mit ihren aktuellen Richtungen bereits vorhanden');
+                continue;
+              }
+            }
+          }
           target.directions.push({ line: line, towards: looksRid ? '' : ref,
                                    type: '', richtungsId: looksRid ? ref : '' });
           union.add(line + '|' + ref);
