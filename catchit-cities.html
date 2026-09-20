@@ -6,7 +6,7 @@
   <title>catch-it Cities</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Asap+Condensed:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2285,17 +2285,34 @@
     /* Display Preview in Finetuning */
     .finetuning-step .preview-container {
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
       margin-bottom: 24px;
+      /* Klebt beim Scrollen oben, der restliche Inhalt taucht dahinter ab */
+      position: sticky;
+      top: -1px;
+      z-index: 60;
+      background: var(--paper);
+      padding: 6px 0 12px;
+      border-radius: 0 0 14px 14px;
+      box-shadow: 0 14px 16px -14px rgba(0,0,0,0.5);
+    }
+    /* Bezel wie im Design-Wizard: dunkler Rahmen, das Display darin 1:1 in
+       Gerätepixeln (320x170), damit die Nachbildungen nicht gestaucht werden. */
+    .finetuning-step .preview-bezel {
+      background: #111;
+      border-radius: 14px;
+      padding: 10px 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.3);
+      max-width: 100%;
     }
     .finetuning-step .preview-display {
-      width: 220px;
-      height: 130px;
+      width: 320px;
+      max-width: 100%;
+      height: 170px;
       background: #000;
-      border-radius: 12px;
-      border: 4px solid #333;
+      border-radius: 4px;
       overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     }
 
     /* Bottom Actions — boxy Retro (wie Installer) */
@@ -3220,10 +3237,11 @@
       <!-- Wechselgeschwindigkeit (nur bei Multi-Display) -->
       <div id="quickSpeedRow" style="display:none;margin-bottom:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <div style="font-size:14px;font-weight:600;">Wechseln</div>
+          <div style="min-width:0;padding-right:10px;">
+            <div style="font-size:14px;font-weight:600;">Anzeigedauer</div>
+            <div style="font-size:12px;color:#999;">Wie lange eine Seite steht, bis zur nächsten gewechselt wird</div>
           </div>
-          <div class="toggle-row" id="quickSpeed" style="gap:0;">
+          <div class="toggle-row" id="quickSpeed" style="gap:0;flex:0 0 auto;">
             <button class="toggle-btn" data-value="5" onclick="setFtToggleVal('quickSpeed',5)" style="border-radius:8px 0 0 8px;">5s<span style="display:block;font-size:10px;font-weight:400;">Sehr schnell</span></button>
             <button class="toggle-btn" data-value="8" onclick="setFtToggleVal('quickSpeed',8)">8s<span style="display:block;font-size:10px;font-weight:400;">Schnell</span></button>
             <button class="toggle-btn active" data-value="12" onclick="setFtToggleVal('quickSpeed',12)">12s<span style="display:block;font-size:10px;font-weight:400;">Normal</span></button>
@@ -3511,12 +3529,21 @@
       <p>Passe dein Display individuell an</p>
     </div>
 
-    <!-- Display Preview: AUSGEBLENDET (Paul 2026-07-13, war meistens nur schwarz).
-         Element bleibt im DOM, weil updateFinetuningPreview/ftFocusPreview hineinschreiben —
-         nur nicht mehr sichtbar. Bei Bedarf display:none entfernen. -->
-    <div class="preview-container" style="display:none;">
-      <div class="preview-display" id="finetuningPreview">
-        <!-- Wird dynamisch gefüllt -->
+    <!-- Geräte-Vorschau über der Display-Ansicht: WIEDER SICHTBAR (Paul 20.09.2026).
+         War seit 13.07.2026 ausgeblendet, weil sie meistens nur schwarz war. Ursachen
+         behoben: Box hatte 220x130 statt der echten 320x170 (Renderer wurden gestaucht,
+         das Eigene Display sogar abgeschnitten), und Display-Typen ohne eigene
+         Nachbildung ließen html leer → schwarze Box. Jetzt echte Displaygröße im
+         Bezel wie im Design-Wizard, plus generischer Fallback in updateFinetuningPreview. -->
+    <!-- STICKY (Paul 20.09.2026): das Display bleibt beim Scrollen oben stehen, der
+         Inhalt verschwindet dahinter. Der Knopf darüber klappt die Vorschau zu
+         (Zustand bleibt über localStorage erhalten). -->
+    <div class="preview-container" id="ftPreviewBar">
+      <button id="ftPreviewToggleBtn" onclick="ftTogglePreviewCollapsed()" style="border:none;background:transparent;color:#777;font-size:12px;font-weight:600;cursor:pointer;padding:2px 8px 6px;font-family:inherit;">&#9662; Display-Vorschau zuklappen</button>
+      <div class="preview-bezel" id="ftPreviewBezel">
+        <div class="preview-display" id="finetuningPreview">
+          <!-- Wird dynamisch gefüllt -->
+        </div>
       </div>
     </div>
 
@@ -12427,10 +12454,14 @@ function goToDisplayConfig() {
     }
   }
 
-  // Anzeigedauer IMMER zeigen (Blatt-Takt gilt in allen Modi, nicht nur Multi-Display)
+  // Anzeigedauer nur bei Spielerisch zeigen (Paul, 20.09.2026): Kunden verwechselten
+  // die Seitendauer mit dem schnellen Wechsel der zwei Abfahrtszeiten in einer Zeile.
+  // Im Kompakt-Modus wirkt der Blatt-Takt (Umblättern) zwar weiter, ist dort aber
+  // bewusst nicht mehr einstellbar; der gespeicherte Wert bleibt erhalten, weil
+  // getFtToggleVal auch versteckte Toggles liest (Seed bei der Restaurierung unten).
   var speedRow = document.getElementById('quickSpeedRow');
   if (speedRow) {
-    speedRow.style.display = '';
+    speedRow.style.display = (getSavedDisplayStyle() === 'playful') ? '' : 'none';
   }
 
   // Nachtmodus Toggle mit bestehender Einstellung initialisieren
@@ -13241,7 +13272,7 @@ const DISPLAY_TYPE_FEATURES = {
   1:  { rows: true, sorting: true, grouping: true, textColor: true, chopper: true, silberpfeil: true, altNext: true, name: 'Wiener Linien' },
   2:  { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Grüne Dot Matrix', offline: true },
   3:  { rows: true, sorting: true, grouping: true, name: 'VBB Berlin', offline: true },
-  4:  { rows: true, sorting: true, grouping: true, name: 'WLB Badner Bahn', offline: true },
+  4:  { rows: true, sorting: true, grouping: true, altNext: true, name: 'WLB Badner Bahn', offline: true },
   5:  { rows: false, sorting: false, grouping: false, name: 'DB S-Bahn' },
   6:  { rows: false, sorting: false, grouping: false, name: 'DB Fernverkehr' },
   7:  { rows: true, sorting: true, grouping: true, altNext: true, name: 'Blau/Gelb' },
@@ -13250,7 +13281,7 @@ const DISPLAY_TYPE_FEATURES = {
   10: { rows: true, sorting: true, grouping: true, name: 'Straba', offline: true },
   11: { rows: false, sorting: false, grouping: false, name: 'ÖBB Fernverkehr', offline: true },
   12: { rows: true, minRows: 2, maxRows: 3, defaultRows: 2, sorting: false, grouping: false, delayHighlight: true, name: 'ÖBB S-Bahn' },
-  13: { rows: true, sorting: true, grouping: true, maxRows: 4, name: 'Holding Graz', offline: true },
+  13: { rows: true, sorting: true, grouping: true, maxRows: 4, altNext: true, name: 'Holding Graz', offline: true },
   14: { rows: false, sorting: false, grouping: false, name: 'Westbahn' },
   15: { rows: true, sorting: true, grouping: true, maxRows: 4, bigText: true, defaultRows: 4, name: 'Orange Matrix', offline: true },
   16: { rows: true, sorting: true, grouping: true, altNext: true, name: 'Prag / CZ-HU' },
@@ -13263,9 +13294,11 @@ const DISPLAY_TYPE_FEATURES = {
   26: { rows: true, sorting: true, grouping: true, maxRows: 5, defaultRows: 3, bigText: true, altNext: true, name: 'CH/LI' },
   // Eigene Displays (Custom): colour 101-103 = customrow-Slot c1-c3. Frei gestaltbares
   // Bodo-Layout (Farben, Hintergrund Simpel/Pixel, Schriftart, Badge-Farben pro Linie, Name).
-  101: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, name: 'Eigenes Display 1' },
-  102: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, name: 'Eigenes Display 2' },
-  103: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, name: 'Eigenes Display 3' }
+  // maxRows 5: die Firmware rendert im Custom-Display bis zu 5 Zeilen und schaltet ab 4
+  // Zeilen selbst auf die kleineren Schriftgrade um (wie CH/LI und Matrix).
+  101: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, maxRows: 5, name: 'Eigenes Display 1' },
+  102: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, maxRows: 5, name: 'Eigenes Display 2' },
+  103: { rows: true, sorting: true, grouping: true, altNext: true, customColors: true, maxRows: 5, name: 'Eigenes Display 3' }
 };
 
 // Display-Typen die einen Schriftgrößen-Toggle haben (Graz auch)
@@ -13570,6 +13603,7 @@ function setFtCompactSeparate(mode) {
   if (!ftIsMultiDisplay) ftIsManualAssignment = false;
   updateStyleAssignmentUI();
   renderDisplayTypeSections();
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
 }
 
 // Optionen eines Display-Typ-Dropdowns: leere „Eigenes Display"-Slots ausblenden
@@ -13647,6 +13681,7 @@ function ftSetKompaktDisplay(val) {
     stations.forEach(function(s) { s.colourOverride = cid; });
   }
   renderDisplayTypeSections();
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
 }
 
 // Sichtbarkeit von Zuordnung (Spielerisch) vs. Einzel-Display-Wähler (Kompakt).
@@ -13825,7 +13860,9 @@ function autoRowsForColour(cid) {
   if (cid === 12) return 2;                       // ÖBB S-Bahn: Standard 2 (3 nur manuell)
   if (cid === 22) return 3;                       // MVG: immer 3
   if (cid === 14) return Math.max(Math.min(dirCount, 3), 2);  // Westbahn: 2-3
-  // Matrix-Familie (Linz/Graz/Orange/SW/Matrix/Paper White): 1 bis maxRows aus Anzahl.
+  // Matrix-Familie (Linz/Graz/Orange/SW/Matrix/Paper White) und eigene Displays:
+  // 1 bis maxRows aus der Anzahl der Richtungen. Greift nur bei noch nie gespeicherten
+  // Displays, rowsForColour liest vorher ftRowsByCid und das 'r' aus displaysettings.
   if ((f.maxRows || 0) >= 4) return Math.min(Math.max(dirCount, 1), 4);
   // Wien & Rest: 1→3, 2→2, 3→3, 4→2, 5+→3 (Single-Mode/Paging-Optik)
   if (dirCount === 1) return 3;
@@ -13946,8 +13983,9 @@ function dsStrVal(cid, key) {
 // Pro-Linie-Liste P) die displaysettings nicht aufblähen. Das Gerät sieht c101
 // in der masterrow und weiß: Design steht in customrow-Segment c1.
 // Defaults = Blau/Gelb (DisplayBodo); G=Hintergrund (1 Simpel, 2 Pixel),
-// F=Schriftart (1 Modern/Poppins, 2 Classic/ÖBB, 3 Matrix DACH, 4 Matrix CZ).
-var FC_DEFAULTS = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff', G: '1', F: '1', A: '1', W: '0' };  // A: Linien-Badges (1=an, FW-Default) · W: Ziel-Text dick (0=dünn)
+// F=Schriftart (1 Modern/Poppins, 2 Classic/ÖBB, 3 Matrix DACH, 4 Matrix CZ),
+// M=Ziel-Position (fehlt oder 0 = oben wie bisher, 1 = mittig).
+var FC_DEFAULTS = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff', G: '1', F: '1', A: '1', W: '0', M: '0' };  // A: Linien-Badges (1=an, FW-Default) · W: Ziel-Text dick (0=dünn) · M: Ziel-Position (0=oben, FW-Default)
 // Offizielle MVG-Linienfarben (U-Bahn + Tram, Netzplan/MVGO). Tram 14 aus dem offiziellen
 // Tramnetz-Plan (März 2026) gesampelt, Rest = publizierte MVG-Palette. Nachtlinien = Taglinie.
 var MVG_LINE_COLORS = {
@@ -13957,7 +13995,7 @@ var MVG_LINE_COLORS = {
   N17: '875a45', N19: 'ee1c25', N20: '17c0e9', N27: 'fca61d'
 };
 var FC_MIN_COLOUR = 101, FC_MAX_COLOUR = 103;   // 3 Slots im Konfigurator (Firmware kann 101-109)
-var customRowBySlot = {};   // slot -> { N,B,T,U,H,V,P,G,F,A } (raw, Hex ohne '#'; A=Badges 1/0)
+var customRowBySlot = {};   // slot -> { N,B,T,U,H,V,P,G,F,A,W,M } (raw, Hex ohne '#'; A=Badges 1/0, M=Ziel-Position 0/1)
 
 function fcIsCustomColour(cid) { return cid >= FC_MIN_COLOUR && cid <= FC_MAX_COLOUR; }
 function fcSlot(cid) { return cid - 100; }
@@ -13999,7 +14037,8 @@ function fcVal(cid, key) {
   return FC_DEFAULTS[key];
 }
 
-// Hintergrund-Stil (G) / Schriftart (F): offener Toggle → live, sonst gespeichert, sonst '1'.
+// Stil-Token als Zahl (G Hintergrund, F Schriftart, A Badges, W dick, M Ziel-Position):
+// offener Toggle → live, sonst gespeicherter Wert, sonst der Default aus FC_DEFAULTS.
 function fcStyleVal(cid, key) {
   var el = document.getElementById('ftFc' + key + '_' + cid);
   if (el) {
@@ -14081,6 +14120,10 @@ function buildCustomRow() {
       if (av !== '1') parts.push('A' + av);
       var wv = fcStyleVal(cid, 'W');
       if (wv !== '0') parts.push('W' + wv);
+      // Ziel-Position (M): Firmware-Default ist OBEN → nur "1" (mittig) schreiben,
+      // damit bestehende Geräte eine unveränderte Row bekommen.
+      var mv = fcStyleVal(cid, 'M');
+      if (mv !== '0') parts.push('M' + mv);
       var map = fcLineColors(cid);
       var p = [];
       Object.keys(map).forEach(function(ln) {
@@ -14106,9 +14149,14 @@ function buildCustomRow() {
 // Linienlänge (38/54/70/84 + 4), Radius 6, 2px-Umrandung, Ziel max. 2 Zeilen,
 // Countdown rechts. Schriftgrößen je F-Stil an die Geräte-Fonts angenähert.
 function fcPreviewConfig(cid) {
+  // rows ist KEIN customrow-Token, die Zeilenzahl steht wie bei allen Display-Typen als
+  // 'r' in den displaysettings. Die Vorschau braucht sie trotzdem, weil die Firmware ab
+  // 4 Zeilen auf kleinere Schriftgrade umschaltet.
   return { B: fcVal(cid, 'B'), T: fcVal(cid, 'T'), U: fcVal(cid, 'U'), H: fcVal(cid, 'H'),
            V: fcVal(cid, 'V'), G: fcStyleVal(cid, 'G'), F: fcStyleVal(cid, 'F'),
-           A: fcStyleVal(cid, 'A'), W: fcStyleVal(cid, 'W'), P: fcLineColors(cid) };
+           A: fcStyleVal(cid, 'A'), W: fcStyleVal(cid, 'W'), M: fcStyleVal(cid, 'M'),
+           rows: (typeof rowsForColour === 'function') ? rowsForColour(cid) : null,
+           P: fcLineColors(cid) };
 }
 
 function fcApplyPreviewBg(el, cfg) {
@@ -14127,27 +14175,75 @@ function fcApplyPreviewBg(el, cfg) {
   }
 }
 
+// Beispiel-Abfahrten zum Auffüllen: bei 4 oder 5 Zeilen hat eine kleine Station oft
+// weniger Richtungen als Zeilen, die Vorschau soll trotzdem alle Zeilen zeigen.
+var FC_PREVIEW_FILL = [
+  { line: 'U1', dest: 'Leopoldau' }, { line: 'U2', dest: 'Seestadt' },
+  { line: '31', dest: 'Stammersdorf' }, { line: 'D', dest: 'Nussdorf Beethovengang' },
+  { line: '2', dest: 'Friedrich-Engels-Platz' }
+];
+
 function fcDevicePreviewHTML(cfg, data) {
-  var rows = Math.min(3, Math.max(2, data.length));
+  // Zeilenzahl aus der Config (1-5). Ohne Angabe wie früher aus der Datenmenge.
+  var rows = parseInt(cfg.rows);
+  if (!rows || isNaN(rows)) rows = Math.min(3, Math.max(2, data.length));
+  rows = Math.max(1, Math.min(5, rows));
   data = data.slice(0, rows);
+  // Fehlende Zeilen mit Beispielen auffüllen (bereits gezeigte Linien zuletzt)
+  for (var fi = 0; data.length < rows; fi++) {
+    var fillDep = FC_PREVIEW_FILL[fi % FC_PREVIEW_FILL.length];
+    var already = data.some(function(d) { return d.line === fillDep.line; });
+    if (already && fi < FC_PREVIEW_FILL.length) continue;
+    data.push({ line: fillDep.line, dest: fillDep.dest, time: 3 + data.length * 3 });
+  }
   var W = 320, H = 170, rowH = Math.floor(H / rows);
   var margin = 8;
   var isMatrix = (cfg.F === '3' || cfg.F === '4');
-  var font = isMatrix ? "'Courier New',monospace" : (cfg.F === '2' ? 'Arial,Helvetica,sans-serif' : "'Poppins',sans-serif");
-  // Geräte-Fonts angenähert: Modern Poppins 16pt/12pt/24pt, Classic FreeSans, Matrix font1/Matrix8x6
-  var badgeFs = cfg.F === '2' ? 17 : (isMatrix ? 15 : 20);
-  var destFs  = cfg.F === '2' ? 13 : (isMatrix ? 12 : 14);
-  var cdFs    = cfg.F === '2' ? 30 : (isMatrix ? 26 : 34);
-  // Ziel-Text dick (W1): fette Zielschrift (Matrix hat keine Bold-Variante)
-  var destWeight = (cfg.W === '1' && !isMatrix) ? 700 : 400;
-  var badgeWFor = function(ln) { var l = String(ln || '').length; return l <= 1 ? 38 : (l === 2 ? 54 : (l === 3 ? 70 : 84)); };
+  var font = isMatrix ? "'Silkscreen','Courier New',monospace" : (cfg.F === '2' ? 'Arial,Helvetica,sans-serif' : "'Poppins',sans-serif");
+  // Ab 4 Zeilen schaltet die Firmware auf kleinere Schriftgrade um, sonst passt bei
+  // 34 px Zeilenhöhe (5 Zeilen) nichts mehr ins Feld. Groß = 1-3, Klein = 4-5 Zeilen.
+  var big = (rows <= 3);
+  // Geräte-Maße aus display_free_color.cpp, je [groß, klein]. Geräte-Fonts dahinter:
+  //   Modern  Badge SemiBold 16pt/10pt · Ziel Medium 12pt/Regular 8pt · Zahl Bold 24pt/SemiBold 16pt
+  //   Classic Badge FreeSansBold 12pt (gleich) · Ziel FreeSans 9pt (gleich) · Zahl FreeSansBold 18pt/12pt
+  //   Matrix  Badge und Ziel setTextSize(2) (gleich) · Zahl setTextSize(4)/(3)
+  // badge/dest/cd = CSS-Pixel der Vorschau, im selben Verhältnis wie die Glyphenhöhen
+  // am Gerät. fh/ls = fontHeight und lineSpacing des Ziel-Zeilenrasters, 1:1 die
+  // Firmware-Werte, damit die Zeilen in der Vorschau exakt gleich liegen.
+  var FC_FONTS = isMatrix
+    ? { badge: [15, 15], dest: [12, 12], cd: [26, 20], fh: [18, 16], ls: [4, 2],
+        badgeH: [38, 26], badgeW: [[38, 54, 70, 84], [28, 38, 50, 60]], cdSpace: [55, 42] }
+    : (cfg.F === '2'
+        ? { badge: [17, 17], dest: [13, 13], cd: [30, 20], fh: [(cfg.W === '1' ? 22 : 17), 15], ls: [4, 2],
+            badgeH: [38, 26], badgeW: [[38, 54, 70, 84], [28, 38, 50, 60]], cdSpace: [55, 42] }
+        : { badge: [20, 13], dest: [14, 10], cd: [34, 23], fh: [19, 14], ls: [4, 2],
+            badgeH: [38, 26], badgeW: [[38, 54, 70, 84], [28, 38, 50, 60]], cdSpace: [55, 42] });
+  var fsIdx = big ? 0 : 1;
+  var badgeFs = FC_FONTS.badge[fsIdx];
+  var destFs  = FC_FONTS.dest[fsIdx];
+  var cdFs    = FC_FONTS.cd[fsIdx];
+  // Ziel-Text dick (W1): fette Zielschrift. Matrix hat keine Bold-Variante, und Classic
+  // bleibt im Klein-Modus bei FreeSans 9pt (eine 12pt-Bold wäre zu hoch) → dort ohne Wirkung.
+  var destBoldActive = (cfg.W === '1' && !isMatrix && !(cfg.F === '2' && !big));
+  var destWeight = destBoldActive ? (big ? 700 : 600) : 400;
+  // Zeilenraster des Ziel-Texts 1:1 wie display_free_color.cpp: fontHeight je Schriftart
+  // plus lineSpacing. Daraus ergibt sich dieselbe Zeilenlage wie am Gerät, unabhängig
+  // von der CSS-Schriftgröße destFs.
+  var destFh = FC_FONTS.fh[fsIdx];
+  var destLH = destFh + FC_FONTS.ls[fsIdx];
+  var badgeWTab = FC_FONTS.badgeW[fsIdx];
+  var badgeWFor = function(ln) { var l = String(ln || '').length; return badgeWTab[Math.max(0, Math.min(3, l - 1))]; };
+  // Matrix-Pixelgrößen (GLCD-SVG): Badge/Ziel size2, Countdown size4 groß / size3 klein
+  var ledCdPx = big ? 4 : 3;
   var maxW = 0;
   data.forEach(function(dp) {
     // Badges aus: Linie läuft in der GROSSEN Countdown-Schrift → Breite daran bemessen
-    var w = (cfg.A === '0') ? Math.ceil(String(dp.line || '').length * cdFs * 0.62) : badgeWFor(dp.line);
+    var w;
+    if (cfg.A === '0') w = isMatrix ? dvLedWidth(dp.line, ledCdPx) : Math.ceil(String(dp.line || '').length * cdFs * 0.62);
+    else w = badgeWFor(dp.line);
     if (w > maxW) maxW = w;
   });
-  var badgeW = maxW + 4, badgeH = Math.min(38, rowH - 6);
+  var badgeW = maxW + 4, badgeH = Math.min(FC_FONTS.badgeH[fsIdx], rowH - 6);
   var glowT = isMatrix ? 'text-shadow:0 0 5px #' + cfg.T + ';' : '';
   var html = '';
   data.forEach(function(dep, i) {
@@ -14157,17 +14253,47 @@ function fcDevicePreviewHTML(cfg, data) {
     var bOl = lc ? ((lc.ol ? '#' + lc.ol : bBg)) : '#' + cfg.U;
     var showOl = bOl.toLowerCase() !== bBg.toLowerCase();
     var destX = margin + maxW + 12;
-    var destW = W - destX - 55;
+    var destW = W - destX - FC_FONTS.cdSpace[fsIdx];
     html += '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:' + W + 'px;height:' + rowH + 'px;">';
     if (cfg.A === '0') {
       // Badges aus: Linienname GROSS (Countdown-Schriftgröße, wie die Zahl rechts),
       // linksbündig in Schriftfarbe
-      html += '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;width:' + badgeW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">' + escapeHtmlFt(dep.line) + '</div>';
+      html += '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;width:' + badgeW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">' + (isMatrix ? dvLedTextSvg(dep.line, ledCdPx, '#' + cfg.T, true) : escapeHtmlFt(dep.line)) + '</div>';
     } else {
-      html += '<div style="position:absolute;left:' + margin + 'px;top:' + Math.round((rowH - badgeH) / 2) + 'px;width:' + badgeW + 'px;height:' + badgeH + 'px;background:' + bBg + ';border-radius:6px;' + (showOl ? 'box-shadow:inset 0 0 0 2px ' + bOl + ';' : '') + 'display:flex;align-items:center;justify-content:center;color:' + bTx + ';font-weight:600;font-size:' + badgeFs + 'px;' + (isMatrix ? 'text-shadow:0 0 4px ' + bTx + ';' : '') + '">' + escapeHtmlFt(dep.line) + '</div>';
+      html += '<div style="position:absolute;left:' + margin + 'px;top:' + Math.round((rowH - badgeH) / 2) + 'px;width:' + badgeW + 'px;height:' + badgeH + 'px;background:' + bBg + ';border-radius:6px;' + (showOl ? 'box-shadow:inset 0 0 0 2px ' + bOl + ';' : '') + 'display:flex;align-items:center;justify-content:center;color:' + bTx + ';font-weight:600;font-size:' + badgeFs + 'px;">' + (isMatrix ? dvLedTextSvg(dep.line, 2, bTx, false) : escapeHtmlFt(dep.line)) + '</div>';
     }
-    html += '<div style="position:absolute;left:' + destX + 'px;top:0;height:' + rowH + 'px;width:' + destW + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:' + destWeight + ';font-size:' + destFs + 'px;line-height:1.25;' + glowT + '"><span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + escapeHtmlFt(dep.dest) + '</span></div>';
-    html += '<div style="position:absolute;right:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">' + dep.time + '</div>';
+    // Ziel-Text: Ausrichtung wie am Gerät (Token M). Der Umbruch ist in BEIDEN Fällen
+    // gleich, eine zweite Zeile gibt es nur, wenn der Text nicht in eine Zeile passt.
+    //   M0 (oben, Default): der Text beginnt auf der oberen von zwei gedachten Zeilen,
+    //       die untere bleibt bei kurzem Ziel leer → Ziel sitzt höher als Linie/Minuten.
+    //   M1 (mittig): der tatsächliche Textblock steht zentriert, also auf derselben
+    //       Höhe wie Linien-Badge und Countdown, die schon immer zentriert sind.
+    var destBox;
+    if (cfg.M === '1') {
+      destBox = 'top:0;height:' + rowH + 'px;display:flex;align-items:center;';
+    } else {
+      var destTop = Math.max(Math.round((rowH - destLH * 2) / 2), 0);
+      destBox = 'top:' + destTop + 'px;height:' + (destLH * 2) + 'px;';
+    }
+    if (isMatrix) {
+      // GLCD size2: 12px je Zeichen; Zeilen im destLH-Raster, jede Zeile im
+      // Zeilenkasten vertikal zentriert ((destLH - 16) / 2)
+      var mLines = dvLedWrap2(dep.dest, Math.max(3, Math.floor(destW / 12)));
+      var mOff = Math.max(0, Math.round((destLH - 16) / 2));
+      var mInner = mLines.map(function(ml, li) {
+        return '<div style="position:absolute;left:0;top:' + (li * destLH + mOff) + 'px;">' + dvLedTextSvg(ml, 2, '#' + cfg.T, true) + '</div>';
+      }).join('');
+      if (cfg.M === '1') {
+        var mBlockH = mLines.length * destLH;
+        html += '<div style="position:absolute;left:' + destX + 'px;top:' + Math.max(0, Math.round((rowH - mBlockH) / 2)) + 'px;height:' + mBlockH + 'px;width:' + destW + 'px;">' + mInner + '</div>';
+      } else {
+        var mTop = Math.max(Math.round((rowH - destLH * 2) / 2), 0);
+        html += '<div style="position:absolute;left:' + destX + 'px;top:' + mTop + 'px;height:' + (destLH * 2) + 'px;width:' + destW + 'px;">' + mInner + '</div>';
+      }
+    } else {
+      html += '<div style="position:absolute;left:' + destX + 'px;' + destBox + 'width:' + destW + 'px;color:#' + cfg.T + ';font-weight:' + destWeight + ';font-size:' + destFs + 'px;line-height:' + destLH + 'px;' + glowT + '"><span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + escapeHtmlFt(dep.dest) + '</span></div>';
+    }
+    html += '<div style="position:absolute;right:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">' + (isMatrix ? dvLedTextSvg(String(dep.time), ledCdPx, '#' + cfg.T, true) : dep.time) + '</div>';
     html += '</div>';
   });
   return '<div style="position:relative;width:' + W + 'px;height:' + H + 'px;font-family:' + font + ';overflow:hidden;">' + html + '</div>';
@@ -14180,12 +14306,12 @@ function fcPreviewData() {
   (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
     if (s.directions && s.directions.length > 0) {
       s.directions.forEach(function(d) {
-        if (d.line && data.length < 3) { data.push({ line: d.line, dest: d.towards || s.stopName || '', time: t }); t += 3; }
+        if (d.line && data.length < 5) { data.push({ line: d.line, dest: d.towards || s.stopName || '', time: t }); t += 3; }
       });
     } else if (s.filter) {
       s.filter.split(',').forEach(function(l) {
         l = l.trim();
-        if (l && data.length < 3) { data.push({ line: l, dest: s.stopName || '', time: t }); t += 3; }
+        if (l && data.length < 5) { data.push({ line: l, dest: s.stopName || '', time: t }); t += 3; }
       });
     }
   });
@@ -14217,7 +14343,10 @@ function fcFreeSlot() {
 
 function fcCreateDisplay() {
   var slot = fcFreeSlot();
-  if (!slot) return;
+  if (!slot) {
+    alert('Alle 3 Plätze für eigene Displays sind belegt. Lösche zuerst eines in der Karte "Eigene Displays" im Feintuning.');
+    return;
+  }
   fcOpenWizard(100 + slot, { create: true });
 }
 
@@ -14228,6 +14357,87 @@ function fcSlotVisible(cid) {
   var o = customRowBySlot[fcSlot(cid)];
   if (o && Object.keys(o).length > 0) return true;
   return (getUniqueDisplayTypes() || []).some(function(dt) { return dt.colour === cid; });
+}
+
+// ===== Eigene Displays verwalten (Umbenennen / Löschen / Namens-Duplikate) =====
+
+// Alle gespeicherten Designs, auch die gerade nicht verwendeten: [{slot, cid, name}]
+function fcExistingDesigns() {
+  var out = [];
+  for (var slot = 1; slot <= FC_MAX_COLOUR - 100; slot++) {
+    var o = customRowBySlot[slot];
+    if (o && Object.keys(o).length > 0) out.push({ slot: slot, cid: 100 + slot, name: fcSanitizeName(o.N || '') });
+  }
+  return out;
+}
+
+// Wird das Design gerade von einer Station/Gruppe/dem Kompakt-Display verwendet?
+function fcDesignInUse(cid) {
+  return (getUniqueDisplayTypes() || []).some(function(dt) { return parseInt(dt.colour) === parseInt(cid); });
+}
+
+// Trägt ein ANDERES eigenes Display schon diesen Namen? (ohne Groß/Klein)
+function fcNameTaken(name, exceptCid) {
+  var n = fcSanitizeName(name).toLowerCase();
+  if (!n) return false;
+  return fcExistingDesigns().some(function(d) {
+    return d.cid !== parseInt(exceptCid) && d.name.toLowerCase() === n;
+  });
+}
+function fcCidByName(name, exceptCid) {
+  var n = fcSanitizeName(name).toLowerCase();
+  var hit = fcExistingDesigns().filter(function(d) {
+    return d.cid !== parseInt(exceptCid) && d.name.toLowerCase() === n;
+  })[0];
+  return hit ? hit.cid : null;
+}
+
+// UI nach Umbenennen/Löschen auffrischen (gleicher Block wie nach fcWizardFinish).
+function fcRefreshAfterManage() {
+  if (typeof populateKompaktDisplay === 'function') populateKompaktDisplay();
+  if (typeof mergedSegmentsSupported === 'function' && mergedSegmentsSupported()
+      && typeof updateGroupByCityUI === 'function') updateGroupByCityUI();
+  if (ftIsManualAssignment && typeof renderStationDisplayList === 'function') renderStationDisplayList();
+  renderDisplayTypeSections();
+  if (typeof updateFinetuningPreview === 'function') updateFinetuningPreview();
+}
+
+// Umbenennen direkt im Namensfeld der Karte (bisher nur versteckt im letzten
+// Wizard-Schritt). Bei Namenskonflikt zurück auf den alten Namen.
+function fcRenameDisplayInline(cid, inp) {
+  cid = parseInt(cid);
+  var old = fcSanitizeName(fcStored(cid, 'N') || '');
+  var nm = fcSanitizeName(inp.value);
+  if (nm === old) { inp.value = old; return; }
+  if (nm && fcNameTaken(nm, cid)) {
+    alert('Diesen Namen hat schon ein anderes eigenes Display. Bitte wähle einen anderen Namen.');
+    inp.value = old;
+    return;
+  }
+  var o = customRowBySlot[fcSlot(cid)] || {};
+  if (nm) o.N = nm; else delete o.N;
+  customRowBySlot[fcSlot(cid)] = o;
+  // Offenes Namensfeld (Wizard) mitziehen, sonst gewinnt es beim nächsten "Fertig".
+  var winp = document.getElementById('ftFcName_' + cid);
+  if (winp) winp.value = nm;
+  fcRefreshAfterManage();
+}
+
+// Löschen mit Sicherheitsabfrage. Ein gerade benutztes Design wird NICHT gelöscht,
+// sonst zeigten Stationen auf einen leeren Slot (stiller Datenmüll): erst umstellen.
+function fcDeleteDisplay(cid) {
+  cid = parseInt(cid);
+  var nm = ftDisplayName(cid);
+  if (fcDesignInUse(cid)) {
+    alert('"' + nm + '" ist gerade in Verwendung. Stelle die betroffenen Stationen zuerst auf ein anderes Display um, dann kannst du das Design löschen.');
+    return;
+  }
+  if (!window.confirm('Eigenes Display "' + nm + '" wirklich löschen? Das Design ist danach weg und der Platz wird wieder frei.')) return;
+  delete customRowBySlot[fcSlot(cid)];
+  // Merker dieses Slots zurücksetzen, damit ein späteres neues Design dort frisch startet.
+  if (typeof ftRowsByCid !== 'undefined') delete ftRowsByCid[cid];
+  if (typeof ftFontModeByCid !== 'undefined') delete ftFontModeByCid[cid];
+  fcRefreshAfterManage();
 }
 
 // 24 Vorschlags-Farben für die Wizard-Palette (8×3): Schwarz/Grau/Weiß, dann
@@ -14345,23 +14555,38 @@ function fcOpenWizard(cid, opts) {
   // Inhalt (Schritte + Fußzeile) mit Seitenabstand
   h += '<div style="padding:10px 22px 0;">';
 
-  // Schritt 1: Farben & Stil. Pro Farbfeld: aktueller Farb-Button → klappt eine
-  // Palette mit 24 Farben zum Antippen auf, darunter der volle Farbpicker (16,7 Mio.
-  // Farben). Der native <input type="color"> behält seine Id ftFc<K>_<cid> — fcVal,
-  // Live-Preview und fcWizardFinish lesen unverändert daraus.
-  h += '<div id="fcWizStep1">';
-  // Farbfeld-Zeile: Farb-Button → Palette (24 Farben) + vollbreiter Farbpicker.
+  // Schritt 1 "Allgemein" (Farben + Stil + Ziel-Text), Schritt 2 "Badges", Schritt 3
+  // "Name" (Paul 20.09.2026: erst generell, dann Badge, dann Name; vorher war alles in
+  // einem unübersichtlichen Schritt). Saubere Zeilen: Label + Hinweis links, Bedienung
+  // rechts, dünne Trennlinie; Abschnitts-Überschriften in grauen Kapitälchen.
+  function fcSec(t) {
+    return '<div style="font-size:11px;font-weight:700;letter-spacing:0.8px;color:#9a9a9a;text-transform:uppercase;margin:16px 2px 2px;">' + t + '</div>';
+  }
+  function fcRow(label, hint, ctrl) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 2px;border-bottom:1px solid #f1f1f1;">'
+      + '<div style="flex:1 1 150px;min-width:0;"><div style="font-weight:600;font-size:13.5px;">' + label + '</div>'
+      + (hint ? '<div style="font-size:11.5px;color:#8f8f8f;line-height:1.35;">' + hint + '</div>' : '')
+      + '</div><div style="flex:0 0 auto;margin-left:auto;">' + ctrl + '</div></div>';
+  }
+  // Kompakte Umschalter: die Leiste umschließt nur ihre Knöpfe (nicht mehr vollbreit)
+  function fcToggle(idSuffix, opts, cur, after) {
+    var t = '<div class="toggle-row" id="ftFc' + idSuffix + '_' + cid + '" style="flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;">';
+    opts.forEach(function(ob) {
+      t += '<button class="toggle-btn' + (cur === ob[0] ? ' active' : '') + '" data-value="' + ob[0] + '" onclick="setFtToggleVal(\'ftFc' + idSuffix + '_' + cid + '\',\'' + ob[0] + '\');' + (after || 'fcWizardPreviewUpdate()') + '">' + ob[1] + '</button>';
+    });
+    return t + '</div>';
+  }
+  // Farbfeld-Zeile: Label links, Farb-Button rechts → klappt Palette (24 Farben) +
+  // vollbreiten Farbpicker auf. Der native <input type="color"> behält seine Id
+  // ftFc<K>_<cid> — fcVal, Live-Preview und fcWizardFinish lesen unverändert daraus.
   // Farbpicker VOLLBREIT: das native Picker-Panel ankert am Input — bei einem kleinen
-  // Swatch am rechten Rand öffnete es nach rechts aus dem Wizard raus. Vollbreite Leiste
-  // → Panel öffnet innerhalb der Wizard-Breite; Mobile zeigt ohnehin das System-Sheet.
+  // Swatch am rechten Rand öffnete es sonst aus dem Wizard raus.
   function fcColorFieldHtml(fd) {
     var cur = fcVal(cid, fd[0]);
-    var fh = '';
-    fh += '<div class="form-row" style="border-bottom:none;padding-bottom:4px;"><div><div class="form-label">' + fd[1] + '</div></div>';
-    fh += '<button id="fcSwBtn_' + fd[0] + '_' + cid + '" onclick="fcTogglePalette(\'' + fd[0] + '\',' + cid + ')" style="width:46px;height:32px;border:1px solid #bbb;border-radius:8px;background:#' + cur + ';cursor:pointer;box-shadow:inset 0 0 0 2px #fff;"></button></div>';
-    // Konflikt-Hinweis (Schrift = Hintergrund bzw. Badge-Text = Badge-Hintergrund)
-    fh += '<div id="fcColErr_' + fd[0] + '_' + cid + '" style="display:none;color:#c62828;font-size:11px;margin:-2px 0 6px;">' + fd[2] + '</div>';
-    fh += '<div class="fc-pal" id="fcPal_' + fd[0] + '_' + cid + '" style="display:none;padding:10px;background:#f6f6f6;border-radius:10px;margin:2px 0 10px;">';
+    var btn = '<button id="fcSwBtn_' + fd[0] + '_' + cid + '" onclick="fcTogglePalette(\'' + fd[0] + '\',' + cid + ')" style="width:52px;height:34px;border:1px solid #ccc;border-radius:9px;background:#' + cur + ';cursor:pointer;box-shadow:inset 0 0 0 2px #fff;"></button>';
+    var fh = fcRow(fd[1], fd[3] || '', btn);
+    fh += '<div id="fcColErr_' + fd[0] + '_' + cid + '" style="display:none;color:#c62828;font-size:11px;margin:4px 0 6px;">' + fd[2] + '</div>';
+    fh += '<div class="fc-pal" id="fcPal_' + fd[0] + '_' + cid + '" style="display:none;padding:10px;background:#f6f6f6;border-radius:10px;margin:8px 0 10px;">';
     fh += '<div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:10px;">';
     FC_PALETTE.forEach(function(hex) {
       fh += '<button class="fc-sw" data-hex="' + hex + '" onclick="fcPickColor(\'' + fd[0] + '\',' + cid + ',\'' + hex + '\')" style="aspect-ratio:1/1;width:100%;border:1px solid rgba(0,0,0,0.15);border-radius:6px;background:#' + hex + ';cursor:pointer;padding:0;"></button>';
@@ -14374,51 +14599,37 @@ function fcOpenWizard(cid, opts) {
   }
   var _errBT = 'Schrift- und Hintergrundfarbe dürfen nicht gleich sein';
   var _errHV = 'Badge-Text und Badge-Hintergrund dürfen nicht gleich sein';
+
+  // === Schritt 1: Allgemein ===
+  h += '<div id="fcWizStep1">';
+  h += fcSec('Farben');
   h += fcColorFieldHtml(['B', 'Hintergrundfarbe', _errBT]);
   h += fcColorFieldHtml(['T', 'Schriftfarbe', _errBT]);
-  // Linien-Badges an/aus: AUS (Default bei neuen Displays) = Linienname als großer
-  // Text wie Wien; AN = Badge-Kästchen mit eigenen Farben (2 Farbpicker darunter).
-  h += '<div class="form-row"><div><div class="form-label">Linien-Badges</div><div class="form-hint">Aus = Linienname als großer Text (wie Wien)</div></div>';
-  h += '<div class="toggle-row" id="ftFcA_' + cid + '">';
-  [['1', 'An'], ['0', 'Aus']].forEach(function(ab) {
-    h += '<button class="toggle-btn' + (fcA === ab[0] ? ' active' : '') + '" data-value="' + ab[0] + '" onclick="setFtToggleVal(\'ftFcA_' + cid + '\',\'' + ab[0] + '\');fcBadgesToggleChanged(' + cid + ')">' + ab[1] + '</button>';
-  });
-  h += '</div></div>';
+  h += fcSec('Stil');
+  var fcG = fcStyleVal(cid, 'G');
+  h += fcRow('Hintergrund', 'Pixel = LED-Matrix-Optik mit Punktraster', fcToggle('G', [['1', 'Simpel'], ['2', 'Pixel']], fcG));
+  var fcF = fcStyleVal(cid, 'F');
+  h += fcRow('Schriftart', 'Matrix CZ = slawisch/ungarisch (&#352; &#268; &#381; &#336; &#368;)', fcToggle('F', [['1', 'Modern'], ['2', 'Classic'], ['3', 'Matrix'], ['4', 'Matrix CZ']], fcF));
+  h += fcSec('Ziel-Text');
+  var fcW = fcStyleVal(cid, 'W');
+  h += fcRow('Stärke', 'Dick = fette Zielschrift (nicht bei Matrix)', fcToggle('W', [['0', 'Dünn'], ['1', 'Dick']], fcW));
+  // Ziel-Position (Token M, Default oben = heutiges Geräteverhalten): Oben startet auf
+  // der oberen von zwei möglichen Zeilen, Mittig auf Höhe von Linie und Minuten.
+  var fcM = fcStyleVal(cid, 'M');
+  h += fcRow('Position', 'Mittig = auf gleicher H&ouml;he wie Linie und Minuten', fcToggle('M', [['0', 'Oben'], ['1', 'Mittig']], fcM));
+  h += '</div>';
+
+  // === Schritt 2: Badges (An/Aus, Badge-Farben, Farben pro Linie) ===
+  h += '<div id="fcWizStep2" style="display:none;">';
+  h += fcRow('Linien-Badges', 'An = K&auml;stchen mit eigenen Farben · Aus = Linienname als gro&szlig;er Text (wie Wien)', fcToggle('A', [['1', 'An'], ['0', 'Aus']], fcA, 'fcBadgesToggleChanged(' + cid + ')'));
   h += '<div id="fcBadgeFields_' + cid + '" style="display:' + (fcA === '1' ? '' : 'none') + ';">';
+  h += fcSec('Badge-Farben');
   h += fcColorFieldHtml(['H', 'Badge-Hintergrund', _errHV]);
   h += fcColorFieldHtml(['V', 'Badge-Text', _errHV]);
   // Umrandung darf gleich dem Badge-Hintergrund sein (= unsichtbar, der Default) →
   // bewusst KEINE Konflikt-Validierung (kein FC_COLOR_PAIRS-Eintrag).
   h += fcColorFieldHtml(['U', 'Badge-Umrandung', '']);
-  h += '</div>';
-  var fcG = fcStyleVal(cid, 'G');
-  h += '<div class="form-row"><div><div class="form-label">Hintergrund</div><div class="form-hint">Pixel = LED-Matrix-Optik mit Punktraster</div></div>';
-  h += '<div class="toggle-row" id="ftFcG_' + cid + '">';
-  [['1', 'Simpel'], ['2', 'Pixel']].forEach(function(gb) {
-    h += '<button class="toggle-btn' + (fcG === gb[0] ? ' active' : '') + '" data-value="' + gb[0] + '" onclick="setFtToggleVal(\'ftFcG_' + cid + '\',\'' + gb[0] + '\');fcWizardPreviewUpdate()">' + gb[1] + '</button>';
-  });
-  h += '</div></div>';
-  var fcF = fcStyleVal(cid, 'F');
-  h += '<div class="form-row"><div><div class="form-label">Schriftart</div><div class="form-hint">Matrix CZ = slawisch/ungarisch (&#352; &#268; &#381; &#336; &#368;)</div></div>';
-  // flex-wrap: 4 Buttons liefen am Handy sonst rechts aus dem Wizard raus
-  h += '<div class="toggle-row" id="ftFcF_' + cid + '" style="flex-wrap:wrap;justify-content:flex-end;">';
-  [['1', 'Modern'], ['2', 'Classic'], ['3', 'Matrix'], ['4', 'Matrix CZ']].forEach(function(fb) {
-    h += '<button class="toggle-btn' + (fcF === fb[0] ? ' active' : '') + '" data-value="' + fb[0] + '" onclick="setFtToggleVal(\'ftFcF_' + cid + '\',\'' + fb[0] + '\');fcWizardPreviewUpdate()">' + fb[1] + '</button>';
-  });
-  h += '</div></div>';
-  // Ziel-Text dünn/dick (Token W, Default dünn). Matrix-Schriften haben keine
-  // Bold-Variante — dort ohne Wirkung.
-  var fcW = fcStyleVal(cid, 'W');
-  h += '<div class="form-row"><div><div class="form-label">Ziel-Text</div><div class="form-hint">Dick = fette Zielschrift (nicht bei Matrix)</div></div>';
-  h += '<div class="toggle-row" id="ftFcW_' + cid + '">';
-  [['0', 'Dünn'], ['1', 'Dick']].forEach(function(wb) {
-    h += '<button class="toggle-btn' + (fcW === wb[0] ? ' active' : '') + '" data-value="' + wb[0] + '" onclick="setFtToggleVal(\'ftFcW_' + cid + '\',\'' + wb[0] + '\');fcWizardPreviewUpdate()">' + wb[1] + '</button>';
-  });
-  h += '</div></div>';
-  h += '</div>';
-
-  // Schritt 2: Badge-Farben pro Linie
-  h += '<div id="fcWizStep2" style="display:none;">';
+  h += fcSec('Farben pro Linie');
   var fcLines = [];
   var fcSeen = {};
   var fcMucLines = {};   // Linien an Münchner Stops (AGS de:09162) → offizielle MVG-Farbe als Default
@@ -14430,7 +14641,7 @@ function fcOpenWizard(cid, opts) {
     arr.forEach(function(l) { if (!fcSeen[l]) { fcSeen[l] = true; fcLines.push(l); } if (isMuc) fcMucLines[l] = true; });
   });
   if (fcLines.length > 0) {
-    h += '<div class="form-hint" style="margin-bottom:8px;">Einzelnen Linien eigene Badge-Farben geben (z.B. U1 rot, U2 gr&uuml;n). Aus = globale Badge-Farben.</div>';
+    h += '<div class="form-hint" style="margin:4px 0 8px;">Einzelnen Linien eigene Badge-Farben geben (z.B. U1 rot, U2 gr&uuml;n). Aus = globale Badge-Farben.</div>';
     h += '<div style="background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:2px 12px;margin-bottom:10px;">';
     var fcStoredP = fcLineColors(cid);
     fcLines.forEach(function(ln) {
@@ -14460,7 +14671,8 @@ function fcOpenWizard(cid, opts) {
   } else {
     h += '<div class="form-hint">Noch keine Stationen gew&auml;hlt, daher keine Linien. Diesen Schritt kannst du &uuml;berspringen.</div>';
   }
-  h += '</div>';
+  h += '</div>';   // Ende fcBadgeFields (Badges aus → alles Badge-Bezogene zu)
+  h += '</div>';   // Ende Schritt 2
 
   // Schritt 3: Name
   h += '<div id="fcWizStep3" style="display:none;">';
@@ -14493,7 +14705,7 @@ function fcWizardSetStep(n) {
     if (st) st.style.display = (i === n) ? 'block' : 'none';
   }
   var lbl = document.getElementById('fcWizStepLabel');
-  if (lbl) lbl.textContent = 'Schritt ' + n + '/3 · ' + ['Farben & Stil', 'Linien-Badges', 'Name'][n - 1];
+  if (lbl) lbl.textContent = 'Schritt ' + n + '/3 · ' + ['Allgemein', 'Badges', 'Name'][n - 1];
   var back = document.getElementById('fcWizBack');
   if (back) back.style.display = (n > 1) ? 'block' : 'none';
   var next = document.getElementById('fcWizNext');
@@ -14502,8 +14714,6 @@ function fcWizardSetStep(n) {
 
 function fcWizardNav(dir) {
   var n = fcWizardStep + dir;
-  // Badges aus → Schritt 2 (Badge-Farben pro Linie) überspringen
-  if (n === 2 && fcWizardCid != null && fcStyleVal(fcWizardCid, 'A') !== '1') n += dir;
   if (n < 1) n = 1;
   if (n > 3) { fcWizardFinish(); return; }
   fcWizardSetStep(n);
@@ -14550,6 +14760,9 @@ function fcWizardFinish() {
   // Ziel-Text dick (W): Default dünn → nur "1" (dick) explizit speichern.
   var wv = fcStyleVal(cid, 'W');
   if (wv !== '0') o.W = wv;
+  // Ziel-Position (M): Firmware-Default ist oben → nur "1" (mittig) speichern.
+  var mv = fcStyleVal(cid, 'M');
+  if (mv !== '0') o.M = mv;
   var fv = fcStyleVal(cid, 'F');
   if (fv !== '1') o.F = fv;
   var map = fcLineColors(cid);
@@ -14563,6 +14776,20 @@ function fcWizardFinish() {
   if (p.length > 0) o.P = p.join(',');
   var nm = fcName(cid);
   if (nm) o.N = nm;
+  // Gleicher Name wie ein anderes eigenes Display? Beim ERSTELLEN anbieten, das
+  // bestehende Design zu überschreiben (das erwarten Kunden von "gleicher Name"),
+  // sonst zurück zum Namens-Schritt. Beim Bearbeiten gibt es nur den Namens-Schritt.
+  if (nm && fcNameTaken(nm, cid)) {
+    var dupCid = fcCidByName(nm, cid);
+    if (fcWizardCreate && dupCid != null
+        && window.confirm('Es gibt schon ein eigenes Display namens "' + nm + '". Soll es mit diesem Design überschrieben werden?')) {
+      cid = dupCid;  // ins bestehende Design schreiben, der neue Slot bleibt frei
+    } else {
+      alert('Diesen Namen hat schon ein anderes eigenes Display. Bitte wähle einen anderen Namen.');
+      fcWizardSetStep(3);
+      return;
+    }
+  }
   customRowBySlot[fcSlot(cid)] = o;
 
   var wasCreate = fcWizardCreate;
@@ -14868,7 +15095,35 @@ function renderDisplayTypeSections() {
       var altOn = (aDs !== undefined) ? (aDs === 1) : !(recommendedConfig && recommendedConfig.alternateNext === false);
       var altActive = altOn ? ' active' : '';
       html += '<div class="form-row"><div><div class="form-label">Abfahrten</div><div class="form-hint">An = 1. &amp; 2. Abfahrt im Wechsel · Aus = nur die 1. Abfahrt</div></div>';
-      html += '<div class="toggle-switch' + altActive + '" id="ftAltNext_' + dt.colour + '" onclick="toggleFtSwitch(\'ftAltNext_' + dt.colour + '\')"></div></div>';
+      html += '<div class="toggle-switch' + altActive + '" id="ftAltNext_' + dt.colour + '" onclick="ftToggleAltNext(' + dt.colour + ')"></div></div>';
+      // Wechselzeiten (Kundenwunsch "zweiter Wert steht nur 2 bis 3 Sekunden"):
+      // Automatisch = bisheriger Firmware-Takt (keine Tokens), Manuell = zwei Regler.
+      // displaysettings 'x' = Standzeit 1. Abfahrt, 'y' = 2. Abfahrt, in ZEHNTELSEKUNDEN.
+      var xDs = dsVal(dt.colour, 'x');
+      var yDs = dsVal(dt.colour, 'y');
+      var altManual = (xDs !== undefined && xDs > 0) || (yDs !== undefined && yDs > 0);
+      var xSec = Math.min(20, Math.max(3, Math.round(((xDs > 0 ? xDs : 40)) / 10)));   // Manuell-Start 4 s
+      var ySec = Math.min(20, Math.max(3, Math.round(((yDs > 0 ? yDs : 30)) / 10)));   // Manuell-Start 3 s
+      var autoTakt = (dt.colour === 13 || dt.colour === 26) ? 'Automatisch = 5 s je Abfahrt' : 'Automatisch = 4 s erste, 1,5 s zweite Abfahrt';
+      html += '<div id="ftAltTimes_' + dt.colour + '" style="display:' + (altOn ? '' : 'none') + ';background:#f8f9fa;border:1px solid #e8e8e8;border-radius:10px;padding:10px 12px;margin:0 0 10px;">';
+      html += '<div class="form-label" style="margin:0;">Wechselzeiten</div>';
+      html += '<div class="form-hint" style="margin:0 0 8px;">Wie lange jede der beiden Abfahrtszeiten steht, bevor die andere kommt</div>';
+      html += '<div class="toggle-row" id="ftAltMode_' + dt.colour + '">';
+      [['auto', 'Automatisch'], ['manual', 'Manuell']].forEach(function(mb) {
+        var mAct = (altManual ? 'manual' : 'auto') === mb[0] ? ' active' : '';
+        html += '<button class="toggle-btn' + mAct + '" data-value="' + mb[0] + '" onclick="ftSetAltMode(' + dt.colour + ',\'' + mb[0] + '\')">' + mb[1] + '</button>';
+      });
+      html += '</div>';
+      html += '<div id="ftAltAutoHint_' + dt.colour + '" class="form-hint" style="margin:8px 0 0;display:' + (altManual ? 'none' : '') + ';">' + autoTakt + '</div>';
+      html += '<div id="ftAltSliders_' + dt.colour + '" style="display:' + (altManual ? '' : 'none') + ';margin-top:8px;">';
+      [['X', '1. Abfahrt', xSec], ['Y', '2. Abfahrt', ySec]].forEach(function(sl) {
+        html += '<div style="display:flex;align-items:center;gap:10px;margin:8px 0;">';
+        html += '<span style="font-size:13px;flex:0 0 82px;">' + sl[1] + '</span>';
+        html += '<input type="range" min="3" max="20" step="1" value="' + sl[2] + '" id="ftAlt' + sl[0] + '_' + dt.colour + '" oninput="ftAltSliderInput(' + dt.colour + ',\'' + sl[0] + '\', this)" style="flex:1;accent-color:#4285f4;min-width:0;">';
+        html += '<span id="ftAlt' + sl[0] + 'Val_' + dt.colour + '" style="font-size:13px;font-weight:600;flex:0 0 38px;text-align:right;">' + sl[2] + ' s</span>';
+        html += '</div>';
+      });
+      html += '</div></div>';
     }
     if (f.fontExt) {
       html += '<div class="form-row"><div><div class="form-label">Schriftart</div><div class="form-hint">DACH = Standard &middot; CZ+HU = slawisch/ungarisch (&#352; &#268; &#381; &#336; &#368;)</div></div>';
@@ -14877,25 +15132,39 @@ function renderDisplayTypeSections() {
       html += '<button class="toggle-btn" data-value="1" onclick="setFtFontExt(' + dt.colour + ',\'1\')">CZ+HU</button>';
       html += '</div></div>';
     }
-    if (f.chopper) {
-      var hDs = dsVal(dt.colour, 'h');
-      var chopperOn = (hDs !== undefined) ? (hDs === 1) : !!(recommendedConfig && recommendedConfig.chopper);
-      var chopperActive = chopperOn ? ' active' : '';
-      html += '<div class="form-row"><div><div class="form-label">Hochflurer markieren</div></div>';
-      html += '<div class="toggle-switch' + chopperActive + '" id="ftChopper_' + dt.colour + '" onclick="toggleFtSwitch(\'ftChopper_' + dt.colour + '\')"></div></div>';
-      // Niederflur-Blink: pulsiert das Icon wenn das folgende Fahrzeug Niederflur ist
-      var nDs = dsVal(dt.colour, 'n');
-      var nfBlinkOn = (nDs !== undefined) ? (nDs === 1) : !!(recommendedConfig && recommendedConfig.niederflurBlink);
-      var nfBlinkActive = nfBlinkOn ? ' active' : '';
-      html += '<div class="form-row"><div><div class="form-label">Niederflur-Hinweis blinken</div><div class="form-hint">Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht</div></div>';
-      html += '<div class="toggle-switch' + nfBlinkActive + '" id="ftNfBlink_' + dt.colour + '" onclick="toggleFtSwitch(\'ftNfBlink_' + dt.colour + '\')"></div></div>';
-    }
-    if (f.silberpfeil) {
-      var kDs = dsVal(dt.colour, 'k');
-      var silberOn = (kDs !== undefined) ? (kDs === 1) : !!(recommendedConfig && recommendedConfig.silberpfeil);
-      var silberActive = silberOn ? ' active' : '';
-      html += '<div class="form-row"><div><div class="form-label">Bim+U-Bahn Klima Anzeige</div><div class="form-hint">Alle Busse in Wien sind schon klimatisiert.</div></div>';
-      html += '<div class="toggle-switch' + silberActive + '" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
+    // Wien-Features (Hochflurer, Niederflur-Blinken, Klima) in eigener, standardmäßig
+    // ZUGEKLAPPTER Sektion (Paul 20.09.2026). Zugeklappt heißt nur versteckt: die
+    // Schalter bleiben im DOM, Speichern/Restore lesen sie unverändert (dsKeepBool).
+    if (f.chopper || f.silberpfeil) {
+      var wxOpen = !!_ftWienExtrasOpen[dt.colour];
+      html += '<div style="border:1px solid #eee;border-radius:10px;margin:6px 0 10px;overflow:hidden;">';
+      html += '<button id="ftWienExtrasHead_' + dt.colour + '" onclick="ftToggleWienExtras(' + dt.colour + ')" style="display:flex;align-items:center;gap:8px;width:100%;border:none;background:#f8f9fa;padding:11px 12px;cursor:pointer;font-family:inherit;text-align:left;">';
+      html += '<span id="ftWienExtrasChev_' + dt.colour + '" style="font-size:11px;color:#777;">' + (wxOpen ? '&#9662;' : '&#9656;') + '</span>';
+      html += '<span style="font-weight:600;font-size:13.5px;">Wien-Features</span>';
+      html += '<span class="form-hint" style="margin:0 0 0 auto;">Hochflurer, Niederflur, Klima</span>';
+      html += '</button>';
+      html += '<div id="ftWienExtras_' + dt.colour + '" style="display:' + (wxOpen ? '' : 'none') + ';padding:0 12px 4px;">';
+      if (f.chopper) {
+        var hDs = dsVal(dt.colour, 'h');
+        var chopperOn = (hDs !== undefined) ? (hDs === 1) : !!(recommendedConfig && recommendedConfig.chopper);
+        var chopperActive = chopperOn ? ' active' : '';
+        html += '<div class="form-row"><div><div class="form-label">Hochflurer markieren</div></div>';
+        html += '<div class="toggle-switch' + chopperActive + '" id="ftChopper_' + dt.colour + '" onclick="toggleFtSwitch(\'ftChopper_' + dt.colour + '\')"></div></div>';
+        // Niederflur-Blink: pulsiert das Icon wenn das folgende Fahrzeug Niederflur ist
+        var nDs = dsVal(dt.colour, 'n');
+        var nfBlinkOn = (nDs !== undefined) ? (nDs === 1) : !!(recommendedConfig && recommendedConfig.niederflurBlink);
+        var nfBlinkActive = nfBlinkOn ? ' active' : '';
+        html += '<div class="form-row"><div><div class="form-label">Niederflur-Hinweis blinken</div><div class="form-hint">Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht</div></div>';
+        html += '<div class="toggle-switch' + nfBlinkActive + '" id="ftNfBlink_' + dt.colour + '" onclick="toggleFtSwitch(\'ftNfBlink_' + dt.colour + '\')"></div></div>';
+      }
+      if (f.silberpfeil) {
+        var kDs = dsVal(dt.colour, 'k');
+        var silberOn = (kDs !== undefined) ? (kDs === 1) : !!(recommendedConfig && recommendedConfig.silberpfeil);
+        var silberActive = silberOn ? ' active' : '';
+        html += '<div class="form-row" style="border-bottom:none;"><div><div class="form-label">Bim+U-Bahn Klima Anzeige</div><div class="form-hint">Alle Busse in Wien sind schon klimatisiert.</div></div>';
+        html += '<div class="toggle-switch' + silberActive + '" id="ftSilber_' + dt.colour + '" onclick="toggleFtSwitch(\'ftSilber_' + dt.colour + '\')"></div></div>';
+      }
+      html += '</div></div>';
     }
     if (f.arrival) {
       var eDs = dsVal(dt.colour, 'e');
@@ -14918,16 +15187,20 @@ function renderDisplayTypeSections() {
     }
 
     // Anzeigedauer — Standardwerte 5/8/12/15 mit Tempo-Label, Default 12 s (Paul
-    // 2026-08-29; Alt-Werte 10/20 snappen auf den nächsten Standard). Seit dem
-    // Blatt-Takt-Fix IMMER sichtbar, nicht mehr nur bei Multi-Display.
-    {
+    // 2026-08-29; Alt-Werte 10/20 snappen auf den nächsten Standard). Nur bei
+    // Spielerisch sichtbar (Paul, 20.09.2026): Kunden verwechselten die Seitendauer
+    // mit dem schnellen Wechsel der zwei Abfahrtszeiten in derselben Zeile. Im
+    // Kompakt-Modus wirkt der Blatt-Takt beim Umblättern weiter, ist dort aber nicht
+    // mehr einstellbar; der gespeicherte i-Wert bleibt beim Speichern erhalten
+    // (buildDisplaySettings fällt ohne Toggle im DOM auf dsVal zurück).
+    if (ftIsMultiDisplay) {
       var iDs = dsVal(dt.colour, 'i');
       var iSel = (iDs !== undefined) ? iDs : 12;   // gespeicherte Dauer, sonst Default 12s
       if (iSel !== 5 && iSel !== 8 && iSel !== 12 && iSel !== 15) {
         iSel = (iSel <= 6) ? 5 : (iSel <= 10) ? 8 : (iSel <= 13) ? 12 : 15;
       }
       var iLabels = { 5: 'Sehr schnell', 8: 'Schnell', 12: 'Normal', 15: 'Langsam' };
-      html += '<div class="form-row"><div><div class="form-label">Anzeigedauer</div><div class="form-hint">Wie lange jedes Blatt dieser Ansicht steht</div></div>';
+      html += '<div class="form-row"><div><div class="form-label">Anzeigedauer</div><div class="form-hint">Wie lange eine Seite steht, bis zur nächsten gewechselt wird, nicht der Wechsel der zwei Abfahrtszeiten in einer Zeile</div></div>';
       html += '<div class="toggle-row" id="ftInterval_' + dt.colour + '">';
       [5, 8, 12, 15].forEach(function(sec) {
         html += '<button class="toggle-btn' + (sec === iSel ? ' active' : '') + '" data-value="' + sec + '" onclick="setFtToggleVal(\'ftInterval_' + dt.colour + '\',' + sec + ')">' + sec + 's<span style="display:block;font-size:10px;font-weight:400;">' + iLabels[sec] + '</span></button>';
@@ -14974,6 +15247,37 @@ function renderDisplayTypeSections() {
   // "+ Eigenes Display erstellen"-Button entfernt (Paul 2026-07-13): Erstellen läuft
   // jetzt über den gleichnamigen Eintrag in JEDEM Display-Typ-Dropdown
   // (displayTypeOptionsHtml → openCustomDisplayWizard) — der Button war doppelt.
+
+  // Eigene Displays verwalten: Umbenennen und Löschen für ALLE gespeicherten Designs,
+  // auch die gerade nicht verwendeten. Ohne diese Karte ließe sich ein belegter Slot
+  // nie wieder freigeben (nach 3 Designs war endgültig Schluss), und Umbenennen ging
+  // nur versteckt über Bearbeiten bis zum letzten Wizard-Schritt.
+  var fcDesigns = fcExistingDesigns();
+  if (fcDesigns.length > 0) {
+    // Pro Design: Name als Eingabefeld oben (direkt änderbar), darunter Farbchips,
+    // rechts nur zwei Icon-Knöpfe: Stift = Design im Wizard bearbeiten, Müll = löschen.
+    var fcIcoStyle = 'width:38px;height:38px;border:none;border-radius:10px;font-size:16px;cursor:pointer;flex:0 0 auto;';
+    html += '<div class="config-card" id="fcManageCard">';
+    html += '<h3>Eigene Displays</h3>';
+    html += '<div class="form-hint" style="margin-bottom:2px;">Name antippen zum Ändern. Löschen macht den Platz für ein neues frei (max. 3).</div>';
+    fcDesigns.forEach(function(d) {
+      var inUse = fcDesignInUse(d.cid);
+      html += '<div class="form-row" style="align-items:center;gap:10px;">';
+      html += '<div style="flex:1;min-width:0;">';
+      html += '<input type="text" value="' + escapeHtmlFt(d.name) + '" maxlength="10" placeholder="' + escapeHtmlFt(ftDisplayName(d.cid)) + '" onchange="fcRenameDisplayInline(' + d.cid + ', this)" style="display:block;width:100%;max-width:190px;font-weight:600;font-size:14px;padding:7px 10px;border:1px solid #ddd;border-radius:8px;">';
+      html += '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">';
+      ['B', 'H', 'T'].forEach(function(k) {
+        html += '<span style="flex:0 0 auto;width:14px;height:14px;border-radius:4px;border:1px solid #ddd;background:#' + fcVal(d.cid, k) + ';"></span>';
+      });
+      html += inUse ? '<span class="form-hint" style="margin:0;">in Verwendung</span>' : '';
+      html += '</div></div>';
+      html += '<div style="display:flex;gap:6px;justify-content:flex-end;">';
+      html += '<button title="Design bearbeiten" aria-label="Design bearbeiten" onclick="fcOpenWizard(' + d.cid + ')" style="' + fcIcoStyle + 'background:#eef3fe;color:#4285f4;">&#9998;</button>';
+      html += '<button title="Löschen" aria-label="Löschen" onclick="fcDeleteDisplay(' + d.cid + ')" style="' + fcIcoStyle + 'background:#fdecec;color:#c62828;">&#128465;&#65039;</button>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+  }
 
   container.innerHTML = html;
 
@@ -15080,6 +15384,8 @@ function setFtToggleVal(containerId, val) {
   container.querySelectorAll('.toggle-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.value === String(val));
   });
+  // Geräte-Vorschau lebt live mit (nur bei offenem Feintuning, mit Rekursions-Guard)
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
 }
 
 // Matrix-Schriftart-Segment (DACH/CZ+HU): wie Sort/Größe persistent (überlebt Re-Render)
@@ -15113,6 +15419,53 @@ function setDtRows(cid, val) {
   ftRowsByCid[cid] = parseInt(val);
   setFtToggleVal('ftRows_' + cid, val);
   ftFocusPreview(cid);
+}
+
+// Wien-Features-Sektion: Default zugeklappt; einmal geöffnet bleibt sie für die
+// Sitzung offen (überlebt Re-Render der Sektionen, nicht den Reload).
+var _ftWienExtrasOpen = {};
+function ftToggleWienExtras(cid) {
+  var box = document.getElementById('ftWienExtras_' + cid);
+  var chev = document.getElementById('ftWienExtrasChev_' + cid);
+  if (!box) return;
+  var open = box.style.display === 'none';
+  box.style.display = open ? '' : 'none';
+  _ftWienExtrasOpen[cid] = open;
+  if (chev) chev.innerHTML = open ? '&#9662;' : '&#9656;';
+}
+
+// ===== Wechselzeiten 1./2. Abfahrt (displaysettings x/y in Zehntelsekunden) =====
+// Abfahrten-Schalter: Wechselzeiten-Bereich nur zeigen, wenn der Wechsel an ist.
+function ftToggleAltNext(cid) {
+  toggleFtSwitch('ftAltNext_' + cid);
+  var box = document.getElementById('ftAltTimes_' + cid);
+  if (box) box.style.display = isFtToggleActive('ftAltNext_' + cid) ? '' : 'none';
+}
+function ftSetAltMode(cid, mode) {
+  setFtToggleVal('ftAltMode_' + cid, mode);
+  var sl = document.getElementById('ftAltSliders_' + cid);
+  if (sl) sl.style.display = (mode === 'manual') ? '' : 'none';
+  var hint = document.getElementById('ftAltAutoHint_' + cid);
+  if (hint) hint.style.display = (mode === 'manual') ? 'none' : '';
+}
+function ftAltSliderInput(cid, which, el) {
+  var lab = document.getElementById('ftAlt' + which + 'Val_' + cid);
+  if (lab) lab.textContent = el.value + ' s';
+}
+// Werte für den Save: Manuell → Sliderwerte in Zehntelsekunden (4 s → 40), Automatisch →
+// nichts (Firmware-Takt 4,0/1,5 s, Graz und Liechtenstein 5/5; Bestandsgeräte bleiben
+// byte-gleich). Feintuning nicht offen → gespeicherte Werte unverändert behalten.
+function ftAltXYForSave(cid) {
+  var modeEl = document.getElementById('ftAltMode_' + cid);
+  if (modeEl) {
+    if (getFtToggleVal('ftAltMode_' + cid) !== 'manual') return {};
+    var xs = document.getElementById('ftAltX_' + cid);
+    var ys = document.getElementById('ftAltY_' + cid);
+    return { x: xs ? Math.round(parseFloat(xs.value) * 10) : null,
+             y: ys ? Math.round(parseFloat(ys.value) * 10) : null };
+  }
+  var xl = dsVal(cid, 'x'), yl = dsVal(cid, 'y');
+  return { x: (xl && xl > 0) ? xl : null, y: (yl && yl > 0) ? yl : null };
 }
 
 // Wien Hintergrundfarbe: Toggle setzen UND recommendedConfig sofort aktualisieren,
@@ -15741,6 +16094,8 @@ function toggleFtSwitch(id) {
   if (el) {
     el.classList.toggle('active');
   }
+  // Geräte-Vorschau lebt live mit (nur bei offenem Feintuning)
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
 }
 
 function toggleTimeWindow(cid) {
@@ -16129,7 +16484,798 @@ function getRowOrderDestinationString() {
   return items.join(',');
 }
 
+// Beispiel-Abfahrten je Display-Typ: für die Feintuning-Vorschau ohne passende
+// Stationsdaten UND für die Vorschau-Galerie (?vorschau). Ehemals fallbackData.
+var DV_DEMO_DATA = {
+  1: [{ line: 'U6', dest: 'Floridsdorf', time: 3, hf: false }, { line: '2', dest: 'Ottakring', time: 6, hf: true }, { line: '13A', dest: 'Hauptbahnhof', time: 8, hf: false }],
+  2: [{ line: '1', dest: 'Auwiesen', time: 4 }, { line: '3', dest: 'Landgutstr.', time: 7 }, { line: '46', dest: 'Hauptbahnhof', time: 11 }],
+  3: [{ line: 'U6', dest: 'Alt-Tegel', time: 2 }, { line: 'S1', dest: 'Oranienburg', time: 5 }, { line: 'M10', dest: 'Warschauer', time: 8 }],
+  4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden', time: 19 }],
+  5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'REX', dest: 'Linz Hbf', time: 5 }, { line: 'RE', dest: 'München', time: 9 }],
+  6: [{ line: 'RJX', dest: 'Wien Hbf', time: 8 }, { line: 'ICE', dest: 'Berlin Hbf', time: 15 }, { line: 'NJ', dest: 'Hamburg', time: 32 }],
+  7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
+  8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }],
+  9: [{ line: '1', dest: 'La Defense', time: 2, timeStr: '14:22' }, { line: '4', dest: 'Porte de Clignancourt', time: 4, timeStr: '14:24' }, { line: '14', dest: 'Saint-Denis Pleyel', time: 6, timeStr: '14:26' }],
+  13: [{ line: '1', dest: 'Eggenberg/UKH', time: 3 }, { line: '3', dest: 'Krenngasse', time: 5 }, { line: '5', dest: 'Puntigam', time: 7 }, { line: '7', dest: 'LKH Med Uni', time: 10 }],
+  18: [{ line: 'U6', dest: 'Alt-Tegel', time: 3 }, { line: 'M10', dest: 'Warschauer Str.', time: 6 }, { line: '100', dest: 'Alexanderplatz', time: 9 }],
+  19: [{ line: '1', dest: 'Weiden West', time: 3 }, { line: '9', dest: 'Sülz', time: 6 }, { line: '18', dest: 'Klettenberg', time: 9 }],
+  20: [{ line: '3A', dest: 'Uniklinik', time: 4 }, { line: '5', dest: 'Kaiserplatz', time: 7 }, { line: '25', dest: 'Vaals', time: 11 }],
+  23: [{ line: '1', dest: 'Auwiesen', time: 2 }, { line: '3', dest: 'Landgutstr.', time: 5 }, { line: '46', dest: 'Hauptbahnhof', time: 8 }, { line: '17', dest: 'Solarcity', time: 12 }, { line: '25', dest: 'Universität', time: 16 }],
+  24: [{ line: 'S2', dest: 'Hauptbahnhof', time: 3 }, { line: '1', dest: 'Salzburg Süd', time: 6 }, { line: '22', dest: 'Aigen', time: 9 }, { line: '7', dest: 'Itzling', time: 13 }, { line: '4', dest: 'Liefering', time: 17 }],
+  4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden Josefsplatz', time: 19 }],
+  12: [{ line: 'S3', dest: 'Wien Floridsdorf', time: 4, via: 'Wien Handelskai', vehicleType: '4020' }, { line: 'REX3', dest: 'St. Pölten Hbf', time: 12 }, { line: 'RJX', dest: 'Salzburg Hbf', time: 28 }],
+  14: [{ line: 'WB', dest: 'Wien Westbahnhof', time: 9, trainNumber: 'WB 921' }, { line: 'WB', dest: 'Wien Meidling', time: 39 }, { line: 'WB', dest: 'Salzburg Hbf', time: 65 }],
+  16: [{ line: '22', dest: 'Bílá Hora', time: 3 }, { line: '9', dest: 'Sídliště Řepy', time: 6 }, { line: 'A', dest: 'Nemocnice Motol', time: 8 }],
+  22: [{ line: 'U3', dest: 'Moosach', time: 3 }, { line: 'U6', dest: 'Klinikum Großhadern', time: 5 }, { line: '12', dest: 'Amalienburgstraße', time: 8 }],
+  25: [{ line: 'IR16', dest: 'Bern', time: 7 }, { line: 'IC1', dest: 'Genève-Aéroport', time: 23 }],
+  26: [{ line: '12', dest: 'Schaan', time: 4 }, { line: '11', dest: 'Vaduz Post', time: 7 }, { line: 'S2', dest: 'Buchs SG', time: 12 }],
+  10: [{ line: 'U1', dest: 'Leopoldau', time: 3, dest2: 'Alaudagasse', time2: 8 }, { line: '31', dest: 'Stammersdorf', time: 5, dest2: 'Schottenring', time2: 12 }],
+  101: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
+  102: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
+  103: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }]
+};
+
+// ---------- Echte Pixel-Schrift und S-Bahn-Logo aus der Firmware ----------
+// DV_GLCD = der eingebaute TFT_eSPI font 1 (klassischer 5x7 GLCD, Zeichen 0x20-0xFF,
+// 5 Spaltenbytes je Zeichen, Bit 0 = oberste Zeile) 1:1 aus glcdfont.c. Damit sehen
+// Matrix, Graz und DB S-Bahn exakt wie am Gerät aus, statt einer Webfont-Näherung.
+var DV_GLCD_B64 = 'AAAAAAAAAF8AAAAHAAcAFH8UfxQkKn8qEiMTCGRiNklWIFAACAcDAAAcIkEAAEEiHAAqHH8cKggIPggIAIBwMAAICAgICAAAYGAAIBAIBAI+UUlFPgBCf0AAcklJSUYhQUlNMxgUEn8QJ0VFRTk8SklJMUEhEQkHNklJSTZGSUkpHgAAFAAAAEA0AAAACBQiQRQUFBQUAEEiFAgCAVkJBj5BXVlOfBIREnx/SUlJNj5BQUEif0FBQT5/SUlJQX8JCQkBPkFBUXN/CAgIfwBBf0EAIEBBPwF/CBQiQX9AQEBAfwIcAn9/BAgQfz5BQUE+fwkJCQY+QVEhXn8JGSlGJklJSTIDAX8BAz9AQEA/HyBAIB8/QDhAP2MUCBRjAwR4BANhWUlNQwB/QUFBAgQIECAAQUFBfwQCAQIEQEBAQEAAAwcIACBUVHhAfyhERDg4REREKDhERCh/OFRUVBgACH4JAhikpJx4fwgEBHgARH1AACBAQD0AfxAoRAAAQX9AAHwEeAR4fAgEBHg4REREOPwYJCQYGCQkGPx8CAQECEhUVFQkBAQ/RCQ8QEAgfBwgQCAcPEAwQDxEKBAoREyQkJB8RGRUTEQACDZBAAAAdwAAAEE2CAACAQIEAjwmIyY8HqGhYRI6QEAgejhUVFVZIVVVeUEhVFR4QSFVVHhAIFRVeUAMHlJyEjlVVVVZOVRUVFk5VVRUWAAARXxBAAJFfUIAAUV8QPApJCnw8CglKPB8VFVFACBUVHxUfAoJf0kySUlJMjJISEgyMkpISDA6QUEhejpCQCB4AJ2goH05REREOT1AQEA9PCT/JCRIfklDZisv/C8r/wkp9iDAiH4JAyBUVHlBAABEfUEwSEhKMjhAQCJ6AHoKCnJ9DRkxfSYpKS8oJikpKSYwSE1AIDgICAgICAgICDgvEMisui8QKDT6AAB7AAAIFCoUIiIUKhQIVQBVAFWqVapVqv9V/1X/AAAA/wAQEBD/ABQUFP8AEBD/AP8QEPAQ8BQUFPwAFBT3AP8AAP8A/xQU9AT8FBQXEB8QEB8QHxQUFB8AEBAQ8AAAAAAfEBAQEB8QEBAQ8BAAAAD/EBAQEBAQ8CkkKfAAAAD/FAAA/wD/AAAfEBcAAPwE9BQUFxAXFBT0BPQAAP8A9xQUFBQUFBT3APcUFBQXFBAQHxAfFBQU9BQQEPAQ8AAAHxAfAAAAHxQAAAD8FAAA8BDwOURERDkUFBT/FBAQEB8AAAAA8BD///////Dw8PDwPUBAQD0AAAD//w8PDw8PfCoqPhR8Kio+FH4CAgYGAn4CfgJjVUlBYyFUVHhBQH4gHiAGAn4CApml56WZHCpJKhxMcgFyTDBKTU0wMEh4SDC8YlpGPT5JSUkAfgEBAX4qKioqKkREX0REQFFKREBAREpRQAAA/wED4ID/AAAICGtrCDJISEgyBg8JDwYAABgYAAAAEBAAMED/AQEAHwEBHjpAQCB6ADw8PDwAAAAAAA==';
+var DV_GLCD = (function() {
+  try {
+    var bin = atob(DV_GLCD_B64);
+    var a = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    return a;
+  } catch (e) { return new Uint8Array(0); }
+})();
+// Umlaute u.ä. liegen im GLCD-Font an den CP437-Positionen
+var DV_CP437 = { '\u00e4': 0x84, '\u00f6': 0x94, '\u00fc': 0x81, '\u00c4': 0x8E, '\u00d6': 0x99, '\u00dc': 0x9A, '\u00df': 0xE1, '\u00e9': 0x82, '\u00e8': 0x8A, '\u00e0': 0x85, '\u00e7': 0x87, '\u00b0': 0xF8 };
+function dvLedTextSvg(text, px, color, glow) {
+  text = String(text == null ? '' : text);
+  var rects = '';
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    var code = (DV_CP437[ch] != null) ? DV_CP437[ch] : ch.charCodeAt(0);
+    if (code < 0x20 || code > 0xFF) code = 0x3F;
+    var off = (code - 0x20) * 5;
+    for (var x = 0; x < 5; x++) {
+      var col = DV_GLCD[off + x] || 0;
+      for (var y = 0; y < 8; y++) {
+        if (col & (1 << y)) rects += '<rect x="' + ((i * 6 + x) * px) + '" y="' + (y * px) + '" width="' + px + '" height="' + px + '"/>';
+      }
+    }
+  }
+  var w = Math.max(1, text.length * 6 * px - px), h = 8 * px;
+  var glowCss = glow ? 'filter:drop-shadow(0 0 ' + Math.min(3, px) + 'px ' + color + ');' : '';
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="display:block;shape-rendering:crispEdges;fill:' + color + ';' + glowCss + 'flex:0 0 auto;">' + rects + '</svg>';
+}
+function dvLedWidth(text, px) { return Math.max(0, String(text == null ? '' : text).length * 6 * px - px); }
+// Wortweiser Umbruch auf maximal 2 Zeilen (wie splitForDisplay, vereinfacht)
+function dvLedWrap2(text, maxChars) {
+  text = String(text == null ? '' : text).trim();
+  if (text.length <= maxChars) return [text];
+  var words = text.split(' ');
+  var l1 = '', i = 0;
+  while (i < words.length) {
+    var t = l1 ? l1 + ' ' + words[i] : words[i];
+    if (t.length <= maxChars) { l1 = t; i++; } else break;
+  }
+  if (!l1) { l1 = text.substring(0, maxChars); return [l1]; }
+  var rest = words.slice(i).join(' ');
+  if (!rest) return [l1];
+  if (rest.length > maxChars) rest = rest.substring(0, maxChars);
+  return [l1, rest];
+}
+// Original S-Bahn-Logo (sbahn_logo.h, 24x24, 1-Bit): weißer Kreis, S-Zug in Zeilenfarbe
+var DV_SBAHN_ROWS = [0x000000, 0x001E00, 0x003E00, 0x007C00, 0x007800, 0x00F000, 0x01F000, 0x01E000,
+                     0x01E000, 0x01F000, 0x00F800, 0x007C00, 0x003E00, 0x001F00, 0x000F80, 0x000780,
+                     0x000780, 0x000F80, 0x000F00, 0x001E00, 0x003E00, 0x007C00, 0x007800, 0x000000];
+function dvSBahnLogoSvg(size, sColor) {
+  var rects = '';
+  for (var y = 0; y < 24; y++) {
+    var row = DV_SBAHN_ROWS[y];
+    for (var x = 0; x < 24; x++) {
+      if (row & (1 << (23 - x))) rects += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>';
+    }
+  }
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" style="display:block;flex:0 0 auto;shape-rendering:crispEdges;"><circle cx="12" cy="12" r="12" fill="#fff"/><g fill="' + sColor + '">' + rects + '</g></svg>';
+}
+
+// ==================== GERÄTEECHTE NACHBILDUNGEN (alle Display-Typen 1:1) ====================
+// Maße, Farben und Schriftgrade stammen aus den Firmware-Renderern (straba-legacy-firmware,
+// src/monitors/oeffimonitor/cities/display_*.cpp). Schriften in der Vorschau:
+//   Poppins           = 1:1 derselbe Webfont wie am Gerät
+//   FreeSans(Ext)     → Arial/Helvetica (metrisch nächste Systemschrift, kein Webfont)
+//   eingebauter font1 → Courier Bold mit LED-Glow (Pixel-Optik)
+//   Asap Condensed    = 1:1 Webfont (DB Fernverkehr)
+// CSS-Pixelgrößen sind auf die Glyphenhöhen der GFX-Fonts kalibriert (Bold24pt ≈ 34px,
+// SemiBold16pt ≈ 19px, Bold/SemiBold12pt ≈ 15px, FreeSansBold18pt ≈ 26px, 12pt ≈ 17px,
+// FreeSans9pt ≈ 12px, LED size4 ≈ 30px, size2 ≈ 15px).
+var DV_ARIAL = 'Arial,Helvetica,sans-serif';
+var DV_POPPINS = "'Poppins',sans-serif";
+var DV_LED = "'Silkscreen','Courier New',monospace";   // Pixel-Font wie der eingebaute font 1
+
+function dvClockStr(withSec) {
+  var d = new Date();
+  var p2 = function(n) { return String(n).padStart(2, '0'); };
+  return p2(d.getHours()) + ':' + p2(d.getMinutes()) + (withSec ? ':' + p2(d.getSeconds()) : '');
+}
+// Wrapper: 320x170-Fläche mit absoluter Positionierung
+function dvWrap(inner, font) {
+  return '<div style="position:relative;width:320px;height:170px;overflow:hidden;font-family:' + (font || DV_POPPINS) + ';">' + inner + '</div>';
+}
+// Zweizeilen-Raster des Zieltexts (splitForDisplay-Layouts: Bodo, Wien, German City):
+// Box beginnt auf der oberen von zwei gedachten Zeilen, zweite Zeile nur bei langem Text.
+function dvDest2(x, rowH, w, fh, ls, fs, color, weight) {
+  var lh = fh + ls;
+  var top = Math.max(Math.round((rowH - lh * 2) / 2), 0);
+  return { open: '<div style="position:absolute;left:' + x + 'px;top:' + top + 'px;height:' + (lh * 2) + 'px;width:' + w + 'px;color:' + color + ';font-weight:' + weight + ';font-size:' + fs + 'px;line-height:' + lh + 'px;"><span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">', close: '</span></div>' };
+}
+// Live-Einstellung: offener Feintuning-Toggle vor gespeichertem displaysettings-Wert.
+function dvSetting(colour, domPrefix, dsKey, def) {
+  if (document.getElementById(domPrefix + colour)) {
+    var v = parseInt(getFtToggleVal(domPrefix + colour));
+    if (!isNaN(v)) return v;
+  }
+  var l = dsVal(colour, dsKey);
+  return (l !== undefined) ? l : def;
+}
+// ÖBB/Westbahn: Zugtyp vom Liniennamen trennen ("REX3" → ["REX","3"])
+function dvSplitTrainType(line) {
+  var l = String(line || '').trim();
+  var pfx = ['nightjet', 'RJX', 'REX', 'CJX', 'ICE', 'RGJ', 'REGIOJET', 'WB', 'EC', 'IC', 'RJ', 'NJ', 'EN', 'IR', 'S', 'R', 'D'];
+  for (var i = 0; i < pfx.length; i++) {
+    if (l.indexOf(pfx[i]) === 0) return [pfx[i], l.substring(pfx[i].length).trim()];
+  }
+  return [l, ''];
+}
+// ÖBB/Westbahn-Topbar: dunkles Uhrzeit-Panel rechts mit Zugnasen-Kurve (drawFastHLine-
+// Schleife der Firmware, hier als clip-path-Kurve angenähert).
+function dvNosePanel(panelBg, panelH, clock) {
+  var w = 130, nose = panelH;
+  return '<div style="position:absolute;right:0;top:0;width:' + w + 'px;height:' + panelH + 'px;background:' + panelBg + ';clip-path:path(\'M' + nose + ' 0 L' + w + ' 0 L' + w + ' ' + panelH + ' L0 ' + panelH + ' C ' + Math.round(nose * 0.45) + ' ' + Math.round(panelH * 0.9) + ', ' + Math.round(nose * 0.8) + ' ' + Math.round(panelH * 0.45) + ', ' + nose + ' 0 Z\');display:flex;align-items:center;justify-content:flex-end;padding-right:10px;color:#fff;font-family:' + DV_ARIAL + ';font-size:12px;">' + clock + '</div>';
+}
+// S-Bahn-Rondell: das ORIGINALE Logo-Bitmap aus der Firmware (dvSBahnLogoSvg)
+function dvSBahnLogo(size, sColor) {
+  return dvSBahnLogoSvg(size, sColor);
+}
+// ÖBB-Wortmarke (nur ÖBB-Brand-Geräte): weiße Box mit roter kursiver Marke
+function dvOebbBox(w, h) {
+  return '<div style="position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;background:#fff;display:flex;align-items:center;justify-content:center;"><span style="color:#e50012;font-weight:800;font-style:italic;font-family:' + DV_ARIAL + ';font-size:16px;">&Ouml;BB</span></div>';
+}
+
+// ---------- Wien / VBB / CZ-HU (display_wien.cpp; CZHU = schwarz/weiß-Ableger) ----------
+function dvWienHTML(colour, data, rows, previewEl, fixed) {
+  // Einstellungen live (nur Wien colour 1 hat b/t/u-Regler): t = Schriftfarbe
+  // (1 gelb #fff05d, 2 weiß, 3 orange 0xFD20 ≈ #f8a400), b = Hintergrund (0 schwarz
+  // rgb(0,5,0), 1 grün rgb(5,30,15)), u = U-Bahn-Badges (0 aus, 1 Linie, 2 ganze Zeile).
+  var wTc = dvSetting(colour, 'ftTxtCol_', 't', 1);
+  var wBgV = dvSetting(colour, 'ftWienBg_', 'b', 0);
+  var wBadgeV = dvSetting(colour, 'ftWienBadges_', 'u', 0);
+  var bgColor = fixed ? fixed.bg : ((wBgV === 1) ? '#051e0f' : '#000500');
+  var textColor = fixed ? fixed.text : ((wTc === 2) ? '#ffffff' : (wTc === 3 ? '#f8a400' : '#fff05d'));
+  // Marker wie am Gerät: Rollstuhl an Niederflur-Trams (Hochflurer-Toggle), Klima-Stern
+  // an U2/U5/U6 (immer klimatisiert); Textfarbe bleibt normal (display_wien.cpp:597).
+  var wChopper = document.getElementById('ftChopper_' + colour) ? isFtToggleActive('ftChopper_' + colour) : ((dsVal(colour, 'h') || 0) === 1);
+  var wKlima = document.getElementById('ftSilber_' + colour) ? isFtToggleActive('ftSilber_' + colour) : ((dsVal(colour, 'k') || 0) === 1);
+  var WIEN_BADGE = { U1: '#e2001a', U2: '#a862a4', U3: '#f39200', U4: '#008d3d', U5: '#00b8aa', U6: '#944210' };
+  previewEl.style.background = bgColor;
+  previewEl.style.backgroundImage = 'none';
+
+  var rowH = Math.floor(170 / rows);
+  var margin = 8;
+  var lineFs = 34, destFs = 14, cdFs = 34;   // Poppins Bold 24pt / Bold 12pt / Bold 24pt
+  var lineW = Math.max.apply(null, data.map(function(d) { return Math.ceil(String(d.line || '').length * lineFs * 0.62); }).concat([42]));
+  var destX = margin + lineW + 6;
+  var destW = 320 - destX - 50;
+  var html = data.map(function(dep, i) {
+    var bCol = (!fixed && WIEN_BADGE[String(dep.line || '').toUpperCase()]) || null;
+    var fullRow = (wBadgeV === 2 && bCol);
+    var lineBadge = (wBadgeV === 1 && bCol);
+    var color = fullRow ? '#ffffff' : textColor;
+    var isTramLine = /^\d+$/.test(String(dep.line || ''));
+    var marker = '';
+    if (wChopper && isTramLine && !dep.hf) marker = ' <span style="font-weight:400;font-size:22px;">&#9855;</span>';
+    else if (wKlima && /^U[256]$/i.test(String(dep.line || ''))) marker = ' <span style="font-weight:400;font-size:24px;">*</span>';
+    var wBadgeH = Math.min(rowH - 4, Math.round(rowH * 52 / 56));
+    var lineHtml = lineBadge
+      ? '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';"><span style="background:' + bCol + ';color:#fff;border-radius:8px;height:' + wBadgeH + 'px;display:flex;align-items:center;padding:0 8px;font-weight:700;font-size:28px;">' + escapeHtmlFt(dep.line) + '</span>' + marker + '</div>'
+      : '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';font-weight:700;font-size:' + lineFs + 'px;">' + escapeHtmlFt(dep.line) + marker + '</div>';
+    var d2 = dvDest2(destX, rowH, destW, 20, 4, destFs, color, 700);   // fontHeight 20 + lineSpacing 4
+    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;' + (fullRow ? 'background:' + bCol + ';' : '') + '">'
+      + lineHtml
+      + d2.open + escapeHtmlFt(dep.dest) + d2.close
+      + '<div style="position:absolute;right:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';font-weight:700;font-size:' + cdFs + 'px;">' + dep.time + '</div>'
+      + '</div>';
+  }).join('');
+  return dvWrap(html, DV_POPPINS);
+}
+
+// ---------- ÖBB S-Bahn/Regional/Fern (display_oebb_sbahn.cpp) ----------
+function dvOebbHTML(colour, data, rows, previewEl) {
+  var BG = '#000094', BGC = '#1e0060', DIM = '#bed2f0';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+  rows = Math.min(Math.max(rows || 2, 2), 3);
+  var panelH = 38, margin = 8;
+  var compactN = rows - 1, compactH = 42;
+  var mainH = 170 - compactN * compactH;
+  var brand = (typeof isOebbDevice === 'function' && isOebbDevice());
+  var dep0 = data[0] || { line: 'S3', dest: 'Wien Floridsdorf', time: 4 };
+
+  // Badge (S-Rondell oder kursiver Zugtyp) + Zugnummer für eine Zeile
+  function badgeHtml(line, sSize, fsNum, rowBg) {
+    var tp = dvSplitTrainType(line);
+    var h = '';
+    if (tp[0] === 'S') h += dvSBahnLogo(sSize, rowBg);
+    else h += '<span style="color:#fff;font-weight:600;font-style:italic;font-family:' + DV_POPPINS + ';font-size:' + Math.round(fsNum * 0.9) + 'px;padding-right:2px;">' + escapeHtmlFt(tp[0]) + '</span>';
+    if (tp[1]) h += '<span style="color:#fff;font-weight:700;font-family:' + DV_ARIAL + ';font-size:' + fsNum + 'px;margin-left:4px;">' + escapeHtmlFt(tp[1]) + '</span>';
+    return h;
+  }
+
+  var html = '';
+  // === Hauptbereich ===
+  html += '<div style="position:absolute;left:0;top:0;width:320px;height:' + mainH + 'px;background:' + BG + ';">';
+  html += dvNosePanel(BGC, panelH, dvClockStr(true));
+  if (brand) html += dvOebbBox(64, panelH);
+  var headX = brand ? 68 : 6;
+  html += '<div style="position:absolute;left:' + headX + 'px;top:0;height:' + panelH + 'px;display:flex;align-items:center;gap:0;">' + badgeHtml(dep0.line, 24, 17, BG);
+  if (dep0.vehicleType) html += '<span style="color:' + DIM + ';font-family:' + DV_ARIAL + ';font-size:12px;margin-left:8px;">&middot; ' + escapeHtmlFt(dep0.vehicleType) + '</span>';
+  html += '</div>';
+  // Ziel groß (FreeSansBold 18pt ≈ 26px) + Countdown rechts auf gleicher Höhe
+  var destTop = panelH + 8 - (rows >= 3 ? 16 : 0);
+  var dest0 = String(dep0.dest || '').replace(' Bahnhof', '').replace(' Bhf', '');
+  html += '<div style="position:absolute;left:' + margin + 'px;top:' + destTop + 'px;right:' + margin + 'px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;color:#fff;font-family:' + DV_ARIAL + ';font-weight:700;font-size:26px;line-height:30px;">';
+  html += '<span style="overflow:hidden;white-space:nowrap;text-overflow:clip;">' + escapeHtmlFt(dest0) + '</span><span>' + dep0.time + '</span></div>';
+  if (rows < 3 && (dep0.via || dep0.viaMatch)) {
+    html += '<div style="position:absolute;left:' + margin + 'px;top:' + (destTop + 34) + 'px;color:' + DIM + ';font-family:' + DV_ARIAL + ';font-size:12px;">&uuml;ber ' + escapeHtmlFt(dep0.via || dep0.viaMatch) + '</div>';
+  }
+  html += '</div>';
+  // === Kompaktzeilen ===
+  for (var i = 0; i < compactN; i++) {
+    var dep = data[i + 1] || { line: 'S' + (40 + i), dest: 'Wien H&uuml;tteldorf', time: 8 + i * 6, _raw: true };
+    var rowBg = (rows >= 3) ? (i === 0 ? BGC : BG) : BGC;
+    var top = mainH + i * compactH;
+    html += '<div style="position:absolute;left:0;top:' + top + 'px;width:320px;height:' + compactH + 'px;background:' + rowBg + ';display:flex;align-items:center;padding:0 6px;gap:6px;font-family:' + DV_ARIAL + ';color:#fff;">';
+    if (brand) html += '<div style="flex:0 0 58px;height:' + compactH + 'px;margin-left:-6px;background:#fff;display:flex;align-items:center;justify-content:center;"><span style="color:#e50012;font-weight:800;font-style:italic;font-size:14px;">&Ouml;BB</span></div>';
+    html += badgeHtml(dep.line, 24, 17, rowBg);
+    html += '<span style="flex:1;overflow:hidden;white-space:nowrap;font-weight:700;font-size:17px;">' + (dep._raw ? dep.dest : escapeHtmlFt(String(dep.dest || '').replace(' Bahnhof', '').replace(' Bhf', ''))) + '</span>';
+    html += '<span style="font-weight:700;font-size:17px;">' + dep.time + '</span>';
+    html += '</div>';
+  }
+  return dvWrap(html, DV_ARIAL);
+}
+
+// ---------- Westbahn (display_westbahn.cpp) ----------
+function dvWestbahnHTML(colour, data, rows, previewEl) {
+  var BG = '#002639', BGC = '#014b87', DIM = '#78aac8', WBGREEN = '#c3d601';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+  rows = Math.min(Math.max(rows || 2, 2), 3);
+  var panelH = 38, margin = 8;
+  var compactN = rows - 1, compactH = 42;
+  var mainH = 170 - compactN * compactH;
+  var dep0 = data[0] || { line: 'WB', dest: 'Wien Westbahnhof', time: 9 };
+  var html = '';
+  html += '<div style="position:absolute;left:0;top:0;width:320px;height:' + mainH + 'px;background:' + BG + ';">';
+  html += dvNosePanel(BGC, panelH, dvClockStr(true));
+  html += '<div style="position:absolute;left:6px;top:0;height:' + panelH + 'px;display:flex;align-items:center;gap:6px;">';
+  html += '<span style="color:' + WBGREEN + ';font-weight:800;font-style:italic;font-family:' + DV_ARIAL + ';font-size:17px;">WEST</span>';
+  if (dep0.trainNumber) html += '<span style="color:' + DIM + ';font-family:' + DV_ARIAL + ';font-size:12px;">' + escapeHtmlFt(dep0.trainNumber) + '</span>';
+  html += '</div>';
+  var destTop = panelH + 8;
+  html += '<div style="position:absolute;left:' + margin + 'px;top:' + destTop + 'px;right:' + margin + 'px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;color:#fff;font-family:' + DV_ARIAL + ';font-weight:700;font-size:26px;line-height:30px;">';
+  html += '<span style="overflow:hidden;white-space:nowrap;">' + escapeHtmlFt(dep0.dest || '') + '</span><span>' + dep0.time + '</span></div>';
+  html += '</div>';
+  for (var i = 0; i < compactN; i++) {
+    var dep = data[i + 1] || { line: 'WB', dest: 'Wien Meidling', time: 39 };
+    var top = mainH + i * compactH;
+    html += '<div style="position:absolute;left:0;top:' + top + 'px;width:320px;height:' + compactH + 'px;background:' + BGC + ';display:flex;align-items:center;padding:0 6px;gap:8px;font-family:' + DV_ARIAL + ';color:#fff;">';
+    html += '<span style="color:' + WBGREEN + ';font-weight:800;font-style:italic;font-size:13px;">WEST</span>';
+    html += '<span style="flex:1;overflow:hidden;white-space:nowrap;font-weight:700;font-size:17px;">' + escapeHtmlFt(dep.dest || '') + '</span>';
+    html += '<span style="font-weight:700;font-size:17px;">' + dep.time + '</span>';
+    html += '</div>';
+  }
+  return dvWrap(html, DV_ARIAL);
+}
+
+// ---------- Matrix-Familie (display_matrix.cpp: 2 grün, 15/18 orange, 21 s/w, 23 per Farbton) ----------
+function dvMatrixHTML(colour, data, rows, previewEl) {
+  var variant;   // 1 = weiß, 2 = grün, 3 = orange (Farbton-Toggle t bei colour 23)
+  if (colour === 2) variant = 2;
+  else if (colour === 15 || colour === 18) variant = 3;
+  else if (colour === 21) variant = 1;
+  else variant = dvSetting(colour, 'ftTxtCol_', 't', 1);
+  var C = variant === 2 ? { bg: '#001405', grid: '#001e0a', led: '#94ce39', dim: '#4a671c' }
+        : variant === 3 ? { bg: '#0f0500', grid: '#281200', led: '#ff8c00', dim: '#804400' }
+                        : { bg: '#000000', grid: '#181818', led: '#ffffff', dim: '#707070' };
+  previewEl.style.background = C.bg;
+  previewEl.style.backgroundImage = 'radial-gradient(circle, ' + C.grid + ' 1.5px, transparent 1.5px)';
+  previewEl.style.backgroundSize = '5px 5px';
+  var rowH = Math.floor(170 / rows);
+  var big = (rows <= 3);
+  // Echte LED-Schrift: der eingebaute GLCD-Font als Pixel-SVG (dvLedTextSvg), groß =
+  // setTextSize(4) (4px-Pixel), klein = setTextSize(2). Glow wie die leuchtenden LEDs.
+  var html = data.map(function(dep, i) {
+    var top = i * rowH;
+    if (big) {
+      // Groß: Linie size4 links, Ziel size2 mittig (Matrix ZENTRIERT den Ziel-Block
+      // auch einzeilig, display_matrix.cpp: destY = (height - totalDestH) / 2), Zahl
+      // size4 rechts.
+      var lineW = Math.max(36, dvLedWidth(dep.line, 4));
+      var destX = 8 + lineW + 10;
+      var cdW = dvLedWidth(String(dep.time), 4);
+      var destWmax = 320 - destX - cdW - 26;
+      var dLines = dvLedWrap2(dep.dest, Math.max(3, Math.floor(destWmax / 12)));
+      var destHtml = dLines.map(function(dl) { return dvLedTextSvg(dl, 2, C.led, true); }).join('<div style="height:4px;"></div>');
+      return '<div style="position:absolute;left:0;top:' + top + 'px;width:320px;height:' + rowH + 'px;">'
+        + '<div style="position:absolute;left:8px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(dep.line, 4, C.led, true) + '</div>'
+        + '<div style="position:absolute;left:' + destX + 'px;top:0;height:' + rowH + 'px;width:' + destWmax + 'px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;">' + destHtml + '</div>'
+        + '<div style="position:absolute;right:10px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(String(dep.time), 4, C.led, true) + '</div>'
+        + '</div>';
+    }
+    // Klein: alles size2, eine Zeile
+    var lineW2 = Math.max(44, dvLedWidth(dep.line, 2) + 8);
+    var cdW2 = dvLedWidth(String(dep.time), 2);
+    var destMax2 = 320 - 8 - lineW2 - cdW2 - 24;
+    var destTxt = dvLedWrap2(dep.dest, Math.max(3, Math.floor(destMax2 / 12)))[0];
+    return '<div style="position:absolute;left:0;top:' + top + 'px;width:320px;height:' + rowH + 'px;">'
+      + '<div style="position:absolute;left:8px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(dep.line, 2, C.led, true) + '</div>'
+      + '<div style="position:absolute;left:' + (8 + lineW2) + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(destTxt, 2, C.led, true) + '</div>'
+      + '<div style="position:absolute;right:8px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(String(dep.time), 2, C.led, true) + '</div>'
+      + '</div>';
+  }).join('');
+  return dvWrap(html, DV_LED);
+}
+
+// ---------- MVG München (display_mvg.cpp) ----------
+function dvMvgHTML(colour, data, rows, previewEl) {
+  var BG = '#204baf';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+  var headerH = 18;
+  var rowH = Math.floor((170 - headerH) / rows);
+  var stationName = (typeof stations !== 'undefined' && stations[0] && stations[0].stopName) || 'Station';
+  var html = '';
+  html += '<div style="position:absolute;left:0;top:0;width:320px;height:' + headerH + 'px;border-bottom:2px solid #fff;display:flex;align-items:center;justify-content:space-between;padding:0 8px;color:#fff;font-weight:600;font-size:11px;">'
+    + '<span style="overflow:hidden;white-space:nowrap;">' + escapeHtmlFt(stationName) + '</span><span>Min</span></div>';
+  html += data.map(function(dep, i) {
+    var l = String(dep.line || '').toUpperCase();
+    var uCol = (typeof MVG_LINE_COLORS !== 'undefined' && MVG_LINE_COLORS[l] && /^U\d/.test(l)) ? '#' + MVG_LINE_COLORS[l] : null;
+    var lineHtml = uCol
+      ? '<span style="background:' + uCol + ';border:2px solid #fff;box-shadow:inset 0 0 0 1px ' + uCol + ', inset 0 0 0 2px #fff;color:#fff;font-weight:700;font-size:15px;height:32px;display:inline-flex;align-items:center;padding:0 8px;">' + escapeHtmlFt(dep.line) + '</span>'
+      : '<span style="color:#fff;font-weight:600;font-size:19px;">' + escapeHtmlFt(dep.line) + '</span>';
+    return '<div style="position:absolute;left:0;top:' + (headerH + i * rowH) + 'px;width:320px;height:' + rowH + 'px;display:flex;align-items:center;padding:0 8px;gap:10px;color:#fff;">'
+      + lineHtml
+      + '<span style="flex:1;overflow:hidden;white-space:nowrap;font-weight:600;font-size:19px;">' + escapeHtmlFt(dep.dest) + '</span>'
+      + '<span style="font-weight:600;font-size:19px;">' + dep.time + '</span></div>';
+  }).join('');
+  return dvWrap(html, DV_POPPINS);
+}
+
+// ---------- CH/LI (display_chli.cpp: Navy, Zebra, Badge mit weißem Rahmen, Minuten mit ') ----------
+function dvChliHTML(colour, data, rows, previewEl) {
+  var BG = '#09163a', ALT = '#182e68';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+  var rowH = Math.floor(170 / rows);
+  var big = (rows <= 3);
+  var html = data.map(function(dep, i) {
+    var rowBg = (i % 2 === 1) ? ALT : BG;
+    var l = String(dep.line || '');
+    var bBg = '#1c5abe', bFg = '#fff';
+    if (/^s/i.test(l)) { bBg = '#fff'; bFg = '#000'; }
+    else if (l === '11') { bBg = '#ffcc00'; bFg = '#000'; }
+    var badgeH = big ? 30 : 22, badgeFs = big ? 15 : 12;
+    var destFs = big ? 15 : 10, cdFs = big ? 24 : 12;
+    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;background:' + rowBg + ';display:flex;align-items:center;padding:0 8px;gap:8px;color:#fff;">'
+      + '<span style="background:' + bBg + ';color:' + bFg + ';border:1px solid #fff;border-radius:' + (big ? 6 : 5) + 'px;height:' + badgeH + 'px;min-width:' + (big ? 40 : 30) + 'px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;font-weight:700;font-size:' + badgeFs + 'px;">' + escapeHtmlFt(dep.line) + '</span>'
+      + '<span style="flex:1;overflow:hidden;white-space:nowrap;font-weight:' + (big ? 600 : 400) + ';font-size:' + destFs + 'px;">' + escapeHtmlFt(dep.dest) + '</span>'
+      + '<span style="font-weight:700;font-size:' + cdFs + 'px;">' + dep.time + "'" + '</span></div>';
+  }).join('');
+  return dvWrap(html, DV_POPPINS);
+}
+
+// ---------- DB S-Bahn Berlin (display_sbahn_berlin.cpp: Zebra, Linien-Pillen, Pixel-Schrift) ----------
+function dvSBerlinHTML(colour, data, rows, previewEl) {
+  var BG = '#0a1628';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+  var LINE = { S1: '#dd4dae', S2: '#009640', S25: '#009640', S3: '#00368c', S5: '#ff5e00', S7: '#7764b0', S75: '#7764b0', S9: '#912a49', S41: '#af642d', S42: '#af642d' };
+  var rowH = Math.floor(170 / rows);
+  var html = data.map(function(dep, i) {
+    var rowBg = (i % 2 === 0) ? '#192846' : '#0f1c32';
+    var l = String(dep.line || '').toUpperCase();
+    var w = l.length <= 2 ? 44 : (l.length === 3 ? 52 : 60);
+    var col = LINE[l] || '#505050';
+    var cdW = dvLedWidth(String(dep.time), 2);
+    var destMax = 320 - 6 - w - cdW - 32;
+    var destTxt = dvLedWrap2(dep.dest, Math.max(3, Math.floor(destMax / 12)))[0];
+    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;background:' + rowBg + ';display:flex;align-items:center;padding:0 6px;gap:10px;">'
+      + '<span style="background:' + col + ';border-radius:5px;width:' + w + 'px;height:28px;display:inline-flex;align-items:center;justify-content:center;">' + dvLedTextSvg(dep.line, 2, '#fff', false) + '</span>'
+      + '<span style="flex:1;display:flex;">' + dvLedTextSvg(destTxt, 2, '#fff', false) + '</span>'
+      + dvLedTextSvg(String(dep.time), 2, '#fff', false) + '</div>';
+  }).join('');
+  return dvWrap(html, DV_LED);
+}
+
+// ---------- DB Fernverkehr (display_db_fern.cpp: Zugzielanzeiger, Asap Condensed) ----------
+function dvDbFernHTML(colour, data, rows, previewEl) {
+  var BG = '#003399', DIM = '#a0b9dc';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+  var dep = data[0] || { line: 'ICE', dest: 'Berlin Hbf', time: 15 };
+  var font = "'Asap Condensed','Arial Narrow',Arial,sans-serif";
+  var html = '';
+  html += '<div style="position:absolute;left:0;top:0;width:320px;height:22px;background:#fff;color:#000;display:flex;align-items:center;padding:0 8px;font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;">' + escapeHtmlFt(dep.dest) + '</div>';
+  html += '<div style="position:absolute;left:8px;top:27px;right:8px;display:flex;justify-content:space-between;color:#fff;font-size:15px;"><span>' + escapeHtmlFt(dep.line) + (dep.trainNumber ? ' ' + escapeHtmlFt(dep.trainNumber) : ' 823') + '</span><span>Gl. 2</span></div>';
+  html += '<div style="position:absolute;left:8px;top:52px;right:8px;color:#fff;font-size:22px;font-weight:500;display:flex;gap:12px;align-items:baseline;"><span>' + dvClockStr(false) + '</span><span style="overflow:hidden;white-space:nowrap;">' + escapeHtmlFt(dep.dest) + '</span></div>';
+  html += '<div style="position:absolute;left:8px;top:86px;right:8px;color:' + DIM + ';font-size:13px;line-height:17px;overflow:hidden;max-height:51px;">&uuml;ber ' + escapeHtmlFt(dep.via || 'Hauptbahnhof &middot; Flughafen') + '</div>';
+  html += '<div style="position:absolute;left:8px;bottom:8px;color:#fff;font-size:26px;font-weight:500;">in ' + dep.time + ' min</div>';
+  return dvWrap(html, font);
+}
+
+// ---------- Paper White (display_paperwhite.cpp: t = 1 komplett weiß, 2 weiß/schwarz, 3 weiß/hellgrau) ----------
+function dvPaperWhiteHTML(colour, data, rows, previewEl) {
+  var variant = dvSetting(colour, 'ftTxtCol_', 't', 1);
+  previewEl.style.background = '#ffffff';
+  previewEl.style.backgroundImage = 'none';
+  var rowH = Math.floor(170 / rows);
+  var html = data.map(function(dep, i) {
+    var zebra = (i % 2 === 1);
+    var rowBg = '#ffffff', rowText = '#000000';
+    if (variant === 2 && zebra) { rowBg = '#1a1a1a'; rowText = '#ffffff'; }
+    if (variant === 3 && zebra) { rowBg = '#bbbbbb'; rowText = '#000000'; }
+    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;background:' + rowBg + ';color:' + rowText + ';display:flex;align-items:center;padding:0 12px;gap:10px;">'
+      + '<span style="font-weight:600;font-size:19px;min-width:40px;">' + escapeHtmlFt(dep.line) + '</span>'
+      + '<span style="flex:1;overflow:hidden;white-space:nowrap;font-weight:600;font-size:15px;">' + escapeHtmlFt(dep.dest) + '</span>'
+      + '<span style="font-weight:600;font-size:19px;">' + dep.time + '</span></div>';
+  }).join('');
+  return dvWrap(html, DV_POPPINS);
+}
+
+// ---------- Salzburg AG (display_salzburg.cpp: Zeilen abwechselnd schwarz/weiß invertiert) ----------
+function dvSalzburgHTML(colour, data, rows, previewEl) {
+  previewEl.style.background = '#000000';
+  previewEl.style.backgroundImage = 'none';
+  var rowH = Math.floor(170 / rows);
+  var html = data.map(function(dep, i) {
+    var black = (i % 2 === 0);
+    var rowBg = black ? '#000' : '#fff', rowText = black ? '#fff' : '#000';
+    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;background:' + rowBg + ';color:' + rowText + ';display:flex;align-items:center;padding:0 10px;gap:10px;">'
+      + '<span style="font-weight:600;font-size:19px;min-width:40px;">' + escapeHtmlFt(dep.line) + '</span>'
+      + '<span style="flex:1;overflow:hidden;white-space:nowrap;font-weight:600;font-size:15px;">' + escapeHtmlFt(dep.dest) + '</span>'
+      + '<span style="font-weight:600;font-size:19px;">' + (dep.timeStr || dep.time) + '</span></div>';
+  }).join('');
+  return dvWrap(html, DV_POPPINS);
+}
+
+// ---------- Holding Graz (display_graz.cpp: schlicht, Pixel-Schrift, dünne Trennlinien) ----------
+function dvGrazHTML(colour, data, rows, previewEl) {
+  var BG = '#19191e';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+  var rowH = Math.floor(170 / rows);
+  var big = (rows <= 2);
+  // Graz zeichnet mit dem eingebauten GLCD-Font auf ruhigem TFT (kein LED-Glow)
+  var html = data.map(function(dep, i) {
+    var sep = (i < data.length - 1) ? 'border-bottom:1px solid #32323a;' : '';
+    if (big) {
+      var cdW = dvLedWidth(String(dep.time), 4);
+      var destMaxB = 320 - 100 - cdW - 30;
+      var destTxtB = dvLedWrap2(dep.dest, Math.max(3, Math.floor(destMaxB / 12)))[0];
+      return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;' + sep + '">'
+        + '<div style="position:absolute;left:10px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(dep.line, 4, '#fff', false) + '</div>'
+        + '<div style="position:absolute;left:100px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(destTxtB, 2, '#fff', false) + '</div>'
+        + '<div style="position:absolute;right:10px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(String(dep.time), 4, '#fff', false) + '</div></div>';
+    }
+    var lineW2 = Math.max(40, dvLedWidth(dep.line, 2) + 8);
+    var cdW2 = dvLedWidth(String(dep.time), 2);
+    var destMax2 = 320 - 8 - lineW2 - cdW2 - 24;
+    var destTxt2 = dvLedWrap2(dep.dest, Math.max(3, Math.floor(destMax2 / 12)))[0];
+    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;' + sep + '">'
+      + '<div style="position:absolute;left:8px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(dep.line, 2, '#fff', false) + '</div>'
+      + '<div style="position:absolute;left:' + (8 + lineW2) + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(destTxt2, 2, '#fff', false) + '</div>'
+      + '<div style="position:absolute;right:8px;top:0;height:' + rowH + 'px;display:flex;align-items:center;">' + dvLedTextSvg(String(dep.time), 2, '#fff', false) + '</div></div>';
+  }).join('');
+  return dvWrap(html, DV_LED);
+}
+
+// ---------- SBB (display_sbb.cpp: Perron-Anzeige, Kategorie-Badge, Wagenreihung) ----------
+function dvSbbHTML(colour, data, rows, previewEl) {
+  var BG = '#264c9a';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+  var dep = data[0] || { line: 'IR16', dest: 'Bern', time: 7 };
+  var tp = dvSplitTrainType(dep.line);
+  var html = '';
+  html += '<div style="position:absolute;left:8px;top:10px;display:flex;align-items:center;gap:10px;">'
+    + '<span style="background:#eb0000;color:#fff;border-radius:4px;height:34px;display:inline-flex;align-items:center;padding:0 10px;font-weight:700;font-style:italic;font-size:17px;">' + escapeHtmlFt(tp[0]) + (tp[1] ? ' ' + escapeHtmlFt(tp[1]) : '') + '</span></div>';
+  html += '<div style="position:absolute;right:8px;top:10px;color:#fff;font-weight:700;font-size:26px;">' + dvClockStr(false) + '</div>';
+  html += '<div style="position:absolute;left:8px;top:58px;right:8px;color:#fff;font-weight:700;font-size:26px;white-space:nowrap;overflow:hidden;">' + escapeHtmlFt(dep.dest) + '</div>';
+  if (data[1]) html += '<div style="position:absolute;left:8px;top:94px;right:8px;color:#cdd9f0;font-size:13px;white-space:nowrap;overflow:hidden;">danach ' + escapeHtmlFt(data[1].line) + ' ' + escapeHtmlFt(data[1].dest) + ' in ' + data[1].time + "'" + '</div>';
+  // Wagenreihungs-Streifen (weiß) mit Sektoren und Klassen-Blöcken
+  html += '<div style="position:absolute;left:0;bottom:0;width:320px;height:26px;background:#fff;display:flex;align-items:center;padding:0 8px;gap:4px;font-size:11px;color:#000;">'
+    + '<span style="font-weight:700;">A</span>'
+    + '<span style="flex:0 0 34px;height:12px;background:#ffd800;"></span>'
+    + '<span style="flex:0 0 34px;height:12px;background:#3c82b4;"></span>'
+    + '<span style="flex:0 0 34px;height:12px;background:#c83232;"></span>'
+    + '<span style="flex:0 0 34px;height:12px;background:#3c82b4;"></span>'
+    + '<span style="font-weight:700;margin-left:auto;">B</span></div>';
+  return dvWrap(html, DV_ARIAL);
+}
+
+// ---------- WLB Badner Bahn (display_badnerbahn.cpp: Blau-Streifen) ----------
+function dvWlbHTML(colour, data, rows, previewEl) {
+  previewEl.style.background = '#0078c8';
+  previewEl.style.backgroundImage = 'none';
+  var rowH = Math.floor(170 / rows);
+  var html = '';
+  for (var i = 0; i < rows; i++) {
+    var dep = data[i];
+    var rowBg = (i % 2 === 0) ? '#0078c8' : '#003278';
+    html += '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;background:' + rowBg + ';display:flex;align-items:center;padding:0 8px;gap:10px;color:#fff;">';
+    if (dep) {
+      var isWlb = /^(WLB|BB)/i.test(String(dep.line || ''));
+      html += isWlb
+        ? '<span style="font-weight:800;font-style:italic;font-family:' + DV_ARIAL + ';font-size:22px;">WLB</span>'
+        : '<span style="font-weight:700;font-size:30px;">' + escapeHtmlFt(dep.line) + '</span>';
+      html += '<span style="flex:1;overflow:hidden;white-space:nowrap;font-family:' + DV_ARIAL + ';font-weight:700;font-size:16px;">' + escapeHtmlFt(dep.dest) + '</span>';
+      html += '<span style="font-weight:700;font-size:30px;">' + dep.time + '</span>';
+    }
+    html += '</div>';
+  }
+  return dvWrap(html, DV_POPPINS);
+}
+
+// ---------- Paris RATP (display_paris.cpp) ----------
+// EINE Richtung pro Ansicht: weißer Header 34px mit Metro-Logo, gelbem Linienkreis
+// (r12, blaue Nummer), Ziel in RATP-Blau und schwarzem Uhr-Kästchen (gelbe Zeit).
+// Darunter auf Schwarz: Labels "1er métro" / "2e métro", dicker weißer Trennbalken
+// mittig und ZWEI riesige gelbe Countdown-Zahlen (Poppins Bold 42pt ≈ 60px).
+function dvParisHTML(colour, data, rows, previewEl) {
+  previewEl.style.background = '#000000';
+  previewEl.style.backgroundImage = 'none';
+  var dep0 = data[0] || { line: '1', dest: 'La Défense', time: 2 };
+  var cd2 = (dep0.time2 != null) ? dep0.time2 : (data[1] && data[1].line === dep0.line ? data[1].time : dep0.time + 4);
+  var l = String(dep0.line || '');
+  var isMetro = /^\d{1,2}$/.test(l);
+  var mode = isMetro ? 'métro' : (/^T/i.test(l) ? 'tram' : 'bus');
+  var html = '';
+  // Header (34px, weiß)
+  html += '<div style="position:absolute;left:0;top:0;width:320px;height:34px;background:#fff;display:flex;align-items:center;padding:0 10px;gap:6px;">';
+  if (isMetro) html += '<span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#003278;color:#fff;font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;">M</span>';
+  html += '<span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#ffcd00;color:#003278;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;">' + escapeHtmlFt(dep0.line) + '</span>';
+  html += '<span style="flex:1;color:#003278;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;margin-left:2px;">' + escapeHtmlFt(dep0.dest) + '</span>';
+  html += '<span style="flex:0 0 52px;height:20px;background:#000;color:#ffcd00;border-radius:3px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;">' + dvClockStr(false) + '</span>';
+  html += '</div>';
+  // Labels
+  html += '<div style="position:absolute;left:14px;top:44px;color:#fff;font-size:12px;">1er ' + mode + '</div>';
+  html += '<div style="position:absolute;left:' + (160 + 14) + 'px;top:44px;color:#fff;font-size:12px;">2e ' + mode + '</div>';
+  // Trennbalken (6px, runde Enden), vertikal im Countdown-Bereich
+  html += '<div style="position:absolute;left:157px;top:68px;width:6px;height:68px;border-radius:3px;background:#fff;"></div>';
+  // Zwei große gelbe Zahlen, je Hälfte zentriert
+  html += '<div style="position:absolute;left:0;top:56px;width:160px;height:114px;display:flex;align-items:center;justify-content:center;color:#ffcd00;font-weight:700;font-size:60px;">' + dep0.time + '</div>';
+  html += '<div style="position:absolute;left:160px;top:56px;width:160px;height:114px;display:flex;align-items:center;justify-content:center;color:#ffcd00;font-weight:700;font-size:60px;">' + cd2 + '</div>';
+  return dvWrap(html, DV_POPPINS);
+}
+
+// ---------- Straba-Ansicht (display_straba.cpp: farbige Voll-Badges, große + kleine Zeile) ----------
+function dvStrabaHTML(colour, data, rows, previewEl) {
+  previewEl.style.background = '#1e1e1e';
+  previewEl.style.backgroundImage = 'none';
+  var lineCol = function(l) {
+    l = String(l || '').toUpperCase();
+    if (l === 'U1') return '#e31e25'; if (l === 'U2') return '#5a3782';
+    if (l === 'U3') return '#ef801e'; if (l === 'U4') return '#009640';
+    if (l === 'U6') return '#874e2a'; if (/^U/.test(l)) return '#0064b4';
+    if (/^\d+$/.test(l)) return '#c41e24';
+    return '#1a3b6f';
+  };
+  var html = '<div style="width:100%;height:100%;display:flex;flex-direction:column;">'
+    + data.map(function(dep, i) {
+      var col = lineCol(dep.line);
+      var t2 = dep.time2 || (dep.time + 8);
+      return '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:2px 8px;' + (i < data.length - 1 ? 'border-bottom:1px solid #333;' : '') + '">'
+        + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">'
+        + '<span style="background:' + col + ';border-radius:4px;padding:1px 7px;min-width:30px;text-align:center;font-weight:700;font-size:16px;color:#fff;">' + escapeHtmlFt(dep.line) + '</span>'
+        + '<span style="flex:1;font-size:14px;color:#fff;font-weight:600;overflow:hidden;white-space:nowrap;">' + escapeHtmlFt(dep.dest) + '</span>'
+        + '<span style="font-weight:700;font-size:20px;color:#fff;">' + dep.time + '</span></div>'
+        + '<div style="display:flex;align-items:center;gap:6px;padding-left:8px;">'
+        + '<span style="background:' + col + ';border-radius:3px;padding:0 4px;min-width:20px;text-align:center;font-weight:700;font-size:9px;color:#fff;">' + escapeHtmlFt(dep.line) + '</span>'
+        + '<span style="flex:1;font-size:10px;color:#b4b4b4;overflow:hidden;white-space:nowrap;">' + escapeHtmlFt(dep.dest2 || dep.dest) + '</span>'
+        + '<span style="font-weight:700;font-size:12px;color:#b4b4b4;">' + t2 + '</span></div></div>';
+    }).join('') + '</div>';
+  return dvWrap(html, DV_POPPINS);
+}
+
+// ---------- Bodo / German City (display_bodo.cpp, display_german_city.cpp) ----------
+// Beide sind exakt das Layout des Eigenen Displays (display_free_color ist eine Kopie
+// von Bodo) → derselbe Renderer mit festen Farben. German City: dunkelgrünes Badge.
+function dvBodoHTML(colour, data, rows, previewEl) {
+  var cfg = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff',
+              G: '1', F: '1', A: '1', W: '0', M: '0', rows: rows, P: {} };
+  if (colour === 19 || colour === 20) { cfg.H = '1b5e20'; cfg.U = '1b5e20'; }
+  fcApplyPreviewBg(previewEl, cfg);
+  return fcDevicePreviewHTML(cfg, data);
+}
+
+// Dispatcher: colour → Nachbildung. null = kein Renderer (generisches Brett).
+function dvPreviewHTML(colour, data, rows, previewEl) {
+  switch (colour) {
+    case 1: case 3:
+      return dvWienHTML(colour, data, rows, previewEl, null);
+    case 16:   // Prag / CZ-HU = Wien-Layout in schwarz/weiß (display_czhu.h)
+      return dvWienHTML(colour, data, rows, previewEl, { bg: '#000000', text: '#ffffff' });
+    case 11: case 12:
+      return dvOebbHTML(colour, data, rows, previewEl);
+    case 14:
+      return dvWestbahnHTML(colour, data, rows, previewEl);
+    case 2: case 15: case 18: case 21: case 23:
+      return dvMatrixHTML(colour, data, rows, previewEl);
+    case 22:
+      return dvMvgHTML(colour, data, rows, previewEl);
+    case 26:
+      return dvChliHTML(colour, data, rows, previewEl);
+    case 5:
+      return dvSBerlinHTML(colour, data, rows, previewEl);
+    case 6:
+      return dvDbFernHTML(colour, data, rows, previewEl);
+    case 24:
+      return dvPaperWhiteHTML(colour, data, rows, previewEl);
+    case 8:
+      return dvSalzburgHTML(colour, data, rows, previewEl);
+    case 13:
+      return dvGrazHTML(colour, data, rows, previewEl);
+    case 25:
+      return dvSbbHTML(colour, data, rows, previewEl);
+    case 4:
+      return dvWlbHTML(colour, data, rows, previewEl);
+    case 9:
+      return dvParisHTML(colour, data, rows, previewEl);
+    case 7:
+    case 19: case 20:
+      return dvBodoHTML(colour, data, rows, previewEl);
+    case 10:
+      return dvStrabaHTML(colour, data, rows, previewEl);
+    default:
+      return '';
+  }
+}
+
+// ==================== VORSCHAU-GALERIE (?vorschau) ====================
+// Eine Seite mit ALLEN Display-Nachbildungen auf einen Blick (Paul 20.09.2026):
+// catchit-cities.html?vorschau (auch #vorschau oder ?galerie). Nutzt dieselben
+// Renderer wie das Feintuning (dvPreviewHTML / fcDevicePreviewHTML) mit den
+// Beispieldaten aus DV_DEMO_DATA, rein lesend, ändert keine Konfiguration.
+function dvOpenGallery() {
+  var old = document.getElementById('dvGallery');
+  if (old) old.remove();
+  var TYPES = [
+    [1, 'Wiener Linien'], [3, 'VBB Berlin'], [16, 'Prag / CZ-HU'], [12, 'ÖBB S-Bahn'],
+    [14, 'Westbahn'], [23, 'Matrix'], [2, 'Grüne Dot Matrix'], [15, 'Orange Matrix'],
+    [21, 'Schwarz/Weiß Matrix'], [22, 'MVG München'], [26, 'CH/LI'], [5, 'DB S-Bahn'],
+    [6, 'DB Fernverkehr'], [24, 'Paper White'], [8, 'Salzburg AG'], [13, 'Holding Graz'],
+    [25, 'SBB'], [4, 'WLB Badner Bahn'], [9, 'Paris'], [7, 'Blau/Gelb (Bodo)'],
+    [19, 'KVB Köln'], [10, 'Straba']
+  ];
+  var ov = document.createElement('div');
+  ov.id = 'dvGallery';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:12000;overflow:auto;background:var(--paper, #efe9dc);padding:18px 16px 40px;font-family:var(--font-main, Poppins), sans-serif;';
+  var h = '';
+  h += '<div style="max-width:1100px;margin:0 auto;">';
+  h += '<div style="display:flex;align-items:center;margin-bottom:14px;gap:12px;">';
+  h += '<div><div style="font-weight:700;font-size:20px;">Display-Vorschau, alle Typen</div>';
+  h += '<div style="font-size:12px;color:#777;">Beispieldaten, gleiche Nachbildungen wie im Feintuning. Diese Seite: catchit-cities.html?vorschau</div></div>';
+  h += '<button onclick="document.getElementById(\'dvGallery\').remove()" style="margin-left:auto;border:none;background:#e8e2d2;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;color:#444;flex:0 0 auto;">&#10005;</button>';
+  h += '</div>';
+  h += '<div id="dvGalleryGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(330px, 1fr));gap:16px;justify-items:center;"></div>';
+  h += '</div>';
+  ov.innerHTML = h;
+  document.body.appendChild(ov);
+  var grid = document.getElementById('dvGalleryGrid');
+
+  function addCell(label, render) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'width:344px;max-width:100%;';
+    var lab = document.createElement('div');
+    lab.textContent = label;
+    lab.style.cssText = 'font-size:12px;font-weight:700;margin:0 0 5px 2px;';
+    var bez = document.createElement('div');
+    bez.style.cssText = 'background:#111;border-radius:14px;padding:10px 12px;box-shadow:0 6px 18px rgba(0,0,0,0.3);';
+    var cell = document.createElement('div');
+    cell.style.cssText = 'width:320px;max-width:100%;height:170px;border-radius:4px;overflow:hidden;background:#000;';
+    bez.appendChild(cell);
+    wrap.appendChild(lab);
+    wrap.appendChild(bez);
+    grid.appendChild(wrap);
+    try {
+      cell.innerHTML = render(cell) || '';
+    } catch (e) {
+      cell.innerHTML = '<div style="color:#c66;font-size:12px;padding:10px;">Fehler: ' + escapeHtmlFt(e.message) + '</div>';
+    }
+  }
+
+  TYPES.forEach(function(t) {
+    var cid = t[0];
+    var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
+    var rows = f.defaultRows || 3;
+    if (f.minRows) rows = Math.max(rows, f.minRows);
+    if (f.maxRows) rows = Math.min(rows, f.maxRows);
+    var data = (DV_DEMO_DATA[cid] || DV_DEMO_DATA[1]).slice();
+    addCell(t[0] + ' · ' + t[1], function(cell) {
+      return dvPreviewHTML(cid, data.slice(0, Math.max(rows, data.length > 3 ? rows : data.length)), rows, cell);
+    });
+  });
+
+  // Eigene Displays: gespeicherte Designs zeigen, sonst ein Beispiel-Design
+  var designs = (typeof fcExistingDesigns === 'function') ? fcExistingDesigns() : [];
+  if (designs.length > 0) {
+    designs.forEach(function(d) {
+      addCell(d.cid + ' · ' + (ftDisplayName(d.cid) || 'Eigenes Display'), function(cell) {
+        var cfg = fcPreviewConfig(d.cid);
+        fcApplyPreviewBg(cell, cfg);
+        return fcDevicePreviewHTML(cfg, (DV_DEMO_DATA[101] || []).slice());
+      });
+    });
+  } else {
+    addCell('101 · Eigenes Display (Beispiel)', function(cell) {
+      var cfg = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff',
+                  G: '1', F: '1', A: '1', W: '0', M: '1', rows: 3, P: {} };
+      fcApplyPreviewBg(cell, cfg);
+      return fcDevicePreviewHTML(cfg, (DV_DEMO_DATA[101] || []).slice());
+    });
+  }
+}
+
+// Aufruf über die URL: ?vorschau / ?galerie / #vorschau — nach dem Laden öffnen,
+// über dem Start-Splash (z-index 12000 > startupLoading 11000).
+(function() {
+  var q = String(location.search + location.hash).toLowerCase();
+  if (q.indexOf('vorschau') < 0 && q.indexOf('galerie') < 0) return;
+  var tries = 0;
+  var t = setInterval(function() {
+    tries++;
+    if (document.body && typeof dvPreviewHTML === 'function') {
+      clearInterval(t);
+      dvOpenGallery();
+    } else if (tries > 100) {
+      clearInterval(t);
+    }
+  }, 100);
+})();
+
+// ===== Vorschau-Leiste: zuklappen + live nachziehen (Paul 20.09.2026) =====
+function ftPreviewCollapsed() {
+  try { return localStorage.getItem('catchit_ft_preview_zu') === '1'; } catch (e) { return false; }
+}
+function ftTogglePreviewCollapsed() {
+  var zu = !ftPreviewCollapsed();
+  try { localStorage.setItem('catchit_ft_preview_zu', zu ? '1' : '0'); } catch (e) {}
+  ftApplyPreviewCollapsed();
+}
+function ftApplyPreviewCollapsed() {
+  var zu = ftPreviewCollapsed();
+  var bez = document.getElementById('ftPreviewBezel');
+  var btn = document.getElementById('ftPreviewToggleBtn');
+  if (bez) bez.style.display = zu ? 'none' : '';
+  if (btn) btn.innerHTML = zu ? '&#9656; Display-Vorschau aufklappen' : '&#9662; Display-Vorschau zuklappen';
+}
+
+// Jede Bedienung im offenen Feintuning sofort in der Geräte-Vorschau zeigen. Der
+// Busy-Guard verhindert Rekursion (updateFinetuningPreview stellt in einem Sonderfall
+// selbst Toggles um, was sonst wieder hier landen würde).
+var _ftPreviewBusy = false;
+function ftPreviewLiveRefresh() {
+  if (_ftPreviewBusy) return;
+  var st = document.getElementById('stepFinetuning');
+  if (!st || st.classList.contains('hidden')) return;
+  _ftPreviewBusy = true;
+  try { updateFinetuningPreview(); } finally { _ftPreviewBusy = false; }
+}
+
 function updateFinetuningPreview() {
+  ftApplyPreviewCollapsed();  // Zuklapp-Zustand bei jedem Render anwenden
   const colour = parseInt(document.getElementById('ftColorSelect').value);
 
   // 4-Zeilen-Button nur bei Grüne Dot Matrix (2), Graz (13), Orange Matrix (15/18), Matrix (23)
@@ -16158,12 +17304,16 @@ function updateFinetuningPreview() {
   let timeCounter = 3;
 
   // Durch alle Stationen gehen und Linien sammeln
+  let previewTramNo = 0;  // Trams abwechselnd Niederflur/Hochflurer (Beispiel-Zustand)
   stations.forEach(station => {
     if (station.filter) {
       const lines = station.filter.split(',').map(l => l.trim());
       lines.forEach(lineName => {
-        // Hochflurer-Erkennung für Wien (Niederflur: ULF-Linien)
-        const isHochflurer = station.network === 'WL' && !lineName.startsWith('U') && /^\d+$/.test(lineName);
+        // Wien-Tram: abwechselnd Hochflurer/Niederflur flaggen. Echte Fahrzeugdaten hat
+        // die Vorschau nicht, so zeigt der Marker-Toggle aber beide Zustände (die
+        // Firmware markiert NIEDERFLUR mit Rollstuhl, Hochflurer bleiben ohne Icon).
+        const isWienTram = station.network === 'WL' && !lineName.startsWith('U') && /^\d+$/.test(lineName);
+        const isHochflurer = isWienTram && (previewTramNo++ % 2 === 0);
         data.push({
           line: lineName,
           dest: station.stopName,
@@ -16178,342 +17328,39 @@ function updateFinetuningPreview() {
 
   // Fallback wenn keine Daten vorhanden
   if (data.length === 0) {
-    const fallbackData = {
-      1: [{ line: 'U6', dest: 'Floridsdorf', time: 3, hf: false }, { line: '2', dest: 'Ottakring', time: 6, hf: true }, { line: '13A', dest: 'Hauptbahnhof', time: 8, hf: false }],
-      2: [{ line: '1', dest: 'Auwiesen', time: 4 }, { line: '3', dest: 'Landgutstr.', time: 7 }, { line: '46', dest: 'Hauptbahnhof', time: 11 }],
-      3: [{ line: 'U6', dest: 'Alt-Tegel', time: 2 }, { line: 'S1', dest: 'Oranienburg', time: 5 }, { line: 'M10', dest: 'Warschauer', time: 8 }],
-      4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden', time: 19 }],
-      5: [{ line: 'S1', dest: 'Oranienburg', time: 2 }, { line: 'REX', dest: 'Linz Hbf', time: 5 }, { line: 'RE', dest: 'München', time: 9 }],
-      6: [{ line: 'RJX', dest: 'Wien Hbf', time: 8 }, { line: 'ICE', dest: 'Berlin Hbf', time: 15 }, { line: 'NJ', dest: 'Hamburg', time: 32 }],
-      7: [{ line: '7', dest: 'Ravensburg', time: 4 }, { line: '1', dest: 'Friedrichshafen', time: 9 }, { line: '4', dest: 'Konstanz', time: 15 }],
-      8: [{ line: '1', dest: 'Hellbrunn', time: 3, timeStr: '14:23' }, { line: 'S3', dest: 'Golling', time: 7, timeStr: '14:27' }, { line: '22', dest: 'Aigen', time: 11, timeStr: '14:31' }],
-      9: [{ line: '1', dest: 'La Defense', time: 2, timeStr: '14:22' }, { line: '4', dest: 'Porte de Clignancourt', time: 4, timeStr: '14:24' }, { line: '14', dest: 'Saint-Denis Pleyel', time: 6, timeStr: '14:26' }],
-      13: [{ line: '1', dest: 'Eggenberg/UKH', time: 3 }, { line: '3', dest: 'Krenngasse', time: 5 }, { line: '5', dest: 'Puntigam', time: 7 }, { line: '7', dest: 'LKH Med Uni', time: 10 }],
-      18: [{ line: 'U6', dest: 'Alt-Tegel', time: 3 }, { line: 'M10', dest: 'Warschauer Str.', time: 6 }, { line: '100', dest: 'Alexanderplatz', time: 9 }],
-      19: [{ line: '1', dest: 'Weiden West', time: 3 }, { line: '9', dest: 'Sülz', time: 6 }, { line: '18', dest: 'Klettenberg', time: 9 }],
-      20: [{ line: '3A', dest: 'Uniklinik', time: 4 }, { line: '5', dest: 'Kaiserplatz', time: 7 }, { line: '25', dest: 'Vaals', time: 11 }],
-      23: [{ line: '1', dest: 'Auwiesen', time: 2 }, { line: '3', dest: 'Landgutstr.', time: 5 }, { line: '46', dest: 'Hauptbahnhof', time: 8 }, { line: '17', dest: 'Solarcity', time: 12 }, { line: '25', dest: 'Universität', time: 16 }],
-      24: [{ line: 'S2', dest: 'Hauptbahnhof', time: 3 }, { line: '1', dest: 'Salzburg Süd', time: 6 }, { line: '22', dest: 'Aigen', time: 9 }, { line: '7', dest: 'Itzling', time: 13 }, { line: '4', dest: 'Liefering', time: 17 }],
-      101: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
-      102: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
-      103: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }]
-    };
-    data = fallbackData[colour] || fallbackData[1];
+    data = (DV_DEMO_DATA[colour] || DV_DEMO_DATA[1]).slice();
   }
 
   data = data.slice(0, rows);
 
-  // Render basierend auf Display-Typ
+  // Render: geräteechte Nachbildung je Display-Typ (dvPreviewHTML, Maße und Farben
+  // aus den Firmware-Renderern), Eigene Displays über den Design-Renderer des Wizards.
+  // Kein Treffer → generisches Brett unten (nie mehr eine schwarze Box).
   let html = '';
-
-  if (colour === 2) {
-    // LINZ Style: Gelb-Grün auf dunkelgrünem Hintergrund mit LED-Matrix Look
-    const bgColor = '#001405';  // Sehr dunkelgrün
-    const textColor = '#c8ff00';  // Gelb-Grün (LED-Farbe)
-    const gridColor = '#002810';  // Etwas heller für Gitter-Muster
-    previewEl.style.background = bgColor;
-    previewEl.style.backgroundImage = `radial-gradient(circle, ${gridColor} 1px, transparent 1px)`;
-    previewEl.style.backgroundSize = '4px 4px';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
-      ${data.map((dep, i) => {
-        return `<div style="flex:1;display:flex;align-items:center;padding:4px 8px;border-bottom:${i < rows - 1 ? '1px solid #0a3020' : 'none'};color:${textColor};">
-          <span style="font-weight:bold;font-size:18px;min-width:36px;text-shadow:0 0 8px ${textColor};">${dep.line}</span>
-          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 6px;text-shadow:0 0 4px ${textColor};">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:18px;text-shadow:0 0 8px ${textColor};">${dep.time}</span>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }
-  else if (colour === 1 || colour === 3) {
-    // Wien/VBB Style: Gelb auf schwarz
-    const bgColor = '#000500';
-    const textColor = '#fff05d';
-    const hlColor = '#87ceeb';
-    previewEl.style.background = bgColor;
-    previewEl.style.backgroundImage = 'none';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
-      ${data.map((dep, i) => {
-        const color = dep.hf ? hlColor : textColor;
-        return `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;border-bottom:${i < rows - 1 ? '2px solid #000' : 'none'};color:${color};">
-          <span style="font-weight:bold;font-size:16px;min-width:44px;">${dep.line}</span>
-          <span style="flex:1;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:18px;">${dep.time}</span>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }
-  else if (colour === 4) {
-    // WLB Style: Weiß auf blau gestreift
-    previewEl.style.background = '#0078c8';
-    previewEl.style.backgroundImage = 'none';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
-      ${data.map((dep, i) => {
-        const bg = i % 2 === 0 ? '#0078c8' : '#003278';
-        return `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;background:${bg};color:#fff;">
-          <span style="font-weight:bold;font-size:14px;min-width:44px;background:${bg};padding:2px 4px;border-radius:3px;">WLB</span>
-          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:16px;">${dep.time}</span>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }
-  else if (colour === 5 || colour === 6) {
-    // DB Style: Modern dunkel
-    const bgColor = '#0a1628';
-    previewEl.style.background = bgColor;
-    previewEl.style.backgroundImage = 'none';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
-      ${data.map((dep, i) => {
-        const rowBg = i % 2 === 0 ? '#192846' : '#0f1c32';
-        // Farben für verschiedene Zuggattungen
-        let lineColor = '#666';  // Default grau
-        const ln = dep.line;
-        if (ln.startsWith('S')) lineColor = '#0055A4';  // S-Bahn blau
-        else if (/^(ICE|IC|EC)/.test(ln)) lineColor = '#c80000';  // DB Fernverkehr rot
-        else if (/^(RJ|RJX|NJ)/.test(ln)) lineColor = '#c80000';  // ÖBB Fernverkehr rot
-        else if (/^(RE|RB|IRE)/.test(ln)) lineColor = '#1E5A9C';  // DE Regional blau
-        else if (/^(REX|CJX)/.test(ln)) lineColor = '#E2001A';  // ÖBB REX rot
-        else if (/^R\d/.test(ln)) lineColor = '#666666';  // ÖBB R grau
-        else if (/^(TGV|THA|EST)/.test(ln)) lineColor = '#6E2064';  // Internationale Züge lila
-        else if (ln === 'WB') lineColor = '#007CC3';  // Westbahn blau
-        else if (ln === 'FLX') lineColor = '#73D700';  // Flixtrain grün
-        return `<div style="flex:1;display:flex;align-items:center;padding:4px 8px;background:${rowBg};color:#fff;">
-          <span style="font-weight:bold;font-size:12px;min-width:38px;background:${lineColor};color:#fff;padding:3px 6px;border-radius:4px;text-align:center;">${dep.line}</span>
-          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:14px;color:#fff;">${dep.time}</span>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }
-  else if (colour === 7) {
-    // BODO Style: Blau
-    previewEl.style.background = '#005BBB';
-    previewEl.style.backgroundImage = 'none';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
-      ${data.map((dep, i) => `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;color:#fff;">
-          <span style="font-weight:bold;font-size:14px;min-width:36px;">${dep.line}</span>
-          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:16px;">${dep.time}</span>
-        </div>`).join('')}
-    </div>`;
-  }
-  else if (fcIsCustomColour(colour)) {
+  if (fcIsCustomColour(colour)) {
     // Eigenes Display: geräteechte Bodo-Replik (gleicher Renderer wie im Design-Wizard)
     const fcCfg = fcPreviewConfig(colour);
     fcApplyPreviewBg(previewEl, fcCfg);
     html = fcDevicePreviewHTML(fcCfg, data);
+  } else {
+    html = dvPreviewHTML(colour, data, rows, previewEl);
   }
-  else if (colour === 22) {
-    // MVG München: helles Blau, U-Bahn-Badges (MVG-Farben), sonst weiße Schrift, "Min"-Header
-    previewEl.style.background = '#126fc8';
+
+  if (!html) {
+    // Display-Typen ohne eigene Nachbildung (ÖBB, Westbahn, SBB, CH/LI, Prag …):
+    // generisches Brett statt schwarzer Box, damit das Vorschau-Fenster nie leer wirkt.
+    previewEl.style.background = '#14181d';
     previewEl.style.backgroundImage = 'none';
-    // U-Bahn UND Tram in offiziellen MVG-Farben (gleiche Tabelle wie der Custom-Wizard)
-    const uColors = {};
-    Object.keys(MVG_LINE_COLORS).forEach(function(k){ uColors[k] = '#' + MVG_LINE_COLORS[k]; });
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Poppins',sans-serif;color:#fff;">
-      <div style="height:13px;display:flex;align-items:center;justify-content:flex-end;padding:0 6px;font-size:8px;border-bottom:2px solid #fff;">Min</div>
-      <div style="flex:1;display:flex;flex-direction:column;">
-      ${data.slice(0,3).map((dep) => {
-        const uc = uColors[String(dep.line || '').toUpperCase()];
-        const badge = uc
-          ? `<span style="background:${uc};color:#fff;border-radius:4px;padding:1px 6px;font-weight:700;font-size:13px;min-width:22px;text-align:center;">${dep.line}</span>`
-          : `<span style="color:#fff;font-weight:700;font-size:14px;min-width:28px;">${dep.line}</span>`;
-        return `<div style="flex:1;display:flex;align-items:center;padding:0 8px;gap:8px;">
-            ${badge}
-            <span style="flex:1;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
-            <span style="font-weight:700;font-size:15px;">${dep.time}</span>
-          </div>`;
-      }).join('')}
-      </div>
-    </div>`;
-  }
-  else if (colour === 21) {
-    // Schwarz/Weiß Matrix: weiße LED-Matrix auf schwarz, Linie+Abfahrt FETT, kein Footer
-    const bgColor = '#000';
-    const textColor = '#fff';
-    const gridColor = '#222';
-    previewEl.style.background = bgColor;
-    previewEl.style.backgroundImage = `radial-gradient(circle, ${gridColor} 1px, transparent 1px)`;
-    previewEl.style.backgroundSize = '4px 4px';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
-      ${data.map((dep) => `<div style="flex:1;display:flex;align-items:center;padding:2px 8px;color:${textColor};">
-          <span style="font-weight:bold;font-size:16px;min-width:34px;">${dep.line}</span>
-          <span style="flex:1;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 6px;">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:16px;">${dep.time}</span>
-        </div>`).join('')}
-    </div>`;
-  }
-  else if (colour === 15 || colour === 18) {
-    // Orange Matrix: LED-Matrix Orange + weißer Stationsname-Footer (wie am Gerät)
-    const bgColor = '#0a0500';
-    const textColor = '#ff8c00';
-    const gridColor = '#1a0d00';
-    previewEl.style.background = bgColor;
-    previewEl.style.backgroundImage = `radial-gradient(circle, ${gridColor} 1px, transparent 1px)`;
-    previewEl.style.backgroundSize = '4px 4px';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
-      <div style="flex:1;display:flex;flex-direction:column;">
-      ${data.map((dep) => `<div style="flex:1;display:flex;align-items:center;padding:2px 8px;color:${textColor};">
-          <span style="font-weight:bold;font-size:16px;min-width:34px;text-shadow:0 0 8px ${textColor};">${dep.line}</span>
-          <span style="flex:1;font-size:10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 6px;">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:16px;text-shadow:0 0 8px ${textColor};">${dep.time}</span>
-        </div>`).join('')}
-      </div>
-      <div style="background:#fff;color:#000;font-family:Arial,sans-serif;font-weight:600;font-size:10px;padding:3px 8px;text-align:left;">Alexanderplatz</div>
-    </div>`;
-  }
-  else if (colour === 23) {
-    // Matrix (zusammengeführt): LED-Dot-Matrix, Farbton weiß/grün/orange über ftTxtCol
-    const variant = parseInt(getFtToggleVal('ftTxtCol_' + colour)) || 1;
-    let bgColor, ledColor, gridColor;
-    if (variant === 2) { bgColor = '#001405'; ledColor = '#94ce39'; gridColor = '#002810'; }      // grün
-    else if (variant === 3) { bgColor = '#0f0500'; ledColor = '#ff8c00'; gridColor = '#1a0d00'; }  // orange
-    else { bgColor = '#000000'; ledColor = '#ffffff'; gridColor = '#222222'; }                     // weiß
-    previewEl.style.background = bgColor;
-    previewEl.style.backgroundImage = `radial-gradient(circle, ${gridColor} 1px, transparent 1px)`;
-    previewEl.style.backgroundSize = '4px 4px';
-
-    const big = rows <= 3;  // Groß 1-3 Zeilen, Klein 4-5 Zeilen
-    const lineFs = big ? 22 : 15;
-    const destFs = big ? 13 : 10;
-    const timeFs = big ? 22 : 15;
-    const minW = big ? 40 : 32;
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Courier New',monospace;">
-      ${data.map((dep) => `<div style="flex:1;display:flex;align-items:center;padding:2px 8px;color:${ledColor};">
-          <span style="font-weight:bold;font-size:${lineFs}px;min-width:${minW}px;text-shadow:0 0 8px ${ledColor};">${dep.line}</span>
-          <span style="flex:1;font-size:${destFs}px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 6px;text-shadow:0 0 4px ${ledColor};">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:${timeFs}px;text-shadow:0 0 8px ${ledColor};">${dep.time}</span>
-        </div>`).join('')}
-    </div>`;
-  }
-  else if (colour === 24) {
-    // Paper White: heller E-Paper-Look, Farbton komplett-weiß / weiß-schwarz / weiß-hellgrau
-    const variant = parseInt(getFtToggleVal('ftTxtCol_' + colour)) || 1;
-    previewEl.style.background = '#ffffff';
-    previewEl.style.backgroundImage = 'none';
-
     html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:'Poppins',sans-serif;">
-      ${data.map((dep, i) => {
-        let rowBg = '#ffffff', txt = '#000000';
-        if (variant === 2) {        // weiß-schwarz alternierend
-          if (i % 2 === 1) { rowBg = '#000000'; txt = '#ffffff'; }
-        } else if (variant === 3) { // weiß-hellgrau alternierend
-          if (i % 2 === 1) { rowBg = '#bbbbbb'; txt = '#000000'; }
-        }
-        return `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;background:${rowBg};color:${txt};border-bottom:${i < data.length - 1 ? '1px solid rgba(0,0,0,0.08)' : 'none'};">
-            <span style="font-weight:700;font-size:16px;min-width:40px;">${dep.line}</span>
-            <span style="flex:1;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
-            <span style="font-weight:700;font-size:17px;">${dep.time}</span>
-          </div>`;
-      }).join('')}
-    </div>`;
-  }
-  else if (colour === 19 || colour === 20) {
-    // Deutsche Städte (KVB/AVV): Bodo-Style, dunkelgrünes Linien-Badge
-    previewEl.style.background = '#1e2328';
-    previewEl.style.backgroundImage = 'none';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
-      ${data.map((dep, i) => `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;color:#fff;${i < data.length - 1 ? 'border-bottom:1px solid #32383e;' : ''}">
-          <span style="background:#1B5E20;color:#fff;border-radius:5px;padding:2px 7px;min-width:30px;text-align:center;font-weight:bold;font-size:14px;">${dep.line}</span>
-          <span style="flex:1;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:18px;">${dep.time}</span>
-        </div>`).join('')}
-    </div>`;
-  }
-  else if (colour === 8) {
-    // Salzburg Style: Schwarz/Weiß alternierend mit Uhrzeit
-    previewEl.style.background = '#000';
-    previewEl.style.backgroundImage = 'none';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
-      ${data.map((dep, i) => {
-        const bg = i % 2 === 0 ? '#000' : '#fff';
-        const text = i % 2 === 0 ? '#fff' : '#000';
-        const timeDisplay = dep.timeStr || `${String(14 + Math.floor(dep.time / 60)).padStart(2, '0')}:${String(20 + dep.time).padStart(2, '0')}`;
-        return `<div style="flex:1;display:flex;align-items:center;padding:4px 10px;background:${bg};color:${text};">
-          <span style="font-weight:bold;font-size:14px;min-width:32px;">${dep.line}</span>
-          <span style="flex:1;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin:0 8px;">${dep.dest}</span>
-          <span style="font-weight:bold;font-size:14px;">${timeDisplay}</span>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }
-  else if (colour === 9) {
-    // Paris RATP Style: Dunkelblauer Header mit Linie + Ziel, darunter 2 große Countdowns
-    previewEl.style.background = '#000';
-    previewEl.style.backgroundImage = 'none';
-
-    const dep = data[0] || { line: '1', dest: 'La Defense', time: 2 };
-    const dep2 = data[1] || { line: '1', dest: 'La Defense', time: 5 };
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
-      <div style="background:#003270;padding:6px 10px;display:flex;align-items:center;gap:8px;">
-        <div style="width:28px;height:28px;border-radius:50%;background:#ffcd00;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:16px;color:#000;">${dep.line}</div>
-        <span style="color:#fff;font-size:13px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
-      </div>
-      <div style="flex:1;display:flex;">
-        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px solid #333;">
-          <span style="color:#a0aac8;font-size:10px;">1er metro</span>
-          <span style="color:#ffcd00;font-size:28px;font-weight:bold;">${dep.time}</span>
-        </div>
-        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-          <span style="color:#a0aac8;font-size:10px;">2e metro</span>
-          <span style="color:#ffcd00;font-size:28px;font-weight:bold;">${dep2.time}</span>
-        </div>
-      </div>
-    </div>`;
-  }
-  else if (colour === 10) {
-    // Straba Ansicht: Große + kleine Zeile pro Gruppe
-    previewEl.style.background = '#1e1e1e';
-    previewEl.style.backgroundImage = 'none';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
-      ${data.map((dep, i) => {
-        const lineColor = dep.line.startsWith('U') ? '#5a3782' : (dep.line.length <= 2 && !isNaN(dep.line) ? '#dc2828' : '#005a8c');
-        const time2 = dep.time2 || (dep.time + 2);
-        const dest2 = dep.dest2 || dep.dest;
-        return `
-          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:2px 8px;${i < data.length - 1 ? 'border-bottom:1px solid #333;' : ''}">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
-              <div style="background:${lineColor};border-radius:5px;padding:2px 6px;min-width:30px;text-align:center;font-weight:bold;font-size:16px;color:#fff;">${dep.line}</div>
-              <span style="flex:1;font-size:14px;color:#fff;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
-              <span style="font-weight:bold;font-size:20px;color:#fff;">${dep.time}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;padding-left:8px;">
-              <div style="background:${lineColor};border-radius:3px;padding:1px 4px;min-width:20px;text-align:center;font-weight:bold;font-size:9px;color:#fff;">${dep.line}</div>
-              <span style="flex:1;font-size:10px;color:#b4b4b4;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dest2}</span>
-              <span style="font-weight:bold;font-size:12px;color:#b4b4b4;">${time2}</span>
-            </div>
-          </div>
-        `;
-      }).join('')}
-    </div>`;
-  }
-  else if (colour === 13) {
-    // Holding Graz: Schlicht, weiß auf schwarzgrau, 4 Zeilen
-    previewEl.style.background = '#19191e';
-    previewEl.style.backgroundImage = 'none';
-
-    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;font-family:Arial,sans-serif;">
-      ${data.map((dep, i) => `
-        <div style="flex:1;display:flex;align-items:center;padding:0 8px;${i < data.length - 1 ? 'border-bottom:1px solid #32323a;' : ''}">
-          <span style="font-size:14px;font-weight:bold;color:#fff;min-width:30px;">${dep.line}</span>
-          <span style="flex:1;font-size:13px;color:#fff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-left:8px;">${dep.dest}</span>
-          <span style="font-size:16px;font-weight:bold;color:#fff;margin-left:8px;">${dep.time}</span>
+      ${data.map(dep => `
+        <div style="flex:1;display:flex;align-items:center;padding:0 10px;gap:8px;">
+          <span style="background:#0089cf;color:#fff;font-weight:700;font-size:15px;border-radius:6px;padding:3px 8px;min-width:34px;text-align:center;">${dep.line}</span>
+          <span style="flex:1;font-size:13px;color:#fff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${dep.dest}</span>
+          <span style="font-weight:700;font-size:22px;color:#fff;">${dep.time}</span>
         </div>
       `).join('')}
     </div>`;
   }
-
   previewEl.innerHTML = html;
 
   // Wien-Optionen ein/ausblenden basierend auf Display-Typ
@@ -17874,7 +18721,14 @@ function buildDisplaySettings() {
     }
     if (f.silberpfeil) parts.push('k' + dsKeepBool(cid, 'k', 'ftSilber_' + cid, recommendedConfig && recommendedConfig.silberpfeil, 0));
     if (f.arrival) parts.push('e' + dsKeepBool(cid, 'e', 'ftArrival_' + cid, 1, 1));  // MVG Einfahr-Ansicht, Default an
-    if (f.altNext) parts.push('a' + dsKeepBool(cid, 'a', 'ftAltNext_' + cid, (recommendedConfig && recommendedConfig.alternateNext === false) ? 0 : 1, 1));
+    if (f.altNext) {
+      parts.push('a' + dsKeepBool(cid, 'a', 'ftAltNext_' + cid, (recommendedConfig && recommendedConfig.alternateNext === false) ? 0 : 1, 1));
+      // Wechselzeiten 1./2. Abfahrt (x/y, Zehntelsekunden): nur bei Manuell — Automatisch
+      // schreibt keine Tokens, dann gilt der Firmware-Takt und Bestandsrows bleiben gleich.
+      var _xy = ftAltXYForSave(cid);
+      if (_xy.x) parts.push('x' + _xy.x);
+      if (_xy.y) parts.push('y' + _xy.y);
+    }
     if (f.fontExt) {  // Matrix-Schriftart: 0=DACH, 1=CZ+HU (Segment, persistent wie Sort/Größe)
       var _fv = (ftFontExtByCid[cid] != null) ? ftFontExtByCid[cid]
               : (dsVal(cid, 'f') !== undefined ? dsVal(cid, 'f') : (anyCZHUStation() ? 1 : 0));
@@ -20267,6 +21121,8 @@ window.addEventListener('DOMContentLoaded', () => {
     'Wähle mindestens 2 Richtungen aus dem Pool': 'Choose at least 2 directions from the pool',
     'Waehle mindestens 2 Richtungen aus dem Pool': 'Choose at least 2 directions from the pool',
     'Anzeigedauer': 'Display duration', 'Wie lange jedes Blatt dieser Ansicht steht': 'How long each page of this view stays',
+    'Wie lange eine Seite steht, bis zur nächsten gewechselt wird, nicht der Wechsel der zwei Abfahrtszeiten in einer Zeile': 'How long each page stays before switching to the next, not the quick swap between the two departure times in a row',
+    'Wie lange eine Seite steht, bis zur nächsten gewechselt wird': 'How long each page stays before switching to the next',
     'Langsam': 'Slow', 'Schnell': 'Fast', 'Sehr schnell': 'Very fast', 'Slideshow': 'Slideshow', 'Gemischt': 'Mixed',
     'Zeitfenster': 'Time window', 'Zeitraum': 'Time range', 'Uhrzeit': 'Time',
     'Nur in bestimmten Stunden anzeigen': 'Only show during certain hours',
@@ -20278,6 +21134,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Extras': 'Extras', 'Erweiterte Einstellungen': 'Advanced settings', 'Aktivierte Funktionen': 'Enabled features',
     'Spaß-Nachrichten': 'Fun messages', 'Zeigt witzige Meldungen bei langen Wartezeiten': 'Shows funny messages during long waits',
     'Niederflur-Hinweis blinken': 'Blink low-floor hint', 'Hochflurer markieren': 'Mark high-floor vehicles',
+    'Wien-Features': 'Vienna features', 'Hochflurer, Niederflur, Klima': 'High-floor, low-floor, A/C',
     'Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht': 'Marker pulses when a low-floor vehicle approaches',
     'Verspätung hervorheben': 'Highlight delays', 'Verspätung herausstechend': 'Delays stand out',
     'Einfahr-Ansicht': 'Arrival view',
@@ -20367,6 +21224,11 @@ window.addEventListener('DOMContentLoaded', () => {
     'Öffi': 'Public transit',
     'Spart Strom: das Display schaltet sich nachts automatisch ab.': 'Saves power: the display turns off automatically at night.',
     'An = 1. & 2. Abfahrt im Wechsel · Aus = nur die 1. Abfahrt': 'On = 1st & 2nd departure alternating · Off = only the 1st departure',
+    'Wechselzeiten': 'Alternation times',
+    'Wie lange jede der beiden Abfahrtszeiten steht, bevor die andere kommt': 'How long each of the two departure times stays before the other appears',
+    'Automatisch = 4 s erste, 1,5 s zweite Abfahrt': 'Automatic = 4 s first, 1.5 s second departure',
+    'Automatisch = 5 s je Abfahrt': 'Automatic = 5 s per departure',
+    '1. Abfahrt': '1st departure', '2. Abfahrt': '2nd departure',
     'Aus = Linienname als großer Text (wie Wien)': 'Off = line name as large text (like Vienna)',
     'Groß = 1-3 große Zeilen · Klein = 4': 'Large = 1-3 big rows · Small = 4',
     'Pro Display: Zeilen, Helligkeit, Textfarbe, Sortierung …': 'Per display: rows, brightness, text color, sorting …',
