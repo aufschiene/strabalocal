@@ -21406,13 +21406,25 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           } else if (union.has(line + '|')) {
             continue;
           }
-          // Ziel-Station via /lines bestimmen (nur bei mehreren Stationen im Segment nötig)
-          let target = segStations[0];
+          // Ziel-Station bestimmen (nur bei mehreren Stationen im Segment nötig). Reihenfolge
+          // wie überall im Lade-Pfad: LIVE belegte Richtungen sind der härteste Beleg, dann
+          // der /lines-Endpunkt, erst dann die erste Station als Rettungsanker. /lines allein
+          // reicht nicht — er ist bei manchen Netzen zeitabhängig und antwortet abends dünner
+          // oder leer (Trafiklab/Stockholm, gemessen 2026-09-20: dieselbe Haltestelle meldete
+          // um 20 Uhr "80,238", um 21:30 nur noch "80"), dann landete das Token blind an der
+          // ersten Station des Segments und zeigte fremde Linien.
+          let target = null;
           if (segStations.length > 1) {
-            for (const st of segStations) {
-              if (await _stationServesLine(st, line)) { target = st; break; }
+            const _ln = String(line).trim().toLowerCase();
+            target = segStations.find(st => (st.directions || []).some(d =>
+              String(d.line || '').trim().toLowerCase() === _ln)) || null;
+            if (!target) {
+              for (const st of segStations) {
+                if (await _stationServesLine(st, line)) { target = st; break; }
+              }
             }
           }
+          if (!target) target = segStations[0];
           const looksRid = /^d\d/.test(ref) || /^\d+$/.test(ref) || ref === 'H' || ref === 'R' ||
                            /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref);
           target.directions.push({ line: line, towards: looksRid ? '' : ref,
