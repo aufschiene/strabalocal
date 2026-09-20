@@ -3638,7 +3638,7 @@
 
     <!-- 2. Pro-Display-Sektionen (dynamisch, zum Aufklappen) -->
     <h3 style="margin:20px 4px 8px;color:#333;font-size:15px;">Displays im Detail</h3>
-    <p class="form-hint" style="margin:0 4px 12px;">Die generellen Einstellungen je Display. Designs stellst du im Zuweisungs-Wizard ein.</p>
+    <p class="form-hint" style="margin:0 4px 12px;">Alle Einstellungen f&uuml;r dein Display, zum Aufklappen antippen.</p>
     <div id="ftDisplayTypeSections">
       <!-- Wird von renderDisplayTypeSections() gefüllt -->
     </div>
@@ -15540,18 +15540,23 @@ function renderDisplayTypeSections() {
   // jetzt über den gleichnamigen Eintrag in JEDEM Display-Typ-Dropdown
   // (displayTypeOptionsHtml → openCustomDisplayWizard) — der Button war doppelt.
 
-  // Umbau (Paul 20.09.2026, zweiter Anlauf): Die Design-Schnellzugriffe (Zeilen,
-  // Farbton, Verspätung, Wien-Look) sitzen im Zuweisungs-Wizard, die GENERELLEN
+  // Umbau (Paul 20.09.2026, dritter Anlauf): Die Design-Schnellzugriffe (Zeilen,
+  // Farbton, Verspätung, Wien-Look) sitzen im Zuweisen-Dialog, die GENERELLEN
   // Einstellungen (Reihenfolge, Sortierung, Abfahrten samt Wechselzeiten,
-  // Anzeigedauer, Wien-Features, Zeitfenster) bleiben als Sektionen auf der Seite
-  // sichtbar. Oben nur die Hinweis-Karte mit "Designs öffnen".
+  // Anzeigedauer, Wien-Features, Zeitfenster) bleiben als Sektionen auf der Seite.
+  // Die Karte "Design pro Display" erscheint NUR bei mehreren Displays: bei Kompakt
+  // (ein Display) steht ohnehin alles direkt auf der Hauptseite, ein Dialog mit
+  // einer einzigen Karte wäre ein Umweg (Paul). Das Wort "Wizard" bleibt aus allen
+  // sichtbaren Texten draußen.
   var ftSectionsHtml = html;
   html = '';
-  html += '<div class="config-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">';
-  html += '<div style="flex:1 1 200px;min-width:0;"><div class="form-label" style="margin:0;">Design pro Display</div>';
-  html += '<div class="form-hint" style="margin:0;">Zeilen, Farbton und mehr stellst du pro Display im Zuweisungs-Wizard ein.</div></div>';
-  html += '<button onclick="openAssignWizard()" style="flex:0 0 auto;padding:10px 18px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,0.2);">Designs &ouml;ffnen</button>';
-  html += '</div>';
+  if (types.length > 1) {
+    html += '<div class="config-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">';
+    html += '<div style="flex:1 1 200px;min-width:0;"><div class="form-label" style="margin:0;">Design pro Display</div>';
+    html += '<div class="form-hint" style="margin:0;">Zeilen, Farbton und mehr stellst du pro Display unter Zuweisen ein.</div></div>';
+    html += '<button onclick="openAssignWizard()" style="flex:0 0 auto;padding:10px 18px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,0.2);">Designs &ouml;ffnen</button>';
+    html += '</div>';
+  }
   html += ftSectionsHtml;
 
   // Eigene Displays verwalten: Umbenennen und Löschen für ALLE gespeicherten Designs,
@@ -21581,8 +21586,9 @@ window.addEventListener('DOMContentLoaded', () => {
     'Wien-Features': 'Vienna features', 'Hochflurer, Niederflur, Klima': 'High-floor, low-floor, A/C',
     'Nach Städten gruppiert': 'Grouped by city', 'Zuweisen': 'Assign', 'Displays zuweisen': 'Assign displays',
     'Design pro Display': 'Design per display', 'Designs öffnen': 'Open designs',
-    'Zeilen, Farbton und mehr stellst du pro Display im Zuweisungs-Wizard ein.': 'Rows, color tone and more are set per display in the assign wizard.',
-    'Die generellen Einstellungen je Display. Designs stellst du im Zuweisungs-Wizard ein.': 'The general settings per display. Designs are set in the assign wizard.',
+    'Zeilen, Farbton und mehr stellst du pro Display unter Zuweisen ein.': 'Rows, color tone and more are set per display under Assign.',
+    'Alle Einstellungen für dein Display, zum Aufklappen antippen.': 'All settings for your display, tap to expand.',
+
     'Verspätung farbig': 'Delay highlighted', 'Farbton': 'Color tone',
     'Ein Display pro Stadt. Die Vorschau zeigt sofort, wie es aussieht.': 'One display per city. The preview instantly shows how it looks.',
     'Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht': 'Marker pulses when a low-floor vehicle approaches',
