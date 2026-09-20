@@ -298,20 +298,6 @@
       line-height: 1;
     }
     
-    /* PRO-Badge (z.B. "Nach Städten gruppieren") */
-    .pro-badge {
-      display: inline-block;
-      padding: 2px 7px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #6a3df5, #b03df5);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      vertical-align: 2px;
-      margin-left: 6px;
-    }
-
     /* Network Brand Colors */
     .network-badge {
       display: inline-block;
@@ -3614,7 +3600,7 @@
            einschaltbar. -->
       <div class="form-row" id="ftGroupByCityRow" style="display:none;">
         <div>
-          <div class="form-label">Nach Städten gruppiert<span class="pro-badge">PRO</span></div>
+          <div class="form-label">Nach Städten gruppiert</div>
           <div class="form-hint" id="ftGroupByCityHint">Stationen derselben Stadt teilen sich ein Display</div>
         </div>
         <button id="ftAssignBtn" onclick="openAssignWizard()" style="flex:0 0 auto;padding:10px 18px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,0.2);">Zuweisen</button>
@@ -13500,7 +13486,32 @@ function renderCityGroupList() {
 // Eine Karte pro Stadt/Provider: Gerätevorschau (echte Nachbildung mit den Linien der
 // Gruppe) + Display-Picker. Der Picker wirkt sofort auf die Vorschau der Karte,
 // übernommen wird erst mit "Fertig" (Abbrechen lässt alles unverändert).
-var _awPending = null;   // net -> gewählte colour (nur solange der Wizard offen ist)
+var _awPending = null;   // net -> { colour, look:{t,b,u}, open } (nur solange der Wizard offen ist)
+
+function awNetId(net) { return String(net).replace(/[^A-Za-z0-9]/g, '_'); }
+function awState(net) {
+  if (!_awPending) _awPending = {};
+  if (!_awPending[net]) _awPending[net] = { colour: null, look: {}, open: false };
+  return _awPending[net];
+}
+// Wirksame colour einer Gruppe (pending vor gespeichert)
+function awEffColour(grp) {
+  var st = _awPending && _awPending[grp.net];
+  return parseInt((st && st.colour != null) ? st.colour : grp.colour);
+}
+// Matrix-Familie: der Farbton steckt im TYP (2 = grün, 15/18 = orange, 21 = s/w,
+// 23 = modern mit t-Token). Nur über getrennte Typen können zwei Städte
+// verschiedene Matrix-Farben haben, displaysettings sind pro Typ gespeichert.
+function awMatrixVariantOf(cid, look) {
+  if (cid === 2) return 'gruen';
+  if (cid === 15 || cid === 18) return 'orange';
+  if (cid === 21) return 'weiss';
+  if (cid === 23) {
+    var t = (look && look.t != null) ? parseInt(look.t) : (dsVal(23, 't') || 1);
+    return t === 2 ? 'gruen' : (t === 3 ? 'orange' : 'weiss');
+  }
+  return null;
+}
 
 function awGroups() {
   var order = [], byNet = {};
@@ -13533,27 +13544,109 @@ function awGroupData(grp) {
 
 // Vorschau EINER Zuweisungs-Karte zeichnen (Custom über den Design-Renderer)
 function awRenderPreview(net) {
-  var cell = document.getElementById('awPrev_' + net.replace(/[^A-Za-z0-9]/g, '_'));
+  var cell = document.getElementById('awPrev_' + awNetId(net));
   if (!cell) return;
   var grp = null;
   awGroups().forEach(function(g) { if (g.net === net) grp = g; });
   if (!grp) return;
-  var cid = parseInt((_awPending && _awPending[net] != null) ? _awPending[net] : grp.colour);
+  var st = _awPending && _awPending[net];
+  var cid = awEffColour(grp);
   var f = (typeof DISPLAY_TYPE_FEATURES !== 'undefined' && DISPLAY_TYPE_FEATURES[cid]) || {};
   var rows = f.defaultRows || 3;
   if (f.minRows) rows = Math.max(rows, f.minRows);
   if (f.maxRows) rows = Math.min(rows, f.maxRows);
   var data = awGroupData(grp);
   var html;
-  if (fcIsCustomColour(cid)) {
-    var cfg = fcPreviewConfig(cid);
-    fcApplyPreviewBg(cell, cfg);
-    html = fcDevicePreviewHTML(cfg, data.slice());
-  } else {
-    html = dvPreviewHTML(cid, data.slice(0, Math.max(rows, 1)), rows, cell);
+  // Noch nicht übernommene Karten-Einstellungen in die Vorschau geben
+  _awLook = (st && st.look) ? { colour: cid, vals: st.look } : null;
+  try {
+    if (fcIsCustomColour(cid)) {
+      var cfg = fcPreviewConfig(cid);
+      fcApplyPreviewBg(cell, cfg);
+      html = fcDevicePreviewHTML(cfg, data.slice());
+    } else {
+      html = dvPreviewHTML(cid, data.slice(0, Math.max(rows, 1)), rows, cell);
+    }
+  } finally {
+    _awLook = null;
   }
   cell.innerHTML = html || '';
 }
+
+// Einstellungs-Bereich einer Karte (nur Typen mit Look-Optionen): kleine Toggle-Reihen,
+// Auswahl wirkt sofort auf die Karten-Vorschau, übernommen wird erst mit Fertig.
+function awSettingsHtml(net, cid) {
+  var netId = awNetId(net);
+  var st = awState(net);
+  function tgl(label, options, activeVal, onclickName) {
+    var h = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid #f3f3f3;">';
+    h += '<span style="font-size:12.5px;font-weight:600;">' + label + '</span>';
+    h += '<div class="toggle-row" style="flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;">';
+    options.forEach(function(o) {
+      h += '<button class="toggle-btn' + (String(activeVal) === String(o[0]) ? ' active' : '') + '" style="padding:6px 10px;font-size:12px;" onclick="' + onclickName + '(\'' + netId + '\',\'' + o[0] + '\')">' + o[1] + '</button>';
+    });
+    return h + '</div></div>';
+  }
+  var inner = '';
+  var mv = awMatrixVariantOf(cid, st.look);
+  if (mv) {
+    inner += tgl('Farbton', [['weiss', 'Wei&szlig;'], ['gruen', 'Gr&uuml;n'], ['orange', 'Orange']], mv, 'awSetMatrixVariant');
+  } else if (cid === 1) {
+    var tCur = (st.look.t != null) ? st.look.t : (dsVal(1, 't') || 1);
+    var bCur = (st.look.b != null) ? st.look.b : (dsVal(1, 'b') || 0);
+    var uCur = (st.look.u != null) ? st.look.u : (dsVal(1, 'u') || 0);
+    inner += tgl('Schriftfarbe', [[1, 'Gelb'], [2, 'Wei&szlig;'], [3, 'Orange']], tCur, 'awSetLookT');
+    inner += tgl('Hintergrund', [[0, 'Schwarz'], [1, 'Gr&uuml;n']], bCur, 'awSetLookB');
+    inner += tgl('U-Bahn Badges', [[0, 'Aus'], [1, 'Linie'], [2, 'Ganze Zeile']], uCur, 'awSetLookU');
+  } else if (cid === 24) {
+    var tP = (st.look.t != null) ? st.look.t : (dsVal(24, 't') || 1);
+    inner += tgl('Farbton', [[1, 'Komplett wei&szlig;'], [2, 'Wei&szlig;/Schwarz'], [3, 'Wei&szlig;/Hellgrau']], tP, 'awSetLookT');
+  }
+  if (!inner) return '';
+  var h = '<button onclick="awToggleSettings(\'' + netId + '\')" style="display:flex;align-items:center;gap:6px;width:100%;border:none;background:transparent;padding:8px 2px 2px;cursor:pointer;font-family:inherit;text-align:left;">';
+  h += '<span id="awSetChev_' + netId + '" style="font-size:10px;color:#777;">' + (st.open ? '&#9662;' : '&#9656;') + '</span>';
+  h += '<span style="font-size:12.5px;font-weight:600;color:#4285f4;">Einstellungen</span></button>';
+  h += '<div id="awSet_' + netId + '" style="display:' + (st.open ? '' : 'none') + ';padding:0 2px;">' + inner + '</div>';
+  return h;
+}
+
+function awNetByNetId(netId) {
+  var hit = null;
+  awGroups().forEach(function(g) { if (awNetId(g.net) === netId) hit = g; });
+  return hit;
+}
+function awRefreshCard(net) {
+  var grp = null;
+  awGroups().forEach(function(g) { if (g.net === net) grp = g; });
+  if (!grp) return;
+  var box = document.getElementById('awSetBox_' + awNetId(net));
+  if (box) box.innerHTML = awSettingsHtml(net, awEffColour(grp));
+  awRenderPreview(net);
+}
+function awToggleSettings(netId) {
+  var grp = awNetByNetId(netId);
+  if (!grp) return;
+  var st = awState(grp.net);
+  st.open = !st.open;
+  var box = document.getElementById('awSet_' + netId);
+  var chev = document.getElementById('awSetChev_' + netId);
+  if (box) box.style.display = st.open ? '' : 'none';
+  if (chev) chev.innerHTML = st.open ? '&#9662;' : '&#9656;';
+}
+// Matrix-Farbton = Typwechsel: Grün → 2, Orange → 18, Weiß → 23 (modern, t=1)
+function awSetMatrixVariant(netId, variant) {
+  var grp = awNetByNetId(netId);
+  if (!grp) return;
+  var st = awState(grp.net);
+  st.look = {};
+  if (variant === 'gruen') st.colour = 2;
+  else if (variant === 'orange') st.colour = 18;
+  else { st.colour = 23; st.look.t = 1; }
+  awRefreshCard(grp.net);
+}
+function awSetLookT(netId, val) { var g = awNetByNetId(netId); if (!g) return; awState(g.net).look.t = parseInt(val); awRefreshCard(g.net); }
+function awSetLookB(netId, val) { var g = awNetByNetId(netId); if (!g) return; awState(g.net).look.b = parseInt(val); awRefreshCard(g.net); }
+function awSetLookU(netId, val) { var g = awNetByNetId(netId); if (!g) return; awState(g.net).look.u = parseInt(val); awRefreshCard(g.net); }
 
 function awPickerChanged(net, val) {
   if (val === 'newcustom') {
@@ -13564,9 +13657,10 @@ function awPickerChanged(net, val) {
     openCustomDisplayWizard({ type: 'city', net: net });
     return;
   }
-  if (!_awPending) _awPending = {};
-  _awPending[net] = parseInt(val);
-  awRenderPreview(net);
+  var st = awState(net);
+  st.colour = parseInt(val);
+  st.look = {};   // Typwechsel → Karten-Einstellungen neu vom gespeicherten Stand
+  awRefreshCard(net);
 }
 
 function closeAssignWizard() {
@@ -13578,9 +13672,27 @@ function closeAssignWizard() {
 function awFinish() {
   var pending = _awPending || {};
   Object.keys(pending).forEach(function(net) {
-    var cid = parseInt(pending[net]);
-    if (isNaN(cid)) return;
-    stations.forEach(function(s) { if ((s.network || '') === net) s.colourOverride = cid; });
+    var st = pending[net];
+    if (!st) return;
+    var cid = (st.colour != null) ? parseInt(st.colour) : NaN;
+    if (!isNaN(cid)) {
+      stations.forEach(function(s) { if ((s.network || '') === net) s.colourOverride = cid; });
+    }
+    // Karten-Einstellungen (t/b/u) in den per-Typ-Speicher schreiben: dsByCid ist die
+    // Quelle, aus der die Display-Sektionen ihre Toggles restaurieren und aus der
+    // buildDisplaySettings ohne offene Toggles liest. renderDisplayTypeSections unten
+    // zieht die sichtbaren Regler damit automatisch nach.
+    var lookCid = !isNaN(cid) ? cid : null;
+    if (lookCid == null) {
+      awGroups().forEach(function(g) { if (g.net === net) lookCid = parseInt(g.colour); });
+    }
+    if (lookCid != null && st.look) {
+      Object.keys(st.look).forEach(function(k) {
+        if (st.look[k] == null) return;
+        if (!dsByCid[lookCid]) dsByCid[lookCid] = {};
+        dsByCid[lookCid][k] = String(st.look[k]);
+      });
+    }
   });
   closeAssignWizard();
   renderDisplayTypeSections();
@@ -13604,7 +13716,7 @@ function openAssignWizard() {
     var label = (typeof NETWORKS !== 'undefined' && NETWORKS[grp.net] && NETWORKS[grp.net].name)
                 || (grp.stations[0] && grp.stations[0].networkName) || grp.net;
     var names = grp.stations.map(function(st) { return st.stopName || ''; }).filter(Boolean).slice(0, 3).join(', ');
-    var netId = grp.net.replace(/[^A-Za-z0-9]/g, '_');
+    var netId = awNetId(grp.net);
     h += '<div style="border:1px solid #eee;border-radius:12px;padding:12px;margin:0 0 12px;">';
     h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
     h += '<div style="min-width:0;"><div style="font-weight:600;font-size:13.5px;">' + escapeHtmlFt(label) + '</div>';
@@ -13614,7 +13726,9 @@ function openAssignWizard() {
     h += '</select></div>';
     h += '<div style="background:#111;border-radius:12px;padding:8px 10px;">';
     h += '<div id="awPrev_' + netId + '" style="width:320px;max-width:100%;height:170px;border-radius:4px;overflow:hidden;background:#000;margin:0 auto;"></div>';
-    h += '</div></div>';
+    h += '</div>';
+    h += '<div id="awSetBox_' + netId + '">' + awSettingsHtml(grp.net, parseInt(grp.colour)) + '</div>';
+    h += '</div>';
   });
   h += '<div style="display:flex;gap:10px;margin-top:4px;">';
   h += '<button onclick="closeAssignWizard()" style="flex:1;padding:12px;border:none;background:#f0f0f0;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;">Abbrechen</button>';
@@ -16757,7 +16871,13 @@ function dvDest2(x, rowH, w, fh, ls, fs, color, weight) {
   return { open: '<div style="position:absolute;left:' + x + 'px;top:' + top + 'px;height:' + (lh * 2) + 'px;width:' + w + 'px;color:' + color + ';font-weight:' + weight + ';font-size:' + fs + 'px;line-height:' + lh + 'px;"><span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">', close: '</span></div>' };
 }
 // Live-Einstellung: offener Feintuning-Toggle vor gespeichertem displaysettings-Wert.
+// _awLook: temporärer Override während der Karten-Vorschau im Zuweisungs-Wizard
+// (die dortigen, noch nicht übernommenen Einstellungen sollen sofort sichtbar sein).
+var _awLook = null;
 function dvSetting(colour, domPrefix, dsKey, def) {
+  if (_awLook && parseInt(_awLook.colour) === parseInt(colour) && _awLook.vals && _awLook.vals[dsKey] != null) {
+    return parseInt(_awLook.vals[dsKey]);
+  }
   if (document.getElementById(domPrefix + colour)) {
     var v = parseInt(getFtToggleVal(domPrefix + colour));
     if (!isNaN(v)) return v;
