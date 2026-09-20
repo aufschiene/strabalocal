@@ -2274,36 +2274,48 @@
       flex-direction: column;
       align-items: center;
       margin-bottom: 24px;
-      /* Klebt beim Scrollen oben, der restliche Inhalt taucht dahinter ab */
+      /* Klebt beim Scrollen oben, der restliche Inhalt taucht dahinter ab.
+         top gleicht das obere 20px-Padding des Scroll-Containers aus (sticky dockt
+         an dessen INNENKANTE an, sonst bleibt ein Spalt mit durchscheinendem Inhalt) */
       position: sticky;
-      top: -1px;
+      top: -21px;
       z-index: 60;
       background: var(--paper);
       padding: 6px 0 12px;
       border-radius: 0 0 14px 14px;
       box-shadow: 0 14px 16px -14px rgba(0,0,0,0.5);
     }
-    /* Bezel wie im Design-Wizard: dunkler Rahmen, das Display darin 1:1 in
-       Gerätepixeln (320x170) GERENDERT, aber per zoom verkleinert dargestellt,
-       damit die Sticky-Leiste nicht den halben Bildschirm frisst (Paul 20.09.2026). */
+    /* Bezel wie im Design-Wizard: dunkler Rahmen. Das Display wird 1:1 in
+       Gerätepixeln (320x170) gerendert und per transform verkleinert DARGESTELLT;
+       die Scalebox reserviert exakt den verkleinerten Platz. Bewusst KEIN zoom:
+       das hat iOS-Safari im Sticky-Container falsch verrechnet, beim Scrollen
+       wurde die Leiste oben abgeschnitten (Paul 20.09.2026). */
+    .finetuning-step { --prevScale: 0.72; }
     .finetuning-step .preview-bezel {
       background: #111;
       border-radius: 14px;
       padding: 8px 10px;
       box-shadow: 0 6px 18px rgba(0,0,0,0.3);
       max-width: 100%;
-      zoom: 0.72;
     }
-    /* Handy: noch eine Stufe kleiner, die Sticky-Leiste soll nur ein schmales Band
-       sein (Paul 20.09.2026, Foto vom iPhone: Vorschau war riesig). */
+    .finetuning-step .preview-scalebox {
+      width: calc(320px * var(--prevScale));
+      height: calc(170px * var(--prevScale));
+      overflow: hidden;
+      border-radius: 4px;
+    }
+    .finetuning-step .preview-scalebox .preview-display {
+      transform: scale(var(--prevScale));
+      transform-origin: top left;
+    }
+    /* Handy: noch eine Stufe kleiner, die Sticky-Leiste ist nur ein schmales Band */
     @media (max-width: 480px) {
-      .finetuning-step .preview-bezel { zoom: 0.55; }
+      .finetuning-step { --prevScale: 0.55; }
       .finetuning-step .preview-container { padding: 4px 0 8px; }
       .finetuning-step .preview-container #ftPreviewToggleBtn { padding: 0 8px 4px; }
     }
     .finetuning-step .preview-display {
       width: 320px;
-      max-width: 100%;
       height: 170px;
       background: #000;
       border-radius: 4px;
@@ -3536,8 +3548,10 @@
     <div class="preview-container" id="ftPreviewBar">
       <button id="ftPreviewToggleBtn" onclick="ftTogglePreviewCollapsed()" style="border:none;background:transparent;color:#777;font-size:12px;font-weight:600;cursor:pointer;padding:2px 8px 6px;font-family:inherit;">&#9662; Display-Vorschau zuklappen</button>
       <div class="preview-bezel" id="ftPreviewBezel">
-        <div class="preview-display" id="finetuningPreview">
-          <!-- Wird dynamisch gefüllt -->
+        <div class="preview-scalebox">
+          <div class="preview-display" id="finetuningPreview">
+            <!-- Wird dynamisch gefüllt -->
+          </div>
         </div>
       </div>
     </div>
@@ -3624,7 +3638,7 @@
 
     <!-- 2. Pro-Display-Sektionen (dynamisch, zum Aufklappen) -->
     <h3 style="margin:20px 4px 8px;color:#333;font-size:15px;">Displays im Detail</h3>
-    <p class="form-hint" style="margin:0 4px 12px;">Designs und Einstellungen pro Display findest du im Zuweisungs-Wizard.</p>
+    <p class="form-hint" style="margin:0 4px 12px;">Die generellen Einstellungen je Display. Designs stellst du im Zuweisungs-Wizard ein.</p>
     <div id="ftDisplayTypeSections">
       <!-- Wird von renderDisplayTypeSections() gefüllt -->
     </div>
@@ -15526,11 +15540,11 @@ function renderDisplayTypeSections() {
   // jetzt über den gleichnamigen Eintrag in JEDEM Display-Typ-Dropdown
   // (displayTypeOptionsHtml → openCustomDisplayWizard) — der Button war doppelt.
 
-  // Umbau (Paul 20.09.2026): "Displays im Detail" zeigt die Sektionen NICHT mehr, nur
-  // noch einen Hinweis mit "Designs öffnen" (führt in den Zuweisungs-Wizard, dort sitzen
-  // die Einstellungen pro Display) und darunter die Karte "Eigene Displays". Die
-  // Sektionen bleiben UNSICHTBAR im DOM, damit sämtliche Speicher- und Restore-Pfade
-  // (Toggles, Wechselzeiten, Wien-Features, Reihenfolge) unverändert weiterlaufen.
+  // Umbau (Paul 20.09.2026, zweiter Anlauf): Die Design-Schnellzugriffe (Zeilen,
+  // Farbton, Verspätung, Wien-Look) sitzen im Zuweisungs-Wizard, die GENERELLEN
+  // Einstellungen (Reihenfolge, Sortierung, Abfahrten samt Wechselzeiten,
+  // Anzeigedauer, Wien-Features, Zeitfenster) bleiben als Sektionen auf der Seite
+  // sichtbar. Oben nur die Hinweis-Karte mit "Designs öffnen".
   var ftSectionsHtml = html;
   html = '';
   html += '<div class="config-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">';
@@ -15538,6 +15552,7 @@ function renderDisplayTypeSections() {
   html += '<div class="form-hint" style="margin:0;">Zeilen, Farbton und mehr stellst du pro Display im Zuweisungs-Wizard ein.</div></div>';
   html += '<button onclick="openAssignWizard()" style="flex:0 0 auto;padding:10px 18px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,0.2);">Designs &ouml;ffnen</button>';
   html += '</div>';
+  html += ftSectionsHtml;
 
   // Eigene Displays verwalten: Umbenennen und Löschen für ALLE gespeicherten Designs,
   // auch die gerade nicht verwendeten. Ohne diese Karte ließe sich ein belegter Slot
@@ -15574,7 +15589,6 @@ function renderDisplayTypeSections() {
     html += '</div>';
   }
 
-  html += '<div id="ftSectionsHidden" style="display:none;">' + ftSectionsHtml + '</div>';
   container.innerHTML = html;
 
   // Reihenfolge initial rendern + initiale Sichtbarkeit (Panel versteckt bei Auto)
@@ -21568,7 +21582,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Nach Städten gruppiert': 'Grouped by city', 'Zuweisen': 'Assign', 'Displays zuweisen': 'Assign displays',
     'Design pro Display': 'Design per display', 'Designs öffnen': 'Open designs',
     'Zeilen, Farbton und mehr stellst du pro Display im Zuweisungs-Wizard ein.': 'Rows, color tone and more are set per display in the assign wizard.',
-    'Designs und Einstellungen pro Display findest du im Zuweisungs-Wizard.': 'Designs and settings per display live in the assign wizard.',
+    'Die generellen Einstellungen je Display. Designs stellst du im Zuweisungs-Wizard ein.': 'The general settings per display. Designs are set in the assign wizard.',
     'Verspätung farbig': 'Delay highlighted', 'Farbton': 'Color tone',
     'Ein Display pro Stadt. Die Vorschau zeigt sofort, wie es aussieht.': 'One display per city. The preview instantly shows how it looks.',
     'Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht': 'Marker pulses when a low-floor vehicle approaches',
