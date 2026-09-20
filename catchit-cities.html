@@ -13980,8 +13980,53 @@ function closeAssignWizard() {
   _awPending = null;
 }
 
+// FIRMWARE-GRENZE: parseMasterRowInto dedupliziert Segmente über das komplette rbl-Feld.
+// Zwei Seiten mit EXAKT derselben Haltestellen-Menge (z.B. eine einzelne Haltestelle auf
+// zwei Seiten gesplittet, ohne weitere Stationen auf einer der Seiten) verlören am Gerät
+// die zweite Seite. Bis der Firmware-Dedup das Linienfeld mitprüft, fangen wir solche
+// Aufteilungen hier ab (true = Kollision).
+function awPageFieldCollision(grp, pending) {
+  var stp = pending[grp.net];
+  if (awPagesFixed(grp)) return false;
+  var mode = (stp && stp.pages != null) ? stp.pages : awPagesModeOf(grp);
+  if (mode !== 'split') return false;
+  var pageOf = awPageMap(grp);
+  var byPage = {};
+  grp.stations.forEach(function(s) {
+    var fid = awStationKey(s);
+    var dirs = s.directions || [];
+    var pages = {};
+    if (!dirs.length) pages[pageOf[fid + '|*'] || 1] = 1;
+    else dirs.forEach(function(d) { pages[pageOf[fid + '|' + String(d.line)] || 1] = 1; });
+    Object.keys(pages).forEach(function(p) {
+      if (!byPage[p]) byPage[p] = [];
+      if (byPage[p].indexOf(fid) < 0) byPage[p].push(fid);
+    });
+  });
+  var seen = {};
+  var hit = false;
+  Object.keys(byPage).forEach(function(p) {
+    var f = byPage[p].join(',');
+    if (seen[f]) hit = true;
+    seen[f] = 1;
+  });
+  return hit;
+}
+
 function awFinish() {
   var pending = _awPending || {};
+  // Vorab-Check VOR jeder Übernahme: kollidierende Seiten-Mengen sauber melden und den
+  // Dialog offen lassen, damit der User umverteilen kann.
+  var _collide = false;
+  awGroups().forEach(function(g) { if (awPageFieldCollision(g, pending)) _collide = true; });
+  if (_collide) {
+    var _en = false;
+    try { _en = (localStorage.getItem('catchit_lang') || 'de') === 'en'; } catch (e) {}
+    alert(_en
+      ? 'Two pages would contain exactly the same stops. Please put at least one different stop or line on one of these pages, or merge them into one page.'
+      : 'Zwei Seiten hätten exakt dieselben Haltestellen. Bitte lege auf eine dieser Seiten mindestens eine andere Haltestelle oder Linie, oder fasse sie zu einer Seite zusammen.');
+    return;
+  }
   Object.keys(pending).forEach(function(net) {
     var st = pending[net];
     if (!st) return;
