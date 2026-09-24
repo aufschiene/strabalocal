@@ -14735,9 +14735,27 @@ function updateStyleAssignmentUI() {
   // Zuweisung aktiv ist — dort hat jedes Display sein eigenes Typ-Dropdown, der eine
   // globale Wähler wäre widersprüchlich (und würde beim Speichern ignoriert).
   var instMode = (typeof instanceModeActive === 'function' && instanceModeActive());
-  var kompaktSelector = kompakt && !instMode && !ftIsManualAssignment;
+  // Gibt es effektiv nur EIN Display, muss sein Design auch hier änderbar sein (Paul
+  // 24.09.2026: "bei einer Stadt mit nur einer Konfig kann ich das Display-Design nicht
+  // ändern"). Vorher verschwand der Wähler, sobald der Instanz-Modus aktiv war — der
+  // bleibt nach einer Seiten-Aufteilung auch dann bestehen, wenn am Ende ein einziges
+  // Display übrig ist, und die Karte stand leer da. Bei mehreren Displays bleibt es beim
+  // bisherigen Verhalten: dort hat jedes sein eigenes Dropdown.
+  var einDisplay = (typeof getUniqueDisplayTypes === 'function') && getUniqueDisplayTypes().length <= 1;
+  var kompaktSelector = !ftIsManualAssignment && (einDisplay || (kompakt && !instMode));
   if (kRow) kRow.style.display = kompaktSelector ? '' : 'none';
   if (kompaktSelector) populateKompaktDisplay();
+  // Auffangnetz: Bliebe die Karte ohne sichtbaren Inhalt, wäre nur noch die Überschrift
+  // zu sehen — dann lieber ganz ausblenden statt eine leere Karte zu zeigen.
+  try {
+    var _karte = document.getElementById('ftDisplayStyleCard');
+    if (_karte) {
+      var _hatInhalt = Array.prototype.some.call(_karte.children, function(c) {
+        return c.tagName !== 'H3' && c.style.display !== 'none';
+      });
+      _karte.style.display = _hatInhalt ? '' : 'none';
+    }
+  } catch (e) { /* Sichtbarkeit ist Beiwerk */ }
   if (typeof updateGroupByCityUI === 'function') updateGroupByCityUI();
 }
 
@@ -21646,7 +21664,11 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         stationDests.forEach(sd => {
           if (!sd.line) return;
           const rid = String(sd.towards || '');
-          if (!/^p\d+$/.test(rid)) return;          // nur reine Bahnsteig-Nummern (siehe Regel)
+          // Formate, die durch eine Server-Umstellung ungültig geworden sein können:
+          // reine Bahnsteig-Nummern (Schweden vor dem 20.09.) und die alten Leipziger
+          // Ziel-Kennungen "di<Zielbahnhof>l<Linie>" (vor der Steig-Zuordnung aus DELFI,
+          // 24.09.). Beide deckten mehrere Fahrtrichtungen bzw. je ein Ziel ab.
+          if (!/^p\d+$/.test(rid) && !/^di\d+l/.test(rid)) return;
           const ziele = _dtx[String(sd.line) + '|' + rid];
           if (ziele && ziele.length > 1) {
             // Der Steig deckt mehrere Richtungen ab → alle anlegen
