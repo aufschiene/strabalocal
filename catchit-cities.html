@@ -302,10 +302,14 @@
     /* Marken-Gerät mit nur EINEM Verkehrsbetrieb: der Zurück-Knopf der Stationssuche
        führte zur Netz-Auswahl, also zu fremden Verkehrsbetrieben. Auf solchen Geräten
        soll nur der eigene Betrieb möglich sein (Paul 01.10.2026). */
-    body.brand-locked #searchBackBtn { display: none; }
-    /* Dieselbe Sperre fuer die Brotkrumen: „Region" und „Deutschland" sind Links in die
-       Netz-Auswahl, und „Baden-Wuerttemberg" passt auf einem bodo-Geraet ohnehin nicht. */
-    body.brand-locked #breadcrumb { display: none; }
+    body.brand-locked #searchBackBtn,
+    body.brand-locked #networkBackBtn,
+    body.brand-locked #bundeslandLeave,
+    body.brand-locked #displayPresetLeave,
+    body.brand-locked #stepRegion,
+    /* Brotkrumen: „Region" und „Deutschland" sind Links in die Netz-Auswahl, und
+       „Baden-Württemberg" passt auf einem bodo-Gerät ohnehin nicht. */
+    body.brand-locked #breadcrumb { display: none !important; }
     
     /* Network Brand Colors */
     .network-badge {
@@ -5019,10 +5023,11 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
     const lines = (data && data.lines) || [];
     if (!lines.length) return;
     const norm = s => String(s || '').trim().toLowerCase();
+    const normD = s => destDedupeKey(s);   // Ziele: Leerzeichen um "/" ignorieren
     // Dedup über Linie+Ziel: bereits aus den (Echtzeit-)Departures vorhandene Richtungen
     // GEWINNEN (deren richtungsId ist korrekt) — der /lines-Endpunkt füllt nur die Lücken
     // (z.B. nachts, wenn gerade nichts fährt).
-    const seen = new Set(availableLines.map(l => norm(l.name) + '|' + norm(l.towards)));
+    const seen = new Set(availableLines.map(l => norm(l.name) + '|' + normD(l.towards)));
     lines.forEach(ln => {
       rememberLineColor(ln.name, ln.lineColor, ln.lineTextColor);  // offizielle Badge-Farbe
       const dirs = ln.directions || [];
@@ -5041,7 +5046,7 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
         // Linie fährt, gewinnt die Steig-Richtung der Departures (Dedup unten schützt davor).
         const towardsList = dirs.map(d => d.towards || '').filter((t, i, a) => a.indexOf(t) === i);
         (towardsList.length ? towardsList : ['']).forEach(tw => {
-          const key = norm(ln.name) + '|' + norm(tw);
+          const key = norm(ln.name) + '|' + normD(tw);
           if (seen.has(key)) return;
           seen.add(key);
           availableLines.push({ name: ln.name, towards: tw, type: ln.type || '', richtungsId: '', stopovers: [] });
@@ -5050,7 +5055,7 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
       }
       // Netze mit stabiler richtungsId (Graz/STV …): fehlende Richtungen mergen (Nacht-Lücken).
       dirs.forEach(d => {
-        const key = norm(ln.name) + '|' + norm(d.towards);
+        const key = norm(ln.name) + '|' + normD(d.towards);
         if (seen.has(key)) return;
         seen.add(key);
         availableLines.push({ name: ln.name, towards: d.towards || '', type: ln.type || '', richtungsId: d.richtungsId || '', stopovers: [] });
@@ -6212,7 +6217,10 @@ DISPLAY_PRESETS.bodo = {
   parent: 'DE',
   hideInChooser: true,
   photo: 'fotos/baden württemberg.jpg',
-  photoPos: 'center top',
+  // Auf dem Bild steht der gelbe bodo-Bus im unteren Drittel; 'center top' hat nur
+  // Baumkronen gezeigt. 80 % schiebt den Bus in den Ausschnitt, oben bleibt Himmel
+  // fuer den Titel (Paul 01.10.2026).
+  photoPos: 'center 80%',
   heroCenter: true,
   title: 'Deine bodo-Station einstellen',
   intro: 'Wähle, welche Busse und Bahnen an deiner Station angezeigt werden.',
@@ -6398,13 +6406,7 @@ function _setHero(preset) {
   var title = document.getElementById('displayHeroTitle');
   if (!hero || !title) return;
   title.classList.toggle('hero-title-center', !!(preset && preset.heroCenter));
-  // Marken-Gerät, dessen Preset nur EIN Netz kennt (bodo): Stationssuche ohne Zurück-Knopf,
-  // sonst landet der Kunde bei den anderen Verkehrsbetrieben.
-  try {
-    document.body.classList.toggle('brand-locked', !!preset &&
-      typeof isBrandDevice === 'function' && isBrandDevice() &&
-      (preset.networks || []).filter(function(e) { return isNetworkEnabled(e.id); }).length === 1);
-  } catch (e) {}
+  if (typeof applyBrandLock === 'function') applyBrandLock();
   if (preset) {
     // Fallback-Hintergrundfarbe = Brand-Farbe des ersten Netzes (zeigt sich falls Foto fehlt)
     var firstNet = preset.networks && preset.networks[0];
@@ -6677,6 +6679,22 @@ function brandStartPreset() {
   return (k && typeof DISPLAY_PRESETS !== 'undefined' && DISPLAY_PRESETS[k]) ? k : null;
 }
 function isBrandDevice() { return !!brandStartPreset(); }
+// Marken-Gerät, dessen Startseite nur EINEN Verkehrsbetrieb kennt (bodo): dann darf der
+// Kunde gar nicht erst zu fremden Netzen. Die Sperre hängt NICHT am Hero: der Brand kommt
+// per postMessage erst nach dem Seitenstart, und wer über „Einstellungen ändern" direkt
+// ins Feintuning geht, sieht nie eine Preset-Seite (Paul 01.10.2026: „ich kann immer noch
+// zurück gehen zu anderen Städten wenn bodo konfiguriert ist").
+function brandLockedDevice() {
+  var k = brandStartPreset();
+  if (!k) return false;
+  try {
+    return (DISPLAY_PRESETS[k].networks || [])
+      .filter(function(e) { return isNetworkEnabled(e.id); }).length === 1;
+  } catch (e) { return false; }
+}
+function applyBrandLock() {
+  try { document.body.classList.toggle('brand-locked', brandLockedDevice()); } catch (e) {}
+}
 function isOebbDevice() { return deviceBrand() === 'OEBB'; }
 function isBodoDevice() { return deviceBrand() === 'BODO'; }
 // Rück-Beschriftung aus der Bundesland-Auswahl: „Zurück zur bodo-Auswahl" usw.
@@ -6712,6 +6730,7 @@ function noteDeviceBrand(brand) {
   var atEntry = (typeof currentStep === 'undefined' || currentStep === 'region') &&
                 !(overlay && overlay.style.display === 'block') &&
                 !(ft && !ft.classList.contains('hidden'));
+  applyBrandLock();          // Brand erst jetzt bekannt → Sperre nachziehen
   if (atEntry) showBrandStart();
 }
 
@@ -6795,6 +6814,7 @@ function detectCountryExplicit() {
 (function() {
   function tryAutoJump() {
     populateCountrySelect();
+    applyBrandLock();
     // 0) Marken-Gerät (?brand=oebb|bodo) → eigene Marken-Startseite
     if (showBrandStart()) return;
     // 1) Konkretes Display-Preset (?display=) hat Vorrang
@@ -8881,9 +8901,29 @@ async function selectStop(id, name) {
   }
 }
 
+// Marken-Geräte eines Verbunds (bodo) sortieren die eigenen Busse nach vorne:
+// Bus → S-Bahn → REX/RE/RB → Fernverkehr (Paul 01.10.2026). Wichtig ist, dass hier
+// zuerst der TYP zählt und erst dann der Name: am Bodensee heißen die Schnellbusse
+// "S30"/"S40" und die Regiobusse "R40"/"R60"/"R70" — über den Namen allein landeten
+// die in der S-Bahn- bzw. Regionalzug-Gruppe.
+function brandBusFirstRank(line) {
+  const t = String(line.type || '').toLowerCase();
+  const n = String(line.name || '').trim();
+  if (t.includes('bus')) return /^N\d/i.test(n) ? 1 : 0;                      // Bus, Nachtbus dahinter
+  if (t.includes('metro') || /^U\d/i.test(n)) return 2;                       // U-Bahn
+  if (t.includes('tram')) return 3;                                          // Tram
+  if (t === 'pttrains' || /^S\s?\d*$/i.test(n)) return 4;                      // S-Bahn
+  // Zugnamen ohne Nummer sind normal, seit der Server "REX 25886 ÖBB-RegionalExpress"
+  // auf die Gattung kürzt — \d* statt \d, sonst landen "REX" und "R" unter Sonstiges.
+  if (/^(REX|RE|RB|RS|IRE|MEX|R)\s?\d*$/i.test(n)) return 5;                  // Regionalzug
+  if (/^(ECE|EC|ICE|IC|RJX|RJ|NJ|EN|TGV|D)\s?\d*$/i.test(n)) return 6;        // Fernverkehr
+  return 7;
+}
+
 // Sortier-Reihenfolge der Linienliste: U-Bahn → Tram → Bus → Nachtbus → Sonstiges,
 // innerhalb jeder Gruppe nach Liniennummer. (Nachtbus = "N" + Ziffer, z.B. N1.)
 function lineTypeRank(line) {
+  if (typeof brandDisplayTypes === 'function' && brandDisplayTypes()) return brandBusFirstRank(line);
   const t = String(line.type || '').toLowerCase();
   const n = String(line.name || '').trim();
   if (t.includes('metro') || /^U\d/i.test(n)) return 0;                      // U-Bahn
@@ -8898,6 +8938,18 @@ function lineTypeRank(line) {
   return 9;                                                                  // Sonstiges (Zug/FV …)
 }
 function _lineNum(name) { const m = String(name || '').match(/\d+/); return m ? parseInt(m[0]) : 999; }
+
+// Zieltexte, die sich nur in Leerzeichen unterscheiden, sind dieselbe Richtung:
+// "Grenzsiedlung/Zech" und "Grenzsiedlung /Zech" standen sonst zweimal im Picker
+// (Lindau Inselbahnhof, Linie 5, Paul 01.10.2026). Nur für den Vergleich, angezeigt
+// wird weiter der Originaltext der ersten Fundstelle.
+function destDedupeKey(s) {
+  return String(s == null ? '' : s)
+    .toLowerCase()
+    .replace(/\s*([\/,+-])\s*/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 function compareLinesForDisplay(a, b) {
   const ra = lineTypeRank(a), rb = lineTypeRank(b);
   if (ra !== rb) return ra - rb;
@@ -8937,7 +8989,7 @@ function extractLines(data) {
         monitor.lines.forEach(line => {
           const name = line.name || '?';
           const towards = line.towards || '';
-          const key = `${name}|${towards}`;
+          const key = `${name}|${destDedupeKey(towards)}`;
 
           // Bei BODO: Nur erlaubte Linien anzeigen
           if (selectedNetwork === 'BODO' && !isBodoAllowed(name)) {
@@ -14729,7 +14781,7 @@ function setFtCompactSeparate(mode) {
 // bodo (Paul 01.10.2026): Blau/Gelb, Orange Matrix und die ÖBB-Anzeige, letztere unter
 // dem neutralen Namen „Bahnhofsanzeige". Reihenfolge = Reihenfolge der Karten.
 var BRAND_DISPLAY_TYPES = { BODO: [7, 23, 12] };
-var BRAND_DISPLAY_NAMES = { BODO: { 12: 'Bahnhofsanzeige', 23: 'Orange Matrix' } };
+var BRAND_DISPLAY_NAMES = { BODO: { 7: 'bodo-Ansicht', 12: 'Bahnhofsanzeige', 23: 'Orange Matrix' } };
 function brandDisplayTypes() {
   var b = (typeof deviceBrand === 'function') ? deviceBrand() : '';
   var l = BRAND_DISPLAY_TYPES[b];
@@ -14743,9 +14795,9 @@ function brandDisplayName(cid) {
 
 // Kurztexte unter den Karten-Namen. Bewusst in Kundensprache, nicht in Technik.
 var BRAND_DISPLAY_DESC = {
-  7:  'Blaues Brett, weiße Schrift, der bodo-Look.',
+  7:  'Dunkles Brett mit blauen Linien-Kästchen.',
   23: 'Orange Punktmatrix auf Schwarz, wie am Bahnsteig.',
-  12: 'Blau-weiß wie am Bahnhof, erste Abfahrt groß.'
+  12: 'Züge bekommen eine eigene Anzeige im Bahnhofs-Look, Busse bleiben wie gewählt.'
 };
 
 // Mini-Vorschau einer Display-Art, im selben Look wie die Kompakt/Spielerisch-Karten.
@@ -14781,8 +14833,12 @@ function renderBrandDisplayChoice() {
   if ((!cur || cur === '') && typeof stations !== 'undefined' && stations[0]) {
     cur = String(stationDisplayColour(stations[0]));
   }
-  grid.innerHTML = list.map(function(cid) {
-    var aktiv = (parseInt(cur) === cid) ? ' active' : '';
+  var split = (typeof brandTrainSplitActive === 'function') && brandTrainSplitActive();
+  grid.innerHTML = list.filter(function(cid) {
+    // Bahnhofsanzeige nur anbieten, wenn auch Züge konfiguriert sind
+    return cid !== 12 || (typeof brandHasTrains === 'function' && brandHasTrains());
+  }).map(function(cid) {
+    var aktiv = (cid === 12 ? split : (!split && parseInt(cur) === cid)) ? ' active' : '';
     return '<button class="display-style-btn' + aktiv + '" data-value="' + cid + '" onclick="ftSetBrandDisplay(' + cid + ')">' +
              brandDisplayPreviewHtml(cid) +
              '<div class="label-box">' +
@@ -14793,8 +14849,109 @@ function renderBrandDisplayChoice() {
   }).join('');
 }
 
-function ftSetBrandDisplay(cid) {
+// Zug-Richtung? Der TYP entscheidet, nicht der Name: am Bodensee heißen die Schnellbusse
+// "S30"/"S40" und die Regiobusse "R40"/"R60" — über den Namen wären sie Züge.
+function brandIsTrainDir(d) {
+  var t = String((d && d.type) || '').toLowerCase();
+  if (t.indexOf('bus') >= 0 || t.indexOf('tram') >= 0 || t.indexOf('metro') >= 0) return false;
+  if (t.indexOf('train') >= 0) return true;
+  if (t) return false;
+  // Alt-Config ohne Typ: nur eindeutige Gattungen
+  return /^(REX|RE|RB|RS|IRE|MEX|ECE|EC|ICE|IC|RJX|RJ|NJ|EN)\s?\d*$/i.test(String((d && d.line) || '').trim());
+}
+// Sind überhaupt Züge konfiguriert? Nur dann hat die Bahnhofsanzeige einen Sinn
+// (Paul 01.10.2026: „das nur verfügbar wenn auch sbahnen und so konfiguriert sind").
+function brandHasTrains() {
+  return (typeof stations !== 'undefined' ? stations : []).some(function(s) {
+    return (s.directions || []).some(brandIsTrainDir);
+  });
+}
+// Läuft gerade die Aufteilung „Züge auf der Bahnhofsanzeige"?
+function brandTrainSplitActive() {
+  var cids = {};
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) { cids[stationDisplayColour(s)] = 1; });
+  return !!cids[12] && Object.keys(cids).length > 1;
+}
+// Grund-Look (bodo-Ansicht oder Orange Matrix), auf dem alles außer den Zügen läuft.
+var _brandBaseCid = null;
+function brandBaseCid() {
+  if (_brandBaseCid != null) return _brandBaseCid;
+  var cands = [];
+  var colSel = document.getElementById('ftColorSelect');
+  if (colSel) cands.push(parseInt(colSel.value));
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) { cands.push(parseInt(stationDisplayColour(s))); });
+  for (var i = 0; i < cands.length; i++) {
+    if (!isNaN(cands[i]) && cands[i] !== 12) return cands[i];
+  }
+  return (brandDisplayTypes() || [7])[0];
+}
+
+// „Bahnhofsanzeige" ist keine Wahl fürs ganze Brett, sondern eine Aufteilung: die Züge
+// bekommen eine eigene Seite im Bahnhofs-Design, alles andere bleibt im Grund-Look
+// (Paul 01.10.2026: „dann automatisch werden alle züge auf sbahnanzeige und sonst
+// entweder matrix oder bodo").
+function brandSplitTrainsToStationDisplay() {
+  var base = brandBaseCid();
+  var getrennt = false;
+  awGroups().forEach(function(grp) {
+    if (awPagesFixed(grp)) return;
+    var st = awState(grp.net);
+    var pageOf = awPageMap(grp);
+    grp.stations.forEach(function(s) {
+      var k = awStationKey(s);
+      var dirs = s.directions || [];
+      if (!dirs.length) { pageOf[k + '|*'] = 1; return; }
+      dirs.forEach(function(d) {
+        var p = brandIsTrainDir(d) ? 2 : 1;
+        if (p === 2) getrennt = true;
+        pageOf[k + '|' + awDirKey(d)] = p;
+      });
+    });
+    st.pageOf = pageOf;
+    st.typeOf = { 1: base, 2: 12 };
+    st.pages = 'split';
+    st.colour = null;
+  });
+  if (!getrennt) { _awPending = null; return false; }
+  // FIRMWARE-GRENZE: zwei Seiten mit derselben Haltestellen-Menge (eine Station, Züge und
+  // Busse getrennt) verliert das Gerät beim Einlesen — parseMasterRowInto dedupliziert über
+  // das rbl-Feld. Bis die Firmware das Linienfeld mitprüft, hier sauber abbrechen statt
+  // stillschweigend die halbe Config zu verlieren.
+  var kollision = awGroups().some(function(g) { return awPageFieldCollision(g, _awPending || {}); });
+  if (kollision) {
+    _awPending = null;
+    alert('Dafür braucht dein catch-it ein Firmware-Update: Züge und Busse derselben '
+        + 'Haltestelle auf zwei Anzeigen kann das Gerät noch nicht auseinanderhalten. '
+        + 'Bis dahin bitte eine der anderen beiden Anzeigen wählen.');
+    return false;
+  }
+  awFinish();
+  return true;
+}
+
+// Zurück auf EIN Display für alles (Aufteilung aufheben, falls eine lief).
+function brandMergeToOneDisplay(cid) {
+  if (brandTrainSplitActive()) {
+    awGroups().forEach(function(grp) {
+      if (awPagesFixed(grp)) return;
+      var st = awState(grp.net);
+      st.pages = 'city';
+      st.typeOf = null;
+      st.pageOf = null;
+      st.colour = cid;
+    });
+    awFinish();
+  }
   ftSetKompaktDisplay(String(cid));
+}
+
+function ftSetBrandDisplay(cid) {
+  if (cid === 12) {
+    if (brandSplitTrainsToStationDisplay()) renderBrandDisplayChoice();
+    return;
+  }
+  _brandBaseCid = cid;
+  brandMergeToOneDisplay(cid);
   renderBrandDisplayChoice();
 }
 
@@ -22686,6 +22843,7 @@ let _startupResolved = false;
 function resolveStartup() {
   if (_startupResolved) return;
   _startupResolved = true;
+  applyBrandLock();
   const sl = document.getElementById('startupLoading');
   if (sl) sl.style.display = 'none';
   if (Array.isArray(stations) && stations.length > 0) {
