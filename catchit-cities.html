@@ -4975,16 +4975,28 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
   // Generell für alle Netze AUSSER Wien (WL hat eigene Regel über wien_json).
   // Der Server liefert für Nicht-Trainboard-Netze einfach eine leere Liste → No-Op.
   if (!network || network === 'WL') return;
-  // VBB/Berlin-Kachel = nur Nahverkehr: S-Bahn, RB/RE und IC/ICE in der AUSWAHL ausblenden
-  // (Paul 2026-09-18). Bestehende Configs mit S-Bahn laufen weiter, der Server liefert sie noch.
-  const hideBerlinRail = () => {
-    if (network !== 'BERLIN') return;
+  // Nahverkehrs-Kacheln: Züge nur in der AUSWAHL ausblenden, nie im Brett — bestehende
+  // Konfigurationen mit RB/RE laufen weiter, der Server liefert sie unverändert, und eine
+  // gespeicherte Zug-Richtung bleibt beim Laden angehakt und sichtbar.
+  //   BERLIN (Paul 2026-09-18): ohne S-Bahn, RB/RE und IC/ICE.
+  //   BWEGT (Paul 2026-10-01): ohne RB/RE/MEX/IRE/IC/ICE, ABER mit S-Bahn
+  //     (ptTrainS: S-Bahn Stuttgart, Stadtbahn Karlsruhe S1/S11/S4), Stadtbahn (ptMetro),
+  //     Tram und Bus. Die Friedrichshafener Stadtbusse 1 bis 16 standen früher als ptTrain
+  //     im Brett und wären mit ausgeblendet worden; seit dem Server-Stand vom 01.10.2026
+  //     kommt der Typ aus dem Fahrzeugfeld und sie sind korrekt als Bus eingestuft.
+  //   bodo-Geräte sind davon AUSGENOMMEN (Paul 01.10.2026): am Bodensee gehören RB/RE/REX
+  //     zum Angebot, dort ist BWEGT die einzige Kachel und muss die Züge mitbringen.
+  const hideRailInPicker = () => {
+    const ohneSBahn = (network === 'BERLIN');
+    const ohneZuege = ohneSBahn ||
+      (network === 'BWEGT' && !(typeof isBodoDevice === 'function' && isBodoDevice()));
+    if (!ohneZuege) return;
     for (let i = availableLines.length - 1; i >= 0; i--) {
       const t = availableLines[i] && availableLines[i].type;
-      if (t === 'ptTrainS' || t === 'ptTrain') availableLines.splice(i, 1);
+      if (t === 'ptTrain' || (ohneSBahn && t === 'ptTrainS')) availableLines.splice(i, 1);
     }
   };
-  hideBerlinRail();
+  hideRailInPicker();
   try {
     const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(network) + '&stopId=' + encodeURIComponent(stopId) + '&_=' + Date.now(), { cache: 'no-store' });
     const data = await r.json();
@@ -5028,7 +5040,7 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
         availableLines.push({ name: ln.name, towards: d.towards || '', type: ln.type || '', richtungsId: d.richtungsId || '', stopovers: [] });
       });
     });
-    hideBerlinRail();
+    hideRailInPicker();
     availableLines.sort(compareLinesForDisplay);
   } catch (e) { /* Endpunkt-/Netzfehler ignorieren — Departures-Liste bleibt bestehen */ }
 }
@@ -6168,6 +6180,32 @@ DISPLAY_PRESETS.oebb = {
   ]
 };
 
+// bodo-gebrandete Geräte (Firmware-Brand BODO, siehe isBodoDevice): eigene Startseite statt
+// Länder-/Bundesland-Auswahl, genau wie bei ÖBB. NUR die bodo-Kachel (Paul 01.10.2026:
+// „wir brauchen eig nur bodo weil züge ja auch möglich sind"), denn im bodo-Gebiet liefert
+// BWEGT Bus UND Bahn (RB/RE/REX) mit Echtzeit, auch die ÖBB-Züge um Lindau. Keine eigene
+// DB-/ÖBB-Kachel mehr. Das alte Netz BODO (efa-bw) bleibt ungenutzt: es typt RE/RB als Bus
+// und filtert Fernzüge raus.
+// Weil nur EIN Netz übrig ist, überspringt renderDisplayPreset die Zwischenseite und geht
+// direkt in die Stationssuche, mit dem bodo-Foto als Banner.
+// Nicht im Bundesland-Chooser (hideInChooser). Foto: baden württemberg.jpg IST das bodo-Bild
+// (Paul 01.10.2026). Markenfarben aus dem bodo-CD: Gelb #FFE92E, Dunkelblau #00305B,
+// Logo-Blau #0088CF.
+DISPLAY_PRESETS.bodo = {
+  name: 'bodo',
+  parent: 'DE',
+  hideInChooser: true,
+  photo: 'fotos/baden württemberg.jpg',
+  photoPos: 'center top',
+  title: 'Deine bodo-Station einstellen',
+  intro: 'Wähle, welche Busse und Bahnen an deiner Station angezeigt werden.',
+  leaveLabel: 'Weitere Stationen in Deutschland einstellen',
+  leaveAsButton: true,
+  networks: [
+    { id: 'BWEGT', label: 'bodo', desc: 'Bus und Bahn im Verbund', color: { bg: '#FFE92E', fg: '#00305B' }, jumpTo: { region: 'DE' } }
+  ]
+};
+
 // Deutschland-Bundesländer — wie Österreich: EINE Kachel pro Bundesland, darin die
 // Netz-Buttons (Verbünde + DB Regio). Buttons ohne label/desc ziehen NETWORKS[id] automatisch.
 DISPLAY_PRESETS.bw = {
@@ -6553,9 +6591,9 @@ function renderBundeslandChooser(parentRegion) {
   });
   document.getElementById('stepBundesland')?.classList.remove('hidden');
   _hideHero();
-  // ÖBB-Geräte: zurück zur ÖBB-Startseite statt zur Länderwahl
+  // Marken-Geräte (ÖBB/bodo): zurück zur Marken-Startseite statt zur Länderwahl
   var bLeave = document.getElementById('bundeslandLeave');
-  if (bLeave) bLeave.textContent = isOebbDevice() ? 'Zurück zur ÖBB-Auswahl' : 'Andere Region wählen →';
+  if (bLeave) bLeave.textContent = brandBackLabel();
   // currentStep auf 'region' lassen, damit die saveBtn-Logik nichts macht
   if (typeof currentStep !== 'undefined') currentStep = 'region';
 }
@@ -6566,7 +6604,7 @@ function showRegionComingSoon(name) {
 
 function leaveBundesland() {
   document.getElementById('stepBundesland')?.classList.add('hidden');
-  if (isOebbDevice()) { showOebbStart(); return; }
+  if (showBrandStart()) return;
   if (typeof showStep === 'function') showStep('region');
   else document.getElementById('stepRegion')?.classList.remove('hidden');
 }
@@ -6592,44 +6630,64 @@ function leaveBundesland() {
   };
 })();
 
-// ==================== ÖBB-GERÄTE (Brand OEBB) ====================
-// ÖBB-gebrandete Geräte (der Masseninstaller setzt den Firmware-Brand OEBB) bekommen statt der
-// Länder-/Bundesland-Auswahl eine eigene Startseite (DISPLAY_PRESETS.oebb). Westbahn wird dort
-// nur aus der AUSWAHL genommen (Knopf, Zugtyp-Chip, Design, Texte); was das Gerät anzeigt,
-// bleibt unverändert (Paul, 16.09.2026).
-// Quellen: ?brand=oebb (Vorschau/Test) > brand aus der Geräte-Config (postMessage, seit FW 2.4.x).
+// ==================== MARKEN-GERÄTE (Brand OEBB, BODO) ====================
+// Gebrandete Geräte (der Masseninstaller setzt den Firmware-Brand) bekommen statt der
+// Länder-/Bundesland-Auswahl eine eigene Startseite: Brand OEBB → DISPLAY_PRESETS.oebb,
+// Brand BODO → DISPLAY_PRESETS.bodo. Bei ÖBB wird Westbahn dort nur aus der AUSWAHL genommen
+// (Knopf, Zugtyp-Chip, Design, Texte); was das Gerät anzeigt, bleibt unverändert
+// (Paul, 16.09.2026).
+// Quellen: ?brand=oebb|bodo (Vorschau/Test) > brand aus der Geräte-Config (postMessage, seit FW 2.4.x).
+var BRAND_START_PRESETS = { OEBB: 'oebb', BODO: 'bodo' };
 var _deviceBrand = '';
-function isOebbDevice() {
+function deviceBrand() {
   try {
     var b = (new URLSearchParams(window.location.search).get('brand') || '').trim().toUpperCase();
-    if (b) return b === 'OEBB';
+    if (b) return b;
   } catch (e) {}
-  return _deviceBrand === 'OEBB';
+  return _deviceBrand;
+}
+// Preset-Key der Marken-Startseite, null bei Geräten ohne eigene Marke.
+function brandStartPreset() {
+  var k = BRAND_START_PRESETS[deviceBrand()];
+  return (k && typeof DISPLAY_PRESETS !== 'undefined' && DISPLAY_PRESETS[k]) ? k : null;
+}
+function isBrandDevice() { return !!brandStartPreset(); }
+function isOebbDevice() { return deviceBrand() === 'OEBB'; }
+function isBodoDevice() { return deviceBrand() === 'BODO'; }
+// Rück-Beschriftung aus der Bundesland-Auswahl: „Zurück zur bodo-Auswahl" usw.
+function brandBackLabel() {
+  var k = brandStartPreset();
+  return k ? ('Zurück zur ' + (DISPLAY_PRESETS[k].name || '') + '-Auswahl') : 'Andere Region wählen →';
 }
 function applyOebbDeviceTexts() {
   if (!isOebbDevice()) return;
   if (typeof NETWORKS !== 'undefined' && NETWORKS.WESTBAHN) NETWORKS.WESTBAHN.desc = 'Railjet, Intercity, Nightjet';
 }
-function showOebbStart() {
+// Marken-Startseite zeigen (ÖBB/bodo). false, wenn das Gerät keine Marke hat.
+function showBrandStart() {
+  var k = brandStartPreset();
+  if (!k) return false;
   applyOebbDeviceTexts();
-  renderDisplayPreset('oebb');
+  renderDisplayPreset(k);
   window.scrollTo(0, 0);
+  return true;
 }
+function showOebbStart() { return showBrandStart(); }  // Altname
 // Brand aus der Geräte-Config übernehmen. Die Info kommt im Geräte-iFrame erst NACH dem
-// Seitenstart → ÖBB-Startseite nachziehen, solange der User noch am Einstieg steht
+// Seitenstart → Marken-Startseite nachziehen, solange der User noch am Einstieg steht
 // (Länder-/Bundesland-/Preset-Auswahl, kein Auswahl-Overlay, kein Feintuning).
 function noteDeviceBrand(brand) {
   if (typeof brand !== 'string') return;
-  var was = isOebbDevice();
+  var was = isBrandDevice();
   _deviceBrand = brand.trim().toUpperCase();
-  if (was || !isOebbDevice()) return;
+  if (was || !isBrandDevice()) return;
   applyOebbDeviceTexts();
   var overlay = document.getElementById('configChoiceOverlay');
   var ft = document.getElementById('stepFinetuning');
   var atEntry = (typeof currentStep === 'undefined' || currentStep === 'region') &&
                 !(overlay && overlay.style.display === 'block') &&
                 !(ft && !ft.classList.contains('hidden'));
-  if (atEntry) showOebbStart();
+  if (atEntry) showBrandStart();
 }
 
 function detectDisplayPreset() {
@@ -6712,8 +6770,8 @@ function detectCountryExplicit() {
 (function() {
   function tryAutoJump() {
     populateCountrySelect();
-    // 0) ÖBB-Gerät (?brand=oebb) → eigene ÖBB-Startseite
-    if (isOebbDevice()) { showOebbStart(); return; }
+    // 0) Marken-Gerät (?brand=oebb|bodo) → eigene Marken-Startseite
+    if (showBrandStart()) return;
     // 1) Konkretes Display-Preset (?display=) hat Vorrang
     var d = detectDisplayPreset();
     if (d) { renderDisplayPreset(d); return; }
@@ -11561,7 +11619,7 @@ function goToRegionSelectionEmpty() {
   if (addMore) addMore.classList.add('hidden');
   if (weiter)  weiter.classList.add('hidden');
   var bb = document.querySelector('.bottom-bar'); if (bb) bb.style.display = '';
-  if (isOebbDevice()) { showOebbStart(); return; }  // ÖBB-Gerät → ÖBB-Startseite
+  if (showBrandStart()) return;  // Marken-Gerät → eigene Startseite
   var country = (typeof detectCountry === 'function' && detectCountry()) ||
                 (typeof DEFAULT_COUNTRY !== 'undefined' ? DEFAULT_COUNTRY : 'AT');
   var hasBundeslaender = country && typeof DISPLAY_PRESETS !== 'undefined' &&
@@ -11606,7 +11664,7 @@ function chooseEditLines() {
   const ft = document.getElementById('stepFinetuning');
   if (ft) ft.classList.add('hidden');
 
-  if (isOebbDevice()) { showOebbStart(); return; }  // ÖBB-Gerät → ÖBB-Startseite
+  if (showBrandStart()) return;  // Marken-Gerät → eigene Startseite
   var country = (typeof detectCountry === 'function' && detectCountry()) ||
                 (typeof DEFAULT_COUNTRY !== 'undefined' ? DEFAULT_COUNTRY : 'AT');
   var hasBundeslaender = country &&
@@ -11710,7 +11768,7 @@ function addMoreStations() {
   var weiter  = document.getElementById('openFinetuningBtn');
   if (addMore) addMore.classList.add('hidden');
   if (weiter)  weiter.classList.add('hidden');
-  if (isOebbDevice()) { showOebbStart(); updateStationsList(); return; }  // ÖBB-Gerät → ÖBB-Startseite
+  if (showBrandStart()) { updateStationsList(); return; }  // Marken-Gerät → eigene Startseite
   var b = pickBundeslandFromStations();
   if (b.preset && typeof renderDisplayPreset === 'function') {
     renderDisplayPreset(b.preset);          // klare Mehrheit → direkt ins Bundesland
@@ -15065,6 +15123,18 @@ function parseCustomRow(str) {
       var key = t.charAt(0);
       var val = t.substring(1);
       if (key === 'c') slot = parseInt(val);
+      else if (key === 'P') {
+        // Linienfarben hängen am LINIENNAMEN. Alte Konfigurationen führen das
+        // Gattungswort mit ("Stb 2"), der Server liefert die Linie heute als "2" — ohne
+        // Überführung verlöre sie ihre Farbe. Nur der Name wird angefasst, die drei
+        // Farbwerte dahinter bleiben unberührt.
+        o[key] = String(val).split(',').map(function(e) {
+          var t = String(e).split(':');
+          if (!t.length) return e;
+          t[0] = _stripModePrefix(t[0]);
+          return t.join(':');
+        }).filter(function(e) { return e && e.charAt(0) !== ':'; }).join(',');
+      }
       else o[key] = val;
     });
     if (slot != null && !isNaN(slot)) customRowBySlot[slot] = o;
@@ -15138,7 +15208,9 @@ function fcLineColors(cid) {
   if (p) {
     p.split(',').forEach(function(e) {
       var t = e.split(':');
-      var ln = (t[0] || '').trim();
+      // Farben sind unter dem LINIENNAMEN abgelegt — der alte Name mit Gattungswort
+      // ("Stb 6") fände die heutige Linie "6" nicht mehr, die Linie verlöre ihre Farbe.
+      var ln = _stripModePrefix(t[0] || '');
       if (!ln) return;
       out[ln] = { bg: (t[1] || '').toLowerCase(), tx: (t[2] || '').toLowerCase(), ol: (t[3] || '').toLowerCase() };
     });
@@ -19451,6 +19523,19 @@ var MASTERROW_TIME_COLOURS = [11, 12, 14];  // ÖBB FV / ÖBB S-Bahn / Westbahn 
 // — die Firmware las dann eine abgeschnittene Richtung plus einen Rest als eigenes Token,
 // und der Kunde sah fremde Richtungen und doppelte Zeilen (Paul 24.09.2026, Naturkundemuseum).
 // Muss identisch beim Vergleich angewandt werden (siehe Lade-Pfad), sonst matcht nichts mehr.
+// Verkehrsmittel-Präfix aus einem gespeicherten Liniennamen entfernen (Peer/Server,
+// 28.09.2026): Der Server liefert die Linien inzwischen ohne Gattungswort, Hannover
+// schickt "6" statt "Stb 6". Die Firmware vergleicht den Liniennamen exakt, ein altes
+// Token "Stb 6>…" trifft die Abfahrt "6" also nicht mehr und die Zeile bleibt leer.
+// Beim Laden wird der Name deshalb mit umgeschrieben, damit ein einfaches Öffnen und
+// Speichern reicht. Gleiche Regel wie am Server; das Wort fällt nur, wenn danach eine
+// Liniennummer oder Kennung folgt ("Bus 125" → "125", "Busbahnhof" bleibt).
+// Richtungs-Ids und Zieltexte bleiben unberührt.
+function _stripModePrefix(line) {
+  return String(line == null ? '' : line)
+    .replace(/^(Stb|Str|Linie|Tram|Stra(?:ss|ß)enbahn|Bus|RNV)\.?\s+(?=\d|[A-Za-z]{1,2}\d)/i, '')
+    .trim();
+}
 function _mrSafeRef(t) {
   return String(t == null ? '' : t)
     .replace(/[\u2192\u27f6\u2794]/g, ' ')   // Pfeile → Leerzeichen
@@ -21251,7 +21336,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
             if (gt > 0) { line = t.substring(0, gt); towards = t.substring(gt + 1); }
             else if (cn > 0) { line = t.substring(0, cn); towards = t.substring(cn + 1); }
             else { line = t; towards = ''; }
-            line = line.trim(); towards = towards.trim();
+            // Gattungswort aus alten Konfigurationen abstreifen ("Stb 6" → "6"), sonst
+            // trifft das Token die heutige Abfahrt nicht mehr. Richtung bleibt unberührt.
+            line = _stripModePrefix(line); towards = towards.trim();
             if (line && !dirs.some(d => d.line === line && d.towards === towards)) dirs.push({ line, towards });
           });
         });
@@ -21437,7 +21524,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // _occ/_segInfo wurden oben vor dem Dubletten-Check gelesen — alle Segment-Maps
     // (Filter, Richtungen, colour) synchron über dasselbe Vorkommen ablesen.
     const stationFilter = (_segInfo !== undefined) ? (filterParts[_segInfo.segIdx] || '') : (filterParts[idx] || '');
-    const filterLines = stationFilter ? stationFilter.split(',').map(f => f.trim()) : [];
+    const filterLines = stationFilter ? stationFilter.split(',').map(f => _stripModePrefix(f)).filter(Boolean) : [];
     // Richtungs-Filter dieser Station: PRIMÄR aus der masterrow (richtungsId-genau), sonst der
     // global geparste linefilterdestination/linegroups-Fallback.
     const stationDests = _pickBySeg(masterDirsByRbl, part, _occ) || lineDestinations;
@@ -21454,7 +21541,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       networkName: NETWORKS[network]?.name || network,
       stopId: bareStopId,
       stopName,
-      filter: stationFilter,
+      filter: filterLines.length ? filterLines.join(',') : stationFilter,   // Namen bereits überführt
       fullId,
       isJourney,
       isExisting: true,
@@ -21665,10 +21752,12 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           if (!sd.line) return;
           const rid = String(sd.towards || '');
           // Formate, die durch eine Server-Umstellung ungültig geworden sein können:
-          // reine Bahnsteig-Nummern (Schweden vor dem 20.09.) und die alten Leipziger
+          // reine Bahnsteig-Nummern (Schweden vor dem 20.09.), die alten Leipziger
           // Ziel-Kennungen "di<Zielbahnhof>l<Linie>" (vor der Steig-Zuordnung aus DELFI,
-          // 24.09.). Beide deckten mehrere Fahrtrichtungen bzw. je ein Ziel ab.
-          if (!/^p\d+$/.test(rid) && !/^di\d+l/.test(rid)) return;
+          // 24.09.) und Bussteig-Kennungen wie "pBstg. 3" (bwegt vor der Umstellung auf
+          // Hin und Rück, 01.10.). Ein Token, das der Linien-Index noch kennt, wird dabei
+          // nie angefasst — Berliner "pPos. 3" bleibt also unberührt.
+          if (!/^p\d+$/.test(rid) && !/^di\d+l/.test(rid) && !/^p[A-Za-zÄÖÜäöüß.\s]+\d+$/.test(rid)) return;
           const ziele = _dtx[String(sd.line) + '|' + rid];
           if (ziele && ziele.length > 1) {
             // Der Steig deckt mehrere Richtungen ab → alle anlegen
@@ -21878,6 +21967,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           if (gt > 0) { line = t.substring(0, gt).trim(); ref = t.substring(gt + 1).trim(); }
           else if (cn > 0) { line = t.substring(0, cn).trim(); ref = t.substring(cn + 1).trim(); }
           else { line = t; ref = ''; }
+          // Auch hier das Gattungswort abstreifen, sonst trägt der Heiler das alte Token
+          // ("Stb 2") neben dem überführten ("2") ein und die Linie stünde doppelt.
+          line = _stripModePrefix(line);
           if (!line || union.has(line + '|' + ref)) continue;
           // BARE Tokens ("1" ohne Richtung, v.a. Wien: Richtung steckt im Bahnsteig-rbl) NICHT
           // zusätzlich anhängen, wenn die Linie bereits MIT einer Richtung rekonstruiert wurde —
@@ -21912,7 +22004,8 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           }
           if (!target) target = segStations[0];
           const looksRid = /^d\d/.test(ref) || /^\d+$/.test(ref) || ref === 'H' || ref === 'R' ||
-                           /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref);
+                           /^st/.test(ref) || /^p\d/.test(ref) || /^hh/.test(ref) || /^bv/.test(ref) ||
+                           /^p[A-Za-zÄÖÜäöüß.\s]*\d+$/.test(ref);   // Bussteige: "pBstg. 3", "pPos. 3"
           // VERALTETE ID NICHT NACHTRAGEN: Hat der Server für dieses Netz auf echte
           // Richtungs-Ids umgestellt (Schweden 20.09.2026), kennt der Linien-Index die alte
           // Bahnsteig-Nummer nicht mehr. Sie hier einzutragen erzeugte eine Richtung ohne
@@ -21952,6 +22045,10 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // (await pro Station für Namen/Abfahrten). Dadurch kann dieselbe Station mehrfach
   // landen. Hier final per fullId deduplizieren (erste behalten).
   dedupeStationsByFullId();
+
+  // Nach ALLEN Nachträgen: Kennungen, die eine Server-Umstellung ungültig gemacht hat,
+  // final entfernen — der Token-Heiler oben trägt sie sonst neben den überführten wieder ein.
+  dropStaleDirectionIds();
 
   // Richtungs-Dubletten mit identischer richtungsId zusammenlegen (Leonard-Fall).
   dedupeDirectionsByRid('loadExistingConfig');
@@ -22025,6 +22122,44 @@ function dedupeDirectionsByRid(quelle) {
     if (st.directions.length !== before) {
       console.log('[' + (quelle || 'dedupeDirections') + '] ' + (st.fullId || st.stopId) + ': ' +
                   before + ' → ' + st.directions.length + ' Richtungen (gleiche richtungsId zusammengelegt)');
+    }
+  });
+}
+
+// Richtungen mit einer Kennung, die der Linien-Index der Haltestelle für diese Linie
+// nicht mehr führt, aus den Stationen werfen. Nötig, weil Server-Umstellungen die
+// Kennungen ändern (Schweden, Leipzig, bwegt): Die überführten Richtungen stehen dann
+// neben der alten, die ins Leere zeigt, und beim Speichern wanderten beide ins Gerät.
+// Greift nur, wenn der Index die Linie überhaupt kennt UND für sie gültige Kennungen
+// liefert — ohne Index bleibt alles unangetastet, damit offline nichts verloren geht.
+function dropStaleDirectionIds() {
+  var idx = (typeof window !== 'undefined' && window._dirTextByStop) || {};
+  if (!Object.keys(idx).length) return;
+  (typeof stations !== 'undefined' ? stations : []).forEach(function(st) {
+    if (!st || !Array.isArray(st.directions) || !st.directions.length) return;
+    var map = idx[(st.network || '') + ':' + (st.stopId || '')];
+    if (!map || !Object.keys(map).length) return;
+    var gueltig = {};
+    Object.keys(map).forEach(function(k) {
+      var cut = k.lastIndexOf('|');
+      if (cut < 0) return;
+      (gueltig[k.substring(0, cut)] = gueltig[k.substring(0, cut)] || {})[k.substring(cut + 1)] = 1;
+    });
+    var vorher = st.directions.length;
+    st.directions = st.directions.filter(function(d) {
+      var g = gueltig[String(d.line)];
+      if (!g) return true;                       // Linie dem Index unbekannt → behalten
+      var rid = String(d.richtungsId || '');
+      if (rid) return !!g[rid];                   // Kennung muss der Index noch führen
+      // Ohne Kennung: Steht im ZIELTEXT eine alte Kennung ("pBstg. 3"), ist das kein Ziel,
+      // sondern ein Rest aus dem Nachtrag — die Richtung existiert bereits überführt.
+      var tw = String(d.towards || '').trim();
+      if (/^p[A-Za-zÄÖÜäöüß.\s]*\d+$/.test(tw) || /^di\d+l/.test(tw)) return false;
+      return true;
+    });
+    if (st.directions.length !== vorher) {
+      console.log('[dropStaleDirectionIds] ' + (st.stopName || st.stopId) + ': ' +
+                  vorher + ' → ' + st.directions.length + ' Richtungen (veraltete Kennungen entfernt)');
     }
   });
 }
@@ -22446,8 +22581,8 @@ function resolveStartup() {
   if (Array.isArray(stations) && stations.length > 0) {
     hasExistingConfig = true;  // Stationen geladen ⇒ es gibt eine Config
     maybeShowConfigChoice();   // bestehende Config → Linie/Feintuning
-  } else if (isOebbDevice()) {
-    showOebbStart();           // ÖBB-Gerät → eigene ÖBB-Startseite
+  } else if (isBrandDevice()) {
+    showBrandStart();          // Marken-Gerät (ÖBB/bodo) → eigene Startseite
   } else {
     // Steht der Einstieg schon (Display-Preset per ?display= oder Bundesland-Auswahl),
     // NICHT zusätzlich die Länderwahl einblenden, sonst stehen beide untereinander.
