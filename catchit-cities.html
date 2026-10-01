@@ -265,6 +265,31 @@
     .fv-chip:active { transform: scale(0.96); }
     .fv-chip:active { transform: scale(0.95); }
     .fv-chip-mark { font-size: 13px; margin-right: 6px; opacity: 0.95; }
+    /* Zug-Wizard: zwei grosse Knoepfe Fernverkehr/Nahverkehr, darunter die einzelnen
+       Gattungen zum Ab- und Anwaehlen (Paul 01.10.2026). */
+    .fv-group-row { display: flex; gap: 10px; padding: 2px 16px 10px; }
+    .fv-group-btn { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+      border-radius: 10px; padding: 11px 14px; border: 2px solid var(--ink); background: #fff;
+      color: var(--ink); cursor: pointer; font-family: inherit; text-align: left; transition: transform 0.1s; }
+    .fv-group-btn:active { transform: scale(0.97); }
+    .fv-group-btn .gname { font-size: 15px; font-weight: 700; }
+    .fv-group-btn .gsub { font-size: 11px; font-weight: 500; opacity: 0.75; }
+    .fv-group-btn.on { color: #fff; }
+    .fv-group-btn.off { border-style: dashed; }
+    .fv-group-btn.partial { border-style: solid; }
+    .fv-gat-toggle { margin: 0 16px 8px; display: block; width: calc(100% - 32px); box-sizing: border-box;
+      border: 1px solid #e6e9ee; border-radius: 10px; background: #fff; color: var(--ink);
+      padding: 10px 14px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+      text-align: left; }
+    .fv-gat-list { margin: 0 16px 14px; border: 1px solid #e6e9ee; border-radius: 10px; overflow: hidden; }
+    .fv-gat-row { display: flex; align-items: center; gap: 10px; padding: 9px 13px; cursor: pointer;
+      border-bottom: 1px solid #f1f3f6; font-size: 14px; }
+    .fv-gat-row:last-child { border-bottom: none; }
+    .fv-gat-box { width: 18px; height: 18px; flex: 0 0 auto; border-radius: 4px; border: 2px solid #c6ccd4;
+      display: inline-flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
+    .fv-gat-row.on .fv-gat-box { border-color: transparent; }
+    .fv-gat-head { padding: 8px 13px 4px; font-size: 11px; font-weight: 700; color: #9aa3ad;
+      text-transform: uppercase; letter-spacing: 0.04em; background: #fafbfc; }
     .fv-feature-filter { background: #fff; border: 1px solid #e6e9ee; border-radius: 14px; padding: 14px 16px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
     .fv-filter-label { font-size: 12px; font-weight: 700; color: #9aa3ad; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
     .fv-filter-hint { font-size: 12px; color: #9aa3ad; font-weight: 400; margin-bottom: 12px; }
@@ -5108,6 +5133,23 @@ const FV_CATS = ['RJX', 'WB', 'IC', 'ICE', 'NJ', 'IR', 'RGJ'];
 const FV_CAT_GATTUNGEN = { RJX: ['RJX', 'RJ'], WB: ['WB'], IC: ['IC', 'EC'], ICE: ['ICE'], NJ: ['NJ', 'EN'], IR: ['IR'], RGJ: ['RGJ', 'REGIOJET', 'RJET'] };
 const FV_CAT_LABEL = { RJX: 'Railjet', WB: 'Westbahn', IC: 'Intercity / EC', ICE: 'ICE', NJ: 'Nightjet', IR: 'InterRegio', RGJ: 'RegioJet' };
 const FV_CAT_COLOR = { RJX: '#E2002A', WB: '#1f9fb0', IC: '#3c4a54', ICE: '#2b6cb0', NJ: '#1a2e66', IR: '#6f3aa5', RGJ: '#F39200' };
+// Nahverkehr im Zug-Wizard (Paul 01.10.2026: "einfach Fernverkehr und Nahverkehr ein Knopf,
+// dann kann ich Fernverkehr/Nahverkehr zwei Buttons klicken und dann im Dropdown einzelne
+// aus- und einwaehlen"). Serverseitig: nur Fernverkehr laeuft weiter ueber OEBB:<von>><nach>,
+// sobald eine Nahverkehrs-Gattung dabei ist ueber OEBBREG:<von>><nach> (liefert ALLE Zuege
+// Richtung Ziel, die Gattungen schraenkt der lines_filter ein).
+const NV_CATS = ['REX', 'R', 'S', 'CJX', 'RE'];
+const NV_CAT_GATTUNGEN = { REX: ['REX'], R: ['R'], S: ['S'], CJX: ['CJX'], RE: ['RE', 'RB'] };
+const NV_CAT_LABEL = { REX: 'REX', R: 'Regionalzug', S: 'S-Bahn', CJX: 'CityJet Xpress', RE: 'RE / RB' };
+const NV_CAT_COLOR = { REX: '#0066B3', R: '#4a7fb5', S: '#1a73b7', CJX: '#00497a', RE: '#5b7f99' };
+const ALL_CATS = FV_CATS.concat(NV_CATS);
+function catIsNv(cat) { return NV_CATS.indexOf(cat) >= 0; }
+function catGattungen(cat) { return FV_CAT_GATTUNGEN[cat] || NV_CAT_GATTUNGEN[cat] || [cat]; }
+function catLabel(cat) { return FV_CAT_LABEL[cat] || NV_CAT_LABEL[cat] || cat; }
+function catColor(cat) { return FV_CAT_COLOR[cat] || NV_CAT_COLOR[cat] || '#555'; }
+// Ist mindestens eine Nahverkehrs-Gattung gewaehlt? Dann muss die Station ueber OEBBREG laufen.
+function fvHasNvCats() { return NV_CATS.some(function(c) { return fvActiveCats.has(c); }); }
+let fvGatListOpen = false;   // Gattungs-Liste aufgeklappt?
 // NICHT MEHR LIMITIEREND (seit 2026-07): früher steuerte diese kuratierte Liste, welche
 // Zugtyp-Chips pro Strecke angeboten wurden — die Realität wich aber ab (Graz Puntigam:
 // IR fährt, „Südstrecke" listete IR nicht → nicht wählbar). Jetzt bekommen ALLE
@@ -5138,7 +5180,7 @@ let fvMode = 'all';
 let fvDests = [];               // gewählte Ziele [{id, name, lines:[]}] (mehrere möglich)
 let fvAll = false;               // true = explizit "Alle Abfahrten" gewählt (Dropdown zu)
 let fvReachable = [];            // erreichbare FV-Ziele ab Start-Bahnhof (aus /oebb/destinations, je {id,name,lines})
-let fvReachableFor = null;       // stopId für den fvReachable geladen wurde
+let fvReachableFor = null;       // Schlüssel (stopId + Netz) für den fvReachable geladen wurde
 let fvReachableLoading = false;  // true während FV-Ziele geladen werden (Prozess-Spinner)
 let fvDestQuery = '';            // aktueller Filter-Text im Ziel-Picker
 
@@ -9378,15 +9420,40 @@ function renderLines() {
     // Routendaten lückenhaft waren (Wien→Linz ohne Westbahn/ICE, 2026-07-14).
     // Ein Chip ohne echte Züge zeigt schlicht nichts an — das ist harmlos.
     if (fvShowCats) {
-      let catBody = '<div class="fv-filter-hint" style="margin-bottom:9px;">Gestrichelte sind <strong>auswählbar</strong>: antippen zum Hinzufügen oder Entfernen.</div><div class="fv-chips">';
-      chipCats.forEach(function(cat) {
-        const active = fvActiveCats.has(cat);
-        const color = FV_CAT_COLOR[cat] || '#555';
-        const style = active ? 'background:' + color + ';color:#fff' : '';
-        const mark = active ? '✓' : '+';
-        catBody += '<button class="fv-chip ' + (active ? 'on' : 'off') + '" style="' + style + '" onclick="toggleFvCat(\'' + cat + '\')"><span class="fv-chip-mark">' + mark + '</span>' + (FV_CAT_LABEL[cat] || cat) + '</button>';
+      // Zwei Knoepfe (Fernverkehr / Nahverkehr), einzeln oder zusammen, darunter die
+      // einzelnen Gattungen zum Ab- und Anwaehlen (Paul 01.10.2026). Ein Knopf steht auf
+      // „teilweise", wenn nur ein Teil seiner Gattungen angehakt ist.
+      const _gruppen = fvCatGroups();
+      let catBody = '<div class="fv-filter-hint" style="margin-bottom:9px;">Fernverkehr und Nahverkehr lassen sich einzeln oder zusammen anschalten. Welche Gattungen genau, stellst du darunter ein.</div>';
+      catBody += '<div class="fv-group-row">';
+      _gruppen.forEach(function(gr) {
+        const an = gr.cats.filter(function(c) { return fvActiveCats.has(c); }).length;
+        const stand = (an === 0) ? 'off' : (an === gr.cats.length ? 'on' : 'partial');
+        const style = (stand === 'on') ? 'background:' + gr.color + ';color:#fff;border-color:' + gr.color + ';'
+                    : (stand === 'partial') ? 'border-color:' + gr.color + ';color:' + gr.color + ';' : '';
+        const sub = (stand === 'partial') ? (an + ' von ' + gr.cats.length + ' Gattungen') : gr.sub;
+        catBody += '<button class="fv-group-btn ' + stand + '" style="' + style + '" onclick="toggleFvGroup(\'' + gr.key + '\')">' +
+                   '<span class="gname">' + gr.name + '</span><span class="gsub">' + escapeHtmlFt(sub) + '</span></button>';
       });
       catBody += '</div>';
+      const _gewaehlt = _gruppen.reduce(function(n, gr) {
+        return n + gr.cats.filter(function(c) { return fvActiveCats.has(c); }).length; }, 0);
+      catBody += '<button class="fv-gat-toggle" onclick="toggleFvGatList()">' +
+                 (fvGatListOpen ? '▾' : '▸') + ' Einzelne Gattungen (' + _gewaehlt + ' gewählt)</button>';
+      if (fvGatListOpen) {
+        catBody += '<div class="fv-gat-list">';
+        _gruppen.forEach(function(gr) {
+          catBody += '<div class="fv-gat-head">' + gr.name + '</div>';
+          gr.cats.forEach(function(cat) {
+            const an2 = fvActiveCats.has(cat);
+            const c2 = catColor(cat);
+            catBody += '<div class="fv-gat-row ' + (an2 ? 'on' : '') + '" onclick="toggleFvCat(\'' + cat + '\')">' +
+                       '<span class="fv-gat-box" style="' + (an2 ? 'background:' + c2 + ';' : '') + '">' + (an2 ? '✓' : '') + '</span>' +
+                       '<span>' + escapeHtmlFt(catLabel(cat)) + '</span></div>';
+          });
+        });
+        catBody += '</div>';
+      }
       fvHtml += vnArrow();
       fvHtml += vnLinienStep(fvAll ? 'Zugtypen' : 'Zugtypen auf dieser Verbindung', catBody);
     }
@@ -9984,9 +10051,9 @@ function buildFvSave() {
 
   const gattungen = new Set();
   const directions = [];
-  FV_CATS.forEach(function(cat) {
+  ALL_CATS.forEach(function(cat) {
     if (!fvActiveCats.has(cat)) return;
-    const codes = FV_CAT_GATTUNGEN[cat] || [cat];
+    const codes = catGattungen(cat);
     codes.forEach(function(g) { gattungen.add(g); });
     const axes = (fvCurrentMode === 'multiCorridor')
       ? Array.from(axisLabel.keys())
@@ -10033,8 +10100,38 @@ function toggleFvDirCheck(code) {
   renderLines();
 }
 function toggleFvCat(cat) {
+  const _warNv = fvHasNvCats();
   if (fvActiveCats.has(cat)) fvActiveCats.delete(cat); else fvActiveCats.add(cat);
   recomputeFvSelection();
+  renderLines();
+  // Nahverkehr dazu- oder weggeschaltet → Zielliste neu holen (Regional-Ziele kommen/gehen)
+  if (_warNv !== fvHasNvCats() && selectedStop) loadFvReachable(selectedStop.id);
+}
+// Die beiden Gruppen des Zug-Wizards. Fernverkehr ohne Westbahn auf ÖBB-Geräten (wie bisher).
+function fvCatGroups() {
+  var fv = FV_CATS.slice();
+  if (typeof isOebbDevice === 'function' && isOebbDevice()) {
+    fv = fv.filter(function(c) { return c !== 'WB'; });
+  }
+  return [
+    { key: 'FV', name: 'Fernverkehr', sub: 'Railjet, ICE, IC/EC, Nightjet …', cats: fv,             color: '#E2002A' },
+    { key: 'NV', name: 'Nahverkehr',  sub: 'REX, Regionalzug, S-Bahn, CJX',      cats: NV_CATS.slice(), color: '#0066B3' }
+  ];
+}
+// Knopf: alles an, wenn noch nicht alles an ist, sonst alles aus.
+function toggleFvGroup(key) {
+  var gr = fvCatGroups().filter(function(g) { return g.key === key; })[0];
+  if (!gr) return;
+  var warNv = fvHasNvCats();
+  var alleAn = gr.cats.every(function(c) { return fvActiveCats.has(c); });
+  gr.cats.forEach(function(c) { if (alleAn) fvActiveCats.delete(c); else fvActiveCats.add(c); });
+  recomputeFvSelection();
+  renderLines();
+  // Nahverkehr dazu- oder weggeschaltet → Zielliste neu holen (Regional-Ziele kommen/gehen)
+  if (warNv !== fvHasNvCats() && selectedStop) loadFvReachable(selectedStop.id);
+}
+function toggleFvGatList() {
+  fvGatListOpen = !fvGatListOpen;
   renderLines();
 }
 
@@ -10210,7 +10307,19 @@ function fvModeToggleHtml() {
 // Linienname (z.B. "RJ 540", "ICE") → FV-Zugtyp-Kategorie (FV_CATS). Spiegelt die Gattungs-Logik
 // aus dem WESTBAHN-Seed (RJ→RJX, EC→IC, EN→NJ …). null = kein Fernverkehr.
 function fvCatForLine(name) {
-  const gm = String(name || '').trim().match(/^(RJX|RJ|ICE|IC|EC|NJ|EN|IR|WB|RGJ|REGIOJET|RJET)/i);
+  const nm = String(name || '').trim();
+  // Nahverkehr zuerst pruefen: "REX" faengt sonst nicht an, aber "RE"/"R" wuerden von
+  // keiner FV-Gattung erfasst. Reihenfolge lang vor kurz (REX vor RE vor R).
+  const nv = nm.match(/^(REX|CJX|RB|RE|R|S)(?=\s|\d|$)/i);
+  if (nv) {
+    const n = nv[1].toUpperCase();
+    if (n === 'REX') return 'REX';
+    if (n === 'CJX') return 'CJX';
+    if (n === 'RB' || n === 'RE') return 'RE';
+    if (n === 'S') return 'S';
+    return 'R';
+  }
+  const gm = nm.match(/^(RJX|RJ|ICE|IC|EC|NJ|EN|IR|WB|RGJ|REGIOJET|RJET)/i);
   if (!gm) return null;
   const g = gm[1].toUpperCase();
   if (g === 'RJX' || g === 'RJ') return 'RJX';
@@ -10375,13 +10484,19 @@ function enrichFvDests() {
 // Erreichbare FV-Ziele ab Start-Bahnhof laden (gecacht pro Bahnhof)
 async function loadFvReachable(stopId) {
   if (!stopId) { fvReachable = []; fvReachableFor = null; fvReachableLoading = false; return; }
-  if (fvReachableFor === stopId && fvReachable.length) { fvReachableLoading = false; enrichFvDests(); return; }
-  fvReachableFor = stopId;
+  // Nahverkehr an → auch die Ziele anbieten, die nur mit Regionalzügen erreichbar sind.
+  // Bischofshofen: 150 statt 103 Ziele, z.B. Aich (R9), Bad Vigaun (S3), Brixlegg (REX2).
+  // Das Netz gehört in den Cache-Schlüssel, sonst bliebe nach dem Umschalten die alte Liste.
+  const _dnet = (typeof fvHasNvCats === 'function' && fvHasNvCats()) ? 'OEBBREG' : '';
+  const _dkey = stopId + '|' + _dnet;
+  if (fvReachableFor === _dkey && fvReachable.length) { fvReachableLoading = false; enrichFvDests(); return; }
+  fvReachableFor = _dkey;
   fvReachable = [];
   fvReachableLoading = true;
   if (selectedNetwork === 'WESTBAHN' && typeof renderLines === 'function') renderLines();  // Prozess: Spinner zeigen
   try {
-    const r = await fetch(FV_DEST_API + '?from=' + encodeURIComponent(stopId));
+    const r = await fetch(FV_DEST_API + '?from=' + encodeURIComponent(stopId)
+                          + (_dnet ? '&network=' + encodeURIComponent(_dnet) : ''));
     const d = await r.json();
     fvReachable = Array.isArray(d.destinations) ? d.destinations : [];
   } catch (e) { fvReachable = []; }
@@ -10446,7 +10561,10 @@ function clearFvDest() {
 function addFvDestStation() {
   if (!selectedStop || (!fvDests.length && !fvAll)) return;
   const fv = buildFvSave();                                // gewählte Zugtypen → Gattungs-Filter
-  const apiNetwork = mapNetworkForApi(selectedNetwork);    // WESTBAHN → OEBB
+  // Nur Fernverkehr → OEBB:<von>><nach> wie bisher. Sobald eine Nahverkehrs-Gattung dabei
+  // ist, muss es OEBBREG sein: OEBB liefert ausschliesslich Fernverkehr, OEBBREG alle Züge
+  // Richtung Ziel — welche davon aufs Brett kommen, entscheidet der Gattungs-Filter.
+  const apiNetwork = fvHasNvCats() ? 'OEBBREG' : mapNetworkForApi(selectedNetwork);
   // „Alle Abfahrten" (kein Ziel) → rbl ohne '>' = alle FV-Abfahrten der gewählten Zugtypen.
   const fullId = fvDests.length
     ? (apiNetwork + ':' + selectedStop.id + '>' + fvDests.map(function(d) { return d.id; }).join('~'))
@@ -22614,11 +22732,47 @@ function colourListFromRows(masterrow, timerow, fallback) {
   return cols.length ? cols.join(',') : String(fallback == null ? '' : fallback);
 }
 
+// ===== Config-Nachrichten: EINMAL laden, nicht sechsmal (Paul 01.10.2026) =====
+// Das Gerät schickt dieselbe Config mehrfach: einmal von sich aus (iframe.onload + 200 ms,
+// beide Typen) und einmal als Antwort auf JEDE unserer Anfragen (DOMContentLoaded plus bis
+// zu fünf Retries). Jede dieser Nachrichten löste einen kompletten Wiederaufbau aus, samt
+// Abfahrts-Abfrage pro Station — derselbe Stand wurde bis zu sechsmal geladen. Zwei Bremsen:
+//   1) Inhaltsgleiche Nachrichten werden verworfen (Signatur über die Nutzdaten). Die
+//      Wiederholungen des Geräts tragen Byte für Byte dasselbe, also greift das sicher.
+//   2) loadExistingConfig wartet kurz ab: kommt im selben Moment ein loadFullConfig (das ist
+//      die vollständige Fassung MIT masterrow), übernimmt nur das. Vorher liefen beide.
+// Die Übertragung bleibt dabei verlustfrei: verworfen wird nur, was identisch schon da war,
+// und die vollständige Fassung gewinnt immer über die kurze.
+var _cfgSigsSeen = {};
+var _fullCfgSeen = false;
+var _configMsgSeen = false;   // true, sobald das Gerät IRGENDEINE Config geschickt hat
+function _cfgSignature(data) {
+  try {
+    if (data.type === 'loadFullConfig') return 'full|' + JSON.stringify(data.config || {});
+    return 'exist|' + ['rbl', 'filter', 'masterrow', 'timerow', 'linegroups',
+                       'linefilterdestination', 'roworderdestination']
+      .map(function(k) { return String(data[k] == null ? '' : data[k]); }).join('\u0001');
+  } catch (e) { return null; }
+}
+
 async function handleConfigMessage(data) {
+  _configMsgSeen = true;   // sofort, nicht erst wenn der Wiederaufbau fertig ist
   // ÖBB-gebrandete Geräte erkennen: die Geräteseite schickt brand in loadExistingConfig mit.
   if (data.type === 'loadExistingConfig' && typeof noteDeviceBrand === 'function') noteDeviceBrand(data.brand);
 
+  // Gleiche Nachricht schon einmal verarbeitet (oder gerade in Arbeit)? Dann nichts tun.
+  var _sig = _cfgSignature(data);
+  if (_sig) {
+    if (_cfgSigsSeen[_sig]) { console.log('[config] identische Nachricht erneut erhalten, übersprungen'); return; }
+    _cfgSigsSeen[_sig] = true;
+  }
+  if (data.type === 'loadFullConfig' && (data.config && (data.config.rbl_id || data.config.rbl))) _fullCfgSeen = true;
+
   if (data.type === 'loadExistingConfig') {
+    // Kurz Luft lassen: das Gerät schickt loadFullConfig im selben Atemzug hinterher.
+    // Ist es da, ist dieser Aufbau überflüssig — die volle Fassung macht dasselbe und mehr.
+    await new Promise(function(r) { setTimeout(r, 300); });
+    if (_fullCfgSeen) { console.log('[config] loadFullConfig übernimmt, loadExistingConfig übersprungen'); return; }
     // Load Wien data first if any WL stations.
     // Wien wird jetzt mit WL:-Prefix gesendet → erkenne Wien an "WL:" ODER (Alt-Config)
     // an nackten numerischen IDs. Nicht mehr "kein Doppelpunkt = Wien" annehmen.
@@ -22891,7 +23045,11 @@ function requestConfigFromParent() {
 }
 
 function checkAndRetryConfig() {
-  if (_configReceived || stations.length > 0) {
+  // Sobald ÜBERHAUPT eine Config-Nachricht da war, nicht mehr nachfragen. Vorher galt die
+  // Config erst als erhalten, wenn der Wiederaufbau fertig war — der dauert mit den
+  // Abfahrts-Abfragen aber Sekunden, in denen die Retries munter weiterliefen und jedes Mal
+  // einen weiteren Wiederaufbau anstießen (Paul 01.10.2026: "lädt 6x nach").
+  if (_configReceived || _configMsgSeen || stations.length > 0) {
     return;
   }
 
