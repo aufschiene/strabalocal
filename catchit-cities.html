@@ -297,6 +297,15 @@
       text-shadow: 0 2px 10px rgba(0,0,0,0.6);
       line-height: 1;
     }
+    /* Marken-Startseiten (bodo): Titel mittig statt links im Banner */
+    .display-hero .hero-title.hero-title-center { left: 0; right: 0; text-align: center; }
+    /* Marken-Gerät mit nur EINEM Verkehrsbetrieb: der Zurück-Knopf der Stationssuche
+       führte zur Netz-Auswahl, also zu fremden Verkehrsbetrieben. Auf solchen Geräten
+       soll nur der eigene Betrieb möglich sein (Paul 01.10.2026). */
+    body.brand-locked #searchBackBtn { display: none; }
+    /* Dieselbe Sperre fuer die Brotkrumen: „Region" und „Deutschland" sind Links in die
+       Netz-Auswahl, und „Baden-Wuerttemberg" passt auf einem bodo-Geraet ohnehin nicht. */
+    body.brand-locked #breadcrumb { display: none; }
     
     /* Network Brand Colors */
     .network-badge {
@@ -3006,7 +3015,7 @@
   
   <!-- Step 3: Search Station (für normale Netze) -->
   <div class="card hidden" id="stepSearch">
-    <button class="back-btn" onclick="goBack('network')">Zurück</button>
+    <button class="back-btn" id="searchBackBtn" onclick="goBack('network')">Zurück</button>
     <h2 id="searchTitle">Station suchen</h2>
     <div id="vonStepBox">
       <div class="vn-label hidden" id="vonStepLabel">Von &middot; Startbahnhof wählen</div>
@@ -3598,6 +3607,13 @@
       <div class="form-row" id="ftKompaktDisplayRow" style="display:none;">
         <div><div class="form-label">Display</div><div class="form-hint">In welchem Stil alles angezeigt wird</div></div>
         <select id="ftKompaktDisplay" onchange="ftSetKompaktDisplay(this.value)" style="padding:6px 10px;border-radius:8px;border:1px solid #ddd;font-size:14px;"></select>
+      </div>
+      <!-- Marken-Geräte (bodo): statt Dropdown drei Karten mit Vorschau, wie die
+           Kompakt/Spielerisch-Karten oben (Paul 01.10.2026, "weils nur 3 Buttons sind"). -->
+      <div id="ftBrandDisplayChoice" style="display:none;">
+        <div class="form-label" style="margin-bottom:4px;">Display</div>
+        <div class="form-hint" style="margin-bottom:10px;">In welchem Stil alles angezeigt wird</div>
+        <div class="display-style-grid" id="ftBrandDisplayGrid"></div>
       </div>
       <!-- Zuordnung (nur Spielerisch): Automatisch oder pro Station -->
       <div class="form-row" id="ftZuordnungRow">
@@ -6197,6 +6213,7 @@ DISPLAY_PRESETS.bodo = {
   hideInChooser: true,
   photo: 'fotos/baden württemberg.jpg',
   photoPos: 'center top',
+  heroCenter: true,
   title: 'Deine bodo-Station einstellen',
   intro: 'Wähle, welche Busse und Bahnen an deiner Station angezeigt werden.',
   leaveLabel: 'Weitere Stationen in Deutschland einstellen',
@@ -6380,6 +6397,14 @@ function _setHero(preset) {
   var hero = document.getElementById('displayHero');
   var title = document.getElementById('displayHeroTitle');
   if (!hero || !title) return;
+  title.classList.toggle('hero-title-center', !!(preset && preset.heroCenter));
+  // Marken-Gerät, dessen Preset nur EIN Netz kennt (bodo): Stationssuche ohne Zurück-Knopf,
+  // sonst landet der Kunde bei den anderen Verkehrsbetrieben.
+  try {
+    document.body.classList.toggle('brand-locked', !!preset &&
+      typeof isBrandDevice === 'function' && isBrandDevice() &&
+      (preset.networks || []).filter(function(e) { return isNetworkEnabled(e.id); }).length === 1);
+  } catch (e) {}
   if (preset) {
     // Fallback-Hintergrundfarbe = Brand-Farbe des ersten Netzes (zeigt sich falls Foto fehlt)
     var firstNet = preset.networks && preset.networks[0];
@@ -14700,16 +14725,93 @@ function setFtCompactSeparate(mode) {
 // (fcSlotVisible — nur benannte/benutzte Slots erscheinen, mit eigenem Namen), am Ende
 // EIN Eintrag "+ Eigenes Display erstellen", der direkt den Design-Wizard öffnet
 // (statt leerer Slot-Einträge, deren Konfiguration weiter unten versteckt war).
+// Marken-Geräte bekommen eine feste, kurze Display-Auswahl statt der ganzen Liste.
+// bodo (Paul 01.10.2026): Blau/Gelb, Orange Matrix und die ÖBB-Anzeige, letztere unter
+// dem neutralen Namen „Bahnhofsanzeige". Reihenfolge = Reihenfolge der Karten.
+var BRAND_DISPLAY_TYPES = { BODO: [7, 23, 12] };
+var BRAND_DISPLAY_NAMES = { BODO: { 12: 'Bahnhofsanzeige', 23: 'Orange Matrix' } };
+function brandDisplayTypes() {
+  var b = (typeof deviceBrand === 'function') ? deviceBrand() : '';
+  var l = BRAND_DISPLAY_TYPES[b];
+  return (l && l.length) ? l : null;
+}
+function brandDisplayName(cid) {
+  var b = (typeof deviceBrand === 'function') ? deviceBrand() : '';
+  var m = BRAND_DISPLAY_NAMES[b];
+  return (m && m[cid]) ? m[cid] : null;
+}
+
+// Kurztexte unter den Karten-Namen. Bewusst in Kundensprache, nicht in Technik.
+var BRAND_DISPLAY_DESC = {
+  7:  'Blaues Brett, weiße Schrift, der bodo-Look.',
+  23: 'Orange Punktmatrix auf Schwarz, wie am Bahnsteig.',
+  12: 'Blau-weiß wie am Bahnhof, erste Abfahrt groß.'
+};
+
+// Mini-Vorschau einer Display-Art, im selben Look wie die Kompakt/Spielerisch-Karten.
+function brandDisplayPreviewHtml(cid) {
+  if (cid === 12) {
+    return '<div class="style-preview"><div class="preview-frame oebb">' +
+             '<div class="oebb-header"><span class="oebb-clock">12:06</span></div>' +
+             '<div class="line primary"><span class="num">RE</span><span class="dest">Ulm Hbf</span><span class="min">12\'</span></div>' +
+             '<div class="line secondary"><span class="num">RB</span><span class="dest">Aulendorf</span><span class="min">7\'</span></div>' +
+           '</div></div>';
+  }
+  if (cid === 23) {
+    return '<div class="style-preview"><div class="preview-frame bvg">' +
+             '<div class="line"><span class="num">1</span><span class="dest">Weissenau</span><span class="min">2</span></div>' +
+             '<div class="line"><span class="num">4</span><span class="dest">Oberzell</span><span class="min">5</span></div>' +
+             '<div class="line"><span class="num">RE</span><span class="dest">Ulm Hbf</span><span class="min">8</span></div>' +
+           '</div></div>';
+  }
+  return '<div class="style-preview"><div class="preview-frame" style="background:#1e2328;color:#fff;">' +
+           '<div class="line"><span class="num" style="background:#0089cf;color:#fff;border-radius:3px;padding:1px 4px;">1</span><span class="dest">Weissenau</span><span class="min">2\'</span></div>' +
+           '<div class="line"><span class="num" style="background:#0089cf;color:#fff;border-radius:3px;padding:1px 4px;">4</span><span class="dest">Oberzell</span><span class="min">5\'</span></div>' +
+           '<div class="line"><span class="num" style="background:#0089cf;color:#fff;border-radius:3px;padding:1px 4px;">RE</span><span class="dest">Ulm Hbf</span><span class="min">8\'</span></div>' +
+         '</div></div>';
+}
+
+// Karten statt Dropdown. Aktuell gewählte Art = ftColorSelect, sonst die der ersten Station.
+function renderBrandDisplayChoice() {
+  var grid = document.getElementById('ftBrandDisplayGrid');
+  var list = brandDisplayTypes();
+  if (!grid || !list) return;
+  var colSel = document.getElementById('ftColorSelect');
+  var cur = colSel ? colSel.value : '';
+  if ((!cur || cur === '') && typeof stations !== 'undefined' && stations[0]) {
+    cur = String(stationDisplayColour(stations[0]));
+  }
+  grid.innerHTML = list.map(function(cid) {
+    var aktiv = (parseInt(cur) === cid) ? ' active' : '';
+    return '<button class="display-style-btn' + aktiv + '" data-value="' + cid + '" onclick="ftSetBrandDisplay(' + cid + ')">' +
+             brandDisplayPreviewHtml(cid) +
+             '<div class="label-box">' +
+               '<div class="name">' + escapeHtmlFt(ftDisplayName(cid)) + '</div>' +
+               '<div class="desc">' + escapeHtmlFt(BRAND_DISPLAY_DESC[cid] || '') + '</div>' +
+             '</div>' +
+           '</button>';
+  }).join('');
+}
+
+function ftSetBrandDisplay(cid) {
+  ftSetKompaktDisplay(String(cid));
+  renderBrandDisplayChoice();
+}
+
 function displayTypeOptionsHtml(selectedCid) {
   var html = '';
+  var nurMarke = brandDisplayTypes();
   Object.keys(DISPLAY_TYPE_FEATURES).forEach(function(k) {
+    // Marken-Gerät: nur die freigegebenen Arten (die aktuell gewählte bleibt immer drin,
+    // damit eine ältere Config beim Laden nicht stillschweigend umspringt).
+    if (nurMarke && nurMarke.indexOf(parseInt(k)) < 0 && parseInt(k) !== parseInt(selectedCid)) return;
     if (DISPLAY_TYPE_FEATURES[k].offline) return;
     // ÖBB-Geräte: kein Westbahn-Design zur Auswahl (außer es ist schon gewählt)
     if (parseInt(k) === 14 && isOebbDevice() && parseInt(selectedCid) !== 14) return;
     if (typeof fcSlotVisible === 'function' && !fcSlotVisible(parseInt(k))) return;
     html += '<option value="' + k + '"' + (parseInt(k) === parseInt(selectedCid) ? ' selected' : '') + '>' + escapeHtmlFt(ftDisplayName(parseInt(k))) + '</option>';
   });
-  if (typeof fcFreeSlot === 'function' && fcFreeSlot() != null) {
+  if (!nurMarke && typeof fcFreeSlot === 'function' && fcFreeSlot() != null) {
     html += '<option value="newcustom">+ Eigenes Display erstellen</option>';
   }
   return html;
@@ -14801,8 +14903,13 @@ function updateStyleAssignmentUI() {
   // bisherigen Verhalten: dort hat jedes sein eigenes Dropdown.
   var einDisplay = (typeof getUniqueDisplayTypes === 'function') && getUniqueDisplayTypes().length <= 1;
   var kompaktSelector = !ftIsManualAssignment && (einDisplay || (kompakt && !instMode));
-  if (kRow) kRow.style.display = kompaktSelector ? '' : 'none';
-  if (kompaktSelector) populateKompaktDisplay();
+  // Marken-Gerät: drei Karten mit Vorschau statt des Dropdowns.
+  var markenKarten = kompaktSelector && !!brandDisplayTypes();
+  var bChoice = document.getElementById('ftBrandDisplayChoice');
+  if (bChoice) bChoice.style.display = markenKarten ? '' : 'none';
+  if (kRow) kRow.style.display = (kompaktSelector && !markenKarten) ? '' : 'none';
+  if (markenKarten) renderBrandDisplayChoice();
+  else if (kompaktSelector) populateKompaktDisplay();
   // Auffangnetz: Bliebe die Karte ohne sichtbaren Inhalt, wäre nur noch die Überschrift
   // zu sehen — dann lieber ganz ausblenden statt eine leere Karte zu zeigen.
   try {
@@ -15182,6 +15289,9 @@ function fcName(cid) {
 function ftDisplayName(cid) {
   var f = DISPLAY_TYPE_FEATURES[cid] || {};
   if (f.customColors) { var n = fcName(cid); if (n) return n; }
+  // Marken-Geräte benennen einzelne Arten um (bodo: ÖBB-Anzeige = „Bahnhofsanzeige")
+  var bn = (typeof brandDisplayName === 'function') ? brandDisplayName(cid) : null;
+  if (bn) return bn;
   return f.name || 'Display';
 }
 
