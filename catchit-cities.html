@@ -6105,9 +6105,7 @@ var DISPLAY_PRESETS = {
       // Überlandbusse rund um Wien (VOR-Regionalbusse, z.B. 200er/300er/400er Richtung
       // NÖ): liefen bisher nur über die NÖ-Kachel, Wiener Umland-Kunden suchten sie hier.
       { id: 'VOR',           label: 'Überlandbus', desc: 'Regionalbusse rund um Wien (VOR)', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_NOE' } },
-      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
-      { id: 'OEBB_FERN',     jumpTo: { region: 'AT' } },
-      { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
+      { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', jumpTo: { region: 'AT' } }
     ]
   },
   lichtenstein: {
@@ -6125,8 +6123,7 @@ var DISPLAY_PRESETS = {
     photo: 'fotos/Oberösterreich.jpg',
     networks: [
       { id: 'OOEVV',         label: 'Bus & Tram', desc: 'Linz, Wels, Gmunden, Steyr …', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_OOE' } },
-      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
-      { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
+      { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', jumpTo: { region: 'AT' } }
     ]
   },
   stmk: {
@@ -6136,8 +6133,7 @@ var DISPLAY_PRESETS = {
     photo: 'fotos/GRAZ.jpg',
     networks: [
       { id: 'STVG',          jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_STMK' } },
-      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
-      { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
+      { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', jumpTo: { region: 'AT' } }
     ]
   },
   sbg: {
@@ -6147,8 +6143,7 @@ var DISPLAY_PRESETS = {
     photo: 'fotos/Salzburg.jpg',
     networks: [
       { id: 'SALZBURG',      jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_SBG' } },
-      { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
-      { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
+      { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', jumpTo: { region: 'AT' } }
     ]
   }
 };
@@ -6167,8 +6162,7 @@ DISPLAY_PRESETS.tirol = {
   networks: [
     { id: 'VVT',           label: 'Tirol (VVT)',      desc: 'Bus, Tram, Bahn (Innsbruck, Kufstein …)',   jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_T' } },
     { id: 'VVV',           label: 'Vorarlberg (VVV)', desc: 'Bus, Bahn (Bregenz, Dornbirn, Feldkirch …)', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_T' } },
-    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
-    { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
+    { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', jumpTo: { region: 'AT' } }
   ]
 };
 
@@ -6180,9 +6174,8 @@ DISPLAY_PRESETS.noe = {
   photo: 'fotos/oebb regio.JPG',
   networks: [
     { id: 'VOR',          label: 'Bus & Tram',  desc: 'St. Pölten, Wr. Neustadt, Mödling …', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_NOE' } },
-    { id: 'OEBB_REG_NOE', label: 'ÖBB',         desc: 'S-Bahn, REX, Regionalzug', jumpTo: { region: 'AT' } },
-    { id: 'WLB',          label: 'Badner Bahn', desc: 'Wien ↔ Baden',             jumpTo: { region: 'AT' } },
-    { id: 'WESTBAHN',     jumpTo: { region: 'AT' } }
+    { id: 'WLB',      label: 'Badner Bahn', desc: 'Wien ↔ Baden', jumpTo: { region: 'AT' } },
+    { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', jumpTo: { region: 'AT' } }
   ]
 };
 
@@ -6194,8 +6187,7 @@ DISPLAY_PRESETS.burgenland = {
   photo: 'fotos/Burgenland.jpg',
   networks: [
     { id: 'VOR',           label: 'Bus & Tram', desc: 'Eisenstadt, Neusiedl, Oberwart …', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_BGLD' } },
-    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
-    { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
+    { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', jumpTo: { region: 'AT' } }
   ]
 };
 
@@ -6207,14 +6199,17 @@ DISPLAY_PRESETS.kaernten = {
   photo: 'fotos/Kaerten.jpg',
   networks: [
     { id: 'KAERNTEN',     label: 'Kärntner Linien', desc: 'Bus (Klagenfurt, Villach …)', jumpTo: { region: 'AT', verkehrsart: 'stadt', subRegion: 'AT_K' } },
-    { id: 'OEBB_REGIONAL', jumpTo: { region: 'AT' } },
-    { id: 'WESTBAHN',      jumpTo: { region: 'AT' } }
+    { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', jumpTo: { region: 'AT' } }
   ]
 };
 
-// Westbahn — eigener Button bei den österreichischen Bundesländern (Wien Westbf ↔ Salzburg)
+// Züge — eigene Kachel in der österreichischen Bundesland-Auswahl. Früher hiess sie
+// „Fernverkehr“ und stand neben einer zweiten Kachel „Regionalverkehr“. Die Trennung in
+// nah und fern hat der Kunde nicht verstanden, er denkt in Betreibern (Paul 01.10.2026).
+// Dahinter liegt derselbe Zug-Ablauf, der seit 01.10.2026 beides kann: zwei Knoepfe
+// Fernverkehr und Nahverkehr plus die Liste der einzelnen Gattungen.
 DISPLAY_PRESETS.westbahn = {
-  name: 'Fernverkehr',
+  name: 'Züge',
   parent: 'AT',
   photo: 'fotos/westbahn.jpg',
   networks: [
@@ -6223,7 +6218,8 @@ DISPLAY_PRESETS.westbahn = {
 };
 
 // ÖBB-gebrandete Geräte (Firmware-Brand OEBB, siehe isOebbDevice): eigene Startseite statt
-// Länder-/Bundesland-Auswahl. Titel + zwei Knöpfe Regional-/Fernverkehr, kein Westbahn-Knopf;
+// Länder-/Bundesland-Auswahl. Titel + EIN Knopf „Züge“ (früher zwei, Regional- und
+// Fernverkehr getrennt, Paul 01.10.2026: der Kunde denkt in Betreibern, nicht in nah/fern);
 // „Weitere lokale Stationen" führt in die normale Österreich-Ansicht. Nicht im Bundesland-
 // Chooser (hideInChooser). Foto: Railjet im Murtal (fotos/oebb_marketing.jpg, Paul 18.09.2026;
 // vorher fotos/oebb.jpg = ÖBB-Intercity). Neuer Dateiname, weil das Release-Tool Fotos nie überschreibt.
@@ -6237,9 +6233,9 @@ DISPLAY_PRESETS.oebb = {
   intro: 'Wähle, welche Züge an deinem Bahnhof angezeigt werden.',
   leaveLabel: 'Weitere lokale Stationen (Straßenbahn/Bus) einstellen',
   leaveAsButton: true,
+  noAutoJump: true,   // eine Kachel, aber die Seite bleibt stehen (siehe renderDisplayPreset)
   networks: [
-    { id: 'OEBB_REGIONAL', label: 'Regionalverkehr', desc: 'S-Bahn, REX, Regionalzug',     color: { bg: '#E2001A', fg: '#fff' }, jumpTo: { region: 'AT' } },
-    { id: 'WESTBAHN',      label: 'Fernverkehr',     desc: 'Railjet, Intercity, Nightjet', color: { bg: '#E2001A', fg: '#fff' }, jumpTo: { region: 'AT' } }
+    { id: 'WESTBAHN', label: 'Züge', desc: 'ÖBB, Westbahn, RegioJet', color: { bg: '#E2001A', fg: '#fff' }, jumpTo: { region: 'AT' } }
   ]
 };
 
@@ -6268,6 +6264,7 @@ DISPLAY_PRESETS.bodo = {
   intro: 'Wähle, welche Busse und Bahnen an deiner Station angezeigt werden.',
   leaveLabel: 'Weitere Stationen in Deutschland einstellen',
   leaveAsButton: true,
+  lockToBrand: true,   // nur bodo, kein Weg zu fremden Verkehrsbetrieben (siehe brandLockedDevice)
   networks: [
     { id: 'BWEGT', label: 'bodo', desc: 'Bus und Bahn im Verbund', color: { bg: '#FFE92E', fg: '#00305B' }, jumpTo: { region: 'DE' } }
   ]
@@ -6482,7 +6479,10 @@ function renderDisplayPreset(displayKey) {
   // „Linien wählen"-Zwischenschritt ist überflüssig → direkt zur Stationssuche.
   var enabledNets = preset.networks.filter(function(e) { return isNetworkEnabled(e.id); });
   var siblingCount = Object.keys(DISPLAY_PRESETS).filter(function(k){ return DISPLAY_PRESETS[k].parent === preset.parent; }).length;
-  if (enabledNets.length === 1 && siblingCount > 1) {
+  // Marken-Startseiten (ÖBB, bodo) ÜBERSPRINGEN NICHT, auch wenn nur ein Netz übrig ist:
+  // an ihnen hängt der Knopf „Weitere lokale Stationen“, der beim Durchspringen verschwindet
+  // (aufgefallen beim Zusammenlegen auf EINE Züge-Kachel, 01.10.2026).
+  if (enabledNets.length === 1 && siblingCount > 1 && !preset.noAutoJump) {
     activeDisplayPreset = displayKey;
     presetAutoJumped = true;
     // Andere Cards (Bundesland-Chooser etc.) ausblenden — nur Hero + Suche zeigen
@@ -6729,10 +6729,7 @@ function isBrandDevice() { return !!brandStartPreset(); }
 function brandLockedDevice() {
   var k = brandStartPreset();
   if (!k) return false;
-  try {
-    return (DISPLAY_PRESETS[k].networks || [])
-      .filter(function(e) { return isNetworkEnabled(e.id); }).length === 1;
-  } catch (e) { return false; }
+  try { return !!DISPLAY_PRESETS[k].lockToBrand; } catch (e) { return false; }
 }
 function applyBrandLock() {
   try { document.body.classList.toggle('brand-locked', brandLockedDevice()); } catch (e) {}
