@@ -3675,20 +3675,6 @@
            Gerätevorschau pro Stadt öffnet. Der alte Instanz-Modus (Gruppieren AUS)
            bleibt für bereits so gespeicherte Configs erhalten, ist aber nicht mehr
            einschaltbar. -->
-      <!-- Alles auf EIN Display: Stationen verschiedener Betreiber in EIN Segment
-           (komma-gejointe rbls über Netzgrenzen hinweg). Der Server beantwortet so eine
-           gemischte Abfrage, geprüft mit BWEGT + BERLIN in einem Aufruf (01.10.2026).
-           Aus = wie bisher, ein Display je Betreiber. -->
-      <div class="form-row" id="ftAllOneRow" style="display:none;">
-        <div>
-          <div class="form-label">Alles auf einem Display</div>
-          <div class="form-hint">An = alle Haltestellen in einer Anzeige, auch über Betreiber hinweg</div>
-        </div>
-        <div class="toggle-row" id="ftAllOneToggle">
-          <button class="toggle-btn active" data-value="0" onclick="setFtAllOneDisplay(0)">Aus</button>
-          <button class="toggle-btn" data-value="1" onclick="setFtAllOneDisplay(1)">An</button>
-        </div>
-      </div>
       <div class="form-row" id="ftGroupByCityRow" style="display:none;">
         <div>
           <div class="form-label">Nach Städten gruppiert</div>
@@ -13954,13 +13940,10 @@ function cityGroupNetwork(net) {
 // lässt mich aber nur ein Display pro Provider").
 var ftAllOneDisplay = false;
 function setFtAllOneDisplay(an) {
+  // Wird nicht mehr direkt bedient: die Entscheidung hängt an den Karten Kompakt
+  // und Spielerisch (setFtCompactSeparate). Bleibt für den Lade-Pfad.
   ftAllOneDisplay = (String(an) === '1');
-  var btns = document.querySelectorAll('#ftAllOneToggle .toggle-btn');
-  btns.forEach(function(b) { b.classList.toggle('active', (b.dataset.value === '1') === ftAllOneDisplay); });
-  if (ftAllOneDisplay) ftGroupByCity = true;   // Instanz-Modus und Alles-auf-eins vertragen sich nicht
-  if (typeof updateStyleAssignmentUI === 'function') updateStyleAssignmentUI();
-  if (typeof renderDisplayTypeSections === 'function') renderDisplayTypeSections();
-  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
+  if (ftAllOneDisplay) ftGroupByCity = true;
 }
 function cityGroupKeyOf(s) {
   if (!s || s.network === 'WL' || s.network === 'WLB') return null;
@@ -14022,16 +14005,9 @@ function updateGroupByCityUI() {
   if (!row) return;
   var multi = (typeof stations !== 'undefined' && stations.length >= 2);
   row.style.display = multi ? '' : 'none';
-  // "Alles auf einem Display" nur anbieten, wenn überhaupt mehrere Betreiber im Spiel sind
-  var allOneRow = document.getElementById('ftAllOneRow');
-  if (allOneRow) {
-    var netze = {};
-    (typeof stations !== 'undefined' ? stations : []).forEach(function(s) { netze[cityGroupNetwork(s.network || '')] = 1; });
-    var mehrereBetreiber = Object.keys(netze).length > 1;
-    allOneRow.style.display = (multi && mehrereBetreiber && mergedSegmentsSupported()) ? '' : 'none';
-    var ab = document.querySelectorAll('#ftAllOneToggle .toggle-btn');
-    ab.forEach(function(b) { b.classList.toggle('active', (b.dataset.value === '1') === ftAllOneDisplay); });
-  }
+  // Kompakt heisst: EIN Display fuer alles. Dann gibt es nichts zuzuweisen, die
+  // Staedte-Zeile mit dem Zuweisen-Knopf waere nur verwirrend.
+  if (ftAllOneDisplay) { row.style.display = 'none'; return; }
   if (assign) assign.style.display = 'none';
   if (!multi) return;
   if (!mergedSegmentsSupported()) {
@@ -14229,6 +14205,27 @@ function awPageMap(grp) {
       });
       if (!hat) st.pageOf[awStationKey(s) + '|*'] = page;
     });
+    // Kapazitaet beachten: mehr Linien als Zeilen passen nicht auf eine Seite, die
+    // uebrigen rutschen auf die naechste (Paul 02.10.2026: "wenn 5 Zeilen sind, sollen
+    // maximal 5 Linien je Seite verfuegbar sein"). Nur beim ERSTEN Aufbau; eine vom
+    // Benutzer gesetzte Zuordnung wird nie umsortiert.
+    // Hier bewusst die Gruppen-Farbe statt awPageTypeOf: letzteres ruft awPageTypes,
+    // das wieder hier hereinliefe.
+    var _max = 0;
+    try {
+      var _r = parseInt(rowsForColour(awEffColour(grp)));
+      _max = (isNaN(_r) || _r < 1) ? 0 : _r;
+    } catch (e) { _max = 0; }
+    if (_max > 0) {
+      var _proSeite = {};
+      awPageRows(grp).forEach(function(r) {
+        var p = st.pageOf[r.key];
+        if (p == null || p === 0) return;
+        while ((_proSeite[p] || 0) >= _max) p++;
+        _proSeite[p] = (_proSeite[p] || 0) + 1;
+        st.pageOf[r.key] = p;
+      });
+    }
   }
   return st.pageOf;
 }
@@ -14307,11 +14304,31 @@ function awMoveRow(netId, key, richtung) {
   awRefreshCard(grp.net);
 }
 
+// Wie viele Zeilen zeigt das Display dieser Seite? Mehr Linien passen nicht drauf.
+function awMaxRowsOfPage(grp, page) {
+  try {
+    var cid = awPageTypeOf(grp, page);
+    var r = (typeof rowsForColour === 'function') ? parseInt(rowsForColour(cid)) : NaN;
+    return (isNaN(r) || r < 1) ? 0 : r;   // 0 = unbekannt, dann nicht begrenzen
+  } catch (e) { return 0; }
+}
 function awSetStationPage(netId, key, val) {
   var grp = awNetByNetId(netId);
   if (!grp) return;
   var p = parseInt(val);
-  awPageMap(grp)[key] = isNaN(p) ? 1 : p;   // 0 = keine Seite (bewusst erlaubt)
+  if (isNaN(p)) p = 1;
+  if (p > 0) {
+    var pageOf = awPageMap(grp);
+    var max = awMaxRowsOfPage(grp, p);
+    var belegt = awPageRows(grp).filter(function(r) { return r.key !== key && (pageOf[r.key] || 1) === p; }).length;
+    if (max > 0 && belegt >= max) {
+      alert('Seite ' + p + ' zeigt ' + max + ' Zeilen und ist voll. Nimm eine andere Seite, '
+          + 'oder stell das Display dieser Seite auf mehr Zeilen.');
+      awRefreshCard(grp.net);
+      return;
+    }
+  }
+  awPageMap(grp)[key] = p;   // 0 = keine Seite (bewusst erlaubt)
   awRefreshCard(grp.net);
 }
 // Gruppen-Stationen im globalen stations-Array durch eine neue Liste ersetzen (an der
@@ -14333,14 +14350,12 @@ function awPagesHtml(grp) {
   if (awPagesFixed(grp) || awPageRows(grp).length < 2) return '';
   var netId = awNetId(grp.net);
   var st = awState(grp.net);
-  var mode = (st.pages != null) ? st.pages : awPagesModeOf(grp);
-  var h = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0 2px;">';
-  h += '<span style="font-size:12.5px;font-weight:600;">Seiten</span>';
-  h += '<div class="toggle-row" style="flex:0 0 auto;">';
-  [['city', 'Eine Seite'], ['split', 'Aufteilen']].forEach(function(o) {
-    h += '<button class="toggle-btn' + (mode === o[0] ? ' active' : '') + '" style="padding:6px 10px;font-size:12px;" onclick="awSetPages(\'' + netId + '\',\'' + o[0] + '\')">' + o[1] + '</button>';
-  });
-  h += '</div></div>';
+  // Der Umschalter "Eine Seite / Aufteilen" ist weg (Paul 02.10.2026: "das sieht man ja
+  // eh durch Seite 1 oder 2"). Die Liste steht immer da; liegt alles auf Seite 1, ist das
+  // eine Seite. Intern laeuft es deshalb immer ueber den Seiten-Weg.
+  st.pages = 'split';
+  var mode = 'split';
+  var h = '<div style="padding:8px 0 2px;"><span style="font-size:12.5px;font-weight:600;">Seiten</span></div>';
   if (mode === 'split') {
     var pageOf = awPageMap(grp);
     var rows = awPageRows(grp);
@@ -14383,7 +14398,16 @@ function awPagesHtml(grp) {
         };
         h += '<span style="display:inline-flex;gap:3px;flex:0 0 auto;">' + _btn('&#9650;', -1, _ersteDerSeite) + _btn('&#9660;', 1, _letzteDerSeite) + '</span>';
         h += '<select onchange="awSetStationPage(\'' + netId + '\',\'' + escapeHtmlFt(row.key).replace(/'/g, '') + '\',this.value)" style="flex:0 0 auto;padding:5px 8px;border-radius:8px;border:1px solid #ddd;font-size:12px;font-family:inherit;">';
-        for (var q = 1; q <= n; q++) h += '<option value="' + q + '"' + ((pageOf[row.key] || 1) === q ? ' selected' : '') + '>Seite ' + q + '</option>';
+        for (var q = 1; q <= n; q++) {
+          // Volle Seiten sperren: mehr Linien als Zeilen passen nicht aufs Display
+          // (Paul 02.10.2026: "wenn 5 Zeilen sind, maximal 5 Linien je Seite").
+          var _max = awMaxRowsOfPage(grp, q);
+          var _belegt = rows.filter(function(r) { return (pageOf[r.key] || 1) === q; }).length;
+          var _istMeine = ((pageOf[row.key] || 1) === q);
+          var _voll = (!_istMeine && _max > 0 && _belegt >= _max);
+          h += '<option value="' + q + '"' + (_istMeine ? ' selected' : '') + (_voll ? ' disabled' : '')
+             + '>Seite ' + q + (_voll ? ' (voll)' : '') + '</option>';
+        }
         // "Keine Seite" (Paul 24.09.2026): eine Richtung aus der Anzeige nehmen, ohne sie
         // in der Linien-Auswahl abwählen zu müssen. Sie bleibt im Dialog sichtbar und ist
         // jederzeit wieder einer Seite zuzuordnen.
@@ -14954,9 +14978,15 @@ function setFtCompactSeparate(mode) {
   var btns = document.querySelectorAll('#ftCompactSeparateToggle .toggle-btn');
   btns.forEach(function(b) { b.classList.toggle('active', b.dataset.value === mode); });
   ftIsMultiDisplay = (mode === 'separate');
-  // Kompakt = EIN Display: keine per-Station-Zuordnung (Automatisch/Manuell), stattdessen
-  // ein einzelner Display-Wähler.
-  if (!ftIsMultiDisplay) ftIsManualAssignment = false;
+  // Kompakt = EIN Display für ALLES, auch über Betreiber hinweg: ein Display-Typ, ein
+  // Segment, eine Anzeige. Spielerisch = ein Display je Stadt/Betreiber, zuweisbar im
+  // Dialog (Paul 02.10.2026: "ich nehme einfach Matrix und haue alle Städte auf ein
+  // Display, das soll im Schritt davor entschieden werden").
+  ftAllOneDisplay = !ftIsMultiDisplay;
+  if (!ftIsMultiDisplay) {
+    ftIsManualAssignment = false;
+    ftGroupByCity = true;    // Instanz-Modus aus, sonst bliebe der Display-Wähler verborgen
+  }
   updateStyleAssignmentUI();
   renderDisplayTypeSections();
   if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
@@ -15225,6 +15255,14 @@ function ftSetKompaktDisplay(val) {
 // Sichtbarkeit von Zuordnung (Spielerisch) vs. Einzel-Display-Wähler (Kompakt).
 function updateStyleAssignmentUI() {
   var kompakt = !ftIsMultiDisplay;
+  // Die Karten Kompakt/Spielerisch IMMER am Zustand ausrichten: beim Laden einer Config
+  // werden die Schalter direkt gesetzt, nicht über den Karten-Klick — ohne das stand
+  // danach keine Karte aktiv da.
+  try {
+    document.querySelectorAll('.display-style-btn[data-value]').forEach(function(b) {
+      b.classList.toggle('active', (b.dataset.value === 'compact') === kompakt);
+    });
+  } catch (e) {}
   var zRow = document.getElementById('ftZuordnungRow');
   var mAssign = document.getElementById('ftManualAssignment');
   var kRow = document.getElementById('ftKompaktDisplayRow');
@@ -15249,6 +15287,12 @@ function updateStyleAssignmentUI() {
   // bisherigen Verhalten: dort hat jedes sein eigenes Dropdown.
   var einDisplay = (typeof getUniqueDisplayTypes === 'function') && getUniqueDisplayTypes().length <= 1;
   var kompaktSelector = !ftIsManualAssignment && (einDisplay || (kompakt && !instMode));
+  // Spielerisch: der Display-Typ wird je Seite im Zuweisen-Dialog gewaehlt, der globale
+  // Waehler gehoert dann nicht mehr ins Hauptmenue (Paul 02.10.2026). Ausnahme: nur EINE
+  // Station, dann gibt es keinen Zuweisen-Dialog und der Waehler ist der einzige Weg.
+  var _zuweisenDa = (typeof stations !== 'undefined' && stations.length >= 2)
+                    && (typeof mergedSegmentsSupported === 'function' && mergedSegmentsSupported());
+  if (ftIsMultiDisplay && _zuweisenDa) kompaktSelector = false;
   // Marken-Gerät: drei Karten mit Vorschau statt des Dropdowns.
   var markenKarten = kompaktSelector && !!brandDisplayTypes();
   var bChoice = document.getElementById('ftBrandDisplayChoice');
@@ -21806,6 +21850,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       return Object.keys(netze).length > 1;
     });
   } catch (e) { ftAllOneDisplay = false; }
+  // Gemischtes Segment heisst Kompakt: die Karten oben muessen das gleich anzeigen,
+  // sonst stuende "Spielerisch" aktiv, obwohl alles auf einem Display laeuft.
+  if (ftAllOneDisplay) { ftIsMultiDisplay = false; ftGroupByCity = true; ftIsManualAssignment = false; }
 
   // Richtungen PRO rbl direkt aus der masterrow ("Linie>richtungsId" / "Linie:towards") —
   // die echte, autoritative Quelle. Viele Netze (BAYERN/MVG, Trainboard /de …) liefern
