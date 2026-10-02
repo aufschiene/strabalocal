@@ -17737,7 +17737,13 @@ async function initFinetuningStep() {
   // ÖBB Regio + ÖBB FV sind 2 Netze, aber dieselbe ÖBB-Optik (colour 12) → keine Stil-Wahl nötig.
   // Erst ein anderer Typ (z.B. Westbahn = colour 14) macht „Kompakt vs. Spielerisch" relevant.
   var uniqueDisplayCols = [...new Set(stations.map(function(s) { return stationDisplayColour(s); }))];
-  var hasMultipleNetworks = uniqueDisplayCols.length > 1;
+  // Die Wahl Kompakt/Spielerisch gibt es, sobald MEHR ALS EINE Station konfiguriert ist
+  // (Paul 02.10.2026). Sie entscheidet, ob alles auf ein Display kommt oder ob sich die
+  // Stationen auf Seiten verteilen lassen, zum Beispiel Linie 2 und 46 auf zwei Seiten.
+  // Frueher haengte das an zwei verschiedenen Display-TYPEN, dadurch fehlten die Karten
+  // bei zwei Betreibern mit derselben Optik komplett.
+  var hasMultipleNetworks = (stations.length >= 2)
+    && (typeof mergedSegmentsSupported === 'function' && mergedSegmentsSupported());
   // Karte IMMER zeigen — die manuelle Display-Zuordnung (Automatisch/Manuell + Pro-Station-
   // Dropdown) soll auch bei nur EINEM Display-Typ verfügbar sein, damit man das Display
   // manuell ändern kann. Nur die Kompakt/Spielerisch-Wahl + den Getrennt/Kompakt-Toggle
@@ -17757,7 +17763,9 @@ async function initFinetuningStep() {
   // Multi-Display Status aus Schnellansicht übernehmen
   ftIsMultiDisplay = !!config.multiDisplay;
   if (hasMultipleNetworks) {
-    setFtCompactSeparate(ftIsMultiDisplay ? 'separate' : 'compact');
+    // Eine geladene Config mit EINEM gemischten Segment ist Kompakt — das schlägt den
+    // multiDisplay-Wert aus der Schnellansicht, sonst stünde die falsche Karte aktiv.
+    setFtCompactSeparate((ftAllOneDisplay || !ftIsMultiDisplay) ? 'compact' : 'separate');
   } else {
     ftIsMultiDisplay = false;
     ftIsManualAssignment = false;
