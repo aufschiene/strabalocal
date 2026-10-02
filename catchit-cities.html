@@ -3675,6 +3675,20 @@
            Gerätevorschau pro Stadt öffnet. Der alte Instanz-Modus (Gruppieren AUS)
            bleibt für bereits so gespeicherte Configs erhalten, ist aber nicht mehr
            einschaltbar. -->
+      <!-- Alles auf EIN Display: Stationen verschiedener Betreiber in EIN Segment
+           (komma-gejointe rbls über Netzgrenzen hinweg). Der Server beantwortet so eine
+           gemischte Abfrage, geprüft mit BWEGT + BERLIN in einem Aufruf (01.10.2026).
+           Aus = wie bisher, ein Display je Betreiber. -->
+      <div class="form-row" id="ftAllOneRow" style="display:none;">
+        <div>
+          <div class="form-label">Alles auf einem Display</div>
+          <div class="form-hint">An = alle Haltestellen in einer Anzeige, auch über Betreiber hinweg</div>
+        </div>
+        <div class="toggle-row" id="ftAllOneToggle">
+          <button class="toggle-btn active" data-value="0" onclick="setFtAllOneDisplay(0)">Aus</button>
+          <button class="toggle-btn" data-value="1" onclick="setFtAllOneDisplay(1)">An</button>
+        </div>
+      </div>
       <div class="form-row" id="ftGroupByCityRow" style="display:none;">
         <div>
           <div class="form-label">Nach Städten gruppiert</div>
@@ -13934,9 +13948,24 @@ function cityGroupNetwork(net) {
   net = String(net || '');
   return /^OEBB/.test(net) ? 'OEBB' : net;
 }
+// "Alles auf einem Display": dann zählt nur noch der Display-Typ, nicht mehr das Netz.
+// Zwei Betreiber mit derselben Optik landen damit in EINEM Segment statt in zwei
+// Slideshow-Seiten (Paul 02.10.2026: "würde gerne alle auf einem Display haben, er
+// lässt mich aber nur ein Display pro Provider").
+var ftAllOneDisplay = false;
+function setFtAllOneDisplay(an) {
+  ftAllOneDisplay = (String(an) === '1');
+  var btns = document.querySelectorAll('#ftAllOneToggle .toggle-btn');
+  btns.forEach(function(b) { b.classList.toggle('active', (b.dataset.value === '1') === ftAllOneDisplay); });
+  if (ftAllOneDisplay) ftGroupByCity = true;   // Instanz-Modus und Alles-auf-eins vertragen sich nicht
+  if (typeof updateStyleAssignmentUI === 'function') updateStyleAssignmentUI();
+  if (typeof renderDisplayTypeSections === 'function') renderDisplayTypeSections();
+  if (typeof ftPreviewLiveRefresh === 'function') ftPreviewLiveRefresh();
+}
 function cityGroupKeyOf(s) {
   if (!s || s.network === 'WL' || s.network === 'WLB') return null;
   if (s.allDepartures || s.isJourney) return null;
+  if (ftAllOneDisplay) return 'ALLE/' + stationDisplayColour(s);
   return cityGroupNetwork(s.network) + '/' + stationDisplayColour(s);
 }
 
@@ -13993,6 +14022,16 @@ function updateGroupByCityUI() {
   if (!row) return;
   var multi = (typeof stations !== 'undefined' && stations.length >= 2);
   row.style.display = multi ? '' : 'none';
+  // "Alles auf einem Display" nur anbieten, wenn überhaupt mehrere Betreiber im Spiel sind
+  var allOneRow = document.getElementById('ftAllOneRow');
+  if (allOneRow) {
+    var netze = {};
+    (typeof stations !== 'undefined' ? stations : []).forEach(function(s) { netze[cityGroupNetwork(s.network || '')] = 1; });
+    var mehrereBetreiber = Object.keys(netze).length > 1;
+    allOneRow.style.display = (multi && mehrereBetreiber && mergedSegmentsSupported()) ? '' : 'none';
+    var ab = document.querySelectorAll('#ftAllOneToggle .toggle-btn');
+    ab.forEach(function(b) { b.classList.toggle('active', (b.dataset.value === '1') === ftAllOneDisplay); });
+  }
   if (assign) assign.style.display = 'none';
   if (!multi) return;
   if (!mergedSegmentsSupported()) {
@@ -20359,7 +20398,11 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       if (typeof ftGroupByCity !== 'undefined' && ftGroupByCity === false) {
         if (s.displayInstance != null) instKey = 'inst/' + s.displayInstance;
       } else {
-        instKey = 'city/' + cityGroupNetwork(s.network) + '/' + colour + '/' + ((bucket === time) ? 't' : 'm');
+        // "Alles auf einem Display": das Netz faellt aus dem Schluessel, damit sich auch
+        // verschiedene Betreiber EIN Segment teilen (Paul 02.10.2026).
+        instKey = 'city/' + ((typeof ftAllOneDisplay !== 'undefined' && ftAllOneDisplay)
+                             ? 'ALLE' : cityGroupNetwork(s.network))
+                + '/' + colour + '/' + ((bucket === time) ? 't' : 'm');
       }
     }
 
@@ -21748,6 +21791,21 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   const allDepStopIds = allDeparturesStopIdsFromRows(masterRowStr);
   // Gehweg pro Bahnsteig aus der masterrow wiederherstellen (Round-Trip).
   gehwegByStopIdState = gehwegByStopIdFromRows(masterRowStr);
+  // Beim Laden erkennen, ob eine Config schon "alles auf einem Display" nutzt: dann traegt
+  // mindestens ein Segment rbls aus MEHREREN Netzen. Sonst verloere der Schalter beim
+  // Wiedereinstieg seinen Zustand und das Speichern wuerde die Anzeige wieder aufteilen.
+  try {
+    ftAllOneDisplay = String(masterRowStr || '').split(';').some(function(seg) {
+      var feld = String(seg || '').split('|')[0] || '';
+      var netze = {};
+      feld.split(',').forEach(function(t) {
+        t = t.trim(); if (!t) return;
+        var ci = t.indexOf(':');
+        netze[ci > 0 ? cityGroupNetwork(t.substring(0, ci)) : 'WL'] = 1;
+      });
+      return Object.keys(netze).length > 1;
+    });
+  } catch (e) { ftAllOneDisplay = false; }
 
   // Richtungen PRO rbl direkt aus der masterrow ("Linie>richtungsId" / "Linie:towards") —
   // die echte, autoritative Quelle. Viele Netze (BAYERN/MVG, Trainboard /de …) liefern
