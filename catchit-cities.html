@@ -290,6 +290,13 @@
     .fv-gat-row.on .fv-gat-box { border-color: transparent; }
     .fv-gat-head { padding: 8px 13px 4px; font-size: 11px; font-weight: 700; color: #9aa3ad;
       text-transform: uppercase; letter-spacing: 0.04em; background: #fafbfc; }
+    /* In der gemeinsamen Von/Nach/Zugtypen-Box sitzen die Zugtypen buendig mit den
+       Feldern darueber: die Box polstert schon, die eigenen Seitenabstaende muessen weg. */
+    .vn-step .fv-group-row { padding: 0; margin-bottom: 10px; }
+    .vn-step .fv-gat-toggle { margin: 0; width: 100%; }
+    .vn-step .fv-gat-list { margin: 8px 0 0; }
+    .vn-step .fv-filter-hint { margin-bottom: 10px; }
+    .vn-step .fv-chips { padding: 0; }
     .fv-feature-filter { background: #fff; border: 1px solid #e6e9ee; border-radius: 14px; padding: 14px 16px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
     .fv-filter-label { font-size: 12px; font-weight: 700; color: #9aa3ad; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
     .fv-filter-hint { font-size: 12px; color: #9aa3ad; font-weight: 400; margin-bottom: 12px; }
@@ -4913,7 +4920,24 @@ function lineColourFor(network, name) {
   return null;
 }
 
+// Waehrend eines Config-Ladevorgangs dieselbe Haltestelle nur EINMAL beim Server abfragen.
+// Vorher fragte die Namensaufloesung und gleich darauf die Richtungs-Rekonstruktion dieselbe
+// Station getrennt ab, und das alles streng nacheinander: bei vier Haltestellen also bis zu
+// sechzehn Rundreisen hintereinander (Kunde 01.10.2026: "erst eine Linie, zehn Sekunden
+// spaeter die anderen drei"). Ausserhalb des Ladens ist der Merker aus, der Picker sieht
+// also weiterhin immer frische Daten.
+var _depMemo = null;
 async function fetchDeparturesUnified(fullId) {
+  if (!fullId) return { data: { monitors: [] } };
+  if (_depMemo) {
+    if (_depMemo.has(fullId)) return _depMemo.get(fullId);
+    const p = _fetchDeparturesUnifiedRaw(fullId);
+    _depMemo.set(fullId, p);
+    return p;
+  }
+  return _fetchDeparturesUnifiedRaw(fullId);
+}
+async function _fetchDeparturesUnifiedRaw(fullId) {
   if (!fullId) return { data: { monitors: [] } };
   const colonIdx = fullId.indexOf(':');
   const network = colonIdx > 0 ? fullId.substring(0, colonIdx) : '';
@@ -9319,8 +9343,63 @@ function renderLines() {
     if (_lh) _lh.style.display = 'none';
     // Vertikaler Stepper: Von ↓ Nach ↓ Zugtypen (wie Regional).
     const fvShowCats = (fvAll || fvDests.length);
+    // Zugtypen werden VOR dem Zusammenbau gerendert, damit sie in dieselbe
+    // Von/Nach-Box wandern statt in einen eigenen Kasten darunter (Paul 01.10.2026:
+    // „das schaut noch wie eine eigene Sektion aus“).
+    let _fvZugtypen = '', _fvZugtypenLabel = '';
+    let chipCats = FV_CATS.slice();
+    // ÖBB-Geräte: kein Westbahn-Chip. Nur aus der Auswahl: ein schon aktiver WB-Filter
+    // bleibt unverändert, das Display zeigt dieselben Züge wie bisher.
+    if (isOebbDevice()) chipCats = chipCats.filter(function(c) { return c !== 'WB'; });
+
+    // Zugtypen erst NACH Zielwahl. IMMER alle Gattungen anbieten (einheitlich an
+    // jedem FV-Bahnhof): die frühere Einengung auf fvServingCats() (nur beobachtete
+    // Zugtypen der Verbindung) versteckte real existierende Chips, wenn die
+    // Routendaten lückenhaft waren (Wien→Linz ohne Westbahn/ICE, 2026-07-14).
+    // Ein Chip ohne echte Züge zeigt schlicht nichts an — das ist harmlos.
+    if (fvShowCats) {
+      // Zwei Knoepfe (Fernverkehr / Nahverkehr), einzeln oder zusammen, darunter die
+      // einzelnen Gattungen zum Ab- und Anwaehlen (Paul 01.10.2026). Ein Knopf steht auf
+      // „teilweise", wenn nur ein Teil seiner Gattungen angehakt ist.
+      const _gruppen = fvCatGroups();
+      let catBody = '<div class="fv-filter-hint" style="margin-bottom:9px;">Fernverkehr und Nahverkehr lassen sich einzeln oder zusammen anschalten. Welche Gattungen genau, stellst du darunter ein.</div>';
+      catBody += '<div class="fv-group-row">';
+      _gruppen.forEach(function(gr) {
+        const an = gr.cats.filter(function(c) { return fvActiveCats.has(c); }).length;
+        const stand = (an === 0) ? 'off' : (an === gr.cats.length ? 'on' : 'partial');
+        const style = (stand === 'on') ? 'background:' + gr.color + ';color:#fff;border-color:' + gr.color + ';'
+                    : (stand === 'partial') ? 'border-color:' + gr.color + ';color:' + gr.color + ';' : '';
+        const sub = (stand === 'partial') ? (an + ' von ' + gr.cats.length + ' Gattungen') : gr.sub;
+        catBody += '<button class="fv-group-btn ' + stand + '" style="' + style + '" onclick="toggleFvGroup(\'' + gr.key + '\')">' +
+                   '<span class="gname">' + gr.name + '</span><span class="gsub">' + escapeHtmlFt(sub) + '</span></button>';
+      });
+      catBody += '</div>';
+      const _gewaehlt = _gruppen.reduce(function(n, gr) {
+        return n + gr.cats.filter(function(c) { return fvActiveCats.has(c); }).length; }, 0);
+      const _alle = _gruppen.reduce(function(n, gr) { return n + gr.cats.length; }, 0);
+      catBody += '<button class="fv-gat-toggle" onclick="toggleFvGatList()">' +
+                 (fvGatListOpen ? '▾' : '▸') + ' Gattungen bearbeiten (' +
+                 _gewaehlt + ' von ' + _alle + ')</button>';
+      if (fvGatListOpen) {
+        catBody += '<div class="fv-gat-list">';
+        _gruppen.forEach(function(gr) {
+          catBody += '<div class="fv-gat-head">' + gr.name + '</div>';
+          gr.cats.forEach(function(cat) {
+            const an2 = fvActiveCats.has(cat);
+            const c2 = catColor(cat);
+            catBody += '<div class="fv-gat-row ' + (an2 ? 'on' : '') + '" onclick="toggleFvCat(\'' + cat + '\')">' +
+                       '<span class="fv-gat-box" style="' + (an2 ? 'background:' + c2 + ';' : '') + '">' + (an2 ? '✓' : '') + '</span>' +
+                       '<span>' + escapeHtmlFt(catLabel(cat)) + '</span></div>';
+          });
+        });
+        catBody += '</div>';
+      }
+      _fvZugtypen = catBody;
+      _fvZugtypenLabel = 'Zugtypen';
+    }
+
     let fvHtml = '<div class="vn-flow reg-fade-in">';
-    fvHtml += vnVonNachStep(fvDestPickerHtml(), fvShowCats);
+    fvHtml += vnVonNachStep(fvDestPickerHtml(), fvShowCats, _fvZugtypen, _fvZugtypenLabel);
 
     // Alte Richtungslisten (multiCorridor/E-W) durch Ziel-Picker ERSETZT → deaktiviert
     // (Code bleibt vorerst stehen, beide Zweige via `false` aus).
@@ -9394,65 +9473,6 @@ function renderLines() {
                + '</div>';
       });
       fvHtml += '</div></div>';
-    }
-
-    // Zugtyp-Chips: nur die Gattungen anbieten, die laut Wikipedia auf den
-    // BELEGTEN Korridoren überhaupt verkehren (Union). Beispiel:
-    //   Tauernbahn → kein ICE/WB
-    //   Westbahn   → kein IR
-    // Damit verschwinden „unmögliche" Chips — aber realistische bleiben sichtbar,
-    // auch wenn aktuell kein Zug der Gattung im Datensatz ist (NJ tagsüber etc.).
-    // ALLE Zugtypen an JEDEM FV-Bahnhof anbieten. Früher beschnitt die kuratierte
-    // FV_CORRIDOR_CATS-Liste die Chips pro Strecke — aber die Realität weicht ab
-    // (Graz Puntigam: InterRegio fährt dort, „Südstrecke" listete IR aber nicht →
-    // nicht wählbar). Lieber alle anbieten; ein Chip ohne echte Züge zeigt halt nichts.
-    let chipCats = FV_CATS.slice();
-    // ÖBB-Geräte: kein Westbahn-Chip. Nur aus der Auswahl: ein schon aktiver WB-Filter
-    // bleibt unverändert, das Display zeigt dieselben Züge wie bisher.
-    if (isOebbDevice()) chipCats = chipCats.filter(function(c) { return c !== 'WB'; });
-
-    // Zugtypen erst NACH Zielwahl. IMMER alle Gattungen anbieten (einheitlich an
-    // jedem FV-Bahnhof): die frühere Einengung auf fvServingCats() (nur beobachtete
-    // Zugtypen der Verbindung) versteckte real existierende Chips, wenn die
-    // Routendaten lückenhaft waren (Wien→Linz ohne Westbahn/ICE, 2026-07-14).
-    // Ein Chip ohne echte Züge zeigt schlicht nichts an — das ist harmlos.
-    if (fvShowCats) {
-      // Zwei Knoepfe (Fernverkehr / Nahverkehr), einzeln oder zusammen, darunter die
-      // einzelnen Gattungen zum Ab- und Anwaehlen (Paul 01.10.2026). Ein Knopf steht auf
-      // „teilweise", wenn nur ein Teil seiner Gattungen angehakt ist.
-      const _gruppen = fvCatGroups();
-      let catBody = '<div class="fv-filter-hint" style="margin-bottom:9px;">Fernverkehr und Nahverkehr lassen sich einzeln oder zusammen anschalten. Welche Gattungen genau, stellst du darunter ein.</div>';
-      catBody += '<div class="fv-group-row">';
-      _gruppen.forEach(function(gr) {
-        const an = gr.cats.filter(function(c) { return fvActiveCats.has(c); }).length;
-        const stand = (an === 0) ? 'off' : (an === gr.cats.length ? 'on' : 'partial');
-        const style = (stand === 'on') ? 'background:' + gr.color + ';color:#fff;border-color:' + gr.color + ';'
-                    : (stand === 'partial') ? 'border-color:' + gr.color + ';color:' + gr.color + ';' : '';
-        const sub = (stand === 'partial') ? (an + ' von ' + gr.cats.length + ' Gattungen') : gr.sub;
-        catBody += '<button class="fv-group-btn ' + stand + '" style="' + style + '" onclick="toggleFvGroup(\'' + gr.key + '\')">' +
-                   '<span class="gname">' + gr.name + '</span><span class="gsub">' + escapeHtmlFt(sub) + '</span></button>';
-      });
-      catBody += '</div>';
-      const _gewaehlt = _gruppen.reduce(function(n, gr) {
-        return n + gr.cats.filter(function(c) { return fvActiveCats.has(c); }).length; }, 0);
-      catBody += '<button class="fv-gat-toggle" onclick="toggleFvGatList()">' +
-                 (fvGatListOpen ? '▾' : '▸') + ' Einzelne Gattungen (' + _gewaehlt + ' gewählt)</button>';
-      if (fvGatListOpen) {
-        catBody += '<div class="fv-gat-list">';
-        _gruppen.forEach(function(gr) {
-          catBody += '<div class="fv-gat-head">' + gr.name + '</div>';
-          gr.cats.forEach(function(cat) {
-            const an2 = fvActiveCats.has(cat);
-            const c2 = catColor(cat);
-            catBody += '<div class="fv-gat-row ' + (an2 ? 'on' : '') + '" onclick="toggleFvCat(\'' + cat + '\')">' +
-                       '<span class="fv-gat-box" style="' + (an2 ? 'background:' + c2 + ';' : '') + '">' + (an2 ? '✓' : '') + '</span>' +
-                       '<span>' + escapeHtmlFt(catLabel(cat)) + '</span></div>';
-          });
-        });
-        catBody += '</div>';
-      }
-      fvHtml += vnArrow();
-      fvHtml += vnLinienStep(fvAll ? 'Zugtypen' : 'Zugtypen auf dieser Verbindung', catBody);
     }
 
     fvHtml += '</div>';  // .vn-flow
@@ -10340,15 +10360,12 @@ function fvDefaultCats() {
 // fvActiveCats nach Zielwahl neu setzen: NUR die Haupttypen (RJX/WB/ICE) vorwählen, die
 // Nebentypen (IC/NJ/IR/RGJ) bleiben sichtbar aber abgewählt → der User sieht, dass er
 // weitere Zugtypen selbst dazu-tippen kann ("auswählbar").
+// Nach der Zielwahl sind ALLE Zugtypen angehakt (Paul 01.10.2026: "die Zugtypen
+// automatisch alle ausgewählt"). Wer weniger will, macht „Gattungen bearbeiten“ darunter
+// auf. Vorher waren nur die Haupttypen vorgewählt, der Rest blieb leer.
 function recomputeFvCats() {
-  if (fvAll) { fvActiveCats = fvDefaultCats(); return; }
-  if (!fvDests.length) { fvActiveCats = new Set(); return; }
-  const serving = fvServingCats();
-  const primary = fvDefaultCats();
-  const sel = new Set();
-  serving.forEach(function(c) { if (primary.has(c)) sel.add(c); });
-  if (!sel.size && serving.size) sel.add(Array.from(serving).sort()[0]);  // mind. einer an
-  fvActiveCats = sel;
+  if (!fvAll && !fvDests.length) { fvActiveCats = new Set(); return; }
+  fvActiveCats = new Set(FV_CATS.concat(NV_CATS));
 }
 
 // ==================== VERTIKALER VON→NACH-STEPPER (ein durchgehender Prozess) ====================
@@ -10375,8 +10392,11 @@ function vnNachStep(bodyHtml, done) {
 }
 // Von + Nach in EINER Box (kompakter, eine Karte statt zwei mit Pfeil dazwischen):
 // oben die gewählte Start-Station mit „ändern", darunter (dezente Trennlinie) der Ziel-Picker.
-function vnVonNachStep(nachBody, nachDone) {
+function vnVonNachStep(nachBody, nachDone, zugtypenBody, zugtypenLabel) {
   const fromName = (selectedStop && selectedStop.name) || '';
+  // Von, Nach und die Zugtypen stehen in EINER Box, getrennt durch die dezenten
+  // Trennlinien. Vorher war die Zugtypen-Auswahl ein eigener Kasten mit Pfeil davor,
+  // das sah aus wie ein fremder Abschnitt (Paul 01.10.2026).
   return '<div class="vn-step ' + (nachDone ? 'vn-done' : 'vn-active') + '">'
     + '<div class="vn-label">✓ Von</div>'
     + '<div class="vn-von"><span class="vn-von-name">' + fromName + '</span>'
@@ -10384,6 +10404,9 @@ function vnVonNachStep(nachBody, nachDone) {
     + '<div class="vn-divider"></div>'
     + '<div class="vn-label">' + (nachDone ? '✓ ' : '') + 'Nach</div>'
     + nachBody
+    + (zugtypenBody
+        ? '<div class="vn-divider"></div><div class="vn-label">' + (zugtypenLabel || 'Zugtypen') + '</div>' + zugtypenBody
+        : '')
     + '</div>';
 }
 function vnLinienStep(label, bodyHtml) {
@@ -10440,6 +10463,12 @@ function fvDestPickerHtml() {
     h += '</div>';
     h += vnRouteNote();
   }
+  // Mit bereits gewähltem Ziel braucht es das große Suchfeld nicht mehr: ein kleiner
+  // Link reicht, der es bei Bedarf aufklappt (Paul 01.10.2026). Ohne Ziel bleibt es offen.
+  if (fvDests.length && !fvDestFeldOffen) {
+    h += '<div style="font-size:13px;"><span class="vn-change" onclick="oeffneFvDestFeld()">+ Weiteres Ziel</span></div></div>';
+    return h;
+  }
   h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;min-height:30px;">'
     +   '<div style="font-size:13px;color:#7891ad;">' + (fvDests.length ? 'Weiteres Ziel hinzufügen?' : 'Wohin soll es gehen?') + '</div>'
     +   (fvDests.length ? '' : '<button class="fv-all-btn" onclick="selectFvAll()">Alle Abfahrten</button>')
@@ -10452,6 +10481,12 @@ function fvDestPickerHtml() {
   return h;
 }
 
+var fvDestFeldOffen = false;   // Suchfeld für ein WEITERES Ziel aufgeklappt?
+function oeffneFvDestFeld() {
+  fvDestFeldOffen = true;
+  renderLines();
+  setTimeout(function() { var i = document.getElementById('fvDestInput'); if (i) i.focus(); }, 30);
+}
 function fvDestResultsHtml() {
   const q = (fvDestQuery || '').trim().toLowerCase();
   if (q.length < 2) return '';
@@ -16137,7 +16172,15 @@ function fcOpenWizard(cid, opts) {
   var fcLines = [];
   var fcSeen = {};
   var fcMucLines = {};   // Linien an Münchner Stops (AGS de:09162) → offizielle MVG-Farbe als Default
-  (typeof stations !== 'undefined' ? stations : []).forEach(function(s) {
+  // NUR die Stationen DIESES Displays: vorher lief die Schleife über ALLE Stationen, dadurch
+  // standen in den Badge-Farben eines eigenen Displays die Linien einer fremden Stadt
+  // (Kunde 01.10.2026: eigenes Display für DB Regio zeigte die VBB-Berlin-Linien U3/U9/101).
+  // Ist dem Display noch keine Station zugewiesen — frisch angelegtes Display im Wizard —
+  // bleibt es bei allen Stationen, sonst hätte man dort gar nichts zum Einfärben.
+  var _fcEigene = (typeof stations !== 'undefined' ? stations : []).filter(function(s) {
+    return parseInt(stationDisplayColour(s)) === parseInt(cid);
+  });
+  (_fcEigene.length ? _fcEigene : (typeof stations !== 'undefined' ? stations : [])).forEach(function(s) {
     var isMuc = String(s.stopId || '').indexOf('09162') !== -1;
     var arr = [];
     if (s.directions && s.directions.length > 0) s.directions.forEach(function(d) { if (d.line) arr.push(String(d.line)); });
@@ -21623,8 +21666,12 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
     await _loadExistingConfigPromise;
   }
   _loadExistingConfigPromise = _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr, clearFirst);
-  await _loadExistingConfigPromise;
-  _loadExistingConfigPromise = null;
+  try {
+    await _loadExistingConfigPromise;
+  } finally {
+    _loadExistingConfigPromise = null;
+    _depMemo = null;   // ab jetzt wieder frische Abfragen (Picker)
+  }
 }
 
 // Stop-IDs (bare, ohne Netz-Prefix), deren masterrow/timerow-Linienfeld "*" ist = "Alle
@@ -21683,6 +21730,20 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   if (clearFirst) { try { stations.length = 0; } catch (e) {} }
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
+  // Alle Haltestellen GLEICHZEITIG vorladen. Die Rekonstruktion unten laeuft bewusst
+  // nacheinander (Reihenfolge = Segment-Reihenfolge), holt sich die Abfahrten dann aber
+  // aus dem Merker statt jedes Mal neu zu warten.
+  _depMemo = new Map();
+  try {
+    await Promise.all(rblParts.map(function(part) {
+      const ci = part.indexOf(':');
+      let netz = ci > 0 ? part.substring(0, ci) : 'WL';
+      const sid = ci > 0 ? part.substring(ci + 1) : part;
+      if (netz === 'OEBBALL' || netz === 'OEBBREGALL' || netz === 'OEBBFERNALL') netz = 'OEBB';
+      if (netz === 'WL') return null;   // Wien kommt aus wienData, nicht von der API
+      return fetchDeparturesUnified(netz + ':' + sid).catch(function() { return null; });
+    }).filter(Boolean));
+  } catch (e) { /* Vorladen ist Beschleunigung, kein Muss */ }
   const filterParts = filter ? filter.split('|') : [];
   const allDepStopIds = allDeparturesStopIdsFromRows(masterRowStr);
   // Gehweg pro Bahnsteig aus der masterrow wiederherstellen (Round-Trip).
