@@ -10494,7 +10494,13 @@ function oeffneFvDestFeld() {
 function fvDestResultsHtml() {
   const q = (fvDestQuery || '').trim().toLowerCase();
   if (q.length < 2) return '';
-  if (!fvReachable.length) return '<div class="oebb-dest-no-result">Ziele werden geladen...</div>';
+  // Laden und "Server kennt keine Ziele" auseinanderhalten: fuer manche Bahnhoefe liefert
+  // /oebb/destinations eine leere Liste, obwohl Abfahrten da sind (gemessen 02.10.2026:
+  // Wien Meidling 1291201 hat 45 Linien, aber 0 Ziele). Vorher stand dort fuer immer
+  // "Ziele werden geladen...", der Nutzer wartete auf etwas, das nie kommt.
+  if (!fvReachable.length) return fvReachableLoading
+    ? '<div class="oebb-dest-no-result">Ziele werden geladen...</div>'
+    : '<div class="oebb-dest-no-result">Für diese Station kennen wir keine Ziele. Nimm oben Alle Abfahrten.</div>';
   const chosen = new Set(fvDests.map(function(d) { return d.id; }));
   let list = fvReachable.filter(function(x) { return !chosen.has(x.id) && x.name.toLowerCase().includes(q); }).slice(0, 12);
   if (!list.length) return '<div class="oebb-dest-no-result">Kein Ziel gefunden</div>';
@@ -10517,13 +10523,16 @@ function enrichFvDests() {
   if (changed && selectedNetwork === 'WESTBAHN' && typeof renderLines === 'function') renderLines();
 }
 
-// Erreichbare FV-Ziele ab Start-Bahnhof laden (gecacht pro Bahnhof)
+// Erreichbare Ziele ab Start-Bahnhof laden (gecacht pro Bahnhof).
+// IMMER die Nahverkehrs-Variante abfragen: sie ist die Obermenge. Gemessen am 02.10.2026
+// für Wien Hbf: ohne network 180 Ziele, mit network=OEBBREG 359, davon fehlt KEIN einziges
+// der 180 Fernverkehrs-Ziele. Vorher hängte das Netz an fvHasNvCats(), und das ist
+// VOR der Zielwahl leer (recomputeFvCats setzt die Gattungen erst beim Auswählen) →
+// die Suche bot nur Fernverkehrs-Bahnhöfe an, „Stadlau“ oder „Simmering“ fand sie nicht.
+// Der Gattungs-Filter bleibt davon unberührt, der sitzt im gespeicherten Linienfeld.
 async function loadFvReachable(stopId) {
   if (!stopId) { fvReachable = []; fvReachableFor = null; fvReachableLoading = false; return; }
-  // Nahverkehr an → auch die Ziele anbieten, die nur mit Regionalzügen erreichbar sind.
-  // Bischofshofen: 150 statt 103 Ziele, z.B. Aich (R9), Bad Vigaun (S3), Brixlegg (REX2).
-  // Das Netz gehört in den Cache-Schlüssel, sonst bliebe nach dem Umschalten die alte Liste.
-  const _dnet = (typeof fvHasNvCats === 'function' && fvHasNvCats()) ? 'OEBBREG' : '';
+  const _dnet = 'OEBBREG';
   const _dkey = stopId + '|' + _dnet;
   if (fvReachableFor === _dkey && fvReachable.length) { fvReachableLoading = false; enrichFvDests(); return; }
   fvReachableFor = _dkey;
@@ -10532,7 +10541,7 @@ async function loadFvReachable(stopId) {
   if (selectedNetwork === 'WESTBAHN' && typeof renderLines === 'function') renderLines();  // Prozess: Spinner zeigen
   try {
     const r = await fetch(FV_DEST_API + '?from=' + encodeURIComponent(stopId)
-                          + (_dnet ? '&network=' + encodeURIComponent(_dnet) : ''));
+                          + '&network=' + encodeURIComponent(_dnet));
     const d = await r.json();
     fvReachable = Array.isArray(d.destinations) ? d.destinations : [];
   } catch (e) { fvReachable = []; }
@@ -10823,7 +10832,9 @@ function regDestResultsHtml() {
   const q = (regDestQuery || '').trim().toLowerCase();
   // Ohne Tippen: bei Stammstrecke poppen Floridsdorf/Meidling als Vorschläge im Dropdown auf.
   if (q.length < 2) return stammSuggestionsHtml();
-  if (!regReachable.length) return '<div class="oebb-dest-no-result">Richtungen werden geladen...</div>';
+  if (!regReachable.length) return regReachableLoading
+    ? '<div class="oebb-dest-no-result">Richtungen werden geladen...</div>'
+    : '<div class="oebb-dest-no-result">Für diese Station kennen wir keine Ziele. Nimm oben Alle Abfahrten.</div>';
   const chosen = new Set(regDests.map(function(d) { return d.id; }));
   let list = regReachable.filter(function(x) { return !chosen.has(x.id) && x.name.toLowerCase().includes(q); }).slice(0, 12);
   if (!list.length) return '<div class="oebb-dest-no-result">Kein Ziel gefunden</div>';
@@ -23620,6 +23631,8 @@ window.addEventListener('DOMContentLoaded', () => {
     'Einzelne Linien': 'Individual lines', 'Nach Linie filtern': 'Filter by line',
     'Richtung wählen': 'Choose direction', 'Richtung(en) wählen': 'Choose direction(s)',
     'Richtungen werden geladen...': 'Loading directions...', 'Ziele werden geladen...': 'Loading destinations...',
+    'Für diese Station kennen wir keine Ziele. Nimm oben Alle Abfahrten.':
+      'We do not know any destinations for this station. Pick All departures above.',
     'Keine Linie gefunden': 'No line found', 'Keine Linien verfügbar': 'No lines available',
     'Keine Abfahrten gefunden': 'No departures found',
     'Aktuell keine Abfahrten für diese Station verfügbar.': 'No departures currently available for this station.',
