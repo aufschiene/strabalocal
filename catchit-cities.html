@@ -10251,8 +10251,12 @@ async function searchOebbDest(query) {
       const params = new URLSearchParams({ network: 'OEBB', q: query });
       const response = await fetch(`${SEARCH_API}?${params}`);
       const data = await response.json();
-      // Nur Fernverkehrshalte + deduplizieren
-      let fvStops = (data.stops || []).filter(s => (s.info || '').includes('Fernverkehr'));
+      // KEIN Fernverkehrs-Filter mehr. Erstens gilt der Zug-Wizard seit den Knoepfen
+      // Fernverkehr/Nahverkehr allgemein, zweitens kam die Suche vor der Gattungswahl,
+      // und drittens liefert der Server in `info` laengst nur noch "AT · train station" —
+      // der Filter warf damit JEDEN Treffer weg, auch Wien Hbf (gemessen 02.10.2026).
+      // Nur noch deduplizieren.
+      let fvStops = (data.stops || []);
       const seen = new Map();
       fvStops.forEach(s => {
         const suffix = String(s.id).slice(-4);
@@ -11217,7 +11221,9 @@ function selectP2PDestByName(name) {
       const apiNetwork = mapNetworkForApi(selectedNetwork);
       const response = await fetch(`${SEARCH_API}?q=${encodeURIComponent(name)}&network=${apiNetwork}`);
       const data = await response.json();
-      const results = (data.stops || data).filter(r => (r.info || '').includes('Fernverkehr'));
+      // Ohne Fernverkehrs-Filter, siehe searchOebbDest: `info` traegt die Produkte nicht
+      // mehr, der Filter lieferte nie wieder einen Treffer.
+      const results = (data.stops || data);
       if (results.length > 0) {
         selectP2PDest(results[0].id, results[0].name);
       } else {
