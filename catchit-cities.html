@@ -890,6 +890,17 @@
       color: #999;
       font-size: 13px;
     }
+    /* Zwischenueberschrift im Ziel-Picker: trennt die Ziele mit Direktverbindung von
+       den uebrigen Bahnhoefen aus der allgemeinen Suche. */
+    .oebb-dest-gruppe {
+      padding: 9px 14px 5px;
+      color: #8b8378;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+      border-top: 1px solid #ece7df;
+    }
     .oebb-dest-chosen {
       padding: 10px 14px;
       background: #e8f0f8;
@@ -4452,10 +4463,14 @@ const NETWORKS = {
     isJourneyBased: false
   },
   WESTBAHN: {
-    name: 'Fernverkehr',
-    shortName: 'FV',
+    // Hiess bis 02.10.2026 "Fernverkehr". Seit die beiden Kacheln zu einer verschmolzen
+    // sind, fuehrt dieses Netz Nah- UND Fernverkehr, der Brotkrumen-Pfad sagte aber weiter
+    // "Fernverkehr" (Paul 02.10.2026). Der Netz-SCHLUESSEL bleibt WESTBAHN, gespeicherte
+    // Konfigurationen sind davon unberuehrt, name/shortName sind reine Anzeigetexte.
+    name: 'Z\u00fcge',
+    shortName: 'Z\u00fcge',
     region: 'AT',
-    desc: '\u00d6BB/Westbahn',
+    desc: '\u00d6BB, Westbahn, RegioJet',
     searchType: 'trainboard',
     trainboard: { path: '/at' },
     placeholder: 'z.B. Wien, Linz, Salzburg, Graz, Villach...',
@@ -8364,9 +8379,13 @@ function fvWhitelistKey(name) {
   return null;
 }
 
-// Score = Anzahl verschiedener Fernverkehr-Zugtypen, die an der Station halten
-// (D, EC, EN, IC, ICE, IR, NJ, RJ, RJX, WB). Mehr Typen = wichtigerer Halt → weiter
-// oben in der Suche (z.B. Graz Hbf vor Graz Don Bosco). Pro Station gecacht.
+// Score = Zugangebot der Station. Fernverkehrs-Gattungen (D, EC, EN, IC, ICE, IR, NJ,
+// RJ, RJX, WB) zählen zehnfach, Nahverkehrs-Gattungen (REX, RE, RB, R, S, CJX, OS)
+// einfach. Mehr Angebot = wichtigerer Halt → weiter oben in der Suche (Graz Hbf vor
+// Graz Don Bosco). Seit die Kachel „Züge“ auch den Nahverkehr führt, zählt der
+// Nahverkehr mit, sonst stünden reine Regionalbahnhöfe gleichauf mit Bushaltestellen.
+// Bushaltestellen bleiben bei 0: das ÖBB-Netz liefert für sie keine Abfahrten.
+// Pro Station gecacht.
 const FV_SCORE_CACHE = new Map();
 // Cache für die "fehlende Whitelist-Hubs nachladen"-Suchen: normFvName → station|null.
 // Die Hub-Bahnhöfe ändern sich nie → jeder wird pro Session HÖCHSTENS EINMAL gesucht
@@ -8379,12 +8398,15 @@ async function fvStationScore(stationId) {
     // Abfahrten über unseren Server (mappt WESTBAHN→OEBB / Trainboard /at)
     const dep = await fetchDeparturesUnified('WESTBAHN:' + stationId);
     const mons = (dep && dep.data && dep.data.monitors) || [];
-    const types = new Set();
+    const fvTypes = new Set(), nvTypes = new Set();
     mons.forEach(m => (m.lines || []).forEach(ln => {
-      const mt = String(ln.name || '').trim().toUpperCase().match(/^(RJX|RJ|ICE|IC|EC|NJ|EN|IR|WB|D)(?=\s|\d|$)/);
-      if (mt) types.add(mt[1]);
+      const nm = String(ln.name || '').trim().toUpperCase();
+      const fv = nm.match(/^(RJX|RJ|ICE|IC|EC|NJ|EN|IR|WB|D)(?=\s|\d|$)/);
+      if (fv) { fvTypes.add(fv[1]); return; }
+      const nv = nm.match(/^(REX|RE|RB|CJX|OS|R|S)(?=\s|\d|$)/);
+      if (nv) nvTypes.add(nv[1]);
     }));
-    score = types.size;
+    score = fvTypes.size * 10 + nvTypes.size;
   } catch (e) {}
   FV_SCORE_CACHE.set(stationId, score);
   return score;
@@ -8492,22 +8514,43 @@ async function performSearch(query) {
       results = checked.filter(Boolean);
     }
 
-    // Fernverkehr (WESTBAHN): 1) nur echte Fernverkehrsbahnhöfe (Whitelist),
-    // 2) nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben,
-    //    z.B. Graz Hbf vor Graz Don Bosco).
+    // Züge (WESTBAHN): 1) Dubletten raus, 2) nach Zugangebot sortieren (mehr Gattungen
+    //    → weiter oben, z.B. Graz Hbf vor Graz Don Bosco).
+    // KEINE Fernverkehrs-Whitelist mehr: die Kachel heißt seit 01.10.2026 „Züge“ und
+    // bringt Nah- und Fernverkehr zusammen. Der Whitelist-Filter kannte aber nur die
+    // Fernverkehrsbahnhöfe und warf alles andere weg, „Stadlau“ oder „Simmering“
+    // endeten in „Keine Stationen gefunden“ (Paul 02.10.2026). Bushaltestellen sortieren
+    // sich jetzt über den Score nach unten statt über eine Liste gefiltert zu werden:
+    // das ÖBB-Netz liefert für sie 0 Abfahrten (gemessen: Wien Gewerbepark Stadlau 0,
+    // Wien Stadlau 4). Gefiltert wird bewusst NICHT danach, sonst verschwände ein
+    // kleiner Bahnhof nachts aus der Suche.
     if (selectedNetwork === 'WESTBAHN') {
-      // Whitelist (tolerant: "Linz/Donau Hbf" ↔ "Linz Hbf") + Dedupe: derselbe Bahnhof
-      // kommt aus der Suche unter mehreren Ids/Namensvarianten → pro WHITELIST-Key nur einer.
-      const seenFv = new Set();
-      results = results.filter(s => {
-        const k = fvWhitelistKey(s.name);
-        if (!k || seenFv.has(k)) return false;
-        seenFv.add(k);
-        return true;
+      // Dedupe: derselbe Bahnhof kommt unter mehreren Ids/Namensvarianten. Hub-Namen über
+      // den toleranten Whitelist-Key ("Linz/Donau Hbf" ↔ "Linz Hbf"), alles andere über
+      // den normalisierten Namen. Bei gleichem Key gewinnt der Treffer, der exakt so
+      // heißt wie der Hub-Bahnhof. Vorher gewann einfach der erste, und die ÖBB-Suche
+      // liefert den vagen Cluster-Namen zuerst: "Salzburg" verdrängte "Salzburg Hbf",
+      // das direkt dahinter stand (gemessen 02.10.2026).
+      const bestByKey = new Map();
+      results.forEach((s, i) => {
+        const k = fvWhitelistKey(s.name) || normFvName(s.name);
+        if (!k) return;
+        const exakt = FV_AT_SET.has(normFvName(s.name));
+        const da = bestByKey.get(k);
+        if (!da) { bestByKey.set(k, { idx: i, exakt: exakt }); return; }
+        if (exakt && !da.exakt) bestByKey.set(k, { idx: da.idx, exakt: true, ersatz: i });
       });
-      const haveNorms = new Set(results.map(s => fvWhitelistKey(s.name)).filter(Boolean));
+      const behalten = new Map();   // Position → anzuzeigender Treffer
+      bestByKey.forEach(v => behalten.set(v.idx, results[v.ersatz != null ? v.ersatz : v.idx]));
+      results = results.map((s, i) => behalten.get(i)).filter(Boolean);
+      const haveNorms = new Set(results.map(s => fvWhitelistKey(s.name) || normFvName(s.name)).filter(Boolean));
       // Whitelist-Bahnhöfe, die zur Eingabe passen, aber wegen Trainboard-Ranking
       // fehlen (z.B. „Wien Meidling", „Wien Westbahnhof" bei Suche „Wien") → gezielt nachladen.
+      // Sie kommen nach VORNE: nachgeladen wird nur, was auf der Hub-Liste steht, und nur
+      // die vorderen acht Treffer werden gescort. Hängte man sie hinten an, fiele der
+      // nachgeladene Hbf aus der Wertung und stünde unter den Kleinhalten (gemessen
+      // 02.10.2026: Suche „Salzburg“ zeigte Salzburg Hbf nicht mehr oben).
+      const hubAdds = [];
       const ql = query.toLowerCase();
       const missing = FV_AT_STATIONS.filter(n => n.toLowerCase().includes(ql) && !haveNorms.has(normFvName(n)));
       for (const name of missing.slice(0, 6)) {
@@ -8523,10 +8566,11 @@ async function performSearch(query) {
           FV_HUB_CACHE.set(nk, match);
         }
         if (match && !haveNorms.has(fvWhitelistKey(match.name))) {
-          results.push(match);
+          hubAdds.push(match);
           haveNorms.add(fvWhitelistKey(match.name));
         }
       }
+      if (hubAdds.length) results = hubAdds.concat(results);
       // nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben). NUR die Top 8
       // scoren (spart Requests) — die großen Hubs stehen ohnehin oben; 9-15 bleiben in Reihenfolge.
       const toScore = results.slice(0, 8);
@@ -10435,6 +10479,7 @@ function changeVonStation() {
   selectedStop = null;
   regDests = []; regAll = false; regLines = new Set(); regDestQuery = ''; regReachableLoading = false; regReachableFor = null; regReachable = [];
   fvDests = []; fvAll = false; fvDestQuery = ''; fvReachableLoading = false; fvReachableFor = null; fvReachable = [];
+  fvSearchHits = []; fvSearchFor = ''; fvSearchLoading = false;
   if (searchInput) searchInput.value = '';
   showStep('search');
   if (searchInput) searchInput.focus();
@@ -10498,15 +10543,100 @@ function fvDestResultsHtml() {
   // /oebb/destinations eine leere Liste, obwohl Abfahrten da sind (gemessen 02.10.2026:
   // Wien Meidling 1291201 hat 45 Linien, aber 0 Ziele). Vorher stand dort fuer immer
   // "Ziele werden geladen...", der Nutzer wartete auf etwas, das nie kommt.
-  if (!fvReachable.length) return fvReachableLoading
-    ? '<div class="oebb-dest-no-result">Ziele werden geladen...</div>'
-    : '<div class="oebb-dest-no-result">Für diese Station kennen wir keine Ziele. Nimm oben Alle Abfahrten.</div>';
   const chosen = new Set(fvDests.map(function(d) { return d.id; }));
-  let list = fvReachable.filter(function(x) { return !chosen.has(x.id) && x.name.toLowerCase().includes(q); }).slice(0, 12);
-  if (!list.length) return '<div class="oebb-dest-no-result">Kein Ziel gefunden</div>';
-  return list.map(x => '<div class="oebb-dest-item" onclick="selectFvDest(\'' + x.id + '\',\'' + x.name.replace(/'/g, "\\'") + '\')">'
-    + '<span class="oebb-dest-item-name">' + x.name + '</span>'
-    + '<span class="oebb-dest-item-arrow">→</span></div>').join('');
+  const zeile = function(x) {
+    return '<div class="oebb-dest-item" onclick="selectFvDest(\'' + x.id + '\',\'' + x.name.replace(/'/g, "\\'") + '\')">'
+      + '<span class="oebb-dest-item-name">' + x.name + '</span>'
+      + '<span class="oebb-dest-item-arrow">→</span></div>';
+  };
+  // 1) Ziele mit Direktverbindung (aus /oebb/destinations).
+  const direkt = fvReachable.filter(function(x) { return !chosen.has(x.id) && x.name.toLowerCase().includes(q); }).slice(0, 12);
+  // 2) Alle übrigen Bahnhöfe aus der allgemeinen Suche. Der Routenfilter des Servers
+  // löst Trainboard-Ids selbst auf, gegengemessen 02.10.2026: OEBBREG:1290401>8104229,
+  // >1192208 und >1292204 liefern identisch R81, REX1, REX8, RJX19917, S80. Namen, die
+  // schon oben stehen, fallen raus, damit nicht derselbe Bahnhof zweimal erscheint.
+  // Dubletten gegen die obere Liste: derselbe Bahnhof kommt unter zwei Ids und zwei
+  // Schreibweisen ("Wien Stadlau" oben, "Stadlau" aus der Suche). Ist die eine Wortmenge
+  // in der anderen enthalten, ist es dieselbe Station und faellt unten weg.
+  const obenToks = direkt.map(function(x) { return normFvName(x.name).split(' ').filter(Boolean); });
+  const istSchonOben = function(name) {
+    const toks = normFvName(name).split(' ').filter(Boolean);
+    if (!toks.length) return false;
+    return obenToks.some(function(o) {
+      const klein = toks.length <= o.length ? toks : o;
+      const gross = toks.length <= o.length ? o : toks;
+      return klein.every(function(t) { return gross.indexOf(t) >= 0; });
+    });
+  };
+  // Nur die Treffer zur AKTUELLEN Eingabe zeigen. Ohne diese Pruefung stand unter einer
+  // frisch getippten Station noch die Ersatzliste der vorigen Eingabe.
+  const sucheAktuell = (fvSearchFor === (fvDestQuery || '').trim());
+  const weitere = (sucheAktuell ? (fvSearchHits || []) : []).filter(function(x) {
+    return !chosen.has(x.id) && !istSchonOben(x.name);
+  }).slice(0, 8);
+  if (!direkt.length && !weitere.length) {
+    if (fvReachableLoading || fvSearchLoading) return '<div class="oebb-dest-no-result">Ziele werden geladen...</div>';
+    // Laden und "nichts gefunden" auseinanderhalten: sonst stand dort fuer immer
+    // "Ziele werden geladen...", und der Nutzer wartete auf etwas, das nie kommt.
+    return '<div class="oebb-dest-no-result">Kein Ziel gefunden</div>';
+  }
+  let h = direkt.map(zeile).join('');
+  if (weitere.length) {
+    h += '<div class="oebb-dest-gruppe">Weitere Bahnhöfe, keine Direktverbindung gefunden</div>'
+       + weitere.map(zeile).join('');
+  }
+  return h;
+}
+
+// Allgemeine Bahnhofssuche fuer den Ziel-Picker: faengt die Bahnhoefe ab, die NICHT in der
+// Erreichbarkeitsliste stehen (etwa weil der Server fuer die Startstation keine Ziele kennt).
+// Entprellt, und ein spaet eintreffendes Ergebnis einer alten Eingabe wird verworfen.
+var fvSearchHits = [];        // Treffer der allgemeinen Suche [{id,name}]
+var fvSearchFor = '';         // Eingabe, zu der fvSearchHits gehoert
+var fvSearchLoading = false;
+var fvSearchTimer = null;
+function ladeFvSuche(q) {
+  q = String(q || '').trim();
+  if (fvSearchFor === q) return;            // Ergebnis passt schon
+  clearTimeout(fvSearchTimer);
+  if (q.length < 2) { fvSearchHits = []; fvSearchFor = q; fvSearchLoading = false; return; }
+  fvSearchLoading = true;
+  fvSearchTimer = setTimeout(async function() {
+    const lauf = q;
+    let treffer = [];
+    try {
+      const r = await fetch(SEARCH_API + '?' + new URLSearchParams({ network: 'OEBB', q: lauf }));
+      const d = await r.json();
+      // Gleiche Dublettenregel wie in der Zielsuche oben: pro letzten vier Ziffern der Id
+      // einen Treffer, "Wien ..." gewinnt gegen die Kurzform.
+      const seen = new Map();
+      (d.stops || []).forEach(function(x) {
+        const suffix = String(x.id).slice(-4);
+        const da = seen.get(suffix);
+        if (!da) seen.set(suffix, x);
+        else if (String(x.name).startsWith('Wien ') && !String(da.name).startsWith('Wien ')) seen.set(suffix, x);
+      });
+      treffer = Array.from(seen.values());
+    } catch (e) { treffer = []; }
+    // Nur echte Bahnhoefe anbieten. Die Stationssuche liefert auch Bus- und Bimhaltestellen
+    // ("Wien Stadion", "Wien Praterkai"), und als Fahrtziel waeren die eine Falle: das Brett
+    // bliebe leer. Das ÖBB-Netz liefert fuer sie messbar 0 Abfahrten (gemessen 02.10.2026:
+    // Wien Gewerbepark Stadlau 0, Wien Stadlau 4), also zaehlt fvStationScore sie aus.
+    // Hoechstens sechs Proben, Ergebnis je Station gecacht.
+    try {
+      const geprueft = await Promise.all(treffer.slice(0, 6).map(async function(x) {
+        return (await fvStationScore(x.id)) > 0 ? x : null;
+      }));
+      treffer = geprueft.filter(Boolean);
+    } catch (e) { treffer = []; }
+    // Ladezeichen IMMER loeschen, auch wenn die Eingabe weitergelaufen ist: sonst bliebe
+    // fvSearchLoading haengen und die leere Liste zeigte fuer immer "Ziele werden geladen...".
+    fvSearchLoading = false;
+    if (fvDestQuery.trim() !== lauf) return;   // Eingabe hat sich weitergedreht
+    fvSearchHits = treffer; fvSearchFor = lauf;
+    const box = document.getElementById('fvDestResults');
+    if (box) box.innerHTML = fvDestResultsHtml();
+  }, 300);
 }
 
 // Gewählte FV-Ziele (z.B. aus Edit-Restore) mit .lines + Namen anreichern, dann neu rendern.
@@ -10560,6 +10690,7 @@ function setFvMode(mode) {
 
 function filterFvDest(q) {
   fvDestQuery = q || '';
+  ladeFvSuche(fvDestQuery);
   const box = document.getElementById('fvDestResults');
   if (box) box.innerHTML = fvDestResultsHtml();
 }
@@ -23631,6 +23762,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Einzelne Linien': 'Individual lines', 'Nach Linie filtern': 'Filter by line',
     'Richtung wählen': 'Choose direction', 'Richtung(en) wählen': 'Choose direction(s)',
     'Richtungen werden geladen...': 'Loading directions...', 'Ziele werden geladen...': 'Loading destinations...',
+    'Weitere Bahnhöfe, keine Direktverbindung gefunden': 'More stations, no direct connection found',
     'Für diese Station kennen wir keine Ziele. Nimm oben Alle Abfahrten.':
       'We do not know any destinations for this station. Pick All departures above.',
     'Keine Linie gefunden': 'No line found', 'Keine Linien verfügbar': 'No lines available',
@@ -23791,6 +23923,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Niederösterreich & Burgenland': 'Lower Austria & Burgenland',
     'Süddeutschland': 'Southern Germany', 'Süd-Niedersachsen': 'South Lower Saxony', 'Mittelthüringen': 'Central Thuringia',
     'Stadtverkehr': 'City transit', 'Fernverkehr': 'Long-distance', 'Regionalverkehr': 'Regional',
+    'Züge': 'Trains',
     'U-Bahn, Straßenbahn, Bus': 'Metro, tram, bus', 'U-Bahn, S-Bahn, Bus, Fähre': 'Metro, S-Bahn, bus, ferry',
     'Straßenbahn, Bus': 'Tram, bus', 'Metro, Tram, Bus, Fähre – live': 'Metro, tram, bus, ferry – live',
     'Nahverkehr Dänemark': 'Local transit Denmark',
