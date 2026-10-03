@@ -9332,12 +9332,15 @@ function extractLines(data) {
     if (!fvCheckedDirs.size) {
       fvCheckedDirs = new Set(availableLines.map(l => fvLineAxis(l)));
     }
-    // Keine aktuellen Abfahrten (z.B. kleiner FV-Bahnhof, IC fährt erst später): automatisch
-    // „Alle Abfahrten" → der User kann trotzdem die Zugtypen wählen, damit ein späterer Zug erscheint.
-    if (!fvVonNach && editingStationIndex === null && availableLines.length === 0) {
-      fvAll = true;
-      recomputeFvCats();
-    }
+    // FRÜHER: „Keine aktuellen Abfahrten → automatisch Alle Abfahrten“. Das ist seit der
+    // Zusammenlegung zur Kachel „Züge“ falsch, denn availableLines enthält nur den
+    // FERNVERKEHR (siehe Gattungs-Abgleich beim Aufbau). An einem Bahnhof, an dem nur
+    // Regionalzüge halten, war die Liste damit immer leer und der Nutzer landete ohne
+    // Zutun bei „Alle Abfahrten“, statt ein Ziel wählen zu dürfen (Paul 03.10.2026,
+    // Wien Stadlau: 0 FV-Linien, aber 53 erreichbare Ziele). Die Zielauswahl hängt
+    // ohnehin nicht mehr an den aktuellen Abfahrten, sondern an /oebb/destinations.
+    // Kennt der Server für die Station keine Ziele, sagt der Picker das jetzt selbst
+    // und verweist auf den Knopf „Alle Abfahrten“.
     recomputeFvSelection();
   }
 }
@@ -10660,6 +10663,23 @@ function enrichFvDests() {
 // VOR der Zielwahl leer (recomputeFvCats setzt die Gattungen erst beim Auswählen) →
 // die Suche bot nur Fernverkehrs-Bahnhöfe an, „Stadlau“ oder „Simmering“ fand sie nicht.
 // Der Gattungs-Filter bleibt davon unberührt, der sitzt im gespeicherten Linienfeld.
+// Zielliste abrufen, bei leerer Antwort EINMAL nachfassen. Der Server zieht die Ziele aus
+// Trainboards /at/lines; direkt nach einem Server-Neustart oder unter der Drossel kommt der
+// erste Abruf leer zurueck, der naechste stimmt (gemessen 03.10.2026: Bischofshofen erst 0,
+// dann 149). Ohne den zweiten Versuch stuende faelschlich "kennen wir keine Ziele" da.
+async function holeZiele(stopId, netz) {
+  const url = FV_DEST_API + '?from=' + encodeURIComponent(stopId) + '&network=' + encodeURIComponent(netz);
+  for (let versuch = 0; versuch < 2; versuch++) {
+    if (versuch) await new Promise(function(r) { setTimeout(r, 3000); });
+    try {
+      const d = await (await fetch(url)).json();
+      const liste = Array.isArray(d.destinations) ? d.destinations : [];
+      if (liste.length) return liste;
+    } catch (e) { /* naechster Versuch */ }
+  }
+  return [];
+}
+
 async function loadFvReachable(stopId) {
   if (!stopId) { fvReachable = []; fvReachableFor = null; fvReachableLoading = false; return; }
   const _dnet = 'OEBBREG';
@@ -10669,12 +10689,9 @@ async function loadFvReachable(stopId) {
   fvReachable = [];
   fvReachableLoading = true;
   if (selectedNetwork === 'WESTBAHN' && typeof renderLines === 'function') renderLines();  // Prozess: Spinner zeigen
-  try {
-    const r = await fetch(FV_DEST_API + '?from=' + encodeURIComponent(stopId)
-                          + '&network=' + encodeURIComponent(_dnet));
-    const d = await r.json();
-    fvReachable = Array.isArray(d.destinations) ? d.destinations : [];
-  } catch (e) { fvReachable = []; }
+  const _liste = await holeZiele(stopId, _dnet);
+  if (fvReachableFor !== _dkey) return;   // zwischenzeitlich andere Station gewaehlt
+  fvReachable = _liste;
   fvReachableLoading = false;
   enrichFvDests();
   // Prozess: geladen → Picker aktiv rendern (Spinner weg).
@@ -10997,12 +11014,10 @@ async function loadRegReachable(stopId) {
   regReachable = [];
   regReachableLoading = true;
   if (isRegionalOebbNetwork() && typeof renderLines === 'function') renderLines();  // Prozess: Spinner zeigen
-  try {
-    const net = (typeof mapNetworkForApi === 'function') ? mapNetworkForApi(selectedNetwork) : selectedNetwork;
-    const r = await fetch(FV_DEST_API + '?from=' + encodeURIComponent(stopId) + '&network=' + encodeURIComponent(net));
-    const d = await r.json();
-    regReachable = Array.isArray(d.destinations) ? d.destinations : [];
-  } catch (e) { regReachable = []; }
+  const _net = (typeof mapNetworkForApi === 'function') ? mapNetworkForApi(selectedNetwork) : selectedNetwork;
+  const _liste = await holeZiele(stopId, _net);
+  if (regReachableFor !== stopId) return;   // zwischenzeitlich andere Station gewaehlt
+  regReachable = _liste;
   regReachableLoading = false;
   enrichRegDests();
   // Prozess: geladen → Picker aktiv rendern (Spinner weg).
@@ -23923,6 +23938,11 @@ window.addEventListener('DOMContentLoaded', () => {
     'Niederösterreich & Burgenland': 'Lower Austria & Burgenland',
     'Süddeutschland': 'Southern Germany', 'Süd-Niedersachsen': 'South Lower Saxony', 'Mittelthüringen': 'Central Thuringia',
     'Stadtverkehr': 'City transit', 'Fernverkehr': 'Long-distance', 'Regionalverkehr': 'Regional',
+    'Nahverkehr': 'Regional', 'REX, Regionalzug, S-Bahn, CJX': 'REX, regional train, S-Bahn, CJX',
+    'Zugtypen': 'Train types', '+ Weiteres Ziel': '+ Another destination',
+    'Fernverkehr und Nahverkehr lassen sich einzeln oder zusammen anschalten. Welche Gattungen genau, stellst du darunter ein.':
+      'Long-distance and regional can be switched on separately or together. Which train types exactly, you set below.',
+    'Railjet, ICE, IC/EC, Nightjet …': 'Railjet, ICE, IC/EC, Nightjet …',
     'Züge': 'Trains',
     'U-Bahn, Straßenbahn, Bus': 'Metro, tram, bus', 'U-Bahn, S-Bahn, Bus, Fähre': 'Metro, S-Bahn, bus, ferry',
     'Straßenbahn, Bus': 'Tram, bus', 'Metro, Tram, Bus, Fähre – live': 'Metro, tram, bus, ferry – live',
@@ -24048,7 +24068,9 @@ window.addEventListener('DOMContentLoaded', () => {
     [/^Wähle eine andere Variante in der Suche /, 'Choose another variant in the search '],
     [/^Diese Station wird vom Bahn-Netz nicht bedient\. /, 'This station is not served by the rail network. '],
     [/^Fehler beim Laden: /, 'Failed to load: '],
-    [/(\d+) Linien geladen/, '$1 lines loaded']
+    [/(\d+) Linien geladen/, '$1 lines loaded'],
+    [/^([▸▾]) Gattungen bearbeiten \((\d+) von (\d+)\)$/, '$1 Edit train types ($2 of $3)'],
+    [/^(\d+) von (\d+) Gattungen$/, '$1 of $2 train types']
   ];
 
   function tr(s) {
