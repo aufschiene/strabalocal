@@ -1088,6 +1088,24 @@
       text-overflow: ellipsis;
     }
     .station-chip .stop-details { font-size: 12px; color: #666; margin-top: 2px; }
+    /* von→nach in der Stationskarte: Start und Ziel je eine eigene Zeile, Label und Name
+       NEBENEINANDER, jede Zeile fuer sich gekuerzt. Eigene Klassennamen, denn vn-label
+       gehoert dem Wizard-Stepper und steht dort auf display:flex. */
+    .station-chip .stop-name .vnk-zeile {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .station-chip .stop-name .vnk-label {
+      display: inline;
+      color: #8b8378;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+      margin-right: 4px;
+    }
     .station-chip .delete {
       background: #ffebee;
       border: none;
@@ -7909,9 +7927,14 @@ function selectWienStation(station) {
   if (_otherSec) _otherSec.style.display = 'none';
   if (_otherList) _otherList.innerHTML = '';
 
-  // Titel aktualisieren
+  // Titel aktualisieren. Einzahl oder Mehrzahl nach der Zahl der Richtungen statt dem
+  // sperrigen "Richtung(en)" (Paul 04.10.2026). Bei genau einer Richtung waehlt der
+  // Nutzer nichts mehr aus, sie ist unten schon angehakt, darum auch kein "waehle".
   document.getElementById('wienDirectionTitle').innerHTML = `📍 ${station.name}`;
-  document.getElementById('wienDirectionInfo').textContent = `Linie ${wienSelectedLine.lineName} - Wähle die Richtung(en)`;
+  const _dirAnzahl = (station.directions || []).length;
+  document.getElementById('wienDirectionInfo').textContent = (_dirAnzahl === 1)
+    ? `Linie ${wienSelectedLine.lineName}, nur eine Richtung`
+    : `Linie ${wienSelectedLine.lineName}, wähle die Richtungen`;
 
   // BESTAND dieser Station einsammeln (Kunde 2026-08-29: „2 → Dornbach sollte schon
   // ausgewählt sein, weil unten schon hinzugefügt") — Kombis line|towards, die in
@@ -7958,7 +7981,7 @@ function selectWienStation(station) {
       <div class="line-group" style="padding:0;overflow:hidden;">
         <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;">
           <span class="line-badge ${wienBadgeClass(wienSelectedLine.lineName)}" style="padding:6px 12px;border-radius:6px;font-weight:700;">${wienSelectedLine.lineName}</span>
-          <span style="color:#888;font-size:13px;">Richtung(en) wählen</span>
+          <span style="color:#888;font-size:13px;">Richtungen wählen</span>
         </div>
         ${uniqueDirections.map((dir, idx) => {
           const pre = window._wienExistingKeys[wienSelectedLine.lineName + '|' + (dir.towards || '')] ? true : false;
@@ -8553,7 +8576,9 @@ async function performSearch(query) {
       const hubAdds = [];
       const ql = query.toLowerCase();
       const missing = FV_AT_STATIONS.filter(n => n.toLowerCase().includes(ql) && !haveNorms.has(normFvName(n)));
-      for (const name of missing.slice(0, 6)) {
+      // Die bis zu sechs Nachladungen laufen PARALLEL. Nacheinander kosteten sie bei
+      // "Salzburg" rund sechs Sekunden, obwohl sie nichts voneinander wissen muessen.
+      const gefunden = await Promise.all(missing.slice(0, 6).map(async function(name) {
         const nk = normFvName(name);
         let match = FV_HUB_CACHE.get(nk);            // gecacht → kein erneuter Request
         if (match === undefined) {                   // noch nie aufgelöst
@@ -8565,19 +8590,38 @@ async function performSearch(query) {
           } catch (e) { match = null; }
           FV_HUB_CACHE.set(nk, match);
         }
+        return match;
+      }));
+      // Einsammeln bleibt der Reihe nach, damit haveNorms Dubletten weiter sauber abfaengt.
+      gefunden.forEach(function(match) {
         if (match && !haveNorms.has(fvWhitelistKey(match.name))) {
           hubAdds.push(match);
           haveNorms.add(fvWhitelistKey(match.name));
         }
-      }
+      });
       if (hubAdds.length) results = hubAdds.concat(results);
-      // nach Anzahl Fernverkehr-Zugtypen sortieren (mehr Typen → weiter oben). NUR die Top 8
-      // scoren (spart Requests) — die großen Hubs stehen ohnehin oben; 9-15 bleiben in Reihenfolge.
-      const toScore = results.slice(0, 8);
-      const rest = results.slice(8, 15);
-      const scored = await Promise.all(toScore.map(async s => ({ s, score: await fvStationScore(s.id) })));
-      scored.sort((a, b) => b.score - a.score);
-      results = scored.map(x => x.s).concat(rest);
+      // Reihenfolge ohne eine einzige Zusatzabfrage. Frueher wurden dafuer die Abfahrten
+      // der vorderen acht Treffer gezaehlt, das kostete bis zu acht Requests und rund
+      // zehn Sekunden pro Suche; seit der Server das Feld rail mitgibt (03.10.2026)
+      // reicht der Name. Sortiert wird, nicht gefiltert: ein kleiner Bahnhof hat nachts
+      // auch 0 Abfahrten und muss trotzdem auffindbar bleiben. Bei Gleichstand bleibt die
+      // Reihenfolge des Servers erhalten (stabile Sortierung ueber den Index).
+      const _qn = normFvName(query);
+      const punkte = function(s) {
+        if (s.rail === false) return -1;                    // Bus, Bim, U-Bahn ganz nach unten
+        const n = normFvName(s.name);
+        let p = 0;
+        if (fvWhitelistKey(s.name)) p += 4;                 // bekannter Hub-Bahnhof
+        if (/(^| )hbf( |$)/.test(n)) p += 3;                // Hauptbahnhof vor Nebenhalt
+        // Nur auf Wortgrenze: sonst zaehlt "wiener neustadt hbf" als Treffer fuer "wien"
+        // und stand bei der Suche "Wien" vor dem Wien Hbf.
+        if (_qn && (n === _qn || n.indexOf(_qn + ' ') === 0)) p += 2;
+        return p;
+      };
+      results = results.map(function(s, i) { return { s: s, i: i, p: punkte(s) }; })
+                       .sort(function(a, b) { return (b.p - a.p) || (a.i - b.i); })
+                       .map(function(x) { return x.s; })
+                       .slice(0, 15);
     }
 
     displaySearchResults(results);
@@ -8632,10 +8676,22 @@ function searchWien(query) {
 
 async function searchViaProxy(network, query) {
   const params = new URLSearchParams({ network: mapNetworkForApi(network), q: query });
-  const response = await fetch(`${SEARCH_API}?${params}`);
-  const data = await response.json();
+  // Leere Antwort EINMAL wiederholen: direkt nach einem Server-Neustart bzw. unter der
+  // Trainboard-Drossel kommt der erste Abruf leer zurueck, der naechste stimmt
+  // (Hinweis des Server-Teams, 03.10.2026). Kostet nur im Nichtstreffer-Fall Zeit.
+  let data = { stops: [] };
+  for (let versuch = 0; versuch < 2; versuch++) {
+    if (versuch) await new Promise(function(r) { setTimeout(r, 800); });
+    try {
+      data = await (await fetch(`${SEARCH_API}?${params}`)).json();
+    } catch (e) { data = { stops: [] }; }
+    if ((data.stops || []).length) break;
+  }
   return (data.stops || []).map(s => ({
     id: s.id, name: s.name, info: s.info || '',
+    // Seit 03.10.2026 sagt der Server pro Treffer, ob es ein Bahnhof ist: true/false/null
+    // (null = unbekannt). Spart uns das Nachzaehlen ueber die Abfahrten.
+    rail: (s.rail === undefined ? null : s.rail),
     // Zusatzfelder fuer netz-spezifische Geofilter (Tirol/Vorarlberg, CH)
     country: (s.country || '').toUpperCase(),
     lat: (typeof s.lat === 'number') ? s.lat : null,
@@ -10623,15 +10679,17 @@ function ladeFvSuche(q) {
     } catch (e) { treffer = []; }
     // Nur echte Bahnhoefe anbieten. Die Stationssuche liefert auch Bus- und Bimhaltestellen
     // ("Wien Stadion", "Wien Praterkai"), und als Fahrtziel waeren die eine Falle: das Brett
-    // bliebe leer. Das ÖBB-Netz liefert fuer sie messbar 0 Abfahrten (gemessen 02.10.2026:
-    // Wien Gewerbepark Stadlau 0, Wien Stadlau 4), also zaehlt fvStationScore sie aus.
-    // Hoechstens sechs Proben, Ergebnis je Station gecacht.
+    // bliebe leer. Seit 03.10.2026 sagt der Server das pro Treffer im Feld rail, frueher
+    // mussten wir dafuer sechs Abfahrts-Abfragen machen (rund zehn Sekunden). Nur wo rail
+    // fehlt (null), wird noch gezaehlt, und auch das hoechstens dreimal.
+    const sicher = treffer.filter(function(x) { return x.rail === true; });
+    const unklar = treffer.filter(function(x) { return x.rail !== true && x.rail !== false; });
     try {
-      const geprueft = await Promise.all(treffer.slice(0, 6).map(async function(x) {
+      const geprueft = await Promise.all(unklar.slice(0, 3).map(async function(x) {
         return (await fvStationScore(x.id)) > 0 ? x : null;
       }));
-      treffer = geprueft.filter(Boolean);
-    } catch (e) { treffer = []; }
+      treffer = sicher.concat(geprueft.filter(Boolean));
+    } catch (e) { treffer = sicher; }
     // Ladezeichen IMMER loeschen, auch wenn die Eingabe weitergelaufen ist: sonst bliebe
     // fvSearchLoading haengen und die leere Liste zeigte fuer immer "Ziele werden geladen...".
     fvSearchLoading = false;
@@ -11966,11 +12024,20 @@ function updateStationsList() {
         }).join('');
       }
     }
+    // von→nach-Stationen auf ZWEI Zeilen: "Von: X" / "Nach: Y". In einer Zeile schnitt
+    // der Name ab und das Ziel war nicht mehr lesbar ("Wien Stadlau → Br…", Paul 03.10.2026).
+    const nameHtml = (function() {
+      const n = String(group.stopName || '');
+      const p = n.indexOf(' \u2192 ');
+      if (p < 0) return escapeHtmlFt(n);
+      return '<span class="vnk-zeile"><span class="vnk-label">Von:</span> ' + escapeHtmlFt(n.slice(0, p)) + '</span>'
+           + '<span class="vnk-zeile"><span class="vnk-label">Nach:</span> ' + escapeHtmlFt(n.slice(p + 3)) + '</span>';
+    })();
     return `
       <div class="station-chip ${group.isExisting ? 'existing' : ''} ${group.isJourney ? 'journey' : ''}">
         ${chipHead || `<span class="network-badge ${badgeClass}">${badgeLabel}</span>`}
         <div class="info">
-          <div class="stop-name">${group.stopName}</div>
+          <div class="stop-name">${nameHtml}</div>
           <div class="stop-details">${chipDetails || filterLabel}</div>
         </div>
         <div class="buttons">
@@ -23776,6 +23843,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Alle Abfahrten': 'All departures', 'Alle Linien': 'All lines', 'Alle Richtungen': 'All directions',
     'Einzelne Linien': 'Individual lines', 'Nach Linie filtern': 'Filter by line',
     'Richtung wählen': 'Choose direction', 'Richtung(en) wählen': 'Choose direction(s)',
+    'Richtungen wählen': 'Choose directions',
     'Richtungen werden geladen...': 'Loading directions...', 'Ziele werden geladen...': 'Loading destinations...',
     'Weitere Bahnhöfe, keine Direktverbindung gefunden': 'More stations, no direct connection found',
     'Für diese Station kennen wir keine Ziele. Nimm oben Alle Abfahrten.':
@@ -24061,6 +24129,8 @@ window.addEventListener('DOMContentLoaded', () => {
     [/^Station suchen\.{2,3}$/, 'Search station...'],
     [/^Aktuell: /, 'Current: '],
     [/^Linie (.+?) - Wähle die Richtung\(en\)$/, 'Line $1 · choose direction(s)'],
+    [/^Linie (.+?), wähle die Richtungen$/, 'Line $1, choose the directions'],
+    [/^Linie (.+?), nur eine Richtung$/, 'Line $1, only one direction'],
     [/^Linie (\d+\S*)$/, 'Line $1'],
     [/^Richtung (.+)$/, 'Towards $1'],
     [/ wird bald unterstützt — die Schnittstelle ist in Arbeit\.$/, ' will be supported soon — the integration is in progress.'],
