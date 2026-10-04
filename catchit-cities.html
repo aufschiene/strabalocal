@@ -7849,12 +7849,24 @@ function showWienStationDropdown(inputValue) {
     });
   }
 
-  let stationsList = Array.from(stationsByName.values()).map(s => ({
-    name: s.originalNames.find(n => n.includes('/')) || s.originalNames[0],
-    originalNames: s.originalNames,
-    stopIds: Array.from(s.stopIds),
-    directions: s.directions
-  })).sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  // An der Endstation die Richtung wegwerfen, die GENAU HIER endet. In den Daten steht
+  // an Oberlaa bei der U1 auch "→ Oberlaa", das ist der Ankunftsbahnsteig: gemessen am
+  // 04.10.2026 liefert Halt 4133 (→ Oberlaa) null Abfahrten, Halt 4134 (→ Leopoldau)
+  // sieben. Wählbar war sie trotzdem, und das Brett blieb dann leer (Paul 04.10.2026).
+  // Nur an der Endstation selbst: unterwegs (z.B. Reumannplatz) bleibt "→ Oberlaa" die
+  // richtige Fahrtrichtung. Würde nichts übrig bleiben (Ringlinie, die hier anfängt und
+  // endet), bleibt alles stehen, sonst könnte man die Station gar nicht mehr nehmen.
+  let stationsList = Array.from(stationsByName.entries()).map(([normName, s]) => {
+    let dirs = s.directions;
+    const abfahrend = dirs.filter(d => normalizeStationName(d.towards || '') !== normName);
+    if (abfahrend.length) dirs = abfahrend;
+    return {
+      name: s.originalNames.find(n => n.includes('/')) || s.originalNames[0],
+      originalNames: s.originalNames,
+      stopIds: Array.from(s.stopIds),
+      directions: dirs
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name, 'de'));
 
   if (query.length > 0) {
     stationsList = stationsList.filter(s =>
@@ -8966,7 +8978,10 @@ async function selectStop(id, name) {
   editingStationIndex = null;  // Sicherstellen dass wir nicht im Bearbeiten-Modus sind
 
   document.getElementById('selectedStationName').textContent = name;
-  document.getElementById('selectedStationInfo').textContent = `${NETWORKS[selectedNetwork].name} · ID: ${id}`;
+  // Netz defensiv aufloesen: ein unbekannter Schluessel (Server-Prefix aus einer
+  // Geraete-Config) warf hier eine Ausnahme und brach den ganzen Vorgang stumm ab.
+  document.getElementById('selectedStationInfo').textContent =
+    `${(NETWORKS[selectedNetwork] && NETWORKS[selectedNetwork].name) || selectedNetwork || ''} · ID: ${id}`;
 
   searchResults.classList.remove('show');
 
@@ -10820,7 +10835,17 @@ function addFvDestStation() {
   const fullId = fvDests.length
     ? (apiNetwork + ':' + selectedStop.id + '>' + fvDests.map(function(d) { return d.id; }).join('~'))
     : (apiNetwork + ':' + selectedStop.id);
-  const filter = fv.filter;
+  // „Alle Abfahrten" OHNE Einschraenkung der Zugtypen → WILDCARD statt Gattungsliste.
+  // Sonst schrieb der Konfigurator alle bekannten Gattungen einzeln ins Linienfeld
+  // (RJX,RJ,WB,IC,…,RE,RB), und das Geraet wirft jede Abfahrt weg, deren Name mit keiner
+  // davon beginnt. Gemessen am 04.10.2026 fuer Puchberg am Schneeberg: die Schneebergbahn
+  // „NÖSBB" verschwand, nur R98 blieb uebrig, obwohl der Kunde alle Abfahrten wollte
+  // (Bugreport H. Ludwig). Sobald der Kunde Gattungen abwaehlt, bleibt die Liste bestehen,
+  // dann ist sie ja gewollt.
+  const alleGattungenAn = (typeof ALL_CATS !== 'undefined')
+    && ALL_CATS.every(function(c) { return fvActiveCats.has(c); });
+  const alleAbfahrten = fvAll && !fvDests.length && alleGattungenAn;
+  const filter = alleAbfahrten ? '' : fv.filter;
   // WICHTIG: KEINE directions mit towards=Ziel setzen! Das Ziel ist ein ZWISCHENHALT,
   // kein Terminus — der Server filtert schon nach Route. Würde das Gerät zusätzlich auf
   // "Endziel == Zielbahnhof" filtern, fände es nichts (Züge enden in Linz/Salzburg/…).
@@ -10832,7 +10857,7 @@ function addFvDestStation() {
   const fd = fvDests.map(function(d) { return { id: d.id, name: d.name }; });
   if (editingStationIndex !== null) {
     const ex = stations[editingStationIndex];
-    ex.filter = filter; ex.directions = directions; ex.allDepartures = false;
+    ex.filter = filter; ex.directions = directions; ex.allDepartures = alleAbfahrten;
     ex.fullId = fullId; ex.stopName = stopName; ex.fvDests = fd;
     ex.fvDestId = fd[0] && fd[0].id; ex.fvDestName = fd.map(function(d) { return d.name; }).join(', ');
     stations = stations.filter(function(s, i) { return i === editingStationIndex || s.fullId !== fullId; });
@@ -10846,7 +10871,7 @@ function addFvDestStation() {
     stations.push({
       network: selectedNetwork, networkName: NETWORKS[selectedNetwork].name,
       stopId: selectedStop.id, stopName: stopName, filter: filter, fullId: fullId,
-      isExisting: false, directions: directions, fvDests: fd,
+      isExisting: false, directions: directions, allDepartures: alleAbfahrten, fvDests: fd,
       fvDestId: fd[0] && fd[0].id, fvDestName: fd.map(function(d) { return d.name; }).join(', ')
     });
   }
@@ -12199,17 +12224,40 @@ function presetForNetwork(net) {
 //  - klare Mehrheit  → { preset } (direkt ins Bundesland)
 //  - Gleichstand     → { preset:null, country } (Bundesland-Auswahl des Landes)
 //  - nichts erkannt  → { preset:null, country:null }
+// Land eines Netzes, auch wenn es kein Bundesland-Preset gibt. Zug-Stationen hiessen
+// bisher nirgends dazu: die Kachel „Züge" (WESTBAHN) springt ohne subRegion ins Land,
+// also fand presetForNetwork nichts. Kommt die Station vom GERAET zurueck, traegt sie
+// ausserdem das Server-Prefix als Netz (OEBBREG, OEBBFERN, …), das gar kein Schluessel
+// in NETWORKS ist. Beides fuehrte dazu, dass „Weitere Station" wieder in der
+// Laenderauswahl landete statt in der Regionsauswahl (Bugreport H. Ludwig 04.10.2026).
+function landFuerNetz(net) {
+  if (!net) return null;
+  if (NETWORKS[net] && NETWORKS[net].region) return NETWORKS[net].region;
+  if (/^OEBB/.test(String(net))) return 'AT';   // Server-Prefixe: OEBBREG, OEBBFERN, OEBBALL …
+  return null;
+}
+
 function pickBundeslandFromStations() {
   var counts = {}, parents = {};
   (typeof stations !== 'undefined' ? stations : []).forEach(function(s){
     var k = presetForNetwork(s.network);
-    if (!k) return;
+    if (!k) {
+      // Kein Bundesland ableitbar, aber das Land kennen wir → wenigstens dorthin.
+      var land = landFuerNetz(s.network);
+      if (land) parents[land] = (parents[land] || 0) + 1;
+      return;
+    }
     counts[k] = (counts[k] || 0) + 1;
     var par = DISPLAY_PRESETS[k] && DISPLAY_PRESETS[k].parent;
     if (par) parents[par] = (parents[par] || 0) + 1;
   });
   var keys = Object.keys(counts);
-  if (!keys.length) return { preset: null, country: null };
+  // Kein Bundesland erkannt, aber ein Land: dann wenigstens dessen Regionsauswahl zeigen,
+  // statt zurueck in die Laenderauswahl zu fallen.
+  if (!keys.length) {
+    var nurLand = Object.keys(parents).sort(function(a,b){ return parents[b]-parents[a]; })[0] || null;
+    return { preset: null, country: nurLand };
+  }
   var max = Math.max.apply(null, keys.map(function(k){ return counts[k]; }));
   var top = keys.filter(function(k){ return counts[k] === max; });
   var country = Object.keys(parents).sort(function(a,b){ return parents[b]-parents[a]; })[0] || null;
@@ -12280,7 +12328,16 @@ async function editStation(idx) {
   // wie ÖBB Regional (Kundenreport 2026-07-14). Wie beim In-Session-Edit: selectedStop
   // = NUR die Von-Station (id vor '>', Name vor '→'); Ziele/Zugtypen stellt der
   // renderLines-FV-Restore aus fullId+filter wieder her.
-  if (station.network === 'OEBBFERN') {
+  // Auch OEBBREG und die *ALL-Varianten: Eine Station, die vom GERAET zurueckkommt, traegt
+  // als Netz das rbl-Prefix (OEBBREG, OEBBALL, …). Das sind Server-Kennungen, KEINE
+  // Schluessel in NETWORKS. „Bearbeiten" setzte selectedNetwork darauf, und
+  // selectStopForEdit stuerzte an NETWORKS[selectedNetwork].name ab: der Knopf tat
+  // sichtbar nichts, und der halb gesetzte Zustand schickte den naechsten
+  // „Station hinzufuegen"-Versuch in die Endlosschleife der Laenderauswahl
+  // (Bugreport H. Ludwig 04.10.2026, nachgestellt mit OEBBREG:1131826).
+  if (station.network === 'OEBBFERN' || station.network === 'OEBBREG'
+      || station.network === 'OEBBALL' || station.network === 'OEBBREGALL'
+      || station.network === 'OEBBFERNALL') {
     selectedNetwork = 'WESTBAHN';
     const fvFromId = String(station.stopId || '').split('>')[0];
     const fvFromName = String(station.stopName || '').split(' → ')[0] || fvFromId;
@@ -12412,7 +12469,10 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
     ? JSON.parse(JSON.stringify(_editStation.regionalLinks)) : {};
 
   document.getElementById('selectedStationName').textContent = name;
-  document.getElementById('selectedStationInfo').textContent = `${NETWORKS[selectedNetwork].name} · ID: ${id}`;
+  // Netz defensiv aufloesen: ein unbekannter Schluessel (Server-Prefix aus einer
+  // Geraete-Config) warf hier eine Ausnahme und brach den ganzen Vorgang stumm ab.
+  document.getElementById('selectedStationInfo').textContent =
+    `${(NETWORKS[selectedNetwork] && NETWORKS[selectedNetwork].name) || selectedNetwork || ''} · ID: ${id}`;
 
   // Toggle-Modus setzen: "Alle Abfahrten" wenn Station allDepartures hat, sonst "Linien wählen"
   const editingStation = editingStationIndex !== null ? stations[editingStationIndex] : null;
