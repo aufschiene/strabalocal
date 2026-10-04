@@ -3785,24 +3785,6 @@
       </div>
     </div>
 
-    <!-- Sicherung: Konfiguration als Datei exportieren/importieren (Kunde Alex 2026-09,
-         nach mehrfach zerschossenen Configs). Export = exakt die Felder, die auch ans
-         Gerät gehen; Import läuft über denselben loadFullConfig-Pfad wie das Gerät. -->
-    <div class="config-card">
-      <h3>Sicherung</h3>
-      <div class="form-row">
-        <div>
-          <div class="form-label">Konfiguration als Datei</div>
-          <div class="form-hint">Sichert alle Einstellungen auf diesem Gerät, zum Wiederherstellen oder Übertragen</div>
-        </div>
-        <div style="display:flex;gap:8px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;">
-          <button onclick="exportConfigBackup()" style="padding:9px 14px;border:none;background:#4285f4;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Sichern</button>
-          <button onclick="document.getElementById('cfgBackupFile').click()" style="padding:9px 14px;border:1px solid #ccc;background:#fff;color:#333;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Laden</button>
-          <input type="file" id="cfgBackupFile" accept=".json,application/json,text/plain" style="display:none" onchange="importConfigBackup(this)">
-        </div>
-      </div>
-    </div>
-
     <!-- Hidden fields for backwards compatibility -->
     <select id="ftColorSelect" style="display:none;">
       <option value="1">Wiener Linien</option>
@@ -9069,10 +9051,11 @@ async function selectStop(id, name) {
 
     extractLines(mergedData || {});
     await augmentLinesFromLinesEndpoint(selectedNetwork, selectedStop.id);
-    renderLines();
+    try { renderLines(); } catch (e) { console.error('renderLines:', e); }
 
     linesLoading.classList.add('hidden');
     linesContainer.classList.remove('hidden');
+    pruefeLinienMaske(selectedStop && selectedStop.name);
   } catch (e) {
     console.error('Failed to load departures:', e);
     linesLoading.innerHTML = '<div style="color:#d32f2f">Fehler beim Laden der Linien</div>';
@@ -12457,6 +12440,32 @@ async function restoreWienStationEdit(idx) {
 }
 
 // Spezielle Version von selectStop für das Bearbeiten (mit Vorauswahl)
+// Sicherheitsnetz fuer den Linien-Schritt: bleibt die Maske nach dem Rendern leer, zeigt
+// sie das auch an statt einer weissen Flaeche. Kunden sahen sonst nur den Stationsnamen
+// und darunter nichts, ohne Hinweis und ohne Ausweg (Paul 04.10.2026).
+function pruefeLinienMaske(name) {
+  var liste = document.getElementById('linesList');
+  if (liste && liste.innerHTML.trim().length > 0) return;
+  var text = 'Fuer ' + (name || 'diese Station') + ' kamen gerade keine Daten an.';
+  if (liste) {
+    liste.innerHTML = '<div style="padding:18px 4px;text-align:center;color:#6b6357;font-size:14px;">'
+      + escapeHtml(text)
+      + '<div style="margin-top:12px;"><button class="btn" onclick="erneutLinienLaden()">Erneut versuchen</button></div></div>';
+  }
+  try { linesLoading.classList.add('hidden'); linesContainer.classList.remove('hidden'); } catch (e) {}
+}
+
+// Erneuter Anlauf fuer den Linien-Schritt (Knopf aus pruefeLinienMaske).
+function erneutLinienLaden() {
+  if (!selectedStop) return;
+  if (editingStationIndex !== null && typeof selectStopForEdit === 'function') {
+    var st = stations[editingStationIndex];
+    selectStopForEdit(selectedStop.id, selectedStop.name, (st && st.directions) || [], (st && st.filter) || '');
+  } else {
+    selectStop(selectedStop.id, selectedStop.name);
+  }
+}
+
 async function selectStopForEdit(id, name, existingDirections, existingFilter) {
   selectedStop = { id, name };
   selectedLines = new Set();
@@ -12553,12 +12562,13 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
       }
     });
 
-    renderLines();
+    try { renderLines(); } catch (e) { console.error('renderLines:', e); }
 
     linesLoading.classList.add('hidden');
     linesContainer.classList.remove('hidden');
     addStationBtn.disabled = selectedLines.size === 0;
     addStationBtn.textContent = 'Aktualisieren';
+    pruefeLinienMaske(selectedStop && selectedStop.name);
   } catch (e) {
     console.error('Failed to load departures:', e);
     linesLoading.innerHTML = '<div style="color:#d32f2f">Fehler beim Laden der Linien</div>';
@@ -16943,7 +16953,7 @@ function renderDisplayTypeSections() {
       // Reihenfolge Drag&Drop (nur bei Statisch) — kein separater Auto/Manuell-Toggle mehr
       html += '<div id="ftManualOrder_' + cid + '" style="display:none;margin-top:8px;padding:12px;background:#f8f9fa;border-radius:10px;">';
       html += '<div class="form-label" style="margin-bottom:4px;">Reihenfolge</div>';
-      html += '<div class="form-hint" style="margin-bottom:8px;">Zeile 1 = oben · ziehen zum Umsortieren</div>';
+      html += '<div class="form-hint" style="margin-bottom:8px;">Zeile 1 = oben · Pfeil länger drücken schiebt ganz nach oben oder unten</div>';
       html += '<div id="ftOrderList_' + cid + '"></div>';
       html += '</div>';
 
@@ -18341,8 +18351,14 @@ function renderRowOrderList() {
         <span class="group-badges">${badgesHtml}</span>
         <span class="direction-text">${destText}</span>
         <span class="move-buttons">
-          <button class="move-btn move-up" onclick="moveRowOrder(${idx}, -1)" ${isFirst ? 'disabled' : ''}>▲</button>
-          <button class="move-btn move-down" onclick="moveRowOrder(${idx}, 1)" ${isLast ? 'disabled' : ''}>▼</button>
+          <button class="move-btn move-up" title="Tippen = eine Position, halten = ganz nach oben"
+            onpointerdown="ftPfeilHalten(${idx}, -1)" onpointerup="ftPfeilLoslassen()"
+            onpointerleave="ftPfeilLoslassen()" onpointercancel="ftPfeilLoslassen()"
+            onclick="ftPfeilKlick(${idx}, -1)" ${isFirst ? 'disabled' : ''}>▲</button>
+          <button class="move-btn move-down" title="Tippen = eine Position, halten = ganz nach unten"
+            onpointerdown="ftPfeilHalten(${idx}, 1)" onpointerup="ftPfeilLoslassen()"
+            onpointerleave="ftPfeilLoslassen()" onpointercancel="ftPfeilLoslassen()"
+            onclick="ftPfeilKlick(${idx}, 1)" ${isLast ? 'disabled' : ''}>▼</button>
         </span>
       </div>
     `;
@@ -18357,6 +18373,11 @@ function renderRowOrderList() {
     item.addEventListener('drop', handleDrop);
     item.addEventListener('dragenter', handleDragEnter);
     item.addEventListener('dragleave', handleDragLeave);
+    // Zusaetzlich per Pointer: die HTML5-Drag-API gibt es auf Touchgeraeten NICHT,
+    // dort liess sich trotz des Hinweises "ziehen zum Umsortieren" nichts ziehen
+    // (Bugreport H. Ludwig 04.10.2026). Pointer-Events decken Maus UND Finger ab.
+    const griff = item.querySelector('.drag-handle');
+    if (griff) griff.addEventListener('pointerdown', ftZiehStart);
   });
 }
 
@@ -18415,6 +18436,82 @@ function handleDrop(e) {
 }
 
 // Mobile-freundliche Alternative zu Drag & Drop
+// Pfeil TIPPEN = eine Position, Pfeil HALTEN = ganz nach oben bzw. unten. Ohne das
+// musste man eine Station an 18 Eintraegen vorbei einzeln hochklicken (Bugreport
+// H. Ludwig 04.10.2026); vier Knoepfe pro Zeile waren Paul zu viel (04.10.2026).
+var _ftHaltUhr = null;
+var _ftSprungGemacht = false;
+function ftPfeilHalten(index, richtung) {
+  _ftSprungGemacht = false;
+  clearTimeout(_ftHaltUhr);
+  _ftHaltUhr = setTimeout(function() {
+    _ftSprungGemacht = true;   // der folgende Klick darf dann NICHT nochmal einen Schritt machen
+    moveRowOrderTo(index, richtung < 0 ? 'oben' : 'unten');
+  }, 450);
+}
+function ftPfeilLoslassen() { clearTimeout(_ftHaltUhr); }
+function ftPfeilKlick(index, richtung) {
+  if (_ftSprungGemacht) { _ftSprungGemacht = false; return; }
+  moveRowOrder(index, richtung);
+}
+
+function moveRowOrderTo(index, wohin) {
+  if (index < 0 || index >= ftLineGroups.length) return;
+  const eintrag = ftLineGroups.splice(index, 1)[0];
+  if (wohin === 'oben') ftLineGroups.unshift(eintrag);
+  else ftLineGroups.push(eintrag);
+  renderRowOrderList();
+}
+
+// ===== Ziehen per Pointer (Maus UND Finger) =====
+// Waehrend des Ziehens wird NUR im DOM verschoben, nicht neu gerendert: sonst wuerde das
+// gezogene Element unter dem Finger verschwinden. Erst beim Loslassen wird die neue
+// Reihenfolge aus dem DOM zurueck in ftLineGroups geschrieben.
+var _ftZieh = null;
+function ftZiehStart(ev) {
+  const item = ev.currentTarget.closest('.ft-row-order-item');
+  if (!item) return;
+  ev.preventDefault();
+  _ftZieh = { item: item, liste: item.parentElement, pointerId: ev.pointerId };
+  item.classList.add('dragging');
+  try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) {}
+  ev.currentTarget.addEventListener('pointermove', ftZiehBewegen);
+  ev.currentTarget.addEventListener('pointerup', ftZiehEnde);
+  ev.currentTarget.addEventListener('pointercancel', ftZiehEnde);
+}
+function ftZiehBewegen(ev) {
+  if (!_ftZieh) return;
+  ev.preventDefault();
+  const unten = document.elementFromPoint(ev.clientX, ev.clientY);
+  const ziel = unten && unten.closest ? unten.closest('.ft-row-order-item') : null;
+  if (!ziel || ziel === _ftZieh.item || ziel.parentElement !== _ftZieh.liste) return;
+  const kaesten = Array.from(_ftZieh.liste.children);
+  const vonPos = kaesten.indexOf(_ftZieh.item);
+  const zuPos  = kaesten.indexOf(ziel);
+  if (vonPos < 0 || zuPos < 0) return;
+  if (zuPos > vonPos) _ftZieh.liste.insertBefore(_ftZieh.item, ziel.nextSibling);
+  else                _ftZieh.liste.insertBefore(_ftZieh.item, ziel);
+}
+function ftZiehEnde(ev) {
+  if (!_ftZieh) return;
+  const griff = ev.currentTarget;
+  griff.removeEventListener('pointermove', ftZiehBewegen);
+  griff.removeEventListener('pointerup', ftZiehEnde);
+  griff.removeEventListener('pointercancel', ftZiehEnde);
+  try { griff.releasePointerCapture(_ftZieh.pointerId); } catch (e) {}
+  _ftZieh.item.classList.remove('dragging');
+  // Neue Reihenfolge aus dem DOM lesen: data-index traegt die URSPRUENGLICHE Position.
+  const neueFolge = Array.from(_ftZieh.liste.children)
+    .map(function(el) { return parseInt(el.dataset.index, 10); })
+    .filter(function(n) { return !isNaN(n) && n >= 0 && n < ftLineGroups.length; });
+  _ftZieh = null;
+  if (neueFolge.length === ftLineGroups.length) {
+    const alt = ftLineGroups.slice();
+    ftLineGroups = neueFolge.map(function(i) { return alt[i]; });
+  }
+  renderRowOrderList();
+}
+
 function moveRowOrder(index, direction) {
   const newIndex = index + direction;
 
@@ -18746,10 +18843,22 @@ function dvWienHTML(colour, data, rows, previewEl, fixed) {
   var margin = 8;
   var lineFs = 34, destFs = 14, cdFs = 34;   // Poppins Bold 24pt / Bold 12pt / Bold 24pt
   var lineW = Math.max.apply(null, data.map(function(d) { return Math.ceil(String(d.line || '').length * lineFs * 0.62); }).concat([42]));
+  // Badge-Farbe einer Abfahrt. Ohne Farbe ODER wenn die Fahrzeugart nicht angehakt ist,
+  // gibt es KEIN Badge, dann wird der Linienname als großer Text gezeichnet.
+  function dvBadgeFarbe(dep) {
+    var vb = dvVehicleBit(dep);
+    var ok = (vb === 0) || ((wVehMask & vb) !== 0);
+    return ok ? (dvLineColorCss(dep.lineColor) || WIEN_BADGE[String(dep.line || '').toUpperCase()] || null) : null;
+  }
   // Im Badge-Modus ist das Badge mindestens quadratisch (Höhe = wBadgeH, siehe unten) und
   // trägt links/rechts Innenabstand. Die Linien-Spalte muss das reservieren, sonst liegt
   // der Zieltext über dem Badge (Paul 20.09.2026, Foto Graz Linie 1).
-  if (wBadgeV === 1) {
+  // ABER nur, wenn überhaupt eine Zeile ein Badge bekommt. Sonst wurde die Spalte breiter,
+  // ohne dass ein Badge erschien, der Zieltext bekam zu wenig Platz und rutschte auf zwei
+  // Zeilen: genau das sah der Kunde bei ÖBB-Zuegen im Wiener-Linien-Stil, denn die
+  // Fahrzeugart Zug ist standardmaessig nicht angehakt (Maske 4 = nur U-Bahn) und fuer
+  // Zuglinien gibt es keine eingebaute Farbe (Bugreport H. Ludwig 04.10.2026).
+  if (wBadgeV === 1 && data.some(function(d) { return !!dvBadgeFarbe(d); })) {
     var _rowH0 = Math.floor(170 / rows);
     var _bH = Math.min(_rowH0 - 4, Math.round(_rowH0 * 52 / 56));
     lineW = Math.max(lineW + 16, _bH);
@@ -18760,9 +18869,7 @@ function dvWienHTML(colour, data, rows, previewEl, fixed) {
     // Badge-Farbe wie badgeColorFor der Firmware: Server-Linienfarbe gewinnt, die
     // eingebaute Wien-U-Bahn-Tabelle bleibt Rückfall (gilt per Erbschaft auch für
     // VBB/CZHU). Die Fahrzeugarten-Maske entscheidet, wer überhaupt eines bekommt.
-    var vBit = dvVehicleBit(dep);
-    var vOk = (vBit === 0) || ((wVehMask & vBit) !== 0);
-    var bCol = vOk ? (dvLineColorCss(dep.lineColor) || WIEN_BADGE[String(dep.line || '').toUpperCase()] || null) : null;
+    var bCol = dvBadgeFarbe(dep);
     var bTxt = dvLineColorCss(dep.lineTextColor) || '#ffffff';
     var fullRow = (wBadgeV === 2 && bCol);
     var lineBadge = (wBadgeV === 1 && bCol);
@@ -21419,75 +21526,6 @@ function sendWithCustomConfig() {
 let saveRetryCount = 0;
 const MAX_SAVE_RETRIES = 3;
 
-// Sicherung als Datei (Kunde Alex 2026-09): exakt die Geräte-Felder, gebaut aus denselben
-// Buildern wie beim Speichern. Die Datei entspricht dem /debug-Format und lässt sich
-// darum auch mit einem Debug-Abzug vom Gerät wiederherstellen.
-function exportConfigBackup() {
-  var en = false;
-  try { en = (localStorage.getItem('catchit_lang') || 'de') === 'en'; } catch (e) {}
-  try {
-    var rows = buildMasterAndTimeRows();
-    if (!rows || !rows.masterrow) { alert(en ? 'Nothing to back up yet, add a station first.' : 'Noch nichts zu sichern, bitte zuerst eine Station hinzufügen.'); return; }
-    var ds = (typeof buildDisplaySettings === 'function') ? buildDisplaySettings() : '';
-    var cr = '';
-    try { cr = (typeof buildCustomRow === 'function') ? (buildCustomRow() || '') : ''; } catch (e) {}
-    var rblId = rows.masterrow.split(';').concat((rows.timerow || '').split(';'))
-      .map(function(seg) { return (seg.split('|')[0] || '').trim(); }).filter(Boolean).join(',');
-    var rc = recommendedConfig || {};
-    var cfg = {
-      rbl_id: rblId,
-      colour: (typeof colourListFromRows === 'function') ? colourListFromRows(rows.masterrow, rows.timerow, rc.colour != null ? rc.colour : '1') : String(rc.colour != null ? rc.colour : '1'),
-      sort_mode: (rc.sortMode != null) ? parseInt(rc.sortMode) : 1,
-      stop_interval: (rc.stopInterval != null) ? parseInt(rc.stopInterval) : 12,
-      displaylight: (rc.displayLight != null) ? parseInt(rc.displayLight) : 3,
-      display_mode: (rc.displayMode != null) ? parseInt(rc.displayMode) : 1,
-      chopper: rc.chopper ? 1 : 0,
-      night_mode_enabled: !!rc.nightMode,
-      night_mode_start: (rc.nightStart != null) ? parseInt(rc.nightStart) : 22,
-      night_mode_end: (rc.nightEnd != null) ? parseInt(rc.nightEnd) : 6,
-      masterrow: rows.masterrow,
-      timerow: rows.timerow || '',
-      displaysettings: ds,
-      customrow: cr
-    };
-    var d = new Date();
-    var name = 'catch-it-sicherung-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '.json';
-    var blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-  } catch (e) {
-    console.error('[BACKUP] Export-Fehler:', e);
-    alert(en ? 'Backup failed, please try again.' : 'Sicherung fehlgeschlagen, bitte noch einmal versuchen.');
-  }
-}
-function importConfigBackup(inp) {
-  var en = false;
-  try { en = (localStorage.getItem('catchit_lang') || 'de') === 'en'; } catch (e) {}
-  var f = inp && inp.files && inp.files[0];
-  if (!f) return;
-  var rd = new FileReader();
-  rd.onload = function() {
-    try {
-      var cfg = JSON.parse(String(rd.result || ''));
-      if (!cfg || (!cfg.rbl_id && !cfg.rbl) || !cfg.masterrow) {
-        alert(en ? 'This is not a catch-it backup file.' : 'Das ist keine catch-it Sicherungsdatei.');
-        return;
-      }
-      // Gleicher Weg wie eine Geräte-Config: der loadFullConfig-Handler stellt alles wieder her.
-      window.postMessage({ type: 'loadFullConfig', config: cfg }, '*');
-    } catch (e) {
-      console.error('[BACKUP] Import-Fehler:', e);
-      alert(en ? 'Could not read this file.' : 'Die Datei konnte nicht gelesen werden.');
-    }
-    try { inp.value = ''; } catch (e) {}
-  };
-  rd.readAsText(f);
-}
-
 function sendConfigToDeviceDirect(config) {
   // Baue die Gehweg-String im neuen Format: "stopId:value|stopId:value"
   // WICHTIG: Struktur IMMER aus config.rbl ableiten (= die echte, an das Gerät
@@ -23865,6 +23903,7 @@ window.addEventListener('DOMContentLoaded', () => {
   var D = {
     // Start / Grundgerüst
     'Lade Konfiguration …': 'Loading configuration …', 'Lade…': 'Loading…', 'Lade Abfahrten...': 'Loading departures...',
+    'Erneut versuchen': 'Try again',
     'Was möchtest du ändern?': 'What would you like to change?',
     'Dein catch-it ist schon eingerichtet. Wähle, was du anpassen willst.': 'Your catch-it is already set up. Choose what you want to adjust.',
     'Linien ändern': 'Change lines', 'Einstellungen ändern': 'Change settings',
@@ -23964,11 +24003,6 @@ window.addEventListener('DOMContentLoaded', () => {
     'Farbige Linien-Kästchen in der offiziellen Linienfarbe, wie auf den echten Anzeigen':
       'Colored line badges in the official line color, like on the real displays',
     'Badges für': 'Badges for', 'Zug/S-Bahn': 'Train/S-Bahn',
-    // Sicherung (Export/Import als Datei)
-    'Sicherung': 'Backup', 'Konfiguration als Datei': 'Configuration as a file',
-    'Sichert alle Einstellungen auf diesem Gerät, zum Wiederherstellen oder Übertragen':
-      'Saves all settings on this device, for restoring or transferring',
-    'Sichern': 'Save', 'Laden': 'Load',
     'Nur Linien mit hinterlegter Linienfarbe bekommen ein Badge. Für die Wiener U-Bahn sind die Farben fest eingebaut':
       'Only lines with a stored line color get a badge. Vienna metro colors are built in',
     'Wien-Bahnsteige bleiben immer zusammen auf einem Display.': 'Vienna platforms always stay together on one display.',
@@ -24143,6 +24177,10 @@ window.addEventListener('DOMContentLoaded', () => {
     'Sortiert nach Zeit': 'Sorted by time',
     'Von · Startbahnhof wählen': 'From · choose departure station',
     'Zeile 1 = oben · ziehen zum Umsortieren': 'Row 1 = top · drag to reorder',
+    'Zeile 1 = oben · Pfeil länger drücken schiebt ganz nach oben oder unten':
+      'Row 1 = top · press and hold an arrow to move all the way',
+    'Tippen = eine Position, halten = ganz nach oben': 'Tap = one position, hold = move to top',
+    'Tippen = eine Position, halten = ganz nach unten': 'Tap = one position, hold = move to bottom',
     'Zeit: einfach die nächsten Abfahrten, chronologisch.': 'Time: simply the next departures, chronological.',
     'ZeitGruppe: Linien gruppiert, geordnet nach der frühesten Abfahrt.': 'TimeGroup: lines grouped, ordered by earliest departure.',
     'Erreichbare Ziele werden ermittelt…': 'Finding reachable destinations…',
