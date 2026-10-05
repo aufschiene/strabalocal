@@ -5071,6 +5071,14 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
   //   bodo-Geräte sind davon AUSGENOMMEN (Paul 01.10.2026): am Bodensee gehören RB/RE/REX
   //     zum Angebot, dort ist BWEGT die einzige Kachel und muss die Züge mitbringen.
   const hideRailInPicker = () => {
+    // bodo: Fernbusse gehoeren nicht aufs Brett (Paul 05.10.2026). Muss VOR dem
+    // Rueckspruenger unten stehen, denn auf bodo-Geraeten bleiben Zuege ja drin.
+    if (typeof isBodoDevice === 'function' && isBodoDevice()) {
+      for (let i = availableLines.length - 1; i >= 0; i--) {
+        const nm = String((availableLines[i] && availableLines[i].name) || '');
+        if (/fernbus/i.test(nm)) availableLines.splice(i, 1);
+      }
+    }
     const ohneSBahn = (network === 'BERLIN');
     const ohneZuege = ohneSBahn ||
       (network === 'BWEGT' && !(typeof isBodoDevice === 'function' && isBodoDevice()));
@@ -8668,6 +8676,23 @@ function searchWien(query) {
     .slice(0, 15);
 }
 
+// Doppelten Ortsnamen am Anfang wegnehmen: der Server liefert "<Ort> <Haltestelle>", und
+// wenn die Haltestelle den Ort schon traegt, steht er zweimal da ("Lindau Lindau-Reutin",
+// "Niederhaus Niederhaus", gemessen 05.10.2026). Nur bei echter Wortgrenze, damit
+// "Wien Wiener Neustadt" oder "Boren Lindau" unangetastet bleiben.
+function entdoppelOrt(name) {
+  const n = String(name || '').trim();
+  const leer = n.indexOf(' ');
+  if (leer <= 0) return n;
+  const ort = n.substring(0, leer);
+  const rest = n.substring(leer + 1).trim();
+  if (!rest || rest.length < ort.length) return n;
+  if (rest.substring(0, ort.length).toLowerCase() !== ort.toLowerCase()) return n;
+  const danach = rest.charAt(ort.length);
+  if (danach && !/[\s\-,\/]/.test(danach)) return n;   // "Wiener" faengt zwar mit "Wien" an, ist aber ein anderes Wort
+  return rest;
+}
+
 async function searchViaProxy(network, query) {
   const params = new URLSearchParams({ network: mapNetworkForApi(network), q: query });
   // Leere Antwort EINMAL wiederholen: direkt nach einem Server-Neustart bzw. unter der
@@ -8682,7 +8707,7 @@ async function searchViaProxy(network, query) {
     if ((data.stops || []).length) break;
   }
   return (data.stops || []).map(s => ({
-    id: s.id, name: s.name, info: s.info || '',
+    id: s.id, name: entdoppelOrt(s.name), info: s.info || '',
     // Seit 03.10.2026 sagt der Server pro Treffer, ob es ein Bahnhof ist: true/false/null
     // (null = unbekannt). Spart uns das Nachzaehlen ueber die Abfahrten.
     rail: (s.rail === undefined ? null : s.rail),
@@ -9070,9 +9095,11 @@ async function selectStop(id, name) {
 function brandBusFirstRank(line) {
   const t = String(line.type || '').toLowerCase();
   const n = String(line.name || '').trim();
-  if (t.includes('bus')) return /^N\d/i.test(n) ? 1 : 0;                      // Bus, Nachtbus dahinter
-  if (t.includes('metro') || /^U\d/i.test(n)) return 2;                       // U-Bahn
-  if (t.includes('tram')) return 3;                                          // Tram
+  // Tram zuerst, dann Bus, dann alles mit Zug (Paul 05.10.2026). Davor stand der Bus
+  // ganz oben; die Züge waren schon unten und bleiben es.
+  if (t.includes('tram')) return 0;                                          // Tram
+  if (t.includes('bus')) return /^N\d/i.test(n) ? 2 : 1;                      // Bus, Nachtbus dahinter
+  if (t.includes('metro') || /^U\d/i.test(n)) return 3;                       // U-Bahn / Stadtbahn
   if (t === 'pttrains' || /^S\s?\d*$/i.test(n)) return 4;                      // S-Bahn
   // Zugnamen ohne Nummer sind normal, seit der Server "REX 25886 ÖBB-RegionalExpress"
   // auf die Gattung kürzt — \d* statt \d, sonst landen "REX" und "R" unter Sonstiges.
@@ -9081,21 +9108,23 @@ function brandBusFirstRank(line) {
   return 7;
 }
 
-// Sortier-Reihenfolge der Linienliste: U-Bahn → Tram → Bus → Nachtbus → Sonstiges,
-// innerhalb jeder Gruppe nach Liniennummer. (Nachtbus = "N" + Ziffer, z.B. N1.)
+// Sortier-Reihenfolge der Linienliste: U-Bahn → Tram → Bus → Nachtbus → alles mit Zug.
+// Züge standen früher VOR den Bussen; Paul will sie am 05.10.2026 generell unten haben,
+// Reihenfolge Tram, Bus, Zug. Innerhalb jeder Gruppe nach Liniennummer.
+// (Nachtbus = "N" + Ziffer, z.B. N1.)
 function lineTypeRank(line) {
   if (typeof brandDisplayTypes === 'function' && brandDisplayTypes()) return brandBusFirstRank(line);
   const t = String(line.type || '').toLowerCase();
   const n = String(line.name || '').trim();
   if (t.includes('metro') || /^U\d/i.test(n)) return 0;                      // U-Bahn
   if (t.includes('tram')) return 1;                                          // Tram / Straßenbahn
-  if (/^S\d/i.test(n) || t.includes('s-bahn') || t === 'pttrains') return 2; // S-Bahn
-  if (/^CJX/i.test(n)) return 3;                                             // CJX
-  if (/^REX/i.test(n)) return 4;                                             // REX
-  if (/^R\d|^R$/i.test(n)) return 5;                                         // R-Züge
-  if (/^IR/i.test(n)) return 6;                                              // IR
-  if (/^N\d/i.test(n)) return 8;                                             // Nachtbus (vor Bus, da Bus-Typ)
-  if (t.includes('bus')) return 7;                                           // Bus
+  if (/^N\d/i.test(n)) return 3;                                             // Nachtbus (hinter Bus)
+  if (t.includes('bus')) return 2;                                           // Bus
+  if (/^S\d/i.test(n) || t.includes('s-bahn') || t === 'pttrains') return 4; // S-Bahn
+  if (/^CJX/i.test(n)) return 5;                                             // CJX
+  if (/^REX/i.test(n)) return 6;                                             // REX
+  if (/^R\d|^R$/i.test(n)) return 7;                                         // R-Züge
+  if (/^IR/i.test(n)) return 8;                                              // IR
   return 9;                                                                  // Sonstiges (Zug/FV …)
 }
 function _lineNum(name) { const m = String(name || '').match(/\d+/); return m ? parseInt(m[0]) : 999; }
@@ -12698,6 +12727,20 @@ function calculateRecommendedConfig() {
     description = 'Optimiert für ÖBB Anzeige (EC, IC, S-Bahn, REX)';
   }
 
+  // bodo-Geraet: Voreinstellung immer bodo-Ansicht UND Kompakt (Paul 05.10.2026).
+  // BWEGT wuerde sonst auf Matrix (23) starten, weil das der Netz-Default fuer
+  // Baden-Wuerttemberg ist. Wer etwas anderes will, stellt im Feintuning um.
+  // Nur fuer eine NEUE Konfiguration: eine vom Geraet geladene behaelt die Wahl des Kunden.
+  if (typeof isBodoDevice === 'function' && isBodoDevice() && !hasExistingConfig) {
+    displayType = 7;
+    displayName = 'bodo-Ansicht';
+    description = 'Optimiert für bodo';
+    ftIsMultiDisplay = false;
+    ftAllOneDisplay = true;      // alles auf EIN Display
+    ftIsManualAssignment = false;
+    ftGroupByCity = true;
+  }
+
   // Zug-Netzwerke immer chronologisch sortieren
   const TRAIN_NETWORKS = ['OEBB', 'OEBB_FERN', 'OEBB_REGIONAL', 'OEBB_SBAHN', 'OEBB_STAMM_SBAHN', 'OEBB_REG_NOE', 'OEBB_REG_OOE', 'WESTBAHN'];
   const isTrainNetwork = TRAIN_NETWORKS.includes(dominantNetwork);
@@ -12835,6 +12878,10 @@ function calculateRecommendedConfig() {
     // sonst verliert der erneute Einstieg ins Feintuning (Stationen → zurück →
     // Feintuning) die Zuweisung und fällt auf den Netz-Default (Wien) zurück.
     if (s && s.colourOverride != null && !isNaN(s.colourOverride)) return parseInt(s.colourOverride);
+    // bodo-Geraet: ohne eigene Zuweisung immer die bodo-Ansicht (Paul 05.10.2026).
+    // Ohne das gewinnt hier NETWORK_COLORS.BWEGT (23 = Matrix) ueber die Voreinstellung
+    // weiter oben, und das Geraet startete trotzdem in Orange.
+    if (typeof isBodoDevice === 'function' && isBodoDevice() && !hasExistingConfig) return 7;
     if (s.network === 'WESTBAHN') {
       const codes = new Set();
       (s.filter || '').split(',').forEach(c => { const t = c.trim().toUpperCase(); if (t) codes.add(t); });
