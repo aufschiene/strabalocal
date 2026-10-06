@@ -24576,6 +24576,7 @@ window.addEventListener('DOMContentLoaded', () => {
         <button type="button" class="btn" id="bdRetryBtn" style="margin-top:12px;">Erneut verbinden</button>
       </div>
       <button type="button" class="btn" id="bdEditStationsBtn" style="margin-top:14px;">Stationen &auml;ndern</button>
+      <button type="button" class="btn" id="bdBackMenuBtn" style="margin-top:14px;display:none;">&larr; Zur&uuml;ck zum Men&uuml;</button>
     </div>
 
     <div class="bd-card">
@@ -25258,10 +25259,10 @@ window.addEventListener('DOMContentLoaded', () => {
     var html = '';
     html += rowHtml('Kartengr&ouml;&szlig;e', 'Klein und Mittel: Tafel links neben der Karte. Gro&szlig;: Karte &uuml;ber das ganze Display.',
       segHtml('lay', ['Klein', 'Mittel', 'Gro&szlig;'], st.lay));
-    // Kartenweite: wie viele Meter Stadt sichtbar sind (Firmware-Key mapw, 100 bis 300)
-    var mw = bdIsNum(st.mapw) ? Math.min(300, Math.max(100, st.mapw)) : 200;
-    html += rowHtml('Kartenweite', '100 m: nah ans Zentrum gezoomt. 300 m: mehr Stadt im Blick.',
-      '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdMapW" min="100" max="300" step="10" value="' + mw + '">' +
+    // Kartenweite: wie viele Meter Stadt sichtbar sind (Firmware-Key mapw, 300 bis 1500)
+    var mw = bdIsNum(st.mapw) ? Math.min(1500, Math.max(300, st.mapw)) : 600;
+    html += rowHtml('Kartenweite', '300 m: nah ans Zentrum gezoomt. 1500 m: viel Stadt im Blick.',
+      '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdMapW" min="300" max="1500" step="50" value="' + mw + '">' +
       '<span class="bd-range-val" id="bdMapWVal">' + mw + ' m</span></div>');
     var ly = st.layers || {};
     LAYERS.forEach(function (d) {
@@ -25750,7 +25751,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (e.target && e.target.id === 'bdMapW') {
-      var mv = parseInt(e.target.value, 10) || 200;
+      var mv = parseInt(e.target.value, 10) || 600;
       if (BD.state) BD.state.mapw = mv;
       var ml = $('bdMapWVal');
       if (ml) ml.textContent = mv + ' m';
@@ -25806,6 +25807,19 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   $('bdEditStationsBtn').addEventListener('click', bdOpenStations);
+  // Einstieg ueber das Portal-Menue "Display-Einstellungen": statt "Stationen aendern"
+  // nur ein Zurueck-Button zum Geraete-Menue (navigiert das aeussere Fenster der Bruecke)
+  if (bdViewFromUrl() === 'tuning') {
+    $('bdEditStationsBtn').style.display = 'none';
+    $('bdBackMenuBtn').style.display = '';
+  }
+  $('bdBackMenuBtn').addEventListener('click', function () {
+    var url = 'http://' + BD_HOST + '/';
+    try {
+      if (window.top && window.top !== window) { window.top.location.href = url; return; }
+    } catch (e) {}
+    window.location.href = url;
+  });
   $('bdBackChip').addEventListener('click', function () {
     // Stationswahl abbrechen: Liste wieder auf den Geraete-Stand bringen
     if (BD.state && bdCurrentRbls() !== bdDeviceRbls()) {
