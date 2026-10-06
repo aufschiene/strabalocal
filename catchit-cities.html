@@ -15774,6 +15774,12 @@ function variantForColour(cid) {
 function stationDisplayColour(s) {
   if (!s) return 1;
   if (s.colourOverride != null && !isNaN(s.colourOverride)) return parseInt(s.colourOverride);
+  // bodo-Geraet: ohne eigene Zuweisung die bodo-Ansicht statt des Netz-Defaults (23 Matrix).
+  // Muss AUCH hier stehen, nicht nur in calculateRecommendedConfig: diese Funktion baut die
+  // masterrow, sonst stuende in der gespeicherten Zeile weiter c23 (Paul 05.10.2026).
+  // Eine manuelle Umstellung gewinnt trotzdem, die laeuft ueber colourOverride oben bzw.
+  // in Kompakt ueber recommendedConfig.colour im Bau.
+  if (typeof isBodoDevice === 'function' && isBodoDevice() && !hasExistingConfig) return 7;
   // Fernverkehr (WESTBAHN): ÖBB-Ansicht (12) als Default; Westbahn-Ansicht (14) NUR, wenn
   // ausschließlich WB-Züge gewählt sind (sonst zeigt ein IC/RJ-Display fälschlich Westbahn-Optik).
   if (s.network === 'WESTBAHN') {
