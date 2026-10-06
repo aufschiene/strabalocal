@@ -25261,7 +25261,7 @@ window.addEventListener('DOMContentLoaded', () => {
       segHtml('lay', ['Klein', 'Mittel', 'Gro&szlig;'], st.lay));
     // Kartenweite: wie viele Meter Stadt sichtbar sind (Firmware-Key mapw, 300 bis 1500)
     var mw = bdIsNum(st.mapw) ? Math.min(1500, Math.max(300, st.mapw)) : 600;
-    html += rowHtml('Kartenweite', '300 m: nah ans Zentrum gezoomt. 1500 m: viel Stadt im Blick.',
+    html += rowHtml('Kartenweite', '300 m: nah ans Zentrum gezoomt. 1500 m: viel Stadt im Blick. Nach dem Vergrößern lädt die Karte ihre Ränder in wenigen Minuten nach.',
       '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdMapW" min="300" max="1500" step="50" value="' + mw + '">' +
       '<span class="bd-range-val" id="bdMapWVal">' + mw + ' m</span></div>');
     var ly = st.layers || {};
