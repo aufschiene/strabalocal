@@ -24519,6 +24519,24 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   #bdBackChip.show { display: block; }
   #bdBackChip:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--ink); }
+  .bd-backlink {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: none; padding: 2px 0; margin: 0 0 12px;
+    font-family: var(--font-main); font-size: 14px; font-weight: 800; color: var(--ink);
+    cursor: pointer;
+  }
+  .bd-backlink:hover { color: var(--red); }
+  #bdReloadOverlay {
+    position: fixed; inset: 0; z-index: 10500; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    font-family: var(--font-main);
+    background-color: var(--paper);
+    background-image: linear-gradient(rgba(27,27,27,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(27,27,27,.045) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  #bdReloadOverlay.show { display: flex; }
+  #bdReloadOverlay .t1 { margin-top: 18px; color: var(--ink); font-weight: 700; font-size: 16px; }
+  #bdReloadOverlay .t2 { margin-top: 6px; color: #8a8276; font-size: 13px; text-align: center; padding: 0 24px; }
   @media (max-width: 600px) {
     .bd-line .bd-seg { margin-left: 0; width: 100%; }
     .bd-line .bd-seg button { flex: 1; padding: 6px 4px; }
@@ -24554,6 +24572,8 @@ window.addEventListener('DOMContentLoaded', () => {
   </div>
   <div class="container">
 
+    <button type="button" class="bd-backlink" id="bdTopBackBtn">&larr; Zur&uuml;ck zu den Linien-Einstellungen</button>
+
     <div class="bd-card" id="bdDeviceCard" style="display:none;">
       <div style="display:flex;align-items:flex-start;gap:14px;">
         <div style="width:46px;height:46px;background:var(--red);border:3px solid var(--ink);border-radius:10px;box-shadow:3px 3px 0 var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;" aria-hidden="true">
@@ -24577,7 +24597,7 @@ window.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
 
-    <div class="bd-card">
+    <div class="bd-card" id="bdLinesCard">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <h2 style="margin-bottom:0;">Linien auf dem Display</h2>
         <button type="button" class="bd-refresh" id="bdLinesReloadBtn" title="Linien neu laden">&#8635;</button>
@@ -24622,6 +24642,18 @@ window.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <button type="button" id="bdBackChip">&larr; Zur&uuml;ck zu den Einstellungen</button>
+<div id="bdReloadOverlay" role="status">
+  <div class="train-loading">
+    <div class="train-track"></div>
+    <div class="train-body">
+      <div class="train-wheel w1"></div>
+      <div class="train-wheel w2"></div>
+      <div class="train-door"></div>
+    </div>
+  </div>
+  <div class="t1">Dein Display l&auml;dt neu &hellip;</div>
+  <div class="t2">Stationen und Linien werden eingerichtet. Das kann eine Minute dauern.</div>
+</div>
 <div id="bdToast" role="status"></div>
 
 <script>
@@ -24655,7 +24687,7 @@ window.addEventListener('DOMContentLoaded', () => {
   var BD_HOST = bdHostFromUrl();
   if (!BD_HOST) {
     // Kein Bigdisplay: eigene DOM-Knoten entfernen, Legacy-Flow bleibt exakt wie bisher.
-    ['bdHome', 'bdBackChip', 'bdToast'].forEach(function (id) {
+    ['bdHome', 'bdBackChip', 'bdToast', 'bdReloadOverlay'].forEach(function (id) {
       var el = document.getElementById(id); if (el && el.parentNode) el.parentNode.removeChild(el);
     });
     return;
@@ -24732,6 +24764,10 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!m) return '#fff';
     var n = parseInt(m[1], 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
     return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1b1b1b' : '#fff';
+  }
+  function bdSetReloadOverlay(show) {
+    var ov = $('bdReloadOverlay');
+    if (ov) ov.classList.toggle('show', !!show);
   }
   var _toastTimer = null;
   function bdToast(msg, isErr) {
@@ -25122,6 +25158,15 @@ window.addEventListener('DOMContentLoaded', () => {
   function bdRenderLines() {
     var wrap = $('bdLinesWrap');
     if (!wrap) return;
+    // Ansichten ohne Karte (Monitor-Boards oder reine Liste): Tafel/Karte-Modi sind
+    // dort sinnlos, die ganze Linien-Karte verwirrt nur -> komplett ausblenden.
+    var card = $('bdLinesCard');
+    if (card) {
+      var stv = BD.state || {};
+      var noMap = ((parseInt(stv.btyp, 10) || 0) > 0) || ((parseInt(stv.cols, 10) || 0) > 0);
+      card.style.display = noMap ? 'none' : '';
+      if (noMap) return;
+    }
     if (!BD.online && !BD.state) {
       wrap.innerHTML = '<div class="bd-empty">Sobald dein Display verbunden ist, stehen hier seine Linien.</div>';
       return;
@@ -25520,6 +25565,8 @@ window.addEventListener('DOMContentLoaded', () => {
       bdRenderAnchor();
     }
     var rblsForCenter = sendRbls || bdCurrentRbls() || (BD.state ? String(BD.state.rbls || '') : '');
+    // Stations-Push: Vollbild-Ladescreen statt halb leerem Panel, bis die Linien da sind
+    if (sendRbls) bdSetReloadOverlay(true);
     bdAnchorCenter(rblsForCenter).then(function (center) {
       var aaddrVal = (BD.anchor.mode === 'addr' && bdIsNum(BD.anchor.lat)) ? 1 : 0;
       // Adress-Anker ohne bekannte Koordinaten: aaddr nicht anfassen (Punkt bleibt am Geraet)
@@ -25571,6 +25618,7 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     }).catch(function () {
       BD.online = false;
+      bdSetReloadOverlay(false);
       bdRenderDevice();
       bdToast('Keine Verbindung zum Display. Änderung nicht übernommen.', true);
     }).then(function () {
@@ -25588,7 +25636,7 @@ window.addEventListener('DOMContentLoaded', () => {
     var lastSnap = '';
     (function step(i) {
       if (run !== _pollRun || i >= delays.length) {
-        if (run === _pollRun) { BD.reloadPending = false; bdRenderLines(); }
+        if (run === _pollRun) { BD.reloadPending = false; bdRenderLines(); bdSetReloadOverlay(false); }
         return;
       }
       bdSleep(delays[i]).then(function () {
@@ -25599,6 +25647,7 @@ window.addEventListener('DOMContentLoaded', () => {
           var lines = st.lines || [];
           if (lines.length) {
             BD.reloadPending = false;
+            bdSetReloadOverlay(false);
             bdRenderLines();
             bdRenderTafel();
             var snap = JSON.stringify(lines.map(function (l) { return l.n; }));
@@ -25744,6 +25793,7 @@ window.addEventListener('DOMContentLoaded', () => {
       bdDisp(key, v);
       if (key === 'lay') { bdRenderKarte(); bdRenderAnzeige(); }
       else if (key === 'sort') bdRenderTafel();
+      else if (key === 'btyp' || key === 'cols') { bdRenderAnzeige(); bdRenderLines(); }
       else bdRenderAnzeige();
       return;
     }
@@ -25872,6 +25922,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   $('bdEditStationsBtn').addEventListener('click', bdOpenStations);
+  $('bdTopBackBtn').addEventListener('click', bdOpenStations);
   // Einstieg ueber das Portal-Menue "Display-Einstellungen": statt "Stationen aendern"
   // nur ein Zurueck-Button zum Geraete-Menue (navigiert das aeussere Fenster der Bruecke)
   if (bdViewFromUrl() === 'tuning') {
