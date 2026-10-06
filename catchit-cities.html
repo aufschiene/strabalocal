@@ -25061,12 +25061,60 @@ window.addEventListener('DOMContentLoaded', () => {
       if (a.label && bdIsNum(a.lat)) {
         html += '<div class="bd-anchor-note"><span class="bd-bluedot"></span><span><b>' + esc(a.label) + '</b><br>' +
           'Die Karte zentriert hierher, dein Display zeigt an der Adresse einen blauen Standort-Punkt.</span></div>';
+        // Liegen die Stationen weiter weg als die Kartenweite, ist der Punkt bzw. die Station
+        // auf dem Display nicht mehr sichtbar: klar sagen statt stumm nicht zentrieren.
+        if (bdIsNum(a.farM) && a.farM > bdMapwM()) {
+          html += '<div class="bd-anchor-err" style="display:block;">Dieser Punkt liegt au&szlig;erhalb deiner Karte: ' +
+            'deine Stationen sind bis zu ' + Math.round(a.farM) + ' m entfernt, die Kartenweite betr&auml;gt ' + bdMapwM() + ' m. ' +
+            'Erh&ouml;he die Kartenweite oder w&auml;hle eine n&auml;here Adresse.</div>';
+        }
       } else {
         html += '<div class="bd-anchor-hint">Adresse eingeben und suchen: die Karte zentriert dann auf deine Adresse, mit blauem Standort-Punkt.</div>';
       }
       html += '<div class="bd-anchor-err" id="bdAddrErr" style="display:none;">Adresse nicht gefunden, probiere es genauer.</div>';
     }
     wrap.innerHTML = html;
+  }
+
+  // Kartenweite des Geraets in Metern (Firmware mapw 500..1000, Default 600)
+  function bdMapwM() {
+    var st = BD.state;
+    return (st && bdIsNum(st.mapw)) ? Math.min(1000, Math.max(500, st.mapw)) : 600;
+  }
+  function bdDistM(la1, lo1, la2, lo2) {
+    var R = 6371000, dLa = (la2 - la1) * Math.PI / 180, dLo = (lo2 - lo1) * Math.PI / 180;
+    var x = Math.sin(dLa / 2), y = Math.sin(dLo / 2);
+    var h = x * x + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * y * y;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  // Groesste Entfernung Adresse -> Station; liegt sie ueber der Kartenweite, zeigt
+  // bdRenderAnchor den Hinweis "ausserhalb deiner Karte".
+  function bdCheckAnchorRange() {
+    var a = BD.anchor;
+    if (a.mode !== 'addr' || !bdIsNum(a.lat) || !bdIsNum(a.lon)) return;
+    var rbls = bdCurrentRbls() || (BD.state ? String(BD.state.rbls || '') : '');
+    if (!rbls) return;
+    var api = (typeof DEPARTURES_API === 'string') ? DEPARTURES_API : 'https://api.straba.at/api/v1/wl/departures';
+    var la0 = a.lat, lo0 = a.lon;
+    fetch(api + '?rbl=' + encodeURIComponent(rbls) + '&_=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var mons = (d && d.data && Array.isArray(d.data.monitors)) ? d.data.monitors : [];
+        var far = null;
+        mons.forEach(function (m) {
+          var c = m && m.locationStop && m.locationStop.geometry && m.locationStop.geometry.coordinates;
+          if (!Array.isArray(c)) return;
+          var lo = Number(c[0]), la = Number(c[1]);
+          if (!isFinite(lo) || !isFinite(la) || (lo === 0 && la === 0)) return;
+          var dm = bdDistM(la0, lo0, la, lo);
+          if (far === null || dm > far) far = dm;
+        });
+        if (BD.anchor.lat !== la0 || BD.anchor.lon !== lo0) return;   // inzwischen neue Adresse
+        BD.anchor.farM = far;
+        bdSaveAnchor();
+        bdRenderAnchor();
+      })
+      .catch(function () {});
   }
 
   // Geocoding ueber OpenStreetMap Nominatim (frei, CORS offen, sparsam nutzen)
@@ -25101,8 +25149,10 @@ window.addEventListener('DOMContentLoaded', () => {
       if (btn) { btn.disabled = false; btn.textContent = 'Suchen'; }
       if (res) {
         BD.anchor.lat = res.lat; BD.anchor.lon = res.lon; BD.anchor.label = res.label;
+        BD.anchor.farM = null;
         bdRenderAnchor();
         bdSaveAnchor();
+        bdCheckAnchorRange();   // Stationen ausserhalb der Kartenweite? -> Hinweis
         bdPushCfg(null);   // neues Zentrum sofort ans Display
       } else {
         BD.anchor.lat = null; BD.anchor.lon = null; BD.anchor.label = '';
@@ -25143,13 +25193,13 @@ window.addEventListener('DOMContentLoaded', () => {
       var dirsHtml = '';
       var hasDirsApi = (typeof l.dirs !== 'undefined');
       if (hasDirsApi) {
-        var open = BD.dirsOpen[l.n] || (l.dirs && String(l.dirs).length);
+        // Richtungsfilter pro Linie gibt es hier nicht mehr (Richtungen waehlt man in der
+        // Stationswahl, Paul 06.10.2026). Nur ein noch gesetzter Filter bleibt zum Leeren sichtbar.
+        var open = (l.dirs && String(l.dirs).length);
         if (open) {
           dirsHtml = '<div class="bd-dirs"><span aria-hidden="true">&rarr;</span>' +
             '<input type="text" class="bd-input" data-bddirs="' + esc(l.n) + '" value="' + esc(l.dirs || '') + '" placeholder="Nur Richtung, z. B. Floridsdorf (leer = alle)">' +
             '</div>';
-        } else {
-          dirsHtml = '<div class="bd-dirs"><button type="button" class="bd-dirs-link" data-bddirsopen="' + esc(l.n) + '">Richtung filtern</button></div>';
         }
       }
       return '<div class="bd-line' + (hasDirsApi ? ' bd-hasdirs' : '') + '">' +
@@ -25221,8 +25271,11 @@ window.addEventListener('DOMContentLoaded', () => {
       '<span class="bd-range-val" id="bdBrightVal">' + pct + ' %</span></div>');
     html += rowHtml('Abfahrten-Stil', 'Farbig: jede Zeile in der Linienfarbe. Schlicht: ruhige dunkle Zeilen.',
       segHtml('style', ['Schlicht', 'Farbig'], st.style));
-    html += rowHtml('Abfahrten-Panel', 'Ecke: feste Tafel. Pop-up: Abfahrten am Karten-Zentrum. Pro Station: kleine Tafeln an jeder Station.',
-      segHtml('pstyle', ['Ecke', 'Pop-up', 'Pro Station'], st.pstyle));
+    // Abfahrten-Panel (Pop-up / Pro Station) wirkt nur bei grosser Karte -> nur dann anbieten
+    if (st.lay === 2) {
+      html += rowHtml('Abfahrten-Panel', 'Ecke: feste Tafel. Pop-up: Abfahrten am Karten-Zentrum. Pro Station: kleine Tafeln an jeder Station.',
+        segHtml('pstyle', ['Ecke', 'Pop-up', 'Pro Station'], st.pstyle));
+    }
     // Panel-Position: wirkt nur bei grosser Karte, sonst steht die Tafel fix links
     var cornerDim = st.lay < 2 ? ' bd-dim' : '';
     var cornerHint = st.lay < 2
@@ -25259,10 +25312,10 @@ window.addEventListener('DOMContentLoaded', () => {
     var html = '';
     html += rowHtml('Kartengr&ouml;&szlig;e', 'Klein und Mittel: Tafel links neben der Karte. Gro&szlig;: Karte &uuml;ber das ganze Display.',
       segHtml('lay', ['Klein', 'Mittel', 'Gro&szlig;'], st.lay));
-    // Kartenweite: wie viele Meter Stadt sichtbar sind (Firmware-Key mapw, 300 bis 1500)
-    var mw = bdIsNum(st.mapw) ? Math.min(1500, Math.max(300, st.mapw)) : 600;
-    html += rowHtml('Kartenweite', '300 m: nah ans Zentrum gezoomt. 1500 m: viel Stadt im Blick. Nach dem Vergrößern lädt die Karte ihre Ränder in wenigen Minuten nach.',
-      '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdMapW" min="300" max="1500" step="50" value="' + mw + '">' +
+    // Kartenweite: wie viele Meter Stadt sichtbar sind (Firmware-Key mapw, 500 bis 1000)
+    var mw = bdIsNum(st.mapw) ? Math.min(1000, Math.max(500, st.mapw)) : 600;
+    html += rowHtml('Kartenweite', '500 m: nah ans Zentrum gezoomt. 1000 m: viel Stadt im Blick. Nach dem Vergrößern lädt die Karte ihre Ränder in wenigen Minuten nach.',
+      '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdMapW" min="500" max="1000" step="50" value="' + mw + '">' +
       '<span class="bd-range-val" id="bdMapWVal">' + mw + ' m</span></div>');
     var ly = st.layers || {};
     LAYERS.forEach(function (d) {
@@ -25313,16 +25366,7 @@ window.addEventListener('DOMContentLoaded', () => {
       html += rowHtml('Versp&auml;tung hervorheben', 'Versp&auml;tete Abfahrten zeigen ihre Minuten in Orange.',
         switchHtml('dlyhl', !!+st.dlyhl), 'bd-keep');
     }
-    if (typeof st.win !== 'undefined') {
-      var w = bdParseWin(st.win);
-      var winOn = !(w.from === 0 && w.to === 0);
-      html += rowHtml('Zeitfenster', 'Abfahrten nur in diesem Zeitraum zeigen, die Karte l&auml;uft durch. Auch &uuml;ber Mitternacht m&ouml;glich.',
-        switchHtml('winon', winOn), 'bd-keep');
-      html += '<div class="bd-row' + (winOn ? '' : ' bd-dim') + '">' +
-        '<div class="bd-label"><div class="name">Zeitraum</div></div>' +
-        '<div class="bd-nighttimes">von <input type="time" class="bd-time" id="bdWinFrom" value="' + fmtTime(winOn ? w.from : 360) + '"> bis <input type="time" class="bd-time" id="bdWinTo" value="' + fmtTime(winOn ? w.to : 1320) + '"></div>' +
-        '</div>';
-    }
+    // Zeitfenster (win) bewusst nicht mehr angeboten (Paul 06.10.2026); Firmware-Key bleibt unangetastet.
     if (typeof st.groups !== 'undefined') {
       html += '<div class="bd-label" style="margin:14px 0 8px;">' +
         '<div class="name">Zeilen-Gruppen</div>' +
@@ -25359,16 +25403,46 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!order.length) {
         html += '<div class="bd-empty">Die Stationen erscheinen hier, sobald dein Display verbunden ist.</div>';
       } else {
+        // Standard: ein Wert pro Station. Optional pro Linie abweichend (Karlsplatz: U1/U2/U4
+        // haben verschiedene Wege), Token-Form "rbl>LINIE:min", Firmware prueft Linie zuerst.
+        var devLines = ((BD.state && BD.state.lines) || []).map(function (l) { return String(l.n); });
+        BD.walkLines = BD.walkLines || {};
         html += order.map(function (key) {
           var g = byKey[key];
-          var val = 0;
-          bdTokensFromString(bdRblsOf(g.sts)).forEach(function (tok) {
+          var val = 0, perLine = {};
+          var toks = bdTokensFromString(bdRblsOf(g.sts));
+          toks.forEach(function (tok) {
             if (tokMin[tok] && tokMin[tok] > val) val = tokMin[tok];
+            Object.keys(tokMin).forEach(function (t) {
+              if (t.indexOf(tok + '>') === 0) {
+                var ln = t.substring(tok.length + 1);
+                if (tokMin[t] > (perLine[ln] || 0)) perLine[ln] = tokMin[t];
+              }
+            });
           });
-          return '<div class="bd-row bd-keep">' +
+          var openLines = (BD.walkLines[key] || []).slice();
+          Object.keys(perLine).forEach(function (ln) { if (openLines.indexOf(ln) === -1) openLines.push(ln); });
+          BD.walkLines[key] = openLines;
+          var out = '<div class="bd-row bd-keep">' +
             '<div class="bd-label"><div class="name" style="font-weight:600;">' + esc(g.name) + '</div></div>' +
             '<div class="bd-nighttimes"><input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + val + '" data-bdwalk="' + esc(key) + '"> min</div>' +
             '</div>';
+          openLines.forEach(function (ln) {
+            out += '<div class="bd-row bd-keep bd-walkline">' +
+              '<div class="bd-label"><div class="name">&nbsp;&nbsp;&rarr; Linie ' + esc(ln) + '</div></div>' +
+              '<div class="bd-nighttimes"><input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + (perLine[ln] || 0) + '" data-bdwalkline="' + esc(key + '|' + ln) + '"> min ' +
+              '<button type="button" class="bd-grp-btn del" data-bdwalkdel="' + esc(key + '|' + ln) + '" title="Linie entfernen">&times;</button></div>' +
+              '</div>';
+          });
+          var free = devLines.filter(function (ln) { return openLines.indexOf(ln) === -1; });
+          if (free.length) {
+            out += '<div class="bd-row bd-keep bd-walkline"><div class="bd-label"></div>' +
+              '<select class="bd-select bd-walkadd" data-bdwalkadd="' + esc(key) + '">' +
+              '<option value="">Pro Linie abweichend &hellip;</option>' +
+              free.map(function (ln) { return '<option value="' + esc(ln) + '">' + esc(ln) + '</option>'; }).join('') +
+              '</select></div>';
+          }
+          return out;
         }).join('');
       }
     }
@@ -25417,11 +25491,20 @@ window.addEventListener('DOMContentLoaded', () => {
     _walkTimer = setTimeout(bdPushWalk, 600);
   }
   function bdPushWalk() {
-    var mins = {};
+    var mins = {}, lineMins = {};
     var inputs = document.querySelectorAll('[data-bdwalk]');
     for (var i = 0; i < inputs.length; i++) {
       var v = parseInt(inputs[i].value, 10);
       mins[inputs[i].getAttribute('data-bdwalk')] = isNaN(v) ? 0 : Math.min(15, Math.max(0, v));
+    }
+    var lInputs = document.querySelectorAll('[data-bdwalkline]');
+    for (var li = 0; li < lInputs.length; li++) {
+      var lv = parseInt(lInputs[li].value, 10);
+      var lk = lInputs[li].getAttribute('data-bdwalkline');       // "stationKey|LINIE"
+      var sep = lk.lastIndexOf('|');
+      if (sep <= 0) continue;
+      var sk = lk.substring(0, sep), ln = lk.substring(sep + 1);
+      (lineMins[sk] = lineMins[sk] || {})[ln] = isNaN(lv) ? 0 : Math.min(15, Math.max(0, lv));
     }
     var byKey = {};
     allStations().forEach(function (s) {
@@ -25431,8 +25514,13 @@ window.addEventListener('DOMContentLoaded', () => {
     var parts = [];
     Object.keys(byKey).forEach(function (key) {
       var m = mins[key] || 0;
-      if (!m) return;
-      bdTokensFromString(bdRblsOf(byKey[key])).forEach(function (tok) { parts.push(tok + ':' + m); });
+      var toks = bdTokensFromString(bdRblsOf(byKey[key]));
+      if (m) toks.forEach(function (tok) { parts.push(tok + ':' + m); });
+      var lm = lineMins[key] || {};
+      Object.keys(lm).forEach(function (ln) {
+        if (!lm[ln]) return;
+        toks.forEach(function (tok) { parts.push(tok + '>' + ln + ':' + lm[ln]); });
+      });
     });
     var str = parts.join(',');
     if (BD.state && String(BD.state.walk || '') === str) return;
@@ -25656,6 +25744,19 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (t.closest('#bdAddrSearchBtn')) { bdDoGeocode(); return; }
+    var wkDel = t.closest('[data-bdwalkdel]');
+    if (wkDel) {
+      var dk = wkDel.getAttribute('data-bdwalkdel'), dsep = dk.lastIndexOf('|');
+      if (dsep > 0) {
+        var dKey = dk.substring(0, dsep), dLn = dk.substring(dsep + 1);
+        BD.walkLines = BD.walkLines || {};
+        BD.walkLines[dKey] = (BD.walkLines[dKey] || []).filter(function (x) { return x !== dLn; });
+        wkDel.closest('.bd-row').remove();       // Eingabe weg -> naechster Push schreibt ohne diese Linie
+        bdPushWalk();
+        bdRenderTafel(true);
+      }
+      return;
+    }
     var dOpen = t.closest('[data-bddirsopen]');
     if (dOpen) {
       BD.dirsOpen[dOpen.getAttribute('data-bddirsopen')] = true;
@@ -25780,8 +25881,18 @@ window.addEventListener('DOMContentLoaded', () => {
       bdPushDirs(e.target.getAttribute('data-bddirs'), e.target.value.trim());
       return;
     }
-    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdwalk')) {
+    if (e.target && e.target.hasAttribute && (e.target.hasAttribute('data-bdwalk') || e.target.hasAttribute('data-bdwalkline'))) {
       bdQueueWalkPush();
+      return;
+    }
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdwalkadd')) {
+      var wkKey = e.target.getAttribute('data-bdwalkadd'), wkLn = e.target.value;
+      if (!wkLn) return;
+      BD.walkLines = BD.walkLines || {};
+      (BD.walkLines[wkKey] = BD.walkLines[wkKey] || []).push(wkLn);
+      bdRenderTafel(true);
+      var fresh = document.querySelector('[data-bdwalkline="' + wkKey.replace(/"/g, '&quot;') + '|' + wkLn.replace(/"/g, '&quot;') + '"]');
+      if (fresh) fresh.focus();
       return;
     }
     if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdgrp')) {
