@@ -24571,7 +24571,7 @@ window.addEventListener('DOMContentLoaded', () => {
         <ul>
           <li>Dein Display und dieser Browser m&uuml;ssen im selben WLAN sein.</li>
           <li>Chrome fragt nach dem Zugriff auf das lokale Netzwerk: bitte erlauben.</li>
-          <li>Safari und Firefox blockieren lokale Ger&auml;te auf dieser Seite oft. Dann hilft Chrome, oder du nutzt das Men&uuml; direkt am Display: <a href="http://catch.local" target="_blank" rel="noopener">catch.local</a></li>
+          <li>Am iPhone (Safari und Co.) ist der direkte Draht grunds&auml;tzlich gesperrt: &ouml;ffne dort <a href="http://catch.local" target="_blank" rel="noopener">catch.local</a> und starte den Konfigurator &uuml;ber das Display-Men&uuml;, das verbindet ohne diese Sperre.</li>
         </ul>
         <button type="button" class="btn" id="bdRetryBtn" style="margin-top:12px;">Erneut verbinden</button>
       </div>
@@ -24638,6 +24638,16 @@ window.addEventListener('DOMContentLoaded', () => {
       if (/^\[[0-9A-Fa-f:]+\](:\d{1,5})?$/.test(d)) return d;
       return null;
     } catch (e) { return null; }
+  }
+
+  // Direkteinstieg vom Geraete-Portal: view=lines (Stationen und Linien, wie Lilygo)
+  // oder view=tuning (nur das Wall-Feintuning). Ohne view entscheidet der Boot selbst.
+  function bdViewFromUrl() {
+    try {
+      var v = (new URLSearchParams(window.location.search).get('view') || '').toLowerCase();
+      if (v === 'lines' || v === 'tuning') return v;
+    } catch (e) {}
+    return null;
   }
 
   var BD_HOST = bdHostFromUrl();
@@ -24731,11 +24741,53 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------- Geraete-HTTP ----------
-  // Von der https-Seite zum lokalen Geraet: Chrome erlaubt das ueber die Berechtigung
-  // "Zugriff auf das lokale Netzwerk" (Local Network Access), dafuer braucht der Fetch
-  // die targetAddressSpace-Option. Andere Browser ignorieren die Option einfach.
+  // Zwei Transporte:
+  // 1) Direkt: fetch von der https-Seite zum lokalen Geraet. Chrome erlaubt das ueber
+  //    die Berechtigung "Zugriff auf das lokale Netzwerk" (targetAddressSpace-Option),
+  //    WebKit (iPhone, Safari) blockiert es grundsaetzlich.
+  // 2) Bruecke (bridge=1): die Seite laeuft als iframe IM Geraete-Portal (catch.local),
+  //    wie beim Lilygo. Die API-Calls gehen per postMessage an die Portal-Seite, die
+  //    sie same-origin ausfuehrt und das Ergebnis zurueckpostet. Funktioniert ueberall.
+  var BD_BRIDGE = (function () {
+    try {
+      if (window.parent === window) return false;
+      return new URLSearchParams(window.location.search).get('bridge') === '1';
+    } catch (e) { return false; }
+  })();
+  var _bridgeSeq = 0;
+  var _bridgePending = {};
+  if (BD_BRIDGE) {
+    window.addEventListener('message', function (ev) {
+      if (ev.source !== window.parent) return;
+      var d = ev.data;
+      if (!d || d.type !== 'bdApiResult' || !_bridgePending[d.id]) return;
+      var p = _bridgePending[d.id];
+      delete _bridgePending[d.id];
+      clearTimeout(p.timer);
+      p.resolve({
+        ok: !!d.ok,
+        status: d.status || 0,
+        json: function () {
+          try { return Promise.resolve(JSON.parse(d.body)); }
+          catch (e) { return Promise.reject(e); }
+        },
+        text: function () { return Promise.resolve(String(d.body || '')); }
+      });
+    });
+  }
   function bdFetch(path, opts) {
     opts = opts || {};
+    if (BD_BRIDGE) {
+      return new Promise(function (resolve, reject) {
+        var id = ++_bridgeSeq;
+        var timer = setTimeout(function () {
+          delete _bridgePending[id];
+          reject(new Error('Bridge-Timeout'));
+        }, opts.timeout || 8000);
+        _bridgePending[id] = { resolve: resolve, timer: timer };
+        window.parent.postMessage({ type: 'bdApi', id: id, path: path, method: opts.method || 'GET' }, '*');
+      });
+    }
     var init = { method: opts.method || 'GET', cache: 'no-store' };
     if (window.location.protocol === 'https:') init.targetAddressSpace = 'private';
     var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
@@ -25821,7 +25873,12 @@ window.addEventListener('DOMContentLoaded', () => {
       bdRenderLines();
       bdAdoptStations(st.rbls);
       hideStartup();
-      if (allStations().length) {
+      var view = bdViewFromUrl();
+      if (view === 'tuning') {
+        bdShowHome();
+      } else if (view === 'lines') {
+        bdOpenStations();
+      } else if (allStations().length) {
         try { hasExistingConfig = true; } catch (e) {}
         var shown = false;
         try {
@@ -25843,7 +25900,14 @@ window.addEventListener('DOMContentLoaded', () => {
       bdRenderControls();
       bdRenderLines();
       hideStartup();
-      bdShowHome();   // zeigt die Verbindungs-Hilfe
+      if (bdViewFromUrl() === 'tuning') {
+        bdShowHome();   // Einstellungen gewuenscht: Panel mit Verbindungs-Hilfe
+      } else {
+        // Wie bei den Lilygo-Displays: ohne Verbindung trotzdem normal Stationen
+        // waehlen, gesendet wird beim "Weiter" (und das Panel zeigt dann den Status).
+        bdOpenStations();
+        bdToast('Display gerade nicht erreichbar. Stationen kannst du trotzdem schon wählen.', true);
+      }
     });
   }
 
