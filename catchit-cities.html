@@ -24361,5 +24361,1501 @@ window.addEventListener('DOMContentLoaded', () => {
   if (document.body) boot(); else document.addEventListener('DOMContentLoaded', boot);
 })();
 </script>
+
+<!-- ==================== CATCH.IT WALL (Bigdisplay, ESP32-P4, CrowPanel 7 Zoll) ====================
+     Nur aktiv mit ?device=<host|ip> (so verlinkt das Portal auf dem Display, mDNS catch.local).
+     Der Konfigurator spricht dann DIREKT mit dem Webserver auf dem Geraet (CORS offen):
+       GET  /api/state                 kompletter Zustand (rbls, lat/lon, Anzeige, Layer, Linien)
+       POST /api/cfg?rbls&lat&lon      Stationen + Karten-Zentrum, Geraet laedt Karte+Daten neu
+       POST /api/line?name&mode        Linien-Modus (0 Tafel+Karte / 1 Nur Karte / 2 Nur Tafel)
+       POST /api/disp?<key>=<wert>     Anzeige-Einstellungen, wirken sofort
+     Die Stationswahl nutzt den bestehenden Picker-Flow der Seite; nach "Station hinzufuegen"
+     landet man statt auf der Legacy-Zwischenseite wieder in der Bigdisplay-Uebersicht.
+     Ohne ?device= entfernt sich dieser Block selbst, der Legacy-Flow bleibt unberuehrt. -->
+<style>
+  /* catch.it Wall: eigener, geschlossener Stil im catch-it Retro-Ticket-Look (bd-Prefix,
+     bewusst KEINE Legacy-Klassen wie .card, damit deren Show/Hide-Loops uns nie treffen) */
+  #bdHome.hidden { display: none; }
+  .bd-logo-svg { height: 52px; width: auto; vertical-align: middle; margin: -8px 2px -6px 0; }
+  .bd-wall { vertical-align: middle; }
+  .bd-card {
+    background: var(--card); border: 3px solid var(--ink); border-radius: 8px;
+    box-shadow: 6px 6px 0 var(--ink); padding: 22px; margin-bottom: 18px;
+  }
+  .bd-card h2 { font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+  .bd-sub { color: #6b6253; font-size: 13px; margin: 2px 0 14px; line-height: 1.45; }
+  .bd-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; padding: 12px 0; border-bottom: 2px dashed rgba(27,27,27,.14); }
+  .bd-row:last-child { border-bottom: 0; padding-bottom: 2px; }
+  .bd-row.bd-keep { flex-wrap: nowrap; }
+  .bd-label { flex: 1 1 200px; min-width: 0; }
+  .bd-row.bd-keep .bd-label { flex: 1 1 auto; }
+  .bd-label .name { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .bd-label .hint { font-size: 12px; color: #8a8276; line-height: 1.4; margin-top: 2px; }
+  .bd-seg { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .bd-seg button {
+    border: 2px solid var(--ink); background: #fff; color: var(--ink); border-radius: 6px;
+    padding: 8px 12px; font-family: var(--font-main); font-size: 13px; font-weight: 700;
+    cursor: pointer; box-shadow: 2px 2px 0 var(--ink);
+    transition: transform .07s ease, box-shadow .07s ease, background .15s ease;
+  }
+  .bd-seg button:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .bd-seg button:active { transform: translate(2px,2px); box-shadow: 0 0 0 var(--ink); }
+  .bd-seg button.on { background: var(--red); color: #fff; }
+  .bd-switch {
+    position: relative; width: 52px; height: 30px; border: 2px solid var(--ink);
+    background: #fff; border-radius: 15px; cursor: pointer; flex-shrink: 0;
+    box-shadow: 2px 2px 0 var(--ink); transition: background .2s;
+  }
+  .bd-switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px;
+    border-radius: 50%; background: var(--ink); transition: transform .2s, background .2s;
+  }
+  .bd-switch.on { background: var(--red); }
+  .bd-switch.on::after { transform: translateX(22px); background: #fff; }
+  .bd-status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink); margin-top: 2px; }
+  .bd-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink); background: #bbb; flex-shrink: 0; }
+  .bd-dot.ok { background: #2fa84f; }
+  .bd-dot.err { background: var(--red); }
+  .bd-dot.wait { background: var(--amber); animation: bdPulse 1.2s infinite; }
+  @keyframes bdPulse { 50% { opacity: .35; } }
+  .bd-meta { color: #6b6253; font-size: 12px; margin-top: 6px; overflow-wrap: anywhere; line-height: 1.5; }
+  .bd-refresh {
+    border: 2px solid var(--ink); background: #fff; color: var(--ink); border-radius: 6px;
+    width: 36px; height: 36px; cursor: pointer; font-size: 16px; line-height: 1;
+    box-shadow: 2px 2px 0 var(--ink); flex-shrink: 0; font-family: var(--font-main);
+  }
+  .bd-refresh:hover { background: #f0ead9; }
+  .bd-help { background: #fff; border: 2px solid var(--ink); border-radius: 6px; padding: 12px 14px; margin-top: 14px; font-size: 13px; color: var(--ink); }
+  .bd-help ul { margin: 8px 0 0 18px; }
+  .bd-help li { margin-bottom: 6px; line-height: 1.45; }
+  .bd-help a { color: var(--red); font-weight: 700; }
+  .bd-empty { padding: 14px; text-align: center; color: #8a8276; font-size: 13px; background: #fff; border: 2px dashed rgba(27,27,27,.35); border-radius: 6px; line-height: 1.5; }
+  .bd-line { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 2px dashed rgba(27,27,27,.14); flex-wrap: wrap; }
+  .bd-line:last-child { border-bottom: 0; }
+  .bd-badge { min-width: 48px; text-align: center; font-weight: 800; font-size: 14px; padding: 6px 8px; border-radius: 6px; border: 2px solid var(--ink); flex-shrink: 0; }
+  .bd-line .bd-seg { margin-left: auto; }
+  .bd-line .bd-seg button { padding: 6px 9px; font-size: 11px; }
+  .bd-brightwrap { display: flex; align-items: center; gap: 10px; flex: 1 1 220px; max-width: 280px; }
+  input.bd-range { flex: 1; min-width: 120px; accent-color: var(--red); }
+  .bd-range-val { font-weight: 800; font-size: 13px; color: var(--ink); min-width: 48px; text-align: right; }
+  .bd-time {
+    border: 2px solid var(--ink); border-radius: 6px; background: #fff; padding: 8px 10px;
+    font-family: var(--font-main); font-size: 14px; font-weight: 600; color: var(--ink);
+    box-shadow: 2px 2px 0 var(--ink);
+  }
+  .bd-nighttimes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: var(--ink); }
+  input.bd-min { width: 76px; text-align: center; }
+  .bd-dirs { display: flex; align-items: center; gap: 8px; padding: 0 0 10px 58px; margin-top: -4px; border-bottom: 2px dashed rgba(27,27,27,.14); }
+  .bd-dirs:last-child { border-bottom: 0; }
+  .bd-dirs .bd-input { flex: 1; min-width: 0; padding: 6px 9px; font-size: 12px; box-shadow: none; }
+  .bd-dirs-link {
+    background: none; border: none; color: #8a8276; font-size: 12px; font-weight: 700;
+    cursor: pointer; text-decoration: underline; padding: 2px 0; font-family: var(--font-main);
+  }
+  .bd-dirs-link:hover { color: var(--red); }
+  .bd-line.bd-hasdirs { border-bottom: 0; padding-bottom: 6px; }
+  .bd-grp-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .bd-grp-row .bd-input { flex: 1; min-width: 0; }
+  .bd-grp-btn {
+    border: 2px solid var(--ink); background: #fff; color: var(--ink); border-radius: 6px;
+    width: 34px; height: 36px; cursor: pointer; font-size: 14px; font-weight: 800; line-height: 1;
+    box-shadow: 2px 2px 0 var(--ink); flex-shrink: 0; font-family: var(--font-main); padding: 0;
+  }
+  .bd-grp-btn:hover { background: #f0ead9; }
+  .bd-grp-btn.del:hover { background: var(--red); color: #fff; }
+  .bd-grpchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+  .bd-grpchips .lbl { font-size: 11px; color: #8a8276; font-weight: 700; }
+  .bd-grpchip {
+    border: 2px solid var(--ink); border-radius: 6px; padding: 4px 9px; font-size: 12px;
+    font-weight: 800; cursor: pointer; font-family: var(--font-main); box-shadow: 2px 2px 0 var(--ink);
+  }
+  .bd-grpchip:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .bd-corner {
+    background: #20252e; border: 3px solid var(--ink); border-radius: 10px;
+    width: 196px; height: 122px; padding: 10px; flex-shrink: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    gap: 6px; box-shadow: 3px 3px 0 var(--ink);
+  }
+  .bd-corner button { border: 2px solid #4a525e; background: #2b313c; border-radius: 5px; cursor: pointer; padding: 0; }
+  .bd-corner button:hover { border-color: #fff; }
+  .bd-corner button.on { background: var(--red); border-color: #fff; }
+  .bd-corner .ctr { display: flex; align-items: center; justify-content: center; color: #8a93a3; font-size: 10px; font-weight: 700; letter-spacing: .5px; font-family: var(--font-main); }
+  .bd-dim { opacity: .45; pointer-events: none; }
+  .bd-select, .bd-input {
+    border: 2px solid var(--ink); border-radius: 6px; background: #fff; padding: 9px 10px;
+    font-family: var(--font-main); font-size: 13px; font-weight: 600; color: var(--ink);
+    box-shadow: 2px 2px 0 var(--ink); max-width: 100%;
+  }
+  .bd-select { width: 100%; margin-top: 8px; }
+  .bd-addr-row { display: flex; gap: 8px; margin-top: 8px; }
+  .bd-addr-row .bd-input { flex: 1; min-width: 0; }
+  .bd-addr-btn {
+    border: 2px solid var(--ink); background: var(--red); color: #fff; border-radius: 6px;
+    padding: 9px 14px; font-family: var(--font-main); font-size: 13px; font-weight: 700;
+    cursor: pointer; box-shadow: 2px 2px 0 var(--ink); flex-shrink: 0;
+  }
+  .bd-addr-btn:disabled { background: #ddd5c4; color: #9a9384; cursor: wait; }
+  .bd-anchor-note {
+    display: flex; align-items: center; gap: 10px; background: #fff; border: 2px solid var(--ink);
+    border-radius: 6px; padding: 10px 12px; margin-top: 10px; font-size: 12px; color: var(--ink); line-height: 1.45;
+  }
+  .bd-bluedot { width: 14px; height: 14px; border-radius: 50%; background: #4285f4; border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(66,133,244,.4); flex-shrink: 0; }
+  .bd-anchor-hint { font-size: 12px; color: #8a8276; margin-top: 8px; line-height: 1.4; }
+  .bd-anchor-err { font-size: 12px; color: var(--red); font-weight: 700; margin-top: 8px; }
+  #bdToast {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 12000;
+    background: var(--ink); color: #fff; border-radius: 8px; padding: 10px 16px;
+    font-size: 13px; font-weight: 700; font-family: var(--font-main);
+    opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 90vw; text-align: center;
+  }
+  #bdToast.show { opacity: 1; }
+  #bdToast.err { background: var(--red); }
+  #bdBackChip {
+    position: fixed; top: 12px; left: 12px; z-index: 9500; display: none;
+    border: 3px solid var(--ink); background: var(--card); color: var(--ink);
+    border-radius: 8px; padding: 8px 14px; font-family: var(--font-main);
+    font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 4px 4px 0 var(--ink);
+  }
+  #bdBackChip.show { display: block; }
+  #bdBackChip:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--ink); }
+  @media (max-width: 600px) {
+    .bd-line .bd-seg { margin-left: 0; width: 100%; }
+    .bd-line .bd-seg button { flex: 1; padding: 6px 4px; }
+    .bd-brightwrap { max-width: none; }
+    .bd-corner { width: 100%; height: 150px; }
+  }
+</style>
+
+<div id="bdHome" class="hidden">
+  <!-- Original catch.it-Logo (aus catch.it.svg, viewBox auf das Artwork beschnitten),
+       wird von bdApplyHeader in die Kopfzeile uebernommen -->
+  <div id="bdLogoTpl" hidden>
+    <svg class="bd-logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="15 26 172 66" role="img" aria-label="catch it">
+      <rect x="22.8" y="46.4" width="147.9" height="36.2" rx="18" ry="18" fill="#fff"/>
+      <path d="M76.7,29h3.6c.2,0,.3.2.3.3v7.5c0,.2-.2.3-.3.3h-3.6c-.2,0-.3-.1-.3-.3v-7.5c0-.2.2-.3.3-.3" fill="#eaeaea"/>
+      <polygon points="76.3 32.7 77.7 32.7 80.6 36.9 80.6 78.7 76.3 78.7 76.3 32.7" fill="#eb3924"/>
+      <path d="M98.8,53h-18.2v-13.1h18.2c.2,0,.3.1.3.3v12.6c0,.2-.1.3-.3.3" fill="#eb3924"/>
+      <rect x="81.8" y="42.1" width="14.8" height="8.5"/>
+      <rect x="88.6" y="46.8" width="2.7" height="2.7" fill="#fff"/>
+      <rect x="91.9" y="43.4" width="2.7" height="2.7" fill="#fff"/>
+      <path d="M132.4,77.4c-.9,0-1.6-.7-1.6-1.5v-13.4c0-1.4.6-2.9,1.6-3.9l18.3-18.3c.6-.6,1.6-.6,2.2,0s.6,1.6,0,2.2l-18.3,18.3c-.4.4-.7,1.1-.7,1.7v13.3c0,.9-.7,1.5-1.6,1.5" fill="#eb3924"/>
+      <path d="M154.8,48.1h-3.1v-6.5h-6.5v-3.1h8.1c.9,0,1.6.7,1.6,1.6v8Z" fill="#eb3924"/>
+      <path d="M77.3,87.1h-16.7c-2.2,0-4.3-.9-5.8-2.4l-23.7-23.7c-1-1-2.2-1.5-3.6-1.5h-8.2c-.9,0-1.5-.7-1.5-1.5s.7-1.5,1.5-1.5h8.2c2.2,0,4.3.9,5.8,2.4l23.7,23.7c1,1,2.2,1.5,3.6,1.5h16.7c.9,0,1.5.7,1.5,1.5s-.7,1.5-1.5,1.5" fill="#eb3924"/>
+      <path d="M81.4,85.6c0,1.6-1.3,2.9-2.9,2.9s-2.9-1.3-2.9-2.9,1.3-2.9,2.9-2.9,2.9,1.3,2.9,2.9"/>
+      <path d="M30.9,68c0-6.3,4.4-10.6,10.9-10.6s5.5,1,7.7,3.1l-2.8,3c-1.2-1.2-3-1.9-4.8-1.9-3.7,0-6.3,2.6-6.3,6.4s2.6,6.4,6.3,6.4,3.8-.8,5.1-2.1l3,3c-2.3,2.2-4.9,3.3-8.1,3.3-6.6,0-10.9-4.2-10.9-10.6"/>
+      <path d="M72.3,57.8v20.4h-4.1v-2.7c-1.6,2-4.3,3.2-7.5,3.2-6,0-10.1-4.4-10.1-10.7s4.1-10.6,10.1-10.6,5.9,1.2,7.4,3.2v-2.7s4.2,0,4.2,0ZM67.6,68c0-3.8-2.6-6.4-6.2-6.4s-6.2,2.6-6.2,6.4,2.6,6.4,6.2,6.4,6.2-2.6,6.2-6.4"/>
+      <path d="M83.8,68c0-6.3,4.4-10.6,10.9-10.6s5.5,1,7.7,3.1l-2.8,3c-1.2-1.2-3-1.9-4.8-1.9-3.7,0-6.3,2.6-6.3,6.4s2.6,6.4,6.3,6.4,3.8-.7,5-2.1l2.8,3.1c-2.3,2.2-4.8,3.2-7.9,3.2-6.6,0-10.9-4.2-10.9-10.6"/>
+      <path d="M126,67v11.3h-4.6v-11c0-3.6-1.9-5.7-4.9-5.7s-5.7,2.5-5.7,5.9v10.7h-4.6v-28.9h4.6v10.9c1.7-1.9,3.9-2.8,6.6-2.8,5.3,0,8.7,3.8,8.7,9.5"/>
+      <path d="M129.6,75.8c0-1.6,1.2-2.8,2.8-2.8s2.8,1.2,2.8,2.8-1.2,2.8-2.8,2.8-2.8-1.2-2.8-2.8" fill="#fff" stroke="#000" stroke-miterlimit="10" stroke-width="2"/>
+      <path d="M138.4,51.8c0-1.5,1.5-2.7,3-2.7,1.7,0,2.9,1.2,2.9,2.9s-1.2,2.8-3,2.8-3-1.3-2.9-3M140.5,57.8h3.1v20.4h-4.6v-18.8l1.6-1.6h0Z"/>
+      <path d="M162.3,77.5c-1.6.7-2.9,1-4.6,1-4.2,0-6.7-2.4-6.7-7.3v-9.5h-3.8v-3.9h3.8v-5.3l4.6-.5v5.8h5.9v3.9h-5.9v9.5c0,2.1.9,3.2,2.9,3.2s1.8-.2,2.6-.6l1.3,3.7h0Z"/>
+    </svg>
+  </div>
+  <div class="container">
+
+    <div class="bd-card" id="bdDeviceCard">
+      <div style="display:flex;align-items:flex-start;gap:14px;">
+        <div style="width:46px;height:46px;background:var(--red);border:3px solid var(--ink);border-radius:10px;box-shadow:3px 3px 0 var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0;" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="12.5" rx="2"/><circle cx="8.6" cy="11.2" r="2.1"/><path d="M13.4 9.2h4.6M13.4 12h4.6M13.4 14.8h2.8"/></svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <h2 style="margin-bottom:0;">Deine catch.it Wall</h2>
+          <div class="bd-status" id="bdStatus"><span class="bd-dot wait"></span><span>Verbinde mit dem Display &hellip;</span></div>
+          <div class="bd-meta" id="bdMeta"></div>
+        </div>
+        <button type="button" class="bd-refresh" id="bdReloadBtn" title="Vom Display neu laden">&#8635;</button>
+      </div>
+      <div class="bd-help" id="bdConnHelp" style="display:none;">
+        <b>Keine Verbindung zum Display.</b>
+        <ul>
+          <li>Dein Display und dieser Browser m&uuml;ssen im selben WLAN sein.</li>
+          <li>Chrome fragt nach dem Zugriff auf das lokale Netzwerk: bitte erlauben.</li>
+          <li>Safari und Firefox blockieren lokale Ger&auml;te auf dieser Seite oft. Dann hilft Chrome, oder du nutzt das Men&uuml; direkt am Display: <a href="http://catch.local" target="_blank" rel="noopener">catch.local</a></li>
+        </ul>
+        <button type="button" class="btn" id="bdRetryBtn" style="margin-top:12px;">Erneut verbinden</button>
+      </div>
+      <button type="button" class="btn" id="bdEditStationsBtn" style="margin-top:14px;">Stationen &auml;ndern</button>
+    </div>
+
+    <div class="bd-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <h2 style="margin-bottom:0;">Linien auf dem Display</h2>
+        <button type="button" class="bd-refresh" id="bdLinesReloadBtn" title="Linien neu laden">&#8635;</button>
+      </div>
+      <p class="bd-sub">Jede Linie kann auf der Tafel stehen, auf der Karte fahren, oder beides. Mit Richtungsfilter zeigt eine Linie nur die gew&auml;hlten Ziele.</p>
+      <div id="bdLinesWrap"></div>
+    </div>
+
+    <div class="bd-card" id="bdTafelCard" style="display:none;">
+      <h2>Abfahrten-Tafel</h2>
+      <p class="bd-sub">Was auf der Tafel steht und wie: &Auml;nderungen wirken sofort.</p>
+      <div id="bdCtlTafel"></div>
+    </div>
+
+    <div class="bd-card">
+      <h2>Anzeige</h2>
+      <p class="bd-sub">&Auml;nderungen wirken sofort auf deinem Display.</p>
+      <div id="bdCtlAnzeige"></div>
+    </div>
+
+    <div class="bd-card">
+      <h2>Karte</h2>
+      <div id="bdAnchorBlock" style="border-bottom:2px dashed rgba(27,27,27,.14);margin-top:10px;padding-bottom:14px;">
+        <div class="bd-label" style="margin-bottom:10px;">
+          <div class="name">Karten-Zentrum</div>
+          <div class="hint">Der Ankerpunkt der Karte: automatisch die Mitte deiner Stationen, eine bestimmte Station, oder deine Adresse. Wird sofort gespeichert.</div>
+        </div>
+        <div id="bdAnchorWrap"></div>
+      </div>
+      <div id="bdCtlKarte"></div>
+    </div>
+
+    <div class="bd-card">
+      <h2>Nachtabschaltung</h2>
+      <div id="bdCtlNacht"></div>
+    </div>
+
+  </div>
+</div>
+
+<button type="button" id="bdBackChip">&larr; Zur&uuml;ck zu den Einstellungen</button>
+<div id="bdToast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- Aktivierung: ?device=<host|ip[:port]> ----------
+  function bdHostFromUrl() {
+    try {
+      var p = new URLSearchParams(window.location.search);
+      var d = (p.get('device') || '').trim();
+      if (!d) return null;
+      if (/^https?:\/\//i.test(d)) { try { d = new URL(d).host; } catch (e) { return null; } }
+      d = d.replace(/\/.*$/, '');
+      if (/^[A-Za-z0-9._\-]+(:\d{1,5})?$/.test(d)) return d;
+      if (/^\[[0-9A-Fa-f:]+\](:\d{1,5})?$/.test(d)) return d;
+      return null;
+    } catch (e) { return null; }
+  }
+
+  var BD_HOST = bdHostFromUrl();
+  if (!BD_HOST) {
+    // Kein Bigdisplay: eigene DOM-Knoten entfernen, Legacy-Flow bleibt exakt wie bisher.
+    ['bdHome', 'bdBackChip', 'bdToast'].forEach(function (id) {
+      var el = document.getElementById(id); if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+    return;
+  }
+
+  var BASE = 'http://' + BD_HOST;
+  var BD = {
+    state: null,          // letzter /api/state vom Geraet
+    online: false,
+    connecting: false,
+    saving: false,
+    savingText: '',
+    reloadPending: false, // nach /api/cfg: Geraet laedt Karte+Abfahrten neu
+    adopted: false,       // stations[] wurde schon aus den Geraete-rbls befuellt
+    dirsOpen: {},         // Linienname -> Richtungsfilter-Editor aufgeklappt
+    lastWin: '',          // letztes aktives Zeitfenster (fuer den An/Aus-Schalter)
+    grpEdit: null         // Zeilen-Gruppen im Editor (Array), null = Stand vom Geraet
+  };
+  window._bd = BD;        // Debug-Griff in der Konsole
+
+  // ---------- Mini-Helfer ----------
+  function $(id) { return document.getElementById(id); }
+  // stations/currentStep sind top-level let-Bindings des Hauptscripts: sie haengen NICHT
+  // an window, sind aber im globalen Scope per Namen erreichbar. Zugriff immer hierueber.
+  function allStations() {
+    try { if (Array.isArray(stations)) return stations; } catch (e) {}
+    window.stations = window.stations || [];
+    return window.stations;
+  }
+  function setStep(v) {
+    try { currentStep = v; return; } catch (e) {}
+    window.currentStep = v;
+  }
+  function getStep() {
+    try { return currentStep; } catch (e) { return window.currentStep; }
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function bdSleep(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+  function fmtTime(min) {
+    min = ((parseInt(min, 10) || 0) % 1440 + 1440) % 1440;
+    var h = Math.floor(min / 60), m = min % 60;
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+  function parseTimeToMin(v) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(v || ''));
+    if (!m) return null;
+    return (parseInt(m[1], 10) % 24) * 60 + (parseInt(m[2], 10) % 60);
+  }
+  // Zeitfenster der Tafel: "360-1320" (Minuten), "0-0" = immer anzeigen
+  function bdParseWin(s) {
+    var m = /^(\d+)-(\d+)$/.exec(String(s || '').trim());
+    if (!m) return { from: 0, to: 0 };
+    return { from: parseInt(m[1], 10) % 1440, to: parseInt(m[2], 10) % 1440 };
+  }
+  // Gehweg: "250:5,STV:at:46:1234:8" -> Map Token->Minuten (Token kann selbst ':' enthalten)
+  function bdParseWalk(s) {
+    var map = {};
+    String(s || '').split(',').forEach(function (t) {
+      t = t.trim();
+      var i = t.lastIndexOf(':');
+      if (i <= 0) return;
+      var tok = t.substring(0, i), v = parseInt(t.substring(i + 1), 10);
+      if (tok && !isNaN(v)) map[tok] = Math.min(15, Math.max(0, v));
+    });
+    return map;
+  }
+  function badgeFg(hex) {
+    var m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || ''));
+    if (!m) return '#fff';
+    var n = parseInt(m[1], 16), r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1b1b1b' : '#fff';
+  }
+  var _toastTimer = null;
+  function bdToast(msg, isErr) {
+    var t = $('bdToast'); if (!t) return;
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function () { t.classList.remove('show'); }, isErr ? 4000 : 2500);
+  }
+
+  // ---------- Geraete-HTTP ----------
+  // Von der https-Seite zum lokalen Geraet: Chrome erlaubt das ueber die Berechtigung
+  // "Zugriff auf das lokale Netzwerk" (Local Network Access), dafuer braucht der Fetch
+  // die targetAddressSpace-Option. Andere Browser ignorieren die Option einfach.
+  function bdFetch(path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || 'GET', cache: 'no-store' };
+    if (window.location.protocol === 'https:') init.targetAddressSpace = 'private';
+    var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = null;
+    if (ctl) {
+      init.signal = ctl.signal;
+      timer = setTimeout(function () { try { ctl.abort(); } catch (e) {} }, opts.timeout || 8000);
+    }
+    var p = fetch(BASE + path, init);
+    return p.finally ? p.finally(function () { if (timer) clearTimeout(timer); }) : p;
+  }
+  function bdLoadState() {
+    return bdFetch('/api/state').then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (st) {
+      BD.state = st; BD.online = true;
+      bdSyncAnchorFromState(st);
+      return st;
+    });
+  }
+
+  // Das Geraet meldet in /api/state, ob sein Zentrum eine Adresse ist (aaddr 0/1),
+  // z. B. nach Umstellung direkt am Portal. Nachgezogen wird nur, wenn sich das
+  // Geraete-Flag gegenueber dem zuletzt bekannten Stand aendert, damit eine gerade
+  // laufende Eingabe hier (Adresse getippt, noch nicht gesucht) nicht zurueckspringt.
+  function bdSyncAnchorFromState(st) {
+    if (!st || typeof st.aaddr === 'undefined') return;
+    var dev = (String(st.aaddr) === '1') ? 1 : 0;
+    var first = (BD.sentAaddr === null);
+    if (!first && dev === BD.sentAaddr) return;
+    BD.sentAaddr = dev;
+    if (dev === 1 && BD.anchor.mode !== 'addr') { BD.anchor.mode = 'addr'; bdSaveAnchor(); bdRenderAnchor(); }
+    else if (dev === 0 && BD.anchor.mode === 'addr') { BD.anchor.mode = 'auto'; bdSaveAnchor(); bdRenderAnchor(); }
+  }
+  function bdDisp(key, val) {
+    return bdFetch('/api/disp?' + encodeURIComponent(key) + '=' + encodeURIComponent(val), { method: 'POST' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (!BD.online) { BD.online = true; bdRenderDevice(); }
+      })
+      .catch(function () {
+        BD.online = false;
+        bdRenderDevice();
+        bdToast('Keine Verbindung zum Display. Einstellung nicht übernommen.', true);
+        bdSafeReload(false);
+      });
+  }
+
+  // ---------- rbls: Stationsliste <-> Geraete-Format ----------
+  // Token-Format wie am Server (parseStopIds): nackte Zahl = Wien-RBL, sonst NETZ:stopId.
+  function bdTokensFromString(rbls) {
+    return String(rbls || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+  }
+  function bdGroupKey(s) { return s.network + '|' + (s.stopName || s.fullId); }
+  function bdRblsOf(list) {
+    var seen = {}, out = [];
+    (list || []).forEach(function (s) {
+      String(s.fullId || '').split(',').forEach(function (t) {
+        t = t.trim();
+        if (!t) return;
+        // Wien-Mehrsteig-Stationen tragen "250,251"; bei anderen Netzen darf ein nacktes
+        // Fragment nach dem Komma nie ohne Netz-Prefix bleiben (der Server verwirft es sonst).
+        if (!/^\d+$/.test(t) && t.indexOf(':') === -1 && s.network && s.network !== 'WL') {
+          t = s.network + ':' + t;
+        }
+        if (seen[t]) return;
+        seen[t] = 1; out.push(t);
+      });
+    });
+    return out.join(',');
+  }
+  function bdCurrentRbls() { return bdRblsOf(allStations()); }
+  function bdDeviceRbls() {
+    return BD.state ? bdTokensFromString(BD.state.rbls).join(',') : '';
+  }
+
+  // ---------- Ankerpunkt (Karten-Zentrum): automatisch / Station / Adresse ----------
+  // Das Geraet kennt lat/lon plus das Flag aaddr (0/1, in /api/state und /api/cfg):
+  // aaddr=1 heisst "Zentrum ist eine Adresse", die Firmware zeichnet dort den blauen
+  // Standort-Punkt. Adresse und Modus-Details merken wir uns pro Display im Browser.
+  function bdDefaultAnchor() { return { mode: 'auto', stationKey: '', addr: '', lat: null, lon: null, label: '' }; }
+  // isFinite(null) waere true (Number(null) = 0), darum strikter Zahlen-Check
+  function bdIsNum(v) { return typeof v === 'number' && isFinite(v); }
+  function bdLoadAnchor() {
+    try {
+      var v = JSON.parse(localStorage.getItem('catchit_bd_anchor_' + BD_HOST) || 'null');
+      if (v && (v.mode === 'auto' || v.mode === 'station' || v.mode === 'addr')) return v;
+    } catch (e) {}
+    return bdDefaultAnchor();
+  }
+  function bdSaveAnchor() {
+    try { localStorage.setItem('catchit_bd_anchor_' + BD_HOST, JSON.stringify(BD.anchor)); } catch (e) {}
+  }
+  BD.anchor = bdLoadAnchor();
+  BD.sentAaddr = null;   // zuletzt bekanntes aaddr-Flag des Geraets (fuer den State-Sync)
+
+  // Befuellt das globale stations[] aus den Geraete-rbls, Namen kommen asynchron nach
+  // (resolveStationName: Wien ueber wienData, andere Netze ueber die Such-API).
+  var _adoptRun = 0;
+  function bdAdoptStations(rbls) {
+    var run = ++_adoptRun;
+    var toks = bdTokensFromString(rbls);
+    var sts = allStations();
+    sts.length = 0;
+    toks.forEach(function (tok) {
+      var network = 'WL', stopId = tok;
+      if (!/^\d+$/.test(tok)) {
+        var ci = tok.indexOf(':');
+        if (ci > 0) {
+          network = tok.substring(0, ci);
+          stopId = tok.substring(ci + 1).split('!')[0];
+          if (network.toUpperCase() === 'WL') network = 'WL';
+        }
+      }
+      var cached = null;
+      try { cached = getCachedStationName(tok) || getCachedStationName('#' + stopId); } catch (e) {}
+      var netName = network;
+      try { if (typeof NETWORKS !== 'undefined' && NETWORKS[network] && NETWORKS[network].name) netName = NETWORKS[network].name; } catch (e) {}
+      sts.push({
+        network: network, networkName: netName,
+        stopId: stopId, stopName: cached || ('Station ' + stopId),
+        filter: '', fullId: tok, isExisting: true, directions: [],
+        _bdNamePending: !cached
+      });
+    });
+    BD.adopted = true;
+    bdRenderAnchor();
+    bdRenderTafel();
+    updateStationsList();
+    // Namen sequenziell aufloesen, damit die Such-API nicht geflutet wird
+    (function next(i) {
+      if (run !== _adoptRun || i >= sts.length) { bdRenderAnchor(); bdRenderTafel(); updateStationsList(); return; }
+      var s = sts[i];
+      if (!s || !s._bdNamePending || typeof resolveStationName !== 'function') { next(i + 1); return; }
+      Promise.resolve()
+        .then(function () { return resolveStationName(s.network, s.stopId); })
+        .then(function (nm) {
+          if (run !== _adoptRun) return;
+          if (nm) {
+            s.stopName = nm;
+            try { setCachedStationName(s.fullId, nm); } catch (e) {}
+          }
+          s._bdNamePending = false;
+        })
+        .catch(function () { s._bdNamePending = false; })
+        .then(function () { next(i + 1); });
+    })(0);
+  }
+
+  // ---------- Sichtbarkeit: Bigdisplay-Uebersicht vs. Stations-Picker ----------
+  var LEGACY_CARDS = ['stepRegion', 'stepNetwork', 'stepSearch', 'stepLines', 'stepBundesland',
+    'stepDisplayPreset', 'stepWienLine', 'stepWienStation', 'stepWienDirection',
+    'stepDisplayConfig', 'stepDbSelect', 'stepWizardStyle', 'stepWizardBvgRows',
+    'stepWizardGehweg', 'stepWizardNight', 'stepWizardAdvanced', 'stationsCard',
+    'stepFinetuning', 'wizardProgress', 'displayHero'];
+  var _hdr = { set: false, h1: '', p: '', title: '' };
+
+  function bdApplyHeader() {
+    var h = document.querySelector('.container .header');
+    if (!h) return;
+    var h1 = h.querySelector('h1'), p = h.querySelector('p');
+    if (!_hdr.set) { _hdr.h1 = h1 ? h1.innerHTML : ''; _hdr.p = p ? p.innerHTML : ''; _hdr.title = document.title; _hdr.set = true; }
+    if (h1) {
+      var tpl = $('bdLogoTpl');
+      h1.innerHTML = (tpl ? tpl.innerHTML : 'catch it<span style="color:var(--red)">.</span>') + '<span class="bd-wall">Wall</span>';
+    }
+    if (p) p.textContent = 'Stationen, Linien und Anzeige: alles live auf deiner Wall.';
+    document.title = 'catch.it Wall';
+  }
+  function bdRestoreHeader() {
+    if (!_hdr.set) return;
+    var h = document.querySelector('.container .header');
+    if (!h) return;
+    var h1 = h.querySelector('h1'), p = h.querySelector('p');
+    if (h1) h1.innerHTML = _hdr.h1;
+    if (p) p.innerHTML = _hdr.p;
+    document.title = _hdr.title;
+  }
+
+  function bdShowHome() {
+    setStep('bdHome');
+    LEGACY_CARDS.forEach(function (id) { var el = $(id); if (el) el.classList.add('hidden'); });
+    var ov = $('configChoiceOverlay'); if (ov) ov.style.display = 'none';
+    var bb = document.querySelector('.bottom-bar'); if (bb) bb.style.display = 'none';
+    var bc = $('breadcrumb'); if (bc) bc.style.display = 'none';
+    var chip = $('bdBackChip'); if (chip) chip.classList.remove('show');
+    bdApplyHeader();
+    var home = $('bdHome'); if (home) home.classList.remove('hidden');
+    bdRenderAnchor();
+    window.scrollTo(0, 0);
+  }
+
+  // In die normale Stationswahl der Seite wechseln (Legacy-Flow bleibt 1:1,
+  // nur der "Weiter"-Button fuehrt danach ins Wall-Feintuning zurueck).
+  function bdPreparePicker() {
+    var hm = $('bdHome'); if (hm) hm.classList.add('hidden');
+    var bc = $('breadcrumb'); if (bc) bc.style.display = '';
+    var chip = $('bdBackChip'); if (chip) chip.classList.add('show');
+    bdRestoreHeader();
+  }
+  function bdOpenStations() {
+    bdPreparePicker();
+    try {
+      if (_bdOrigEditLines) { _bdOrigEditLines(); return; }
+    } catch (e) {}
+    if (typeof goBack === 'function') goBack('region');
+  }
+
+  // ---------- Rendering: Geraete-Karte ----------
+  function bdRenderDevice() {
+    var stEl = $('bdStatus'), meta = $('bdMeta'), help = $('bdConnHelp');
+    if (!stEl) return;
+    var dot, txt;
+    if (BD.connecting) { dot = 'wait'; txt = 'Verbinde mit dem Display &hellip;'; }
+    else if (BD.online) { dot = 'ok'; txt = 'Verbunden'; }
+    else { dot = 'err'; txt = 'Keine Verbindung'; }
+    stEl.innerHTML = '<span class="bd-dot ' + dot + '"></span><span>' + txt + '</span>';
+    var bits = [esc(BD_HOST)];
+    if (BD.state) {
+      if (BD.state.ver) bits.push('Version ' + esc(BD.state.ver));
+      if (BD.state.ssid) bits.push('WLAN: ' + esc(BD.state.ssid));
+      if (BD.state.ip && BD.state.ip !== BD_HOST) bits.push(esc(BD.state.ip));
+    }
+    meta.innerHTML = bits.join(' &middot; ');
+    help.style.display = (!BD.online && !BD.connecting) ? 'block' : 'none';
+  }
+
+  // ---------- Rendering: Ankerpunkt ----------
+  function bdStationGroups() {
+    var groups = [], seen = {};
+    allStations().forEach(function (s) {
+      var key = bdGroupKey(s);
+      if (seen[key]) return;
+      seen[key] = 1;
+      groups.push({ key: key, name: s.stopName || s.fullId });
+    });
+    return groups;
+  }
+  function bdRenderAnchor() {
+    var wrap = $('bdAnchorWrap');
+    if (!wrap) return;
+    // Nicht neu bauen, waehrend der User gerade im Adressfeld tippt
+    var ae = document.activeElement;
+    if (ae && ae.id === 'bdAddrInput' && wrap.contains(ae)) return;
+    var a = BD.anchor;
+    var html = '<div class="bd-seg" style="justify-content:flex-start;">' +
+      [['auto', 'Automatisch'], ['station', 'Station'], ['addr', 'Adresse']].map(function (o) {
+        return '<button type="button" data-bdanchor="' + o[0] + '" class="' + (a.mode === o[0] ? 'on' : '') + '">' + o[1] + '</button>';
+      }).join('') + '</div>';
+    if (a.mode === 'auto') {
+      html += '<div class="bd-anchor-hint">Die Karte zentriert auf die Mitte deiner Stationen.</div>';
+    } else if (a.mode === 'station') {
+      var groups = bdStationGroups();
+      if (!groups.length) {
+        html += '<div class="bd-anchor-hint">Noch keine Stationen in der Liste.</div>';
+      } else {
+        var known = groups.some(function (g) { return g.key === a.stationKey; });
+        html += '<select class="bd-select" id="bdAnchorStationSel">' +
+          '<option value=""' + (known ? '' : ' selected') + '>Station w&auml;hlen &hellip;</option>' +
+          groups.map(function (g) {
+            return '<option value="' + esc(g.key) + '"' + (a.stationKey === g.key ? ' selected' : '') + '>' + esc(g.name) + '</option>';
+          }).join('') + '</select>';
+        html += '<div class="bd-anchor-hint">Die Karte zentriert auf diese Station. Ohne Auswahl nehmen wir automatisch die Mitte.</div>';
+      }
+    } else {
+      html += '<div class="bd-addr-row">' +
+        '<input type="text" class="bd-input" id="bdAddrInput" placeholder="Adresse, z. B. Lerchenfelder Stra&szlig;e 5, Wien" value="' + esc(a.addr) + '">' +
+        '<button type="button" class="bd-addr-btn" id="bdAddrSearchBtn">Suchen</button></div>';
+      if (a.label && bdIsNum(a.lat)) {
+        html += '<div class="bd-anchor-note"><span class="bd-bluedot"></span><span><b>' + esc(a.label) + '</b><br>' +
+          'Die Karte zentriert hierher, dein Display zeigt an der Adresse einen blauen Standort-Punkt.</span></div>';
+      } else {
+        html += '<div class="bd-anchor-hint">Adresse eingeben und suchen: die Karte zentriert dann auf deine Adresse, mit blauem Standort-Punkt.</div>';
+      }
+      html += '<div class="bd-anchor-err" id="bdAddrErr" style="display:none;">Adresse nicht gefunden, probiere es genauer.</div>';
+    }
+    wrap.innerHTML = html;
+  }
+
+  // Geocoding ueber OpenStreetMap Nominatim (frei, CORS offen, sparsam nutzen)
+  function bdGeocode(q) {
+    var url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=de&addressdetails=1&q=' + encodeURIComponent(q);
+    return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (arr) {
+      if (Array.isArray(arr) && arr[0] && isFinite(+arr[0].lat) && isFinite(+arr[0].lon)) {
+        var hit = arr[0], ad = hit.address || {};
+        var street = [ad.road || ad.pedestrian || ad.square || '', ad.house_number || ''].join(' ').trim();
+        var ort = [ad.postcode || '', ad.city || ad.town || ad.village || ad.municipality || ''].join(' ').trim();
+        var label = [street, ort].filter(Boolean).join(', ');
+        if (!label) {
+          label = String(hit.display_name || q);
+          var parts = label.split(',').map(function (p) { return p.trim(); });
+          if (parts.length > 4) label = parts.slice(0, 3).join(', ') + ', ' + parts[parts.length - 1];
+        }
+        return { lat: +hit.lat, lon: +hit.lon, label: label };
+      }
+      return null;
+    }).catch(function () { return null; });
+  }
+  function bdDoGeocode() {
+    var inp = $('bdAddrInput'), btn = $('bdAddrSearchBtn'), err = $('bdAddrErr');
+    if (!inp) return;
+    var q = inp.value.trim();
+    BD.anchor.addr = q;
+    if (!q) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Suche …'; }
+    if (err) err.style.display = 'none';
+    inp.blur();
+    bdGeocode(q).then(function (res) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Suchen'; }
+      if (res) {
+        BD.anchor.lat = res.lat; BD.anchor.lon = res.lon; BD.anchor.label = res.label;
+        bdRenderAnchor();
+        bdSaveAnchor();
+        bdPushCfg(null);   // neues Zentrum sofort ans Display
+      } else {
+        BD.anchor.lat = null; BD.anchor.lon = null; BD.anchor.label = '';
+        bdRenderAnchor();   // alte Erfolgs-Note weg, Eingabe bleibt stehen
+        var e2 = $('bdAddrErr');
+        if (e2) e2.style.display = 'block';
+      }
+    });
+  }
+
+  // ---------- Rendering: Linien ----------
+  var MODE_LABELS = ['Tafel + Karte', 'Nur Karte', 'Nur Tafel'];
+  function bdRenderLines() {
+    var wrap = $('bdLinesWrap');
+    if (!wrap) return;
+    if (!BD.online && !BD.state) {
+      wrap.innerHTML = '<div class="bd-empty">Sobald dein Display verbunden ist, stehen hier seine Linien.</div>';
+      return;
+    }
+    if (BD.reloadPending) {
+      wrap.innerHTML = '<div class="bd-empty">Dein Display l&auml;dt gerade neu, die Linien kommen gleich.</div>';
+      return;
+    }
+    var lines = (BD.state && BD.state.lines) || [];
+    if (!lines.length) {
+      wrap.innerHTML = '<div class="bd-empty">Noch keine Linien da. Dein Display sammelt gerade Abfahrten, lade in ein paar Sekunden neu.</div>';
+      return;
+    }
+    // Nicht neu bauen, waehrend der User gerade einen Richtungsfilter tippt
+    var ae = document.activeElement;
+    if (ae && ae.hasAttribute && ae.hasAttribute('data-bddirs') && wrap.contains(ae)) return;
+    wrap.innerHTML = lines.map(function (l) {
+      var col = /^#?[0-9a-fA-F]{6}$/.test(String(l.c || '')) ? (String(l.c)[0] === '#' ? l.c : '#' + l.c) : '#888888';
+      var seg = MODE_LABELS.map(function (t, i) {
+        return '<button type="button" data-v="' + i + '" class="' + (i === l.m ? 'on' : '') + '">' + t + '</button>';
+      }).join('');
+      // Richtungsfilter (Firmware-Key dirs pro Linie): Editor offen, wenn gesetzt oder angefordert
+      var dirsHtml = '';
+      var hasDirsApi = (typeof l.dirs !== 'undefined');
+      if (hasDirsApi) {
+        var open = BD.dirsOpen[l.n] || (l.dirs && String(l.dirs).length);
+        if (open) {
+          dirsHtml = '<div class="bd-dirs"><span aria-hidden="true">&rarr;</span>' +
+            '<input type="text" class="bd-input" data-bddirs="' + esc(l.n) + '" value="' + esc(l.dirs || '') + '" placeholder="Nur Richtung, z. B. Floridsdorf (leer = alle)">' +
+            '</div>';
+        } else {
+          dirsHtml = '<div class="bd-dirs"><button type="button" class="bd-dirs-link" data-bddirsopen="' + esc(l.n) + '">Richtung filtern</button></div>';
+        }
+      }
+      return '<div class="bd-line' + (hasDirsApi ? ' bd-hasdirs' : '') + '">' +
+        '<span class="bd-badge" style="background:' + esc(col) + ';color:' + badgeFg(col) + ';">' + esc(l.n) + '</span>' +
+        '<span class="bd-seg" data-bdline="' + esc(l.n) + '">' + seg + '</span>' +
+        '</div>' + dirsHtml;
+    }).join('');
+  }
+
+  function bdPushDirs(name, dirs) {
+    var lines = (BD.state && BD.state.lines) || [];
+    for (var i = 0; i < lines.length; i++) if (lines[i].n === name) lines[i].dirs = dirs;
+    if (!dirs) BD.dirsOpen[name] = false;
+    bdRenderLines();
+    bdFetch('/api/line?name=' + encodeURIComponent(name) + '&dirs=' + encodeURIComponent(dirs), { method: 'POST' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        bdToast(dirs ? 'Richtung gespeichert.' : 'Richtungsfilter entfernt.');
+      })
+      .catch(function () {
+        BD.online = false;
+        bdRenderDevice();
+        bdToast('Keine Verbindung zum Display. Richtung nicht übernommen.', true);
+        bdSafeReload(false);
+      });
+  }
+
+  function bdSetLineMode(name, mode) {
+    var lines = (BD.state && BD.state.lines) || [];
+    for (var i = 0; i < lines.length; i++) if (lines[i].n === name) lines[i].m = mode;
+    bdRenderLines();
+    bdFetch('/api/line?name=' + encodeURIComponent(name) + '&mode=' + mode, { method: 'POST' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); })
+      .catch(function () {
+        BD.online = false;
+        bdRenderDevice();
+        bdToast('Keine Verbindung zum Display. Linien-Modus nicht übernommen.', true);
+        bdSafeReload(false);
+      });
+  }
+
+  // ---------- Rendering: Feintuning (Anzeige / Karte / Nacht) ----------
+  function segHtml(key, labels, cur) {
+    return '<div class="bd-seg" data-bdseg="' + key + '">' + labels.map(function (t, i) {
+      return '<button type="button" data-v="' + i + '" class="' + (i === cur ? 'on' : '') + '">' + t + '</button>';
+    }).join('') + '</div>';
+  }
+  function rowHtml(name, hint, controlHtml, extraClass) {
+    return '<div class="bd-row' + (extraClass ? ' ' + extraClass : '') + '">' +
+      '<div class="bd-label"><div class="name">' + name + '</div>' +
+      (hint ? '<div class="hint">' + hint + '</div>' : '') + '</div>' +
+      controlHtml + '</div>';
+  }
+  function switchHtml(key, on) {
+    return '<div class="bd-switch' + (on ? ' on' : '') + '" data-bdswitch="' + key + '" role="switch" aria-checked="' + (on ? 'true' : 'false') + '"></div>';
+  }
+
+  function bdRenderAnzeige() {
+    var el = $('bdCtlAnzeige');
+    if (!el) return;
+    var st = BD.state;
+    if (!st) { el.innerHTML = '<div class="bd-empty">Einstellungen erscheinen, sobald dein Display verbunden ist.</div>'; return; }
+    var pct = (st.bright + 1) * 20;
+    var html = '';
+    html += rowHtml('Design', 'Auto folgt dem Tageslicht: hell am Tag, dunkel in der Nacht.',
+      segHtml('design', ['Dunkel', 'Hell', 'Auto'], st.design));
+    html += rowHtml('Helligkeit', '',
+      '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdBright" min="0" max="4" step="1" value="' + st.bright + '">' +
+      '<span class="bd-range-val" id="bdBrightVal">' + pct + ' %</span></div>');
+    html += rowHtml('Abfahrten-Stil', 'Farbig: jede Zeile in der Linienfarbe. Schlicht: ruhige dunkle Zeilen.',
+      segHtml('style', ['Schlicht', 'Farbig'], st.style));
+    html += rowHtml('Abfahrten-Panel', 'Ecke: feste Tafel. Pop-up: Abfahrten am Karten-Zentrum. Pro Station: kleine Tafeln an jeder Station.',
+      segHtml('pstyle', ['Ecke', 'Pop-up', 'Pro Station'], st.pstyle));
+    // Panel-Position: wirkt nur bei grosser Karte, sonst steht die Tafel fix links
+    var cornerDim = st.lay < 2 ? ' bd-dim' : '';
+    var cornerHint = st.lay < 2
+      ? 'Gilt bei gro&szlig;er Karte. Gerade steht die Tafel fix links neben der Karte.'
+      : 'Wo die Tafel auf der Karte sitzt.';
+    var cells = ['', '', '', '', 'ctr', '', '', '', ''];
+    var cellIdx = [0, 1, 2, 3, -1, 4, 5, 6, 7];
+    var cornerBtns = cells.map(function (c, i) {
+      if (c === 'ctr') return '<div class="ctr">Karte</div>';
+      var ci = cellIdx[i];
+      return '<button type="button" data-bdcorner="' + ci + '" class="' + (st.corner === ci ? 'on' : '') + '" title="' +
+        ['Oben links', 'Oben Mitte', 'Oben rechts', 'Mitte links', 'Mitte rechts', 'Unten links', 'Unten Mitte', 'Unten rechts'][ci] + '"></button>';
+    }).join('');
+    html += rowHtml('Position der Tafel', cornerHint,
+      '<div class="bd-corner' + cornerDim + '" id="bdCorner">' + cornerBtns + '</div>');
+    html += rowHtml('Schnellschalter-Ecke', 'Ein Fingertipp auf die Display-Ecke schaltet diese Funktion direkt um.',
+      segHtml('qsfn', ['Design', 'Versp&auml;tung', 'Verkehr', 'Karte', 'Aus'], st.qsfn));
+    el.innerHTML = html;
+  }
+
+  var LAYERS = [
+    { k: 'roads',   n: 'Stra&szlig;en',             h: 'Stra&szlig;ennetz als Hintergrund der Karte.' },
+    { k: 'dly',     n: 'Versp&auml;tung am Zug',    h: 'Kleine Plus-Minuten-Labels an den Fahrzeugen.' },
+    { k: 'paths',   n: 'Linienfarbe auf Route',     h: 'Strecken in der Linienfarbe statt grau.' },
+    { k: 'traffic', n: 'Verkehr',                   h: 'Verkehrslage auf den Stra&szlig;en.' },
+    { k: 'share',   n: 'Sharing',                   h: 'Leihr&auml;der und E-Scooter auf der Karte.' },
+    { k: 'names',   n: 'Stationsnamen',             h: 'Namen der Stationen einblenden.' }
+  ];
+  function bdRenderKarte() {
+    var el = $('bdCtlKarte');
+    if (!el) return;
+    var st = BD.state;
+    if (!st) { el.innerHTML = '<div class="bd-empty">Einstellungen erscheinen, sobald dein Display verbunden ist.</div>'; return; }
+    var html = '';
+    html += rowHtml('Kartengr&ouml;&szlig;e', 'Klein und Mittel: Tafel links neben der Karte. Gro&szlig;: Karte &uuml;ber das ganze Display.',
+      segHtml('lay', ['Klein', 'Mittel', 'Gro&szlig;'], st.lay));
+    // Kartenweite: wie viele Meter Stadt sichtbar sind (Firmware-Key mapw, 100 bis 300)
+    var mw = bdIsNum(st.mapw) ? Math.min(300, Math.max(100, st.mapw)) : 200;
+    html += rowHtml('Kartenweite', '100 m: nah ans Zentrum gezoomt. 300 m: mehr Stadt im Blick.',
+      '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdMapW" min="100" max="300" step="10" value="' + mw + '">' +
+      '<span class="bd-range-val" id="bdMapWVal">' + mw + ' m</span></div>');
+    var ly = st.layers || {};
+    LAYERS.forEach(function (d) {
+      html += rowHtml(d.n, d.h, switchHtml(d.k, !!ly[d.k]), 'bd-keep');
+    });
+    el.innerHTML = html;
+  }
+
+  function bdRenderNacht() {
+    var el = $('bdCtlNacht');
+    if (!el) return;
+    var st = BD.state;
+    if (!st) { el.innerHTML = '<div class="bd-empty">Einstellungen erscheinen, sobald dein Display verbunden ist.</div>'; return; }
+    var n = st.night || { on: 0, from: 1320, to: 390 };
+    var html = '';
+    html += rowHtml('Display nachts ausschalten', 'Spart Strom: im Zeitraum bleibt das Display schwarz, danach wacht es von selbst wieder auf.',
+      switchHtml('nighton', !!n.on), 'bd-keep');
+    html += '<div class="bd-row' + (n.on ? '' : ' bd-dim') + '" id="bdNightTimesRow">' +
+      '<div class="bd-label"><div class="name">Zeitraum</div></div>' +
+      '<div class="bd-nighttimes">aus von <input type="time" class="bd-time" id="bdNightFrom" value="' + fmtTime(n.from) + '"> bis <input type="time" class="bd-time" id="bdNightTo" value="' + fmtTime(n.to) + '"></div>' +
+      '</div>';
+    el.innerHTML = html;
+  }
+
+  // ---------- Rendering: Abfahrten-Tafel (sort / dlyhl / win / walk) ----------
+  // Jedes Control erscheint nur, wenn die Firmware den Key in /api/state liefert;
+  // auf alter Firmware bleibt die ganze Karte unsichtbar.
+  function bdRenderTafel(force) {
+    var card = $('bdTafelCard'), el = $('bdCtlTafel');
+    if (!card || !el) return;
+    var st = BD.state;
+    var hasAny = st && (typeof st.sort !== 'undefined' || typeof st.dlyhl !== 'undefined' ||
+                        typeof st.win !== 'undefined' || typeof st.walk !== 'undefined' ||
+                        typeof st.groups !== 'undefined');
+    card.style.display = hasAny ? '' : 'none';
+    if (!hasAny) return;
+    // Nicht neu bauen, waehrend der User gerade in einem Tafel-Feld tippt
+    // (force = bewusste Editor-Aktion wie "+ Gruppe", die trotz Fokus neu baut)
+    var ae = document.activeElement;
+    if (!force && ae && el.contains(ae) && (ae.id === 'bdWinFrom' || ae.id === 'bdWinTo' ||
+        (ae.hasAttribute && (ae.hasAttribute('data-bdwalk') || ae.hasAttribute('data-bdgrp'))))) return;
+    var html = '';
+    if (typeof st.sort !== 'undefined') {
+      html += rowHtml('Sortierung', 'Nach Linie: Zeilen nach U-Bahn, Tram und Bus geordnet. Nach Zeit: n&auml;chste Abfahrt zuerst.',
+        segHtml('sort', ['Nach Linie', 'Nach Zeit'], parseInt(st.sort, 10) || 0));
+    }
+    if (typeof st.dlyhl !== 'undefined') {
+      html += rowHtml('Versp&auml;tung hervorheben', 'Versp&auml;tete Abfahrten zeigen ihre Minuten in Orange.',
+        switchHtml('dlyhl', !!+st.dlyhl), 'bd-keep');
+    }
+    if (typeof st.win !== 'undefined') {
+      var w = bdParseWin(st.win);
+      var winOn = !(w.from === 0 && w.to === 0);
+      html += rowHtml('Zeitfenster', 'Abfahrten nur in diesem Zeitraum zeigen, die Karte l&auml;uft durch. Auch &uuml;ber Mitternacht m&ouml;glich.',
+        switchHtml('winon', winOn), 'bd-keep');
+      html += '<div class="bd-row' + (winOn ? '' : ' bd-dim') + '">' +
+        '<div class="bd-label"><div class="name">Zeitraum</div></div>' +
+        '<div class="bd-nighttimes">von <input type="time" class="bd-time" id="bdWinFrom" value="' + fmtTime(winOn ? w.from : 360) + '"> bis <input type="time" class="bd-time" id="bdWinTo" value="' + fmtTime(winOn ? w.to : 1320) + '"></div>' +
+        '</div>';
+    }
+    if (typeof st.groups !== 'undefined') {
+      html += '<div class="bd-label" style="margin:14px 0 8px;">' +
+        '<div class="name">Zeilen-Gruppen</div>' +
+        '<div class="hint">Mehrere Linien teilen sich eine Tafel-Zeile und wechseln alle paar Sekunden durch. Schreibweise: Linie&gt;Ziel, mehrere mit + verbinden, das Ziel ist optional. Die Reihenfolge der Gruppen ist die Reihenfolge auf der Tafel.</div></div>';
+      var segsArr = BD.grpEdit || bdParseGroups(st.groups);
+      html += segsArr.map(function (seg, gi) {
+        return '<div class="bd-grp-row">' +
+          '<input type="text" class="bd-input" data-bdgrp="' + gi + '" value="' + esc(seg) + '" placeholder="U6&gt;Floridsdorf + 49&gt;H&uuml;tteldorf">' +
+          '<button type="button" class="bd-grp-btn" data-bdgrpmove="' + gi + ':-1" title="Nach oben">&uarr;</button>' +
+          '<button type="button" class="bd-grp-btn" data-bdgrpmove="' + gi + ':1" title="Nach unten">&darr;</button>' +
+          '<button type="button" class="bd-grp-btn del" data-bdgrpdel="' + gi + '" title="Gruppe l&ouml;schen">&times;</button>' +
+          '</div>';
+      }).join('');
+      html += '<button type="button" class="bd-dirs-link" id="bdGrpAdd">+ Gruppe hinzuf&uuml;gen</button>';
+      var chipLines = (st.lines || []);
+      if (chipLines.length) {
+        html += '<div class="bd-grpchips"><span class="lbl">Zum Einf&uuml;gen antippen:</span>' + chipLines.map(function (l) {
+          var col = /^#?[0-9a-fA-F]{6}$/.test(String(l.c || '')) ? (String(l.c)[0] === '#' ? l.c : '#' + l.c) : '#888888';
+          return '<span class="bd-grpchip" data-bdgrpchip="' + esc(l.n) + '" style="background:' + esc(col) + ';color:' + badgeFg(col) + ';">' + esc(l.n) + '</span>';
+        }).join('') + '</div>';
+      }
+    }
+    if (typeof st.walk !== 'undefined') {
+      html += '<div class="bd-label" style="margin:14px 0 2px;">' +
+        '<div class="name">Gehweg zur Haltestelle</div>' +
+        '<div class="hint">Abfahrten, die du nicht mehr erreichst, blendet die Tafel aus. 0 = kein Filter, maximal 15 Minuten.</div></div>';
+      var tokMin = bdParseWalk(st.walk);
+      var byKey = {}, order = [];
+      allStations().forEach(function (s) {
+        var key = bdGroupKey(s);
+        if (!byKey[key]) { byKey[key] = { name: s.stopName || s.fullId, sts: [] }; order.push(key); }
+        byKey[key].sts.push(s);
+      });
+      if (!order.length) {
+        html += '<div class="bd-empty">Die Stationen erscheinen hier, sobald dein Display verbunden ist.</div>';
+      } else {
+        html += order.map(function (key) {
+          var g = byKey[key];
+          var val = 0;
+          bdTokensFromString(bdRblsOf(g.sts)).forEach(function (tok) {
+            if (tokMin[tok] && tokMin[tok] > val) val = tokMin[tok];
+          });
+          return '<div class="bd-row bd-keep">' +
+            '<div class="bd-label"><div class="name" style="font-weight:600;">' + esc(g.name) + '</div></div>' +
+            '<div class="bd-nighttimes"><input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + val + '" data-bdwalk="' + esc(key) + '"> min</div>' +
+            '</div>';
+        }).join('');
+      }
+    }
+    el.innerHTML = html;
+  }
+
+  // ---------- Zeilen-Gruppen (/api/groups): Segmente ; Mitglieder + Ziel > ----------
+  function bdParseGroups(s) {
+    return String(s || '').split(';').map(function (t) { return t.trim(); }).filter(Boolean);
+  }
+  function bdCollectGroupInputs() {
+    var out = [];
+    var inputs = document.querySelectorAll('[data-bdgrp]');
+    for (var i = 0; i < inputs.length; i++) out.push(inputs[i].value);
+    return out;
+  }
+  function bdPushGroups(segs, forceRender) {
+    var clean = segs.map(function (seg) {
+      return seg.split('+').map(function (m) { return m.trim(); }).filter(Boolean).join('+');
+    }).filter(Boolean);
+    var str = clean.join(';');
+    if (BD.state && String(BD.state.groups || '') === str) {
+      BD.grpEdit = null;
+      bdRenderTafel(forceRender);
+      return;
+    }
+    bdFetch('/api/groups?g=' + encodeURIComponent(str), { method: 'POST' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (BD.state) BD.state.groups = str;
+        BD.grpEdit = null;
+        bdToast(str ? 'Gruppen gespeichert.' : 'Gruppen entfernt.');
+        bdRenderTafel(forceRender);
+      })
+      .catch(function () {
+        BD.online = false;
+        bdRenderDevice();
+        bdToast('Keine Verbindung zum Display. Gruppen nicht übernommen.', true);
+      });
+  }
+
+  // Gehweg-String aus allen Eingaben bauen und ans Geraet schreiben (nur walk, sonst nichts)
+  var _walkTimer = null;
+  function bdQueueWalkPush() {
+    if (_walkTimer) clearTimeout(_walkTimer);
+    _walkTimer = setTimeout(bdPushWalk, 600);
+  }
+  function bdPushWalk() {
+    var mins = {};
+    var inputs = document.querySelectorAll('[data-bdwalk]');
+    for (var i = 0; i < inputs.length; i++) {
+      var v = parseInt(inputs[i].value, 10);
+      mins[inputs[i].getAttribute('data-bdwalk')] = isNaN(v) ? 0 : Math.min(15, Math.max(0, v));
+    }
+    var byKey = {};
+    allStations().forEach(function (s) {
+      var key = bdGroupKey(s);
+      (byKey[key] = byKey[key] || []).push(s);
+    });
+    var parts = [];
+    Object.keys(byKey).forEach(function (key) {
+      var m = mins[key] || 0;
+      if (!m) return;
+      bdTokensFromString(bdRblsOf(byKey[key])).forEach(function (tok) { parts.push(tok + ':' + m); });
+    });
+    var str = parts.join(',');
+    if (BD.state && String(BD.state.walk || '') === str) return;
+    bdFetch('/api/cfg?walk=' + encodeURIComponent(str), { method: 'POST' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (BD.state) BD.state.walk = str;
+        bdToast('Gehweg gespeichert.');
+      })
+      .catch(function () {
+        BD.online = false;
+        bdRenderDevice();
+        bdToast('Keine Verbindung zum Display. Gehweg nicht übernommen.', true);
+      });
+  }
+
+  function bdRenderControls() { bdRenderTafel(); bdRenderAnzeige(); bdRenderKarte(); bdRenderNacht(); }
+
+  // Karten-Zentrum aus den Abfahrts-Monitoren der gewaehlten Stops (eine Server-Anfrage,
+  // Mittelpunkt der Bounding-Box). Klappt es nicht, behaelt das Geraet sein altes Zentrum.
+  function bdResolveCenter(rbls) {
+    var api = (typeof DEPARTURES_API === 'string') ? DEPARTURES_API : 'https://api.straba.at/api/v1/wl/departures';
+    return fetch(api + '?rbl=' + encodeURIComponent(rbls) + '&_=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var mons = (d && d.data && Array.isArray(d.data.monitors)) ? d.data.monitors : [];
+        var minLa = 90, maxLa = -90, minLo = 180, maxLo = -180, nPts = 0;
+        mons.forEach(function (m) {
+          var c = m && m.locationStop && m.locationStop.geometry && m.locationStop.geometry.coordinates;
+          if (!Array.isArray(c)) return;
+          var lo = Number(c[0]), la = Number(c[1]);
+          if (!isFinite(lo) || !isFinite(la) || (lo === 0 && la === 0)) return;
+          nPts++;
+          if (la < minLa) minLa = la; if (la > maxLa) maxLa = la;
+          if (lo < minLo) minLo = lo; if (lo > maxLo) maxLo = lo;
+        });
+        if (!nPts) return null;
+        return { lat: (minLa + maxLa) / 2, lon: (minLo + maxLo) / 2 };
+      })
+      .catch(function () { return null; });
+  }
+
+  // Zentrum je nach Ankerpunkt: Adresse (geocodet), gewaehlte Station, sonst Mitte aller Stationen
+  function bdAnchorCenter(rbls) {
+    var a = BD.anchor;
+    if (a.mode === 'addr' && bdIsNum(a.lat) && bdIsNum(a.lon)) {
+      return Promise.resolve({ lat: a.lat, lon: a.lon });
+    }
+    // Adress-Anker, aber dieser Browser kennt die Adresse nicht (z. B. anderes Geraet):
+    // Zentrum nicht anfassen, das Geraet behaelt seine Adresse samt blauem Punkt.
+    if (a.mode === 'addr') return Promise.resolve(null);
+    if (a.mode === 'station' && a.stationKey) {
+      var toks = bdRblsOf(allStations().filter(function (s) { return bdGroupKey(s) === a.stationKey; }));
+      if (toks) {
+        return bdResolveCenter(toks).then(function (c) { return c || bdResolveCenter(rbls); });
+      }
+    }
+    return bdResolveCenter(rbls);
+  }
+
+  // Schreibt Stationen und/oder Karten-Zentrum ans Geraet (POST /api/cfg).
+  // sendRbls = String: Stationsliste mitschicken (nach der Stationswahl);
+  // sendRbls = null: nur Zentrum + aaddr (Anker im Feintuning umgestellt).
+  function bdPushCfg(sendRbls) {
+    if (BD.saving) return;
+    BD.saving = true;
+    var rblsForCenter = sendRbls || bdCurrentRbls() || (BD.state ? String(BD.state.rbls || '') : '');
+    bdAnchorCenter(rblsForCenter).then(function (center) {
+      var aaddrVal = (BD.anchor.mode === 'addr' && bdIsNum(BD.anchor.lat)) ? 1 : 0;
+      // Adress-Anker ohne bekannte Koordinaten: aaddr nicht anfassen (Punkt bleibt am Geraet)
+      var keepDeviceAnchor = (BD.anchor.mode === 'addr' && !bdIsNum(BD.anchor.lat));
+      var q = [];
+      if (sendRbls) q.push('rbls=' + encodeURIComponent(sendRbls));
+      if (center) { q.push('lat=' + center.lat.toFixed(6)); q.push('lon=' + center.lon.toFixed(6)); }
+      // aaddr=1: Zentrum ist eine Adresse, die Firmware zeichnet dort den blauen Punkt
+      if (!keepDeviceAnchor) q.push('aaddr=' + aaddrVal);
+      return bdFetch('/api/cfg?' + q.join('&'), { method: 'POST' }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (BD.state) {
+          if (sendRbls) BD.state.rbls = sendRbls;
+          if (center) { BD.state.lat = center.lat; BD.state.lon = center.lon; }
+          if (!keepDeviceAnchor) BD.state.aaddr = aaddrVal;
+        }
+        if (!keepDeviceAnchor) BD.sentAaddr = aaddrVal;
+        bdSaveAnchor();
+        BD.online = true;
+        BD.reloadPending = true;
+        bdRenderDevice();
+        bdRenderLines();
+        bdToast('Gespeichert, dein Display lädt neu.');
+        bdPollAfterCfg();
+      });
+    }).catch(function () {
+      BD.online = false;
+      bdRenderDevice();
+      bdToast('Keine Verbindung zum Display. Änderung nicht übernommen.', true);
+    }).then(function () {
+      BD.saving = false;
+    });
+  }
+
+  // Nach /api/cfg laedt das Geraet Karte und Abfahrten neu: ein paar Mal nachschauen,
+  // bis die neue Linienliste da ist (sonst bleibt der Hinweis stehen, manuell neu laden geht immer).
+  var _pollRun = 0;
+  function bdPollAfterCfg() {
+    var run = ++_pollRun;
+    var delays = [4000, 5000, 7000, 9000, 12000];
+    (function step(i) {
+      if (run !== _pollRun || i >= delays.length) {
+        if (run === _pollRun) { BD.reloadPending = false; bdRenderLines(); }
+        return;
+      }
+      bdSleep(delays[i]).then(function () {
+        if (run !== _pollRun) return;
+        bdLoadState().then(function (st) {
+          if (run !== _pollRun) return;
+          bdRenderDevice();
+          if ((st.lines || []).length) {
+            BD.reloadPending = false;
+            bdRenderLines();
+            return;
+          }
+          step(i + 1);
+        }).catch(function () { step(i + 1); });
+      });
+    })(0);
+  }
+
+  // Zustand neu vom Geraet holen; adopt=true uebernimmt auch die Stationsliste
+  // (nur sinnvoll, wenn es keine ungesendeten Aenderungen gibt).
+  function bdSafeReload(adopt) {
+    BD.connecting = true;
+    bdRenderDevice();
+    return bdLoadState().then(function (st) {
+      BD.connecting = false;
+      bdRenderDevice();
+      bdRenderControls();
+      BD.reloadPending = false;
+      bdRenderLines();
+      if (adopt) bdAdoptStations(st.rbls);
+      return st;
+    }).catch(function () {
+      BD.connecting = false;
+      BD.online = false;
+      bdRenderDevice();
+      bdRenderControls();
+      bdRenderLines();
+    });
+  }
+
+  // ---------- Events (Delegation) ----------
+  var home = $('bdHome');
+  // Zeilen-Gruppen: Buttons auf mousedown mit preventDefault, damit das gerade
+  // fokussierte Eingabefeld nicht erst den Fokus verliert (das change-Event wuerde
+  // sonst vor dem Klick speichern und den Editor neu rendern).
+  home.addEventListener('mousedown', function (e) {
+    var t = e.target;
+    var grpAdd = t.closest('#bdGrpAdd');
+    if (grpAdd) {
+      e.preventDefault();
+      BD.grpEdit = bdCollectGroupInputs();
+      BD.grpEdit.push('');
+      bdRenderTafel(true);
+      var gInputs = document.querySelectorAll('[data-bdgrp]');
+      if (gInputs.length) gInputs[gInputs.length - 1].focus();
+      return;
+    }
+    var grpMove = t.closest('[data-bdgrpmove]');
+    if (grpMove) {
+      e.preventDefault();
+      var mv = grpMove.getAttribute('data-bdgrpmove').split(':');
+      var gi = parseInt(mv[0], 10), dir = parseInt(mv[1], 10);
+      var segsM = bdCollectGroupInputs();
+      var ni = gi + dir;
+      if (ni < 0 || ni >= segsM.length) return;
+      var tmp = segsM[gi]; segsM[gi] = segsM[ni]; segsM[ni] = tmp;
+      bdPushGroups(segsM, true);
+      return;
+    }
+    var grpDel = t.closest('[data-bdgrpdel]');
+    if (grpDel) {
+      e.preventDefault();
+      var di = parseInt(grpDel.getAttribute('data-bdgrpdel'), 10);
+      var segsD = bdCollectGroupInputs();
+      segsD.splice(di, 1);
+      bdPushGroups(segsD, true);
+      return;
+    }
+    var grpChip = t.closest('[data-bdgrpchip]');
+    if (grpChip) {
+      e.preventDefault();
+      var gInputs2 = document.querySelectorAll('[data-bdgrp]');
+      if (!gInputs2.length) {
+        BD.grpEdit = [''];
+        bdRenderTafel(true);
+        gInputs2 = document.querySelectorAll('[data-bdgrp]');
+      }
+      // Ziel: das gerade aktive Gruppen-Feld, sonst das letzte
+      var aeC = document.activeElement;
+      var inp2 = (aeC && aeC.hasAttribute && aeC.hasAttribute('data-bdgrp')) ? aeC : gInputs2[gInputs2.length - 1];
+      if (!inp2) return;
+      var ln = grpChip.getAttribute('data-bdgrpchip');
+      inp2.value = inp2.value.trim() ? (inp2.value.replace(/\s+$/, '') + ' + ' + ln) : ln;
+      inp2.focus();
+      return;
+    }
+  });
+  home.addEventListener('click', function (e) {
+    var t = e.target;
+    var anc = t.closest('[data-bdanchor]');
+    if (anc) {
+      var newMode = anc.getAttribute('data-bdanchor');
+      if (newMode === BD.anchor.mode) return;
+      BD.anchor.mode = newMode;
+      bdRenderAnchor();
+      bdSaveAnchor();
+      // Automatisch: sofort uebernehmen. Station/Adresse: erst wenn Auswahl bzw. Suche da ist.
+      if (newMode === 'auto') bdPushCfg(null);
+      else if (newMode === 'station' && BD.anchor.stationKey) bdPushCfg(null);
+      else if (newMode === 'addr' && bdIsNum(BD.anchor.lat)) bdPushCfg(null);
+      return;
+    }
+    if (t.closest('#bdAddrSearchBtn')) { bdDoGeocode(); return; }
+    var dOpen = t.closest('[data-bddirsopen]');
+    if (dOpen) {
+      BD.dirsOpen[dOpen.getAttribute('data-bddirsopen')] = true;
+      bdRenderLines();
+      var inp = document.querySelector('[data-bddirs="' + (window.CSS && CSS.escape ? CSS.escape(dOpen.getAttribute('data-bddirsopen')) : dOpen.getAttribute('data-bddirsopen')) + '"]');
+      if (inp) inp.focus();
+      return;
+    }
+    var lineBtn = t.closest('[data-bdline] button');
+    if (lineBtn) {
+      var name = lineBtn.closest('[data-bdline]').getAttribute('data-bdline');
+      bdSetLineMode(name, parseInt(lineBtn.getAttribute('data-v'), 10) || 0);
+      return;
+    }
+    var segBtn = t.closest('[data-bdseg] button');
+    if (segBtn) {
+      var key = segBtn.closest('[data-bdseg]').getAttribute('data-bdseg');
+      var v = parseInt(segBtn.getAttribute('data-v'), 10) || 0;
+      if (!BD.state) return;
+      BD.state[key] = v;
+      bdDisp(key, v);
+      if (key === 'lay') { bdRenderKarte(); bdRenderAnzeige(); }
+      else if (key === 'sort') bdRenderTafel();
+      else bdRenderAnzeige();
+      return;
+    }
+    var corner = t.closest('[data-bdcorner]');
+    if (corner) {
+      var ci = parseInt(corner.getAttribute('data-bdcorner'), 10) || 0;
+      if (!BD.state) return;
+      BD.state.corner = ci;
+      bdDisp('corner', ci);
+      bdRenderAnzeige();
+      return;
+    }
+    var sw = t.closest('[data-bdswitch]');
+    if (sw) {
+      var k = sw.getAttribute('data-bdswitch');
+      if (!BD.state) return;
+      if (k === 'nighton') {
+        BD.state.night = BD.state.night || { on: 0, from: 1320, to: 390 };
+        BD.state.night.on = BD.state.night.on ? 0 : 1;
+        bdDisp('nighton', BD.state.night.on);
+        bdRenderNacht();
+      } else if (k === 'dlyhl') {
+        BD.state.dlyhl = +BD.state.dlyhl ? 0 : 1;
+        bdDisp('dlyhl', BD.state.dlyhl);
+        bdRenderTafel();
+      } else if (k === 'winon') {
+        var w0 = bdParseWin(BD.state.win);
+        if (w0.from === 0 && w0.to === 0) {
+          var nw = (BD.lastWin && BD.lastWin !== '0-0') ? BD.lastWin : '360-1320';
+          BD.state.win = nw;
+          bdDisp('win', nw);
+        } else {
+          BD.lastWin = BD.state.win;
+          BD.state.win = '0-0';
+          bdDisp('win', '0-0');
+        }
+        bdRenderTafel();
+      } else {
+        BD.state.layers = BD.state.layers || {};
+        BD.state.layers[k] = BD.state.layers[k] ? 0 : 1;
+        bdDisp(k, BD.state.layers[k]);
+        bdRenderKarte();
+      }
+      return;
+    }
+  });
+
+  home.addEventListener('keydown', function (e) {
+    if (e.target && e.target.id === 'bdAddrInput' && e.key === 'Enter') {
+      e.preventDefault();
+      bdDoGeocode();
+      return;
+    }
+    if (e.target && e.key === 'Enter' && e.target.hasAttribute &&
+        (e.target.hasAttribute('data-bddirs') || e.target.hasAttribute('data-bdgrp'))) {
+      e.preventDefault();
+      e.target.blur();   // blur loest das change-Event aus, das speichert
+    }
+  });
+
+  var _brightTimer = null;
+  var _mapwTimer = null;
+  home.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'bdAddrInput') {
+      // Adresse geaendert: alte Koordinaten verwerfen, erst die Suche macht sie wieder gueltig
+      BD.anchor.addr = e.target.value;
+      BD.anchor.lat = null; BD.anchor.lon = null; BD.anchor.label = '';
+      var note = home.querySelector('.bd-anchor-note');
+      if (note) note.style.display = 'none';
+      return;
+    }
+    if (e.target && e.target.id === 'bdMapW') {
+      var mv = parseInt(e.target.value, 10) || 200;
+      if (BD.state) BD.state.mapw = mv;
+      var ml = $('bdMapWVal');
+      if (ml) ml.textContent = mv + ' m';
+      if (_mapwTimer) clearTimeout(_mapwTimer);
+      _mapwTimer = setTimeout(function () { bdDisp('mapw', mv); }, 250);
+      return;
+    }
+    if (e.target && e.target.id === 'bdBright') {
+      var v = parseInt(e.target.value, 10) || 0;
+      if (BD.state) BD.state.bright = v;
+      var lbl = $('bdBrightVal');
+      if (lbl) lbl.textContent = ((v + 1) * 20) + ' %';
+      if (_brightTimer) clearTimeout(_brightTimer);
+      _brightTimer = setTimeout(function () { bdDisp('bright', v); }, 250);
+    }
+  });
+  home.addEventListener('change', function (e) {
+    var id = e.target && e.target.id;
+    if (id === 'bdAnchorStationSel') {
+      BD.anchor.stationKey = e.target.value;
+      bdSaveAnchor();
+      if (BD.anchor.stationKey) bdPushCfg(null);   // Zentrum sofort auf die Station
+      return;
+    }
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bddirs')) {
+      bdPushDirs(e.target.getAttribute('data-bddirs'), e.target.value.trim());
+      return;
+    }
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdwalk')) {
+      bdQueueWalkPush();
+      return;
+    }
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdgrp')) {
+      bdPushGroups(bdCollectGroupInputs());
+      return;
+    }
+    if (id === 'bdWinFrom' || id === 'bdWinTo') {
+      var wm = parseTimeToMin(e.target.value);
+      if (wm === null || !BD.state) return;
+      var w = bdParseWin(BD.state.win);
+      if (id === 'bdWinFrom') w.from = wm; else w.to = wm;
+      BD.state.win = w.from + '-' + w.to;
+      bdDisp('win', BD.state.win);
+      return;
+    }
+    if (id !== 'bdNightFrom' && id !== 'bdNightTo') return;
+    var min = parseTimeToMin(e.target.value);
+    if (min === null) return;
+    if (!BD.state) return;
+    BD.state.night = BD.state.night || { on: 0, from: 1320, to: 390 };
+    if (id === 'bdNightFrom') { BD.state.night.from = min; bdDisp('nightfrom', min); }
+    else { BD.state.night.to = min; bdDisp('nightto', min); }
+  });
+
+  $('bdEditStationsBtn').addEventListener('click', bdOpenStations);
+  $('bdBackChip').addEventListener('click', function () {
+    // Stationswahl abbrechen: Liste wieder auf den Geraete-Stand bringen
+    if (BD.state && bdCurrentRbls() !== bdDeviceRbls()) {
+      bdAdoptStations(BD.state.rbls);
+      bdToast('Änderungen verworfen.');
+    }
+    bdShowHome();
+  });
+  $('bdReloadBtn').addEventListener('click', function () { bdSafeReload(true); });
+  $('bdRetryBtn').addEventListener('click', function () { bdSafeReload(true); });
+  $('bdLinesReloadBtn').addEventListener('click', function () { bdSafeReload(false); });
+
+  // ---------- Einklinken in den Legacy-Flow (nur im Wall-Modus aktiv) ----------
+  // Die Stationswahl bleibt komplett die der normalen Seite. Nur der "Weiter"-Button
+  // (Zwischenseite "Deine Stationen") schreibt die Stationen ans Geraet und oeffnet
+  // das Wall-Feintuning statt des Legacy-Wizards.
+  var _bdOrigEditLines = (typeof chooseEditLines === 'function') ? chooseEditLines : null;
+  try {
+    window.chooseEditLines = function () {
+      bdPreparePicker();
+      if (_bdOrigEditLines) _bdOrigEditLines();
+    };
+  } catch (e) {}
+  try {
+    window.chooseEditSettings = function () {
+      var ov = $('configChoiceOverlay'); if (ov) ov.style.display = 'none';
+      bdShowHome();
+    };
+  } catch (e) {}
+  try {
+    window.handleStationsNextStep = function () {
+      var rbls = bdCurrentRbls();
+      bdShowHome();
+      if (!rbls) { bdToast('Keine Stationen gewählt.', true); return; }
+      if (rbls !== bdDeviceRbls()) bdPushCfg(rbls);
+    };
+  } catch (e) {}
+  try {
+    var _bdOrigUpd = (typeof updateStationsList === 'function') ? updateStationsList : null;
+    window.updateStationsList = function () {
+      if (_bdOrigUpd) _bdOrigUpd();
+      if (getStep() === 'bdHome') {
+        var sc = $('stationsCard'); if (sc) sc.classList.add('hidden');
+        var bb = document.querySelector('.bottom-bar'); if (bb) bb.style.display = 'none';
+        bdRenderAnchor();
+      }
+    };
+  } catch (e) {}
+
+  // ---------- Start ----------
+  function bdBoot() {
+    // Legacy-Start-Gate stilllegen (kein Warten auf iframe-Config). Das Lade-Overlay
+    // der Seite bleibt sichtbar, bis der Geraete-State entschieden ist; danach laeuft
+    // der gewohnte Einstieg: "Was moechtest du aendern?" oder direkt die Stationswahl.
+    try { _startupResolved = true; } catch (e) {}
+    function hideStartup() { var sl = $('startupLoading'); if (sl) sl.style.display = 'none'; }
+    BD.connecting = true;
+    bdRenderDevice();
+    bdRenderControls();
+    bdRenderLines();
+    bdLoadState().then(function (st) {
+      BD.connecting = false;
+      bdRenderDevice();
+      bdRenderControls();
+      bdRenderLines();
+      bdAdoptStations(st.rbls);
+      hideStartup();
+      if (allStations().length) {
+        try { hasExistingConfig = true; } catch (e) {}
+        var shown = false;
+        try {
+          if (typeof maybeShowConfigChoice === 'function') {
+            maybeShowConfigChoice();
+            var ov = $('configChoiceOverlay');
+            shown = !!(ov && ov.style.display === 'block');
+          }
+        } catch (e) {}
+        if (!shown) bdShowHome();
+      } else {
+        // Frisches Geraet ohne Stationen: direkt in die normale Stationswahl
+        bdOpenStations();
+      }
+    }).catch(function () {
+      BD.connecting = false;
+      BD.online = false;
+      bdRenderDevice();
+      bdRenderControls();
+      bdRenderLines();
+      hideStartup();
+      bdShowHome();   // zeigt die Verbindungs-Hilfe
+    });
+  }
+
+  bdBoot();
+  // Falls ein spaeterer DOMContentLoaded-Handler (Auto-Jump bei ?country/?display)
+  // Picker-Karten einblendet: Bigdisplay-Ansicht danach wieder durchsetzen.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      if (getStep() === 'bdHome') bdShowHome();
+    });
+  }
+})();
+</script>
 </body>
 </html>
