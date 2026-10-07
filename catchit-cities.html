@@ -24472,13 +24472,23 @@ window.addEventListener('DOMContentLoaded', () => {
     background: repeating-linear-gradient(45deg, #fff, #fff 4px, #f0ead9 4px, #f0ead9 8px);
   }
   .bd-grp-color input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
-  .bd-grpchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
-  .bd-grpchips .lbl { font-size: 11px; color: #8a8276; font-weight: 700; }
-  .bd-grpchip {
-    border: 2px solid var(--ink); border-radius: 6px; padding: 4px 9px; font-size: 12px;
-    font-weight: 800; cursor: pointer; font-family: var(--font-main); box-shadow: 2px 2px 0 var(--ink);
+  .bd-grp-members { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; align-items: center; min-height: 36px; }
+  .bd-grp-empty { font-size: 12px; color: #8a8276; line-height: 1.4; }
+  .bd-pairs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+  .bd-pair {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+    border: 2px solid var(--ink); border-radius: 999px; background: #fff; color: var(--ink);
+    padding: 3px 10px 3px 3px; font-family: var(--font-main); font-size: 12px; font-weight: 700;
+    cursor: pointer; box-shadow: 2px 2px 0 var(--ink);
   }
-  .bd-grpchip:hover { transform: translate(-1px,-1px); box-shadow: 3px 3px 0 var(--ink); }
+  .bd-pair.on { background: var(--red); color: #fff; }
+  .bd-pair.in { cursor: default; padding-right: 2px; box-shadow: none; }
+  .bd-pair-badge { min-width: 26px; text-align: center; border-radius: 999px; padding: 2px 7px; font-weight: 800; font-size: 11px; flex-shrink: 0; }
+  .bd-pair-dest { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+  .bd-pair-x { border: none; background: none; color: inherit; font-weight: 800; font-size: 15px; line-height: 1; cursor: pointer; padding: 0 6px; font-family: var(--font-main); }
+  .bd-pair-x:hover { color: var(--red); }
+  .bd-pair-actions { margin: 8px 0 4px; }
+  .bd-addr-btn:disabled { background: #ddd5c4; color: #9a9384; cursor: default; box-shadow: 2px 2px 0 #c9c1b0; border-color: #c9c1b0; }
   .bd-corner {
     background: #20252e; border: 3px solid var(--ink); border-radius: 10px;
     width: 196px; height: 122px; padding: 10px; flex-shrink: 0;
@@ -24606,15 +24616,6 @@ window.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
 
-    <div class="bd-card" id="bdLinesCard">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <h2 style="margin-bottom:0;">Linien auf dem Display</h2>
-        <button type="button" class="bd-refresh" id="bdLinesReloadBtn" title="Linien neu laden">&#8635;</button>
-      </div>
-      <p class="bd-sub">Jede Linie kann auf der Tafel stehen, auf der Karte fahren, oder beides. Mit Richtungsfilter zeigt eine Linie nur die gew&auml;hlten Ziele.</p>
-      <div id="bdLinesWrap"></div>
-    </div>
-
     <div class="bd-card" id="bdTafelCard" style="display:none;">
       <h2>Abfahrten-Tafel</h2>
       <p class="bd-sub">Was auf der Tafel steht und wie: &Auml;nderungen wirken sofort.</p>
@@ -24642,6 +24643,15 @@ window.addEventListener('DOMContentLoaded', () => {
     <div class="bd-card">
       <h2>Nachtabschaltung</h2>
       <div id="bdCtlNacht"></div>
+    </div>
+
+    <div class="bd-card" id="bdLinesCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <h2 style="margin-bottom:0;">Linien auf dem Display</h2>
+        <button type="button" class="bd-refresh" id="bdLinesReloadBtn" title="Linien neu laden">&#8635;</button>
+      </div>
+      <p class="bd-sub">Jede Linie kann auf der Tafel stehen, auf der Karte fahren, oder beides.</p>
+      <div id="bdLinesWrap"></div>
     </div>
 
     <button type="button" class="btn" id="bdEditStationsBtn" style="margin-bottom:18px;">Stationen &auml;ndern</button>
@@ -24712,6 +24722,12 @@ window.addEventListener('DOMContentLoaded', () => {
     reloadPending: false, // nach /api/cfg: Geraet laedt Karte+Abfahrten neu
     adopted: false,       // stations[] wurde schon aus den Geraete-rbls befuellt
     grpEdit: null,        // Zeilen-Gruppen im Editor (Array), null = Stand vom Geraet
+    grpSel: {},           // ausgewaehlte Linie+Ziel-Bubbles (Key -> true)
+    grpPairs: null,       // Linie+Ziel-Paare aus den Live-Abfahrten (null = laedt)
+    grpPairsKey: '',
+    grpPairsLoading: false,
+    grpPairMap: {},
+    grpPairColor: {},
     walkLines: null,      // Gehweg-Linien-Regeln im Editor, null = Stand vom Geraet
     adoptedLsel: ''       // Linien-Whitelist (lsel) vom Geraet, fuer den naechsten Stations-Push
   };
@@ -25477,10 +25493,14 @@ window.addEventListener('DOMContentLoaded', () => {
     if (typeof st.groups !== 'undefined') {
       html += '<div class="bd-label" style="margin:14px 0 8px;">' +
         '<div class="name">Zeilen-Gruppen</div>' +
-        '<div class="hint">Mehrere Linien teilen sich eine Tafel-Zeile und wechseln alle paar Sekunden durch. Schreibweise: Linie&gt;Ziel, mehrere mit + verbinden, das Ziel ist optional. Mit Namen (z. B. Richtung HBF) zeigt die Zeile den Namen statt der Liniennummer, die Farbe ist optional. Die Reihenfolge der Gruppen ist die Reihenfolge auf der Tafel.</div></div>';
-      var segsArr = BD.grpEdit || bdParseGroups(st.groups);
-      html += segsArr.map(function (g, gi) {
+        '<div class="hint">Fasse Linien und Richtungen zu einer Tafel-Zeile zusammen: sie teilen sich die Zeile und wechseln alle paar Sekunden durch. Optional mit Namen (z. B. Richtung HBF) und eigener Farbe. Die Reihenfolge hier ist die Reihenfolge auf der Tafel.</div></div>';
+      var model = BD.grpEdit || bdParseGroups(st.groups);
+      var selKeys = Object.keys(BD.grpSel || {});
+      html += model.map(function (g, gi) {
         var hasCol = /^#[0-9a-fA-F]{6}$/.test(g.color || '');
+        var mem = (g.members || []).map(function (m, mi) {
+          return bdPairChip(m.line, m.dest, 'in', 'data-bdgrpmemrm="' + gi + ':' + mi + '"');
+        }).join('');
         return '<div class="bd-grp">' +
           '<div class="bd-grp-row">' +
           '<input type="text" class="bd-input" data-bdgrpname="' + gi + '" maxlength="24" value="' + esc(g.name || '') + '" placeholder="Name der Zeile (optional)">' +
@@ -25490,19 +25510,31 @@ window.addEventListener('DOMContentLoaded', () => {
           (hasCol ? '<button type="button" class="bd-grp-btn" data-bdgrpcolorreset="' + gi + '" title="Farbe wie die Linie">&#8634;</button>' : '') +
           '<button type="button" class="bd-grp-btn del" data-bdgrpdel="' + gi + '" title="Zeile l&ouml;schen">&times;</button>' +
           '</div>' +
-          '<div class="bd-grp-row">' +
-          '<input type="text" class="bd-input" data-bdgrp="' + gi + '" value="' + esc(g.members || '') + '" placeholder="U6&gt;Floridsdorf + 49&gt;H&uuml;tteldorf">' +
+          '<div class="bd-grp-row" style="align-items:flex-start;">' +
+          '<div class="bd-grp-members">' + (mem || '<span class="bd-grp-empty">Noch leer: unten Linien antippen und hier hinzuf&uuml;gen.</span>') + '</div>' +
           '<button type="button" class="bd-grp-btn" data-bdgrpmove="' + gi + ':-1" title="Nach oben">&uarr;</button>' +
           '<button type="button" class="bd-grp-btn" data-bdgrpmove="' + gi + ':1" title="Nach unten">&darr;</button>' +
-          '</div></div>';
+          '</div>' +
+          (selKeys.length ? '<button type="button" class="bd-dirs-link" data-bdgrpaddsel="' + gi + '" style="margin:0 0 8px;">+ Ausgew&auml;hlte hier hinzuf&uuml;gen</button>' : '') +
+          '</div>';
       }).join('');
-      html += '<button type="button" class="bd-dirs-link" id="bdGrpAdd">+ Gruppe hinzuf&uuml;gen</button>';
-      var chipLines = (st.lines || []);
-      if (chipLines.length) {
-        html += '<div class="bd-grpchips"><span class="lbl">Zum Einf&uuml;gen antippen:</span>' + chipLines.map(function (l) {
-          var col = /^#?[0-9a-fA-F]{6}$/.test(String(l.c || '')) ? (String(l.c)[0] === '#' ? l.c : '#' + l.c) : '#888888';
-          return '<span class="bd-grpchip" data-bdgrpchip="' + esc(l.n) + '" style="background:' + esc(col) + ';color:' + badgeFg(col) + ';">' + esc(l.n) + '</span>';
+      // Pool: alle Linie+Ziel-Kombinationen der Tafel, die noch in keiner Zeile stecken
+      var pairs = bdVisiblePairs(model);
+      BD.grpPairMap = {};
+      html += '<div class="bd-label" style="margin:10px 0 0;"><div class="name" style="font-size:13px;">Linien und Richtungen</div>' +
+        '<div class="hint">Antippen zum Ausw&auml;hlen, dann zu einer Zeile zusammenfassen.</div></div>';
+      if (pairs === null) {
+        html += '<div class="bd-empty" style="margin-top:8px;">Lade Linien und Richtungen &hellip;</div>';
+      } else if (!pairs.length) {
+        html += '<div class="bd-empty" style="margin-top:8px;">Alle Linien stecken schon in einer Zeile, oder gerade f&auml;hrt nichts.</div>';
+      } else {
+        html += '<div class="bd-pairs">' + pairs.map(function (pr) {
+          var k = bdPairKey(pr.line, pr.dest);
+          BD.grpPairMap[k] = pr;
+          return bdPairChip(pr.line, pr.dest, (BD.grpSel && BD.grpSel[k]) ? 'on' : '', 'data-bdpair="' + esc(k) + '"');
         }).join('') + '</div>';
+        html += '<div class="bd-pair-actions"><button type="button" class="bd-addr-btn" data-bdgrpmake="1"' + (selKeys.length ? '' : ' disabled') + '>' +
+          (selKeys.length ? 'Zu einer Zeile zusammenfassen (' + selKeys.length + ')' : 'Zu einer Zeile zusammenfassen') + '</button></div>';
       }
     }
     if (typeof st.walk !== 'undefined') {
@@ -25598,18 +25630,28 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         name = label.trim();
       }
-      return { name: name, color: color, members: members.trim() };
+      var mem = members.split('+').map(function (x) {
+        x = x.trim();
+        if (!x) return null;
+        var gt = x.indexOf('>');
+        return gt < 0 ? { line: x, dest: '' } : { line: x.substring(0, gt).trim(), dest: x.substring(gt + 1).trim() };
+      }).filter(function (m) { return m && m.line; });
+      return { name: name, color: color, members: mem };
     }).filter(Boolean);
   }
   function bdCleanGroupName(n) {
     return String(n || '').replace(/[;:=#"+>]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 24);
   }
-  function bdCleanMembers(m) {
-    return String(m || '').split('+').map(function (x) { return x.trim(); }).filter(Boolean).join('+');
+  function bdCleanTok(t) {
+    return String(t || '').replace(/::/g, ' ').replace(/[;+>"]/g, ' ').replace(/\s+/g, ' ').trim();
   }
   function bdSerializeGroups(segs) {
     return segs.map(function (g) {
-      var members = bdCleanMembers(g.members);
+      var members = (g.members || []).map(function (m) {
+        var line = bdCleanTok(m.line), dest = bdCleanTok(m.dest);
+        if (!line) return '';
+        return dest ? line + '>' + dest : line;
+      }).filter(Boolean).join('+');
       if (!members) return '';
       var name = bdCleanGroupName(g.name);
       var color = /^#[0-9a-fA-F]{6}$/.test(g.color || '') ? g.color.toLowerCase() : '';
@@ -25617,27 +25659,141 @@ window.addEventListener('DOMContentLoaded', () => {
       return name + (color ? '=' + color : '') + '::' + members;
     }).filter(Boolean).join(';');
   }
-  function bdCollectGroupInputs() {
-    var out = [];
+  // Aktuelles Gruppen-Modell inkl. der gerade getippten Namen/Farben aus dem DOM
+  function bdGrpModel() {
+    var base = BD.grpEdit || bdParseGroups(BD.state ? BD.state.groups : '');
+    var model = base.map(function (g) {
+      return { name: g.name || '', color: g.color || '', members: (g.members || []).map(function (m) { return { line: m.line, dest: m.dest }; }) };
+    });
     var blocks = document.querySelectorAll('.bd-grp');
-    for (var i = 0; i < blocks.length; i++) {
-      var b = blocks[i];
-      var n = b.querySelector('[data-bdgrpname]');
-      var c = b.querySelector('[data-bdgrpcolor]');
-      var m = b.querySelector('[data-bdgrp]');
-      out.push({
-        name: n ? n.value : '',
-        color: (c && c.getAttribute('data-auto') !== '1') ? c.value : '',
-        members: m ? m.value : ''
-      });
+    for (var i = 0; i < blocks.length && i < model.length; i++) {
+      var n = blocks[i].querySelector('[data-bdgrpname]');
+      var c = blocks[i].querySelector('[data-bdgrpcolor]');
+      if (n) model[i].name = n.value;
+      if (c) model[i].color = (c.getAttribute('data-auto') !== '1') ? c.value : '';
     }
-    return out;
+    return model;
   }
+
+  // ---------- Linie+Ziel-Paare fuer die Gruppen-Bubbles ----------
+  function bdNormDest(s) {
+    var t = String(s || '').toLowerCase();
+    try { t = t.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch (e) {}
+    return t.replace(/hauptbahnhof/g, 'hbf').replace(/[^a-z0-9]/g, '');
+  }
+  function bdPairKey(line, dest) { return String(line || '').toLowerCase() + '>' + bdNormDest(dest); }
+  function bdLineColor(line) {
+    var ls = (BD.state && BD.state.lines) || [];
+    for (var i = 0; i < ls.length; i++) {
+      if (String(ls[i].n).toLowerCase() === String(line).toLowerCase()) {
+        var c = String(ls[i].c || '');
+        if (/^#?[0-9a-fA-F]{6}$/.test(c)) return c[0] === '#' ? c : '#' + c;
+      }
+    }
+    return '';
+  }
+  function bdPairChip(line, dest, cls, attr) {
+    var col = bdLineColor(line) || (BD.grpPairColor && BD.grpPairColor[String(line).toLowerCase()]) || '#888888';
+    var inner = '<span class="bd-pair-badge" style="background:' + esc(col) + ';color:' + badgeFg(col) + ';">' + esc(line) + '</span>' +
+      '<span class="bd-pair-dest">' + (dest ? esc(dest) : 'alle Richtungen') + '</span>';
+    if (cls === 'in') {
+      return '<span class="bd-pair in">' + inner + '<button type="button" class="bd-pair-x" ' + attr + ' title="Aus der Zeile nehmen">&times;</button></span>';
+    }
+    return '<button type="button" class="bd-pair' + (cls ? ' ' + cls : '') + '" ' + attr + '>' + inner + '</button>';
+  }
+  // Paare kommen aus den Live-Abfahrten der Geraete-Stationen (gleiche API wie das Geraet)
+  // plus den im Picker gewaehlten Richtungen; null = wird noch geladen
+  function bdLoadGrpPairs() {
+    var rbls = (BD.state && BD.state.rbls) ? String(BD.state.rbls) : bdCurrentRbls();
+    if (!rbls) { BD.grpPairs = []; return; }
+    if (BD.grpPairsKey === rbls && (BD.grpPairs || BD.grpPairsLoading)) return;
+    BD.grpPairsKey = rbls;
+    BD.grpPairs = null;
+    BD.grpPairsLoading = true;
+    var api = (typeof DEPARTURES_API === 'string') ? DEPARTURES_API : 'https://api.straba.at/api/v1/wl/departures';
+    fetch(api + '?rbl=' + encodeURIComponent(rbls) + '&_=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var mons = (d && d.data && Array.isArray(d.data.monitors)) ? d.data.monitors : [];
+        var pairs = [], seen = {};
+        BD.grpPairColor = BD.grpPairColor || {};
+        mons.forEach(function (m) {
+          (m.lines || []).forEach(function (l) {
+            var line = String(l.name || '').trim(), dest = String(l.towards || '').trim();
+            if (!line || !dest) return;
+            if (l.lineColor) BD.grpPairColor[line.toLowerCase()] = l.lineColor;
+            var k = bdPairKey(line, dest);
+            if (seen[k]) return;
+            seen[k] = 1;
+            pairs.push({ line: line, dest: dest });
+          });
+        });
+        if (BD.grpPairsKey !== rbls) return;
+        BD.grpPairs = pairs;
+        BD.grpPairsLoading = false;
+        bdRenderTafel();
+      })
+      .catch(function () {
+        BD.grpPairsLoading = false;
+        if (BD.grpPairs === null) BD.grpPairs = [];
+        bdRenderTafel();
+      });
+  }
+  function bdVisiblePairs(model) {
+    if (BD.grpPairs === null || BD.grpPairs === undefined) { bdLoadGrpPairs(); return null; }
+    bdLoadGrpPairs();
+    var st = BD.state || {};
+    var lsel = String(st.lsel || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
+    var lineInfo = {};
+    (st.lines || []).forEach(function (l) { lineInfo[String(l.n).toLowerCase()] = l; });
+    var all = BD.grpPairs.slice();
+    // Picker-Richtungen ergaenzen (Linien, die gerade nicht fahren)
+    var seen = {};
+    all.forEach(function (pr) { seen[bdPairKey(pr.line, pr.dest)] = 1; });
+    allStations().forEach(function (s2) {
+      (s2.directions || []).forEach(function (d) {
+        if (!d || !d.line || !d.towards) return;
+        var dest = String(d.towards).replace(/^Richtung\s+/i, '').trim();
+        var k = bdPairKey(d.line, dest);
+        if (seen[k]) return;
+        seen[k] = 1;
+        all.push({ line: String(d.line), dest: dest });
+      });
+    });
+    // Schon gruppierte Paare raus (ein Mitglied ohne Ziel deckt die ganze Linie ab)
+    var inGroup = {}, wholeLine = {};
+    (model || []).forEach(function (g) {
+      (g.members || []).forEach(function (m) {
+        if (!m.dest) wholeLine[String(m.line).toLowerCase()] = 1;
+        else inGroup[bdPairKey(m.line, m.dest)] = 1;
+      });
+    });
+    return all.filter(function (pr) {
+      var ln = String(pr.line).toLowerCase();
+      if (lsel.length && lsel.indexOf(ln) < 0) return false;
+      var li = lineInfo[ln];
+      if (li && li.m === 1) return false;                   // Nur Karte: steht nicht auf der Tafel
+      if (li && li.dirs) {
+        var nd = bdNormDest(pr.dest);
+        var ok = String(li.dirs).split(',').some(function (dd) {
+          var x = bdNormDest(dd);
+          return x && (nd.indexOf(x) >= 0 || x.indexOf(nd) >= 0);
+        });
+        if (!ok) return false;
+      }
+      if (wholeLine[ln]) return false;
+      return !inGroup[bdPairKey(pr.line, pr.dest)];
+    }).sort(function (a, b) {
+      var c = String(a.line).localeCompare(String(b.line), 'de', { numeric: true });
+      return c || String(a.dest).localeCompare(String(b.dest), 'de');
+    });
+  }
+
   function bdPushGroups(segs, forceRender) {
     var str = bdSerializeGroups(segs);
-    // Begonnene Zeilen (Name oder Farbe, aber noch keine Linien) als Entwurf behalten
+    // Begonnene Zeilen (Name oder Farbe, aber noch ohne Linien) als Entwurf behalten
     var incomplete = segs.some(function (g) {
-      return !bdCleanMembers(g.members) && (bdCleanGroupName(g.name) || g.color);
+      return !(g.members || []).length && (bdCleanGroupName(g.name) || g.color);
     });
     BD.grpEdit = incomplete ? segs : null;
     if (BD.state && String(BD.state.groups || '') === str) {
@@ -25648,13 +25804,13 @@ window.addEventListener('DOMContentLoaded', () => {
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         if (BD.state) BD.state.groups = str;
-        bdToast(str ? 'Gruppen gespeichert.' : 'Gruppen entfernt.');
+        bdToast(str ? 'Zeilen gespeichert.' : 'Zeilen-Gruppen entfernt.');
         bdRenderTafel(forceRender);
       })
       .catch(function () {
         BD.online = false;
         bdRenderDevice();
-        bdToast('Keine Verbindung zum Display. Gruppen nicht übernommen.', true);
+        bdToast('Keine Verbindung zum Display. Zeilen nicht übernommen.', true);
       });
   }
 
@@ -25919,37 +26075,6 @@ window.addEventListener('DOMContentLoaded', () => {
   // sonst vor dem Klick speichern und den Editor neu rendern).
   home.addEventListener('mousedown', function (e) {
     var t = e.target;
-    var grpAdd = t.closest('#bdGrpAdd');
-    if (grpAdd) {
-      e.preventDefault();
-      BD.grpEdit = bdCollectGroupInputs();
-      BD.grpEdit.push({ name: '', color: '', members: '' });
-      bdRenderTafel(true);
-      var gNames = document.querySelectorAll('[data-bdgrpname]');
-      if (gNames.length) gNames[gNames.length - 1].focus();
-      return;
-    }
-    var grpMove = t.closest('[data-bdgrpmove]');
-    if (grpMove) {
-      e.preventDefault();
-      var mv = grpMove.getAttribute('data-bdgrpmove').split(':');
-      var gi = parseInt(mv[0], 10), dir = parseInt(mv[1], 10);
-      var segsM = bdCollectGroupInputs();
-      var ni = gi + dir;
-      if (ni < 0 || ni >= segsM.length) return;
-      var tmp = segsM[gi]; segsM[gi] = segsM[ni]; segsM[ni] = tmp;
-      bdPushGroups(segsM, true);
-      return;
-    }
-    var grpDel = t.closest('[data-bdgrpdel]');
-    if (grpDel) {
-      e.preventDefault();
-      var di = parseInt(grpDel.getAttribute('data-bdgrpdel'), 10);
-      var segsD = bdCollectGroupInputs();
-      segsD.splice(di, 1);
-      bdPushGroups(segsD, true);
-      return;
-    }
     var wlAdd = t.closest('[data-bdwladd]');
     if (wlAdd) {
       e.preventDefault();
@@ -25966,32 +26091,84 @@ window.addEventListener('DOMContentLoaded', () => {
       bdQueueWalkPush();
       return;
     }
+    // Zeilen-Gruppen: alles per mousedown + preventDefault (Fokus bleibt, kein Blur-Rerender)
+    var pairBtn = t.closest('[data-bdpair]');
+    if (pairBtn) {
+      e.preventDefault();
+      var pk = pairBtn.getAttribute('data-bdpair');
+      BD.grpEdit = bdGrpModel();
+      if (BD.grpSel[pk]) delete BD.grpSel[pk]; else BD.grpSel[pk] = true;
+      bdRenderTafel(true);
+      return;
+    }
+    function selectedMembers() {
+      return Object.keys(BD.grpSel).map(function (k) { return BD.grpPairMap[k]; })
+        .filter(Boolean).map(function (pr) { return { line: pr.line, dest: pr.dest }; });
+    }
+    var mk = t.closest('[data-bdgrpmake]');
+    if (mk) {
+      e.preventDefault();
+      var memsN = selectedMembers();
+      if (!memsN.length) return;
+      var modelN = bdGrpModel();
+      modelN.push({ name: '', color: '', members: memsN });
+      BD.grpSel = {};
+      bdPushGroups(modelN, true);
+      return;
+    }
+    var addSel = t.closest('[data-bdgrpaddsel]');
+    if (addSel) {
+      e.preventDefault();
+      var memsA = selectedMembers();
+      var modelA = bdGrpModel();
+      var ga = modelA[parseInt(addSel.getAttribute('data-bdgrpaddsel'), 10)];
+      if (!ga || !memsA.length) return;
+      var have = {};
+      ga.members.forEach(function (m) { have[bdPairKey(m.line, m.dest)] = 1; });
+      memsA.forEach(function (m) { if (!have[bdPairKey(m.line, m.dest)]) ga.members.push(m); });
+      BD.grpSel = {};
+      bdPushGroups(modelA, true);
+      return;
+    }
+    var memRm = t.closest('[data-bdgrpmemrm]');
+    if (memRm) {
+      e.preventDefault();
+      var pr = memRm.getAttribute('data-bdgrpmemrm').split(':');
+      var modelR = bdGrpModel();
+      var gr = modelR[parseInt(pr[0], 10)];
+      if (!gr) return;
+      gr.members.splice(parseInt(pr[1], 10), 1);
+      if (!gr.members.length && !bdCleanGroupName(gr.name) && !gr.color) modelR.splice(parseInt(pr[0], 10), 1);
+      bdPushGroups(modelR, true);
+      return;
+    }
+    var grpMove = t.closest('[data-bdgrpmove]');
+    if (grpMove) {
+      e.preventDefault();
+      var mv = grpMove.getAttribute('data-bdgrpmove').split(':');
+      var gi = parseInt(mv[0], 10), dir = parseInt(mv[1], 10);
+      var modelM = bdGrpModel();
+      var ni = gi + dir;
+      if (ni < 0 || ni >= modelM.length) return;
+      var tmp = modelM[gi]; modelM[gi] = modelM[ni]; modelM[ni] = tmp;
+      bdPushGroups(modelM, true);
+      return;
+    }
+    var grpDel = t.closest('[data-bdgrpdel]');
+    if (grpDel) {
+      e.preventDefault();
+      var modelD = bdGrpModel();
+      modelD.splice(parseInt(grpDel.getAttribute('data-bdgrpdel'), 10), 1);
+      bdPushGroups(modelD, true);
+      return;
+    }
     var grpColRes = t.closest('[data-bdgrpcolorreset]');
     if (grpColRes) {
       e.preventDefault();
-      var segsR = bdCollectGroupInputs();
-      var ri = parseInt(grpColRes.getAttribute('data-bdgrpcolorreset'), 10);
-      if (segsR[ri]) segsR[ri].color = '';
-      bdPushGroups(segsR, true);
-      return;
-    }
-    var grpChip = t.closest('[data-bdgrpchip]');
-    if (grpChip) {
-      e.preventDefault();
-      var gInputs2 = document.querySelectorAll('[data-bdgrp]');
-      if (!gInputs2.length) {
-        BD.grpEdit = [{ name: '', color: '', members: '' }];
-        bdRenderTafel(true);
-        gInputs2 = document.querySelectorAll('[data-bdgrp]');
-      }
-      // Ziel: das gerade aktive Gruppen-Feld, sonst das letzte
-      var aeC = document.activeElement;
-      var blockC = (aeC && aeC.closest) ? aeC.closest('.bd-grp') : null;
-      var inp2 = blockC ? blockC.querySelector('[data-bdgrp]') : gInputs2[gInputs2.length - 1];
-      if (!inp2) return;
-      var ln = grpChip.getAttribute('data-bdgrpchip');
-      inp2.value = inp2.value.trim() ? (inp2.value.replace(/\s+$/, '') + ' + ' + ln) : ln;
-      inp2.focus();
+      var modelC = bdGrpModel();
+      var gc = modelC[parseInt(grpColRes.getAttribute('data-bdgrpcolorreset'), 10)];
+      if (gc) gc.color = '';
+      bdPushGroups(modelC, true);
       return;
     }
   });
@@ -26069,7 +26246,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (e.target && e.key === 'Enter' && e.target.hasAttribute &&
-        (e.target.hasAttribute('data-bddirs') || e.target.hasAttribute('data-bdgrp') || e.target.hasAttribute('data-bdgrpname'))) {
+        (e.target.hasAttribute('data-bddirs') || e.target.hasAttribute('data-bdgrpname'))) {
       e.preventDefault();
       e.target.blur();   // blur loest das change-Event aus, das speichert
     }
@@ -26136,11 +26313,11 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdgrpcolor')) {
       e.target.setAttribute('data-auto', '0');
-      bdPushGroups(bdCollectGroupInputs(), true);
+      bdPushGroups(bdGrpModel(), true);
       return;
     }
-    if (e.target && e.target.hasAttribute && (e.target.hasAttribute('data-bdgrp') || e.target.hasAttribute('data-bdgrpname'))) {
-      bdPushGroups(bdCollectGroupInputs());
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdgrpname')) {
+      bdPushGroups(bdGrpModel());
       return;
     }
     if (id !== 'bdNightFrom' && id !== 'bdNightTo') return;
