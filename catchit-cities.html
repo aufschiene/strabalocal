@@ -24463,7 +24463,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   .bd-grp-btn:hover { background: #f0ead9; }
   .bd-grp-btn.del:hover { background: var(--red); color: #fff; }
-  .bd-grp { border: 2px solid var(--ink); border-radius: 8px; background: #fff; padding: 10px 10px 2px; margin-bottom: 10px; }
   .bd-grp-color {
     position: relative; width: 46px; height: 36px; flex-shrink: 0; cursor: pointer;
     border: 2px solid var(--ink); border-radius: 6px; box-shadow: 2px 2px 0 var(--ink); overflow: hidden;
@@ -24472,8 +24471,6 @@ window.addEventListener('DOMContentLoaded', () => {
     background: repeating-linear-gradient(45deg, #fff, #fff 4px, #f0ead9 4px, #f0ead9 8px);
   }
   .bd-grp-color input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
-  .bd-grp-members { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; align-items: center; min-height: 36px; }
-  .bd-grp-empty { font-size: 12px; color: #8a8276; line-height: 1.4; }
   .bd-pairs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
   .bd-pair {
     display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
@@ -24487,7 +24484,6 @@ window.addEventListener('DOMContentLoaded', () => {
   .bd-pair-dest { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
   .bd-pair-x { border: none; background: none; color: inherit; font-weight: 800; font-size: 15px; line-height: 1; cursor: pointer; padding: 0 6px; font-family: var(--font-main); }
   .bd-pair-x:hover { color: var(--red); }
-  .bd-pair-actions { margin: 8px 0 4px; }
   .bd-addr-btn:disabled { background: #ddd5c4; color: #9a9384; cursor: default; box-shadow: 2px 2px 0 #c9c1b0; border-color: #c9c1b0; }
   .bd-corner {
     background: #20252e; border: 3px solid var(--ink); border-radius: 10px;
@@ -24545,6 +24541,183 @@ window.addEventListener('DOMContentLoaded', () => {
     cursor: pointer;
   }
   .bd-backlink:hover { color: var(--red); }
+  /* ---------- Vorschau-Kit: Bild-Auswahlen, Live-Vorschau, Erklaerungen ---------- */
+  .bd-row.bd-stack { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+  .bd-row.bd-stack .bd-label { flex: 0 0 auto; }
+  .bd-row.bd-stack > .bd-seg { justify-content: flex-start; }
+  .bd-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .bd-opts.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bd-opts.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bd-opts.c4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @media (max-width: 520px) { .bd-opts.c4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .bd-opt {
+    display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 5px 5px 7px;
+    border: 2px solid var(--ink); border-radius: 8px; background: #fff; color: var(--ink);
+    font-family: var(--font-main); font-size: 12px; font-weight: 700; text-align: center; cursor: pointer;
+    box-shadow: 2px 2px 0 var(--ink); transition: transform .07s ease, box-shadow .07s ease;
+  }
+  .bd-opt:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+  .bd-opt:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+  .bd-opt.on { border-color: var(--red); box-shadow: 3px 3px 0 var(--red); }
+  .bd-opt.on .lb { color: var(--red); }
+  .bd-opt svg { display: block; width: 100%; height: auto; aspect-ratio: 1024 / 600; border-radius: 4px; background: #0e1116; }
+  .bd-opt .lb { line-height: 1.25; }
+  .bd-opt .sub { font-size: 10px; font-weight: 600; color: #8a8276; margin-top: -3px; line-height: 1.2; }
+  /* Sticky am direkten Kind der Karte, damit die Vorschau beim Scrollen durch die Karte stehen bleibt */
+  #bdMapPrev, #bdTafelPrev { position: sticky; top: 0; z-index: 6; margin: 2px -10px 12px; padding: 8px 10px 4px; background: var(--card); }
+  #bdMapPrev:empty, #bdTafelPrev:empty { display: none; }
+  @media (max-height: 700px) { #bdMapPrev, #bdTafelPrev { position: static; } }
+  .bd-prev { margin: 0; }
+  .bd-prev-svg { display: block; width: 100%; height: auto; aspect-ratio: 1024 / 600; border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); background: #0e1116; }
+  .bd-prev-cap { margin-top: 8px; font-size: 11px; font-weight: 700; color: #8a8276; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .bd-prev-cap .sep { opacity: .6; }
+  .bd-live { width: 8px; height: 8px; border-radius: 50%; background: #2fa84f; flex-shrink: 0; animation: bdLive 2s infinite; }
+  @keyframes bdLive { 0% { box-shadow: 0 0 0 0 rgba(47,168,79,.55); } 70% { box-shadow: 0 0 0 7px rgba(47,168,79,0); } 100% { box-shadow: 0 0 0 0 rgba(47,168,79,0); } }
+  .bd-tb { background: #0a0c10; color: #fff; border: 3px solid var(--ink); border-radius: 8px; box-shadow: 4px 4px 0 var(--ink); padding: 6px 6px 2px; font-family: var(--font-main); }
+  .bd-tb.light { background: #fff; color: #14181f; }
+  .bd-tb-hd { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 2px 6px 6px; font-size: 12px; font-weight: 700; }
+  .bd-tb-hd .st { opacity: .75; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+  .bd-tb-hd .clk { font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 800; }
+  .bd-tb-row { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 4px; margin-bottom: 4px; border-radius: 5px; background: #20252e; font-size: 13px; font-weight: 700; position: relative; }
+  .bd-tb.light .bd-tb-row, .bd-tb.light .bd-tb-face { background: #e4e8ee; }
+  .bd-tb-row .ln, .bd-tb-bcol .ln { min-width: 34px; height: 22px; padding: 0 6px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+  .bd-tb-row .ln.long, .bd-tb-bcol .ln.long { display: inline-block; max-width: 104px; font-size: 10px; line-height: 22px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; }
+  .bd-tb-row .ds { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .bd-tb-row .mn { min-width: 24px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 800; font-size: 14px; }
+  .bd-tb-row .mn.late { color: #ff9d66; }
+  .bd-tb-row .mn + .mn { opacity: .65; }
+  .bd-tb-row.bd-tb-grp, .bd-tb-row.bd-tb-swap { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; background: transparent !important; }
+  .bd-tb-face { grid-area: 1 / 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 4px; border-radius: 5px; background: #20252e; opacity: 0; transition: opacity .45s ease; }
+  .bd-tb-face.on { opacity: 1; }
+  .bd-tb-body { max-height: 212px; overflow: hidden; }
+  .bd-tb-body.cut { -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+  .bd-tb-blk { border-radius: 5px; background: #20252e; margin-bottom: 4px; overflow: hidden; }
+  .bd-tb.light .bd-tb-blk { background: #e4e8ee; }
+  .bd-tb-blk .bd-tb-row { background: transparent !important; margin-bottom: 0; }
+  .bd-tb-blk.bare { background: transparent !important; overflow: visible; }
+  .bd-tb-blk.span { display: flex; align-items: center; }
+  .bd-tb-bcol { padding-left: 4px; flex-shrink: 0; }
+  .bd-tb-rows { flex: 1; min-width: 0; }
+  .bd-tb-rows .bd-tb-row { padding-left: 8px; }
+  .bd-tb-hdr { height: 28px; line-height: 29px; padding: 0 10px; font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bd-tb-row .ln.none { visibility: hidden; }
+  .bd-tb-swap .bd-tb-blk { margin-bottom: 0; }
+  .bd-tb-row .mn.dim { opacity: .45; }
+  .bd-tb-row .mn.hi, .bd-tb-row .mn + .mn.hi { opacity: 1; }
+  .bd-tb-blk:not(.bare) .bd-tb-face { background: transparent !important; }
+  .bd-tb-rows .bd-tb-face { padding-left: 8px; }
+  .bd-tb-rows .bd-tb-row.bd-tb-grp { padding-left: 0; }
+  .mn.zero { position: relative; display: inline-block; width: 24px; height: 20px; }
+  .mn.zero.z0::after, .mn.zero.z1::after { content: '0'; position: absolute; right: 0; top: 0; line-height: 20px; }
+  .mn.zero.z0::after { color: #ffd200; }
+  .mn.zero.z1::after { color: inherit; animation: bdBlink 1s infinite; }
+  .mn.zero.z2::after { content: ''; position: absolute; width: 7px; height: 7px; background: currentColor; right: 11px; bottom: 3px; animation: bdJump 1s infinite; }
+  @keyframes bdBlink { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  @keyframes bdJump { 0%, 49.9% { transform: translate(0, 0); } 50%, 100% { transform: translate(9px, -9px); } }
+  .bd-seg button.bd-zbtn { display: inline-flex; align-items: center; gap: 7px; }
+  .bd-zero { position: relative; display: inline-block; width: 26px; height: 20px; border-radius: 4px; background: #20252e; flex-shrink: 0; color: #fff; font-weight: 800; font-size: 13px; }
+  .bd-zero.z0::after, .bd-zero.z1::after { content: '0'; position: absolute; left: 0; right: 0; top: 0; line-height: 20px; text-align: center; }
+  .bd-zero.z0::after { color: #ffd200; }
+  .bd-zero.z1::after { animation: bdBlink 1s infinite; }
+  .bd-zero.z2::after { content: ''; position: absolute; width: 6px; height: 6px; background: #fff; left: 6px; bottom: 4px; animation: bdJump2 1s infinite; }
+  @keyframes bdJump2 { 0%, 49.9% { transform: translate(0, 0); } 50%, 100% { transform: translate(8px, -6px); } }
+  .bd-inline { display: inline-flex; align-items: center; gap: 12px; }
+  .bd-minichip { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 26px; padding: 0 8px; border-radius: 5px; background: #20252e; color: #fff; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; transition: color .25s; }
+  .bd-minichip.late { color: #ff9d66; }
+  .bd-info-btn {
+    display: inline-flex; align-items: center; justify-content: center; vertical-align: 2px;
+    width: 18px; height: 18px; margin-left: 7px; padding: 0; border-radius: 50%;
+    border: 2px solid var(--ink); background: #fff; color: var(--ink); cursor: pointer;
+    font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 700; font-size: 11px; line-height: 1;
+  }
+  .bd-info-btn:hover, .bd-info-btn.on { background: var(--ink); color: #fff; }
+  .bd-info { margin: 8px 0 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; overflow: hidden; box-shadow: 3px 3px 0 var(--ink); }
+  .bd-info-scene { background: #2a2f38; padding: 14px; display: flex; justify-content: center; }
+  .bd-info-txt { padding: 10px 12px; font-size: 12.5px; line-height: 1.5; color: var(--ink); border-top: 2px solid var(--ink); }
+  .bd-scene-scr { width: 100%; max-width: 380px; }
+  .bd-scene-scr svg { display: block; width: 100%; height: auto; aspect-ratio: 1024 / 600; border: 3px solid #000; border-radius: 8px; }
+  .bd-scene-pair { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .bd-scene-pair > div:not(.bd-scene-arrow) { width: 250px; max-width: 100%; }
+  .bd-scene-lb { font-size: 11px; font-weight: 700; color: #c7ccd4; margin-bottom: 5px; }
+  .bd-scene-arrow { color: #fff; font-size: 22px; font-weight: 800; }
+  .bd-tb.mini { box-shadow: none; border-color: #000; padding-top: 4px; }
+  .bd-tb-swap .pv-face { grid-area: 1 / 1; min-width: 0; }
+  .bd-tb-swap .pv-face .bd-tb-row { margin-bottom: 0; }
+  .pv-fa { animation: pvFaceA 5s infinite; }
+  .pv-fb { animation: pvFaceB 5s infinite; }
+  @keyframes pvFaceA { 0%, 42% { opacity: 1; } 50%, 92% { opacity: 0; } 100% { opacity: 1; } }
+  @keyframes pvFaceB { 0%, 42% { opacity: 0; } 50%, 92% { opacity: 1; } 100% { opacity: 0; } }
+  .bd-scene-walk { width: 250px; max-width: 100%; }
+  .bd-scene-grp { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 250px)); gap: 8px 14px; justify-content: center; align-items: start; width: 100%; }
+  .bd-scene-grp > .full { grid-column: 1 / -1; justify-self: center; width: 250px; max-width: 100%; }
+  .bd-scene-grp > .bd-scene-arrow.full { width: auto; text-align: center; line-height: 1; }
+  .bd-scene-grp > .full.bd-scene-bm { margin-top: 8px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,.18); }
+  .bd-walk-pill { display: inline-flex; align-items: center; gap: 6px; background: #ffd200; color: #1b1b1b; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
+  .pv-gone { animation: pvGone 6s infinite; overflow: hidden; }
+  @keyframes pvGone {
+    0%, 28% { opacity: 1; max-height: 30px; margin-bottom: 4px; }
+    40% { opacity: .3; max-height: 30px; margin-bottom: 4px; }
+    52%, 90% { opacity: 0; max-height: 0; margin-bottom: 0; }
+    100% { opacity: 1; max-height: 30px; margin-bottom: 4px; }
+  }
+  .pv-qsB { animation: pvQsB 8s infinite; }
+  @keyframes pvQsB { 0%, 18% { opacity: 0; } 21%, 67% { opacity: 1; } 70%, 100% { opacity: 0; } }
+  .pv-tap { transform-box: fill-box; transform-origin: center; opacity: 0; animation: pvTap 8s infinite; }
+  @keyframes pvTap {
+    0%, 13% { opacity: 0; transform: scale(.5); } 18% { opacity: 1; transform: scale(1); } 25% { opacity: 0; transform: scale(1.6); }
+    26%, 62% { opacity: 0; transform: scale(.5); } 67% { opacity: 1; transform: scale(1); } 74%, 100% { opacity: 0; transform: scale(1.6); }
+  }
+  .bd-anchor-block { border-top: 2px dashed rgba(27,27,27,.14); border-bottom: 2px dashed rgba(27,27,27,.14); padding: 14px 0; }
+  .bd-sec { padding: 14px 0 6px; margin-top: 2px; }
+  .bd-sec + .bd-sec { border-top: 2px dashed rgba(27,27,27,.14); }
+  .bd-sec > .bd-label { margin-bottom: 10px; }
+  .bd-gbox { border: 2px solid var(--ink); border-radius: 10px; background: #fff; margin-bottom: 10px; overflow: hidden; box-shadow: 3px 3px 0 var(--ink); }
+  .bd-gbox-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: #f0ead9; border-bottom: 2px solid var(--ink); font-size: 13px; font-weight: 800; color: var(--ink); }
+  .bd-gbox-hd.cr { background: var(--red); color: #fff; }
+  .bd-gbox-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .bd-gbox-del { background: none; border: none; color: var(--red); font-family: var(--font-main); font-size: 12px; font-weight: 700; cursor: pointer; padding: 2px 4px; flex-shrink: 0; }
+  .bd-gbox-del:hover { text-decoration: underline; }
+  .bd-gbox-bd { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; min-height: 46px; align-items: center; }
+  .bd-gbox-hint { font-size: 12px; color: #8a8276; font-style: italic; }
+  .bd-gbox-act { display: flex; gap: 8px; padding: 10px 12px; border-top: 2px dashed rgba(27,27,27,.14); }
+  .bd-gbtn { flex: 1; padding: 9px 10px; border: 2px solid var(--ink); border-radius: 8px; background: #fff; color: var(--ink); font-family: var(--font-main); font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: 2px 2px 0 var(--ink); }
+  .bd-gbtn.pri { background: var(--red); color: #fff; }
+  .bd-gbtn:disabled { background: #ddd5c4; color: #9a9384; border-color: #c9c1b0; box-shadow: 2px 2px 0 #c9c1b0; cursor: default; }
+  .bd-gbox-opts { padding: 2px 12px 10px; border-top: 2px dashed rgba(27,27,27,.14); display: flex; flex-direction: column; gap: 2px; }
+  .bd-gopt { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 8px; }
+  .bd-gopt-lb { font-size: 12px; font-weight: 700; color: #8a8276; min-width: 70px; }
+  .bd-gopt .bd-input { flex: 1; min-width: 150px; }
+  .bd-seg.sm { justify-content: flex-start; }
+  .bd-seg.sm button { padding: 5px 9px; font-size: 12px; }
+  .bd-grp-color.sm { width: 40px; height: 30px; }
+  @media (max-width: 420px) {
+    .bd-gbox-opts .bd-seg.sm { gap: 5px; }
+    .bd-gbox-opts .bd-seg.sm button { padding: 5px 7px; font-size: 11.5px; }
+    .bd-gopt { gap: 6px 10px; }
+    .bd-gopt-lb { flex-basis: 100%; }
+    .bd-gopt-lb:empty { display: none; }
+  }
+  .bd-gnew { display: block; width: 100%; padding: 12px; margin: 2px 0 10px; border: 2px dashed var(--ink); border-radius: 10px; background: #fff; color: var(--ink); font-family: var(--font-main); font-size: 13px; font-weight: 800; cursor: pointer; }
+  .bd-gnew:hover { background: #f0ead9; }
+  .bd-gpool { border: 2px solid rgba(27,27,27,.22); border-radius: 10px; background: #fbf8f0; padding: 10px 12px; }
+  .bd-gpool-hd { font-size: 12px; font-weight: 700; color: #8a8276; }
+  .bd-gpool-empty { font-size: 12px; color: #8a8276; padding: 4px 0; }
+  .bd-order { display: flex; flex-direction: column; gap: 6px; }
+  .bd-order-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 2px solid rgba(27,27,27,.22); border-radius: 8px; background: #fff; }
+  .bd-order-row.grp { border-color: var(--ink); background: #f0ead9; }
+  .bd-order-nr { font-size: 12px; font-weight: 800; color: #8a8276; min-width: 16px; text-align: center; }
+  .bd-order-badges { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
+  .bd-order-plus { font-size: 11px; color: #8a8276; font-weight: 800; }
+  .bd-order-name { font-size: 12px; font-weight: 800; color: var(--ink); margin-right: 3px; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .bd-order-sub { flex: 1; min-width: 0; font-size: 12px; color: #6b6253; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .bd-order-btns { display: inline-flex; gap: 4px; flex-shrink: 0; }
+  .bd-order-btns .bd-grp-btn { width: 30px; height: 30px; font-size: 11px; }
+  .bd-grp-btn:disabled { opacity: .3; cursor: default; box-shadow: none; }
+  .bd-paused *, .bd-paused *::after { animation-play-state: paused !important; }
+  @media (prefers-reduced-motion: reduce) {
+    #bdHome *, #bdHome *::after { animation: none !important; transition: none !important; }
+    .pv-qsB, .pv-fb { opacity: 0; }
+  }
   #bdReloadOverlay {
     position: fixed; inset: 0; z-index: 10500; display: none;
     flex-direction: column; align-items: center; justify-content: center;
@@ -24616,21 +24789,16 @@ window.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
 
-    <div class="bd-card" id="bdTafelCard" style="display:none;">
-      <h2>Abfahrten-Tafel</h2>
-      <p class="bd-sub">Was auf der Tafel steht und wie: &Auml;nderungen wirken sofort.</p>
-      <div id="bdCtlTafel"></div>
+    <div class="bd-card" id="bdAnsichtCard" style="display:none;">
+      <h2>Ansicht</h2>
+      <div id="bdCtlAnsicht"></div>
     </div>
 
-    <div class="bd-card">
-      <h2>Anzeige</h2>
-      <p class="bd-sub">&Auml;nderungen wirken sofort auf deinem Display.</p>
-      <div id="bdCtlAnzeige"></div>
-    </div>
-
-    <div class="bd-card">
+    <div class="bd-card" id="bdKarteCard">
       <h2>Karte</h2>
-      <div id="bdAnchorBlock" style="border-bottom:2px dashed rgba(27,27,27,.14);margin-top:10px;padding-bottom:14px;">
+      <div id="bdMapPrev"></div>
+      <div id="bdCtlKarteA"></div>
+      <div id="bdAnchorBlock" class="bd-anchor-block">
         <div class="bd-label" style="margin-bottom:10px;">
           <div class="name">Karten-Zentrum</div>
           <div class="hint">Der Ankerpunkt der Karte: automatisch die Mitte deiner Stationen, eine bestimmte Station, oder deine Adresse. Wird sofort gespeichert.</div>
@@ -24638,6 +24806,17 @@ window.addEventListener('DOMContentLoaded', () => {
         <div id="bdAnchorWrap"></div>
       </div>
       <div id="bdCtlKarte"></div>
+    </div>
+
+    <div class="bd-card" id="bdTafelCard" style="display:none;">
+      <h2>Abfahrten-Tafel</h2>
+      <div id="bdTafelPrev"></div>
+      <div id="bdCtlTafel"></div>
+    </div>
+
+    <div class="bd-card" id="bdAnzeigeCard">
+      <h2>Anzeige</h2>
+      <div id="bdCtlAnzeige"></div>
     </div>
 
     <div class="bd-card">
@@ -24722,7 +24901,8 @@ window.addEventListener('DOMContentLoaded', () => {
     reloadPending: false, // nach /api/cfg: Geraet laedt Karte+Abfahrten neu
     adopted: false,       // stations[] wurde schon aus den Geraete-rbls befuellt
     grpEdit: null,        // Zeilen-Gruppen im Editor (Array), null = Stand vom Geraet
-    grpSel: {},           // ausgewaehlte Linie+Ziel-Bubbles (Key -> true)
+    grpSel: [],           // ausgewaehlte Linie+Ziel-Paare fuer eine neue Gruppe (Keys)
+    grpCreating: false,   // Neue-Gruppe-Box offen
     grpPairs: null,       // Linie+Ziel-Paare aus den Live-Abfahrten (null = laedt)
     grpPairsKey: '',
     grpPairsLoading: false,
@@ -25128,6 +25308,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     wrap.innerHTML = html;
     bdCheckAnchorRange();
+    bdRenderMapPrev();
   }
 
   // Adress-Anker: liegen Stationen ausserhalb des sichtbaren Kartenausschnitts?
@@ -25363,78 +25544,777 @@ window.addEventListener('DOMContentLoaded', () => {
       (hint ? '<div class="hint">' + hint + '</div>' : '') + '</div>' +
       controlHtml + '</div>';
   }
+  // Zeile mit Inhalt unter der Beschriftung (fuer Bild-Auswahlen in voller Breite)
+  function stackRow(name, hint, controlHtml) {
+    return '<div class="bd-row bd-stack">' +
+      '<div class="bd-label"><div class="name">' + name + '</div>' +
+      (hint ? '<div class="hint">' + hint + '</div>' : '') + '</div>' +
+      controlHtml + '</div>';
+  }
   function switchHtml(key, on) {
     return '<div class="bd-switch' + (on ? ' on' : '') + '" data-bdswitch="' + key + '" role="switch" aria-checked="' + (on ? 'true' : 'false') + '"></div>';
   }
 
-  function bdRenderAnzeige() {
-    var el = $('bdCtlAnzeige');
-    if (!el) return;
+  // ======================================================================
+  // Vorschau-Kit: Mini-Displays im echten Wall-Look (Farben aus der Firmware),
+  // Bild-Auswahlen, Live-Vorschau fuer Karte und Tafel, Erklaer-Animationen.
+  // ======================================================================
+  var PV = {
+    d: { bg: '#0e1116', r1: '#252a32', r2: '#1c2027', rail: '#525a66', dot: '#c7ccd4', panel: '#101318', hdr: '#0a0c10', fg: '#ffffff', row: '#20252e', brd: '#2b313a' },
+    l: { bg: '#d6dbe2', r1: '#b7bfca', r2: '#c7ced7', rail: '#8e98a6', dot: '#555e6b', panel: '#ffffff', hdr: '#ffffff', fg: '#14181f', row: '#e4e8ee', brd: '#c3cad3' },
+    zero: '#ffd200', late: '#ff9d66', blue: '#4285f4'
+  };
+  var PV_MOTION = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var _pvId = 0;
+  BD.infoOpen = BD.infoOpen || {};
+  function pvPal(design) {
+    var d = (design === undefined) ? (BD.state ? (parseInt(BD.state.design, 10) || 0) : 0) : design;
+    if (d === 2) { var h = new Date().getHours(); d = (h >= 7 && h < 19) ? 1 : 0; }
+    return d === 1 ? PV.l : PV.d;
+  }
+  // Linienfarben des Geraets (fuer echte Farben in allen Vorschauen), sonst Beispielfarben
+  function pvCols() {
+    var out = [], seen = {};
+    ((BD.state && BD.state.lines) || []).forEach(function (l) {
+      var c = String(l.c || '');
+      if (!/^#?[0-9a-fA-F]{6}$/.test(c)) return;
+      c = (c[0] === '#' ? c : '#' + c).toLowerCase();
+      if (seen[c]) return;
+      seen[c] = 1;
+      out.push(c);
+    });
+    ['#e2001a', '#0067b3', '#00963f', '#f39200', '#7a3e9d'].forEach(function (c) {
+      if (out.length < 5 && !seen[c]) { seen[c] = 1; out.push(c); }
+    });
+    return out;
+  }
+  function pvNums() {
+    var out = [];
+    ((BD.state && BD.state.lines) || []).forEach(function (l) { if (out.length < 7 && l.n) out.push(String(l.n)); });
+    ['1', '2', '41', '3', '13A', '4', '12'].forEach(function (n) { if (out.length < 7) out.push(n); });
+    return out;
+  }
+  function pvSvg(inner, cls) {
+    return '<svg class="' + (cls || '') + '" viewBox="0 0 1024 600" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' + inner + '</svg>';
+  }
+  function pvTxt(x, y, size, fill, txt, extra) {
+    return '<text x="' + x + '" y="' + y + '" font-size="' + size + '" fill="' + fill + '" font-family="Poppins,Arial,sans-serif" ' + (extra || '') + '>' + txt + '</text>';
+  }
+  function pvBase(st) {
+    st = st || BD.state || {};
+    var ly = st.layers || {};
+    return {
+      p: pvPal(), lay: bdIsNum(st.lay) ? st.lay : 2, pstyle: parseInt(st.pstyle, 10) || 0,
+      corner: parseInt(st.corner, 10) || 0, style: parseInt(st.style, 10) ? 1 : 0, cols: pvCols(), nums: pvNums(),
+      roads: ly.roads === undefined ? true : !!+ly.roads, paths: ly.paths === undefined ? true : !!+ly.paths,
+      traffic: !!+ly.traffic, dly: ly.dly === undefined ? true : !!+ly.dly, vbig: !!+st.vbig,
+      vnum: st.vnum === undefined ? !!+st.vbig : !!+st.vnum,
+      anchor: (BD.anchor && BD.anchor.mode === 'addr') ? 'addr' : 'stop'
+    };
+  }
+  function pvWith(base, extra) {
+    var o = {}, k;
+    for (k in base) o[k] = base[k];
+    for (k in extra) o[k] = extra[k];
+    return o;
+  }
+  function pvRoutes(cx) {
+    return [
+      'M' + (cx - 760) + ' 600 C' + (cx - 420) + ' 470 ' + (cx - 200) + ' 330 ' + cx + ' 300 S' + (cx + 420) + ' 150 ' + (cx + 780) + ' 20',
+      'M' + (cx - 640) + ' 40 C' + (cx - 320) + ' 170 ' + (cx - 120) + ' 260 ' + cx + ' 300 S' + (cx + 330) + ' 440 ' + (cx + 700) + ' 600'
+    ];
+  }
+  function pvVehicle(o, i) {
+    // Groesse wie Firmware: gross 1,6x; Standard mit Nummer 1,25x (sonst unlesbar); Nummer weiss
+    var p = o.p, col = o.cols[i], r = Math.round(24 * (o.vbig ? 1.6 : (o.vnum ? 1.25 : 1)));
+    var s = '<circle r="' + r + '" fill="' + col + '" stroke="#fff" stroke-width="5"/>';
+    if (o.vnum) {
+      var num = String(o.nums[i] || ''), fs = r * (num.length > 2 ? 0.62 : 0.8);
+      s += pvTxt(0, Math.round(fs * 0.36), Math.round(fs), '#fff', esc(num), 'text-anchor="middle" font-weight="800"');
+    }
+    if (o.dly) {
+      var late = i === 0;
+      s += '<g transform="translate(' + (r + 6) + ' ' + (-r - 34) + ')"><rect width="74" height="42" rx="10" fill="' + p.panel + '" stroke="' + p.brd + '" stroke-width="3"/>' +
+        pvTxt(37, 30, 26, late ? PV.late : p.fg, late ? '+2' : '+0', 'text-anchor="middle" font-weight="700"') + '</g>';
+    }
+    return s;
+  }
+  // Stilisierte Stadt rund um das Zentrum cx/300: Strassen, Bahn, zwei Linien, Fahrzeuge
+  function pvMap(o) {
+    var p = o.p, cx = o.cx, s = '<rect x="-2600" y="-2400" width="6200" height="5400" fill="' + p.bg + '"/>';
+    if (o.roads !== false) {
+      [[cx - 1500, 140, cx + 1500, 190], [cx - 1500, 560, cx + 1500, 520], [cx - 1500, 345, cx + 1500, 385],
+       [cx - 520, -1000, cx - 430, 1600], [cx + 640, -1000, cx + 570, 1600], [cx - 1500, 770, cx + 1500, 720],
+       [cx - 1500, -150, cx + 1500, -120], [cx - 900, -1000, cx - 820, 1600], [cx + 1000, -1000, cx + 940, 1600]].forEach(function (r) {
+        s += '<line x1="' + r[0] + '" y1="' + r[1] + '" x2="' + r[2] + '" y2="' + r[3] + '" stroke="' + p.r2 + '" stroke-width="14"/>';
+      });
+      [[cx - 1500, 480, cx + 1500, 240], [cx - 170, -1000, cx - 85, 1600], [cx + 300, -1000, cx + 225, 1600]].forEach(function (r) {
+        s += '<line x1="' + r[0] + '" y1="' + r[1] + '" x2="' + r[2] + '" y2="' + r[3] + '" stroke="' + p.r1 + '" stroke-width="26"/>';
+      });
+    }
+    s += '<line x1="' + (cx - 1500) + '" y1="92" x2="' + (cx + 1500) + '" y2="58" stroke="' + p.rail + '" stroke-width="8" stroke-dasharray="34 20"/>';
+    if (o.traffic) {
+      s += '<line x1="' + (cx - 900) + '" y1="436" x2="' + (cx - 320) + '" y2="389" stroke="#e2001a" stroke-width="13" stroke-linecap="round" opacity=".85"/>' +
+        '<line x1="' + (cx + 262) + '" y1="-240" x2="' + (cx + 250) + '" y2="170" stroke="#f39200" stroke-width="13" stroke-linecap="round" opacity=".9"/>' +
+        '<line x1="' + (cx + 390) + '" y1="275" x2="' + (cx + 980) + '" y2="228" stroke="#f39200" stroke-width="13" stroke-linecap="round" opacity=".9"/>';
+    }
+    var rts = pvRoutes(cx);
+    rts.forEach(function (d, i) {
+      s += '<path d="' + d + '" fill="none" stroke="' + (o.paths === false ? p.rail : o.cols[i]) + '" stroke-width="' + (o.paths === false ? 9 : 14) + '" stroke-linecap="round"/>';
+    });
+    [[cx - 360, 440], [cx + 400, 170], [cx - 300, 190], [cx + 360, 440]].forEach(function (pt) {
+      s += '<circle cx="' + pt[0] + '" cy="' + pt[1] + '" r="11" fill="' + p.dot + '"/>';
+    });
+    s += '<circle cx="' + cx + '" cy="300" r="17" fill="' + p.panel + '" stroke="' + p.fg + '" stroke-width="6"/>';
+    if (o.vehicles !== false) {
+      rts.forEach(function (d, i) {
+        if (o.animate && PV_MOTION) {
+          s += '<g>' + pvVehicle(o, i) + '<animateMotion dur="' + (i ? 21 : 16) + 's" repeatCount="indefinite" path="' + d + '"' + (i ? ' begin="-8s"' : '') + '/></g>';
+        } else {
+          var pos = i === 0 ? [cx + 205, 245] : [cx - 175, 250];
+          s += '<g transform="translate(' + pos[0] + ' ' + pos[1] + ')">' + pvVehicle(o, i) + '</g>';
+        }
+      });
+    }
+    return s;
+  }
+  // Tafel-Zeilen als Balken (x, y, Breite, Zeilenhoehe, Anzahl); style 1 = Farbig
+  function pvRows(p, x, y, w, rh, n, style, cols, nums) {
+    var s = '', mins = ['0', '3', '5', '8', '12', '15', '18'];
+    nums = nums || pvNums();
+    for (var i = 0; i < n; i++) {
+      var c = cols[i % cols.length], yy = y + i * rh, h = rh - Math.max(6, Math.round(rh * 0.12));
+      var bg = style ? c : p.row, fg = style ? badgeFg(c) : p.fg;
+      var cw = Math.round(h * 1.15), pad = Math.round(h * 0.12);
+      s += '<rect x="' + x + '" y="' + yy + '" width="' + w + '" height="' + h + '" rx="' + Math.round(h * 0.16) + '" fill="' + bg + '"/>';
+      if (!style) s += '<rect x="' + (x + pad) + '" y="' + (yy + Math.round(h * 0.14)) + '" width="' + cw + '" height="' + Math.round(h * 0.72) + '" rx="' + Math.round(h * 0.14) + '" fill="' + c + '"/>';
+      s += pvTxt(x + pad + cw / 2, yy + Math.round(h * 0.68), Math.round(h * 0.46), style ? fg : badgeFg(c), esc(nums[i % nums.length]), 'text-anchor="middle" font-weight="800"');
+      var dx = x + pad + cw + Math.round(h * 0.3), dw = Math.max(24, w - (dx - x) - Math.round(h * 1.4));
+      s += '<rect x="' + dx + '" y="' + (yy + Math.round(h * 0.38)) + '" width="' + dw + '" height="' + Math.max(4, Math.round(h * 0.24)) + '" rx="' + Math.round(h * 0.12) + '" fill="' + fg + '" opacity=".85"/>';
+      var m = mins[i % mins.length];
+      s += pvTxt(x + w - Math.round(h * 0.35), yy + Math.round(h * 0.68), Math.round(h * 0.48), m === '0' ? PV.zero : fg, m, 'text-anchor="end" font-weight="800"');
+    }
+    return s;
+  }
+  function pvHead(p, x, y, w) {
+    return '<rect x="' + (x + 16) + '" y="' + (y + 22) + '" width="' + Math.round(w * 0.42) + '" height="18" rx="9" fill="' + p.fg + '" opacity=".7"/>' +
+      pvTxt(x + w - 16, y + 44, 30, p.fg, '12:34', 'text-anchor="end" font-weight="700"');
+  }
+  function pvColBoard(o, w) {
+    return '<rect x="0" y="0" width="' + w + '" height="600" fill="' + o.p.hdr + '"/>' + pvHead(o.p, 0, 6, w) +
+      pvRows(o.p, 10, 76, w - 20, 86, 6, o.style, o.cols, o.nums);
+  }
+  function pvPanelAt(o, x, y, n) {
+    var w = 330, h = 60 + n * 64;
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="16" fill="' + o.p.panel + '" stroke="' + o.p.brd + '" stroke-width="3"/>' +
+      pvHead(o.p, x, y, w) + pvRows(o.p, x + 10, y + 56, w - 20, 64, n, o.style, o.cols, o.nums);
+  }
+  function pvCornerXY(ci, w, h) {
+    var mx = (1024 - w) / 2, my = (600 - h) / 2, r = 1024 - w - 14, b = 600 - h - 14;
+    return [[14, 14], [mx, 14], [r, 14], [14, my], [r, my], [14, b], [mx, b], [r, b]][ci] || [14, 14];
+  }
+  // Sprechblase, deren Spitze auf (tx, ty) zeigt
+  function pvBubble(o, tx, ty, n, w, cols, nums) {
+    var rh = 58, h = 18 + n * rh, x = Math.min(1014 - w, Math.max(10, tx - 34)), y = Math.max(8, ty - 44 - h);
+    return '<path d="M' + (tx - 20) + ' ' + (y + h - 4) + ' L' + tx + ' ' + (ty - 16) + ' L' + (tx + 20) + ' ' + (y + h - 4) + ' Z" fill="' + o.p.panel + '" stroke="' + o.p.brd + '" stroke-width="3" stroke-linejoin="round"/>' +
+      '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="14" fill="' + o.p.panel + '" stroke="' + o.p.brd + '" stroke-width="3"/>' +
+      '<rect x="' + (tx - 18) + '" y="' + (y + h - 7) + '" width="36" height="9" fill="' + o.p.panel + '"/>' +
+      pvRows(o.p, x + 8, y + 9, w - 16, rh, n, o.style, cols || o.cols, nums || o.nums);
+  }
+  // Komplette catch-it-Ansicht: Karte + Tafel je nach Kartengroesse und Panel-Stil
+  function pvCatchScene(o) {
+    var lay = o.lay, mapX0 = lay === 0 ? 540 : (lay === 1 ? 310 : 0);
+    var cx = Math.round(mapX0 + (1024 - mapX0) / 2), z = o.zoom || 1;
+    var s = '<g' + (o.zoomId ? ' id="' + o.zoomId + '"' : '') + ' transform="translate(' + cx + ' 300) scale(' + z + ') translate(' + (-cx) + ' -300)">' +
+      pvMap(pvWith(o, { cx: cx })) + '</g>';
+    if (o.anchor === 'addr') s += '<circle cx="' + cx + '" cy="300" r="21" fill="#fff"/><circle cx="' + cx + '" cy="300" r="14" fill="' + PV.blue + '"/>';
+    if (lay < 2) {
+      s += pvColBoard(o, mapX0);
+    } else if (!o.pstyle) {
+      var xy = pvCornerXY(o.corner || 0, 330, 60 + 4 * 64);
+      s += pvPanelAt(o, xy[0], xy[1], 4);
+    } else if (o.pstyle === 1) {
+      s += pvBubble(o, cx, 300, 3, 300);
+    } else {
+      s += pvBubble(o, cx + 400, 170, 1, 190, [o.cols[0]], [o.nums[0]]);
+      s += pvBubble(o, cx - 300, 190, 1, 190, [o.cols[1]], [o.nums[1]]);
+      s += pvBubble(o, cx, 300, 2, 230);
+    }
+    return s;
+  }
+  function pvListScene(o, ncols) {
+    var p = o.p, s = '<rect width="1024" height="600" fill="' + p.hdr + '"/>' + pvHead(p, 8, 4, 1008);
+    var cw = (1000 - (ncols - 1) * 16) / ncols, n = ncols === 1 ? 5 : 7;
+    for (var c = 0; c < ncols; c++) {
+      s += pvRows(p, 12 + c * (cw + 16), 78, cw, Math.floor(512 / n), n, o.style,
+        o.cols.slice(c).concat(o.cols.slice(0, c)), o.nums.slice(c * 2).concat(o.nums.slice(0, c * 2)));
+    }
+    return s;
+  }
+  function pvOebbScene() {
+    var s = '<rect width="1024" height="600" fill="#1d0078"/><rect x="20" y="22" width="44" height="32" rx="4" fill="#fff"/>' +
+      pvTxt(84, 52, 40, '#ffd400', 'Abfahrt') + pvTxt(262, 52, 34, '#ffd400', 'Departure', 'font-style="italic"') +
+      pvTxt(1002, 52, 38, '#fff', '12:34:56', 'text-anchor="end" font-weight="700"');
+    for (var i = 0; i < 7; i++) {
+      var y = 82 + i * 72;
+      if (i % 2 === 0) s += '<rect y="' + y + '" width="1024" height="72" fill="#3336b2"/>';
+      s += '<rect x="22" y="' + (y + 24) + '" width="84" height="24" rx="3" fill="#fff"/>';
+      if (i === 1 || i === 4) s += '<rect x="118" y="' + (y + 24) + '" width="62" height="24" rx="3" fill="#ffd400"/>';
+      s += '<rect x="198" y="' + (y + 22) + '" width="72" height="28" rx="3" fill="#fff"/><rect x="206" y="' + (y + 30) + '" width="30" height="12" fill="#e2001a"/>' +
+        '<rect x="300" y="' + (y + 22) + '" width="' + (250 + (i * 37) % 130) + '" height="28" rx="3" fill="#fff"/>' +
+        '<rect x="700" y="' + (y + 29) + '" width="190" height="13" rx="3" fill="#fff" opacity=".6"/>' +
+        '<rect x="944" y="' + (y + 22) + '" width="56" height="28" rx="3" fill="#fff"/>';
+    }
+    return s;
+  }
+  function pvDbScene() {
+    var s = '<rect width="1024" height="600" fill="#0f2a68"/>' + pvTxt(22, 52, 40, '#fff', 'Abfahrt', 'font-weight="700"') +
+      pvTxt(202, 52, 32, '#fff', 'Departure', 'font-style="italic"') +
+      '<rect x="910" y="14" width="94" height="48" rx="6" fill="#e2001a" stroke="#fff" stroke-width="4"/>' +
+      pvTxt(957, 50, 30, '#fff', 'DB', 'text-anchor="middle" font-weight="800" font-style="italic"') +
+      '<rect x="18" y="82" width="988" height="4" fill="#fff"/>';
+    for (var i = 0; i < 7; i++) {
+      var y = 94 + i * 72;
+      s += '<rect x="22" y="' + (y + 22) + '" width="80" height="24" rx="3" fill="#fff"/>' +
+        '<rect x="130" y="' + (y + 22) + '" width="120" height="22" rx="3" fill="#fff" opacity=".85"/>' +
+        '<rect x="420" y="' + (y + 6) + '" width="430" height="58" fill="#1d3e8f"/><rect x="434" y="' + (y + 22) + '" width="' + (210 + (i * 41) % 160) + '" height="26" rx="3" fill="#fff"/>' +
+        '<rect x="860" y="' + (y + 6) + '" width="146" height="58" fill="#1d3e8f"/><rect x="950" y="' + (y + 22) + '" width="44" height="26" rx="3" fill="#fff"/>' +
+        '<rect x="18" y="' + (y + 68) + '" width="988" height="2" fill="#2c4584"/>';
+    }
+    return s;
+  }
+  function pvSbbScene() {
+    var s = '<rect width="1024" height="600" fill="#1e3a8f"/><rect width="1024" height="56" fill="#d6d6d6"/>';
+    [[20, 120], [160, 70], [270, 300], [790, 80], [900, 100]].forEach(function (b) {
+      s += '<rect x="' + b[0] + '" y="20" width="' + b[1] + '" height="18" rx="3" fill="#1e3a8f"/>';
+    });
+    for (var i = 0; i < 7; i++) {
+      var y = 62 + i * 76, red = i === 2;
+      s += '<rect x="20" y="' + (y + 18) + '" width="96" height="42" fill="' + (red ? '#e2001a' : '#fff') + '" stroke="' + (red ? '#e2001a' : '#000') + '" stroke-width="4"/>' +
+        '<rect x="40" y="' + (y + 32) + '" width="56" height="14" fill="' + (red ? '#fff' : '#000') + '"/>' +
+        '<rect x="150" y="' + (y + 26) + '" width="84" height="26" rx="3" fill="#fff"/>' +
+        '<rect x="270" y="' + (y + 26) + '" width="' + (240 + (i * 53) % 190) + '" height="26" rx="3" fill="#fff"/>' +
+        '<rect x="790" y="' + (y + 26) + '" width="44" height="26" rx="3" fill="#fff"/>' +
+        '<rect y="' + (y + 74) + '" width="1024" height="2" fill="#35519f"/>';
+    }
+    return s;
+  }
+  function pvAutoScene(b) {
+    var id = 'pvclip' + (++_pvId);
+    var sun = '<g transform="translate(930 92)"><circle r="30" fill="#ffd200"/>' + [0, 45, 90, 135, 180, 225, 270, 315].map(function (a) {
+      return '<rect x="-4" y="-56" width="8" height="16" rx="4" fill="#ffd200" transform="rotate(' + a + ')"/>';
+    }).join('') + '</g>';
+    var moon = '<path d="M112 470 a48 48 0 1 0 50 70 a38 38 0 1 1 -50 -70 Z" fill="#fff"/>';
+    return '<defs><clipPath id="' + id + '"><polygon points="1024,0 1024,600 0,600"/></clipPath></defs>' +
+      pvCatchScene(pvWith(b, { p: PV.d })) + '<g clip-path="url(#' + id + ')">' + pvCatchScene(pvWith(b, { p: PV.l })) + '</g>' +
+      '<line x1="1024" y1="0" x2="0" y2="600" stroke="#fff" stroke-width="6"/>' + sun + moon;
+  }
+  // Bild-Auswahl: eine Karte pro Option mit Mini-Display; nutzt den data-bdseg-Klickpfad
+  function optCards(key, items, cur, cls) {
+    return '<div class="bd-opts ' + (cls || '') + '" data-bdseg="' + key + '">' + items.map(function (it, i) {
+      return '<button type="button" class="bd-opt' + (i === cur ? ' on' : '') + '" data-v="' + i + '" aria-pressed="' + (i === cur ? 'true' : 'false') + '">' +
+        pvSvg(it.svg) + '<span class="lb">' + it.label + '</span>' + (it.sub ? '<span class="sub">' + it.sub + '</span>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  function infoBtn(key) {
+    var on = !!BD.infoOpen[key];
+    return '<button type="button" class="bd-info-btn' + (on ? ' on' : '') + '" data-bdinfo="' + key + '" aria-expanded="' + (on ? 'true' : 'false') + '" title="So funktioniert es">i</button>';
+  }
+  function infoPanel(key, scene, text) {
+    if (!BD.infoOpen[key]) return '';
+    return '<div class="bd-info"><div class="bd-info-scene bd-anim">' + scene + '</div><div class="bd-info-txt">' + text + '</div></div>';
+  }
+  function pvMapZoom(mw) { return 600 / Math.max(300, mw); }
+  function pvMapCap(mw) { return 'Ausschnitt etwa ' + String(Math.round(mw * 2 / 100) / 10).replace('.', ',') + ' km hoch'; }
+
+  // ---------- Live-Vorschau Karte (oben in der Karten-Karte, bleibt beim Scrollen stehen) ----------
+  function bdRenderMapPrev() {
+    var box = $('bdMapPrev');
+    if (!box) return;
+    if (!BD.state) { box.innerHTML = ''; return; }
+    var mw = bdIsNum(BD.state.mapw) ? BD.state.mapw : 600;
+    var svg = pvCatchScene(pvWith(pvBase(), { animate: true, zoom: pvMapZoom(mw), zoomId: 'bdMapZoom' }));
+    box.innerHTML = '<div class="bd-prev">' + pvSvg(svg, 'bd-prev-svg') +
+      '<div class="bd-prev-cap"><span class="bd-live"></span>Live-Vorschau <span class="sep">&middot;</span> <span id="bdMapCap">' + pvMapCap(mw) + '</span></div></div>';
+  }
+  var _zoomAnim = null;
+  function bdMapPrevZoom(mw) {
+    var g = document.getElementById('bdMapZoom');
+    var cap = $('bdMapCap');
+    if (cap) cap.textContent = pvMapCap(mw);
+    if (!g) return;
+    var tf = g.getAttribute('transform') || '';
+    var mS = /scale\(([\d.]+)\)/.exec(tf), mT = /translate\(([-\d.]+)/.exec(tf);
+    var from = mS ? parseFloat(mS[1]) : 1, to = pvMapZoom(mw), cx = mT ? parseFloat(mT[1]) : 512;
+    if (_zoomAnim) cancelAnimationFrame(_zoomAnim);
+    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    (function step(now) {
+      var k = PV_MOTION ? Math.min(1, ((now || t0) - t0) / 280) : 1;
+      k = 1 - Math.pow(1 - k, 3);
+      g.setAttribute('transform', 'translate(' + cx + ' 300) scale(' + (from + (to - from) * k).toFixed(4) + ') translate(' + (-cx) + ' -300)');
+      if (k < 1) _zoomAnim = requestAnimationFrame(step);
+    })(t0);
+  }
+
+  // ---------- Live-Vorschau Tafel (echte Linien und Ziele, Beispielzeiten) ----------
+  // Rechnet wie die Firmware (buildPanelLayout, buildUnitList): gleiche Linie hintereinander ist ein
+  // Block mit einer Nummer, eine Gruppe mit Name ein Abschnitt mit Kopfzeile, ohne Name eine
+  // wechselnde Zeile. Die Einzel-Liste verteilt den Platz je Linie und Gruppe (gleich oder nach Takt).
+  var PV_TAKT = [4, 10, 15, 7, 20, 12, 30, 8], PV_OFF = [0, 2, 4, 1, 9, 5, 13, 3];
+  function bdPrevMinCell(m, blink, late, cls) {
+    if (m === 0) return '<span class="mn zero z' + blink + (cls ? ' ' + cls : '') + ' bd-anim"></span>';
+    return '<span class="mn' + (late ? ' late' : '') + (cls ? ' ' + cls : '') + '">' + m + '</span>';
+  }
+  // Kompaktzeile wie der Lilygo: Ziel der naechsten Abfahrt. Faehrt die zweite woanders hin
+  // (Remise, Kurzfuehrung), wechselt der Zieltext alle 3 s, die gemeinte Minute ist hell.
+  // it: { mins, dd (Ziel je Abfahrt), dest, late }; bg nur fuer Zeilen ausserhalb eines Blocks
+  function pvRowNext(o, chip, it, bg) {
+    var m = it.mins.slice(0, 2), d = (it.dd || []).slice(0, 2);
+    var d0 = d[0] || it.dest, d1 = d[1] || it.dest;
+    if (m.length < 2 || d0 === d1) return pvRow(o, chip, d0, m, it.late);
+    var st = (bg && o.style) ? ' style="background:' + esc(bg) + ';color:' + badgeFg(bg) + ';"' : '';
+    function face(hi) {
+      return '<div class="bd-tb-face' + (hi === 0 ? ' on' : '') + '"' + st + '>' + chip + '<span class="ds">' + esc(hi === 0 ? d0 : d1) + '</span>' +
+        m.map(function (x, k) { return bdPrevMinCell(x, o.blink, it.late, k === hi ? 'hi' : 'dim'); }).join('') + '</div>';
+    }
+    return '<div class="bd-tb-row bd-tb-grp">' + face(0) + face(1) + '</div>';
+  }
+  function pvLineCol(line) {
+    return bdLineColor(line) || (BD.grpPairColor && BD.grpPairColor[String(line).toLowerCase()]) || '#888888';
+  }
+  // Liniennummer wie drawPanelBlock: im Stil Farbig ohne Flaeche, wenn sie der Blockfarbe gleicht.
+  // ccol null = keine Nummer, das Ziel bleibt trotzdem eingerueckt
+  function pvChip(o, txt, ccol, blockCol) {
+    if (ccol === null) return '<span class="ln none"></span>';
+    var fill = !o.style || String(ccol).toLowerCase() !== String(blockCol).toLowerCase();
+    return '<span class="ln' + (String(txt).length > 4 ? ' long' : '') + '" style="background:' + (fill ? esc(ccol) : 'transparent') +
+      ';color:' + (fill ? badgeFg(ccol) : 'inherit') + ';">' + esc(txt) + '</span>';
+  }
+  // Badge-Modus einer Gruppe: 0 keine Nummer, 1 Linienfarbe, 2 Gruppenfarbe
+  function pvBmCol(bm, lcol, gcol) { return bm === 0 ? null : (bm === 2 ? gcol : lcol); }
+  function pvRow(o, chip, dest, mins, late) {
+    return '<div class="bd-tb-row">' + chip + '<span class="ds">' + esc(dest) + '</span>' +
+      mins.map(function (m) { return bdPrevMinCell(m, o.blink, late); }).join('') + '</div>';
+  }
+  // Block = gemeinsamer Hintergrund: Farbig in der Blockfarbe, Schlicht als ruhige Zeile
+  function pvBlock(o, col, inner, cls) {
+    return '<div class="bd-tb-blk' + (cls ? ' ' + cls : '') + '"' +
+      (o.style ? ' style="background:' + esc(col) + ';color:' + badgeFg(col) + ';"' : '') + '>' + inner + '</div>';
+  }
+  // Mehrere Zeilen derselben Linie: eine Nummer mittig fuer den ganzen Block
+  function pvSpanBlock(o, line, col, rowsHtml) {
+    return pvBlock(o, col, '<div class="bd-tb-bcol">' + pvChip(o, line, col, col) + '</div><div class="bd-tb-rows">' + rowsHtml + '</div>', 'span');
+  }
+  // Gruppe ohne Name: eine Zeile, die durch ihre Richtungen wechselt
+  function pvBundle(o, items, gcol, bm, nMin) {
+    return '<div class="bd-tb-row bd-tb-grp">' + items.map(function (it, fi) {
+      var bg = gcol || it.col;
+      var ccol = bm === 0 ? null : (gcol && bm === 2 ? gcol : it.col);
+      return '<div class="bd-tb-face' + (fi === 0 ? ' on' : '') + '"' + (o.style ? ' style="background:' + esc(bg) + ';color:' + badgeFg(bg) + ';"' : '') + '>' +
+        pvChip(o, it.line, ccol, bg) + '<span class="ds">' + esc((it.dd && it.dd[0]) || it.dest) + '</span>' +
+        it.mins.slice(0, nMin).map(function (m) { return bdPrevMinCell(m, o.blink, it.late); }).join('') + '</div>';
+    }).join('') + '</div>';
+  }
+  // Kompakte Tafel: Gruppen in ihrer Reihenfolge, danach der Rest
+  function pvCompactRows(model, slots, hit) {
+    var used = {}, out = [];
+    model.forEach(function (g) {
+      var mem = [], nm = g.head ? bdCleanGroupName(g.name) : '';
+      if (nm) {
+        (g.members || []).forEach(function (m) {
+          slots.forEach(function (it) { if (!used[it.key] && hit(m, it)) { used[it.key] = 1; mem.push(it); } });
+        });
+        if (mem.length) out.push({ kind: 'sec', name: nm, col: g.color || mem[0].col, bm: g.bm, items: mem });
+        return;
+      }
+      slots.forEach(function (it) {
+        if (used[it.key] || !(g.members || []).some(function (m) { return hit(m, it); })) return;
+        used[it.key] = 1;
+        mem.push(it);
+      });
+      if (!mem.length) return;
+      if (mem.length === 1 && !g.color && g.bm === 1) out.push({ kind: 'one', items: mem });
+      else out.push({ kind: 'bundle', col: g.color || '', bm: g.bm, items: mem });
+    });
+    slots.forEach(function (it) { if (!used[it.key]) out.push({ kind: 'one', items: [it] }); });
+    return out;
+  }
+  // Einzel-Liste mit Abschnitten; null = passt nicht, die Tafel bleibt kompakt
+  function pvUnitList(model, items, hit, cfg) {
+    var taken = {}, us = [];
+    model.forEach(function (g) {
+      var nm = g.head ? bdCleanGroupName(g.name) : '';
+      var u = { named: !!nm, label: nm, bm: g.bm, col: g.color || '', line: false, deps: [] };
+      (g.members || []).forEach(function (m) {
+        items.forEach(function (it) {
+          if (taken[it.key] || !hit(m, it)) return;
+          taken[it.key] = 1;
+          if (!u.col) u.col = it.col;
+          it.mins.forEach(function (mm, k) { u.deps.push({ m: mm, it: it, dest: (it.dd && it.dd[k]) || it.dest }); });
+        });
+      });
+      if (u.deps.length) us.push(u);
+    });
+    var nG = us.length;
+    items.forEach(function (it) {
+      if (taken[it.key]) return;
+      var lk = String(it.line).toLowerCase(), u = null;
+      for (var k = nG; k < us.length; k++) if (us[k].lk === lk) { u = us[k]; break; }
+      if (!u) { u = { named: false, label: it.line, lk: lk, bm: 1, col: it.col, line: true, deps: [] }; us.push(u); }
+      it.mins.forEach(function (mm, k) { u.deps.push({ m: mm, it: it, dest: (it.dd && it.dd[k]) || it.dest }); });
+    });
+    if (!us.length) return null;
+    us.forEach(function (u) { u.deps.sort(function (a, b) { return a.m - b.m; }); });
+    if (cfg.sort === 1) us.sort(function (a, b) { return a.deps[0].m - b.deps[0].m; });
+    else us = us.slice(0, nG).concat(us.slice(nG).sort(function (a, b) {
+      return String(a.label).localeCompare(String(b.label), 'de', { numeric: true });
+    }));
+    var heads = us.filter(function (u) { return u.named; }).length;
+    // Geraet: 522 px Hoehe fuer die Tafel, Zeile 36 px (Karte mittel) bzw. 54 px (Karte klein)
+    var R = Math.floor((522 - (us.length - 1) * 6) / (cfg.lay === 0 ? 54 : 36)) - heads;
+    if (R < us.length) return null;
+    if (!cfg.force && cfg.compactCount >= R) return null;
+    us.forEach(function (u) {
+      var within = u.deps.filter(function (d) { return d.m <= 80; }).length;
+      u.cap = within || 1;
+      u.w = cfg.split ? u.cap : 1;
+      u.n = 1;
+    });
+    pvDhondt(us, R - us.length);
+    return us;
+  }
+  // Restzeilen proportional zum Gewicht verteilen (D'Hondt, wie die Firmware)
+  function pvDhondt(us, rem) {
+    for (; rem > 0; rem--) {
+      var best = -1, bv = -1;
+      for (var k = 0; k < us.length; k++) {
+        if (us[k].n >= us[k].cap) continue;
+        var v = us[k].w / (us[k].n + 1);
+        if (v > bv) { bv = v; best = k; }
+      }
+      if (best < 0) break;
+      us[best].n++;
+    }
+  }
+  function pvUnitHtml(o, u) {
+    var multi = false;
+    for (var k = 1; k < u.n && k < u.deps.length; k++) if (u.deps[k].it.line !== u.deps[0].it.line) multi = true;
+    var bind = u.named || !u.line || multi;
+    var inner = u.named ? '<div class="bd-tb-hdr">' + esc(u.label) + '</div>' : '';
+    if (u.n === 1) {   // genau eine Zeile: nur diese Einheit kompakt (Linie und zwei Minuten)
+      var g0 = u.deps[0].it;
+      var own = u.deps.filter(function (d) { return d.it === g0; }).slice(0, 2);
+      var row0 = { mins: own.map(function (d) { return d.m; }), dd: own.map(function (d) { return d.dest; }), dest: g0.dest, late: g0.late };
+      return pvBlock(o, u.col, inner + pvRowNext(o, pvChip(o, g0.line, bind ? pvBmCol(u.bm, g0.col, u.col) : u.col, u.col), row0, ''));
+    }
+    if (bind) {
+      for (var k2 = 0; k2 < u.n && k2 < u.deps.length; k2++) {
+        var e2 = u.deps[k2];
+        inner += pvRow(o, pvChip(o, e2.it.line, pvBmCol(u.bm, e2.it.col, u.col), u.col), e2.dest, [e2.m], e2.it.late);
+      }
+      return pvBlock(o, u.col, inner);
+    }
+    var rs = '';
+    for (var k3 = 0; k3 < u.n && k3 < u.deps.length; k3++) rs += pvRow(o, '', u.deps[k3].dest, [u.deps[k3].m], u.deps[k3].it.late);
+    return pvSpanBlock(o, u.deps[0].it.line, u.col, rs);
+  }
+  function pvCompactHtml(o, cRows) {
+    var body = '';
+    for (var i = 0; i < cRows.length; i++) {
+      var r = cRows[i];
+      if (r.kind === 'sec') {
+        body += pvBlock(o, r.col, '<div class="bd-tb-hdr">' + esc(r.name) + '</div>' + r.items.map(function (it) {
+          return pvRowNext(o, pvChip(o, it.line, pvBmCol(r.bm, it.col, r.col), r.col), it, '');
+        }).join(''));
+        continue;
+      }
+      if (r.kind === 'bundle') {
+        body += '<div class="bd-tb-blk bare">' + pvBundle(o, r.items, r.col, r.bm, 2) + '</div>';
+        continue;
+      }
+      // gleiche Linie direkt hintereinander: ein Block mit einer Nummer
+      var run = [r.items[0]];
+      while (i + 1 < cRows.length && cRows[i + 1].kind === 'one' && cRows[i + 1].items[0].line === r.items[0].line) { run.push(cRows[i + 1].items[0]); i++; }
+      var f0 = run[0];
+      if (run.length === 1) body += pvBlock(o, f0.col, pvRowNext(o, pvChip(o, f0.line, f0.col, f0.col), f0, ''));
+      else body += pvSpanBlock(o, f0.line, f0.col, run.map(function (it) { return pvRowNext(o, '', it, ''); }).join(''));
+    }
+    return body;
+  }
+  function bdRenderTafelPrev() {
+    var box = $('bdTafelPrev');
+    if (!box) return;
     var st = BD.state;
-    if (!st) { el.innerHTML = '<div class="bd-empty">Einstellungen erscheinen, sobald dein Display verbunden ist.</div>'; return; }
-    var pct = (st.bright + 1) * 20;
-    var html = '';
-    var btypKnown = (typeof st.btyp !== 'undefined');
-    var btypVal = btypKnown ? (parseInt(st.btyp, 10) || 0) : 0;
-    if (btypKnown) {
-      html += rowHtml('Ansicht', 'catch-it: Karte und Abfahrten im eigenen Look. &Ouml;BB, DB und SBB: originalgetreue Abfahrtsmonitore &uuml;ber das ganze Display.',
-        segHtml('btyp', ['catch-it', '&Ouml;BB', 'DB', 'SBB'], btypVal));
+    if (!st || (parseInt(st.btyp, 10) || 0) > 0) { box.innerHTML = ''; return; }
+    var light = pvPal() === PV.l;
+    var o = {
+      style: parseInt(st.style, 10) ? 1 : 0,
+      blink: (st.blink === undefined || st.blink === '') ? 2 : (parseInt(st.blink, 10) || 0),
+      dlyhl: !!+st.dlyhl
+    };
+    var sort = parseInt(st.sort, 10) || 0, lay = bdIsNum(st.lay) ? st.lay : 2;
+    var cols = parseInt(st.cols, 10) || 0, list = parseInt(st.list, 10) || 0;
+    var pairs = bdBoardPairs(), sample = false;
+    if (!pairs || !pairs.length) {
+      sample = true;
+      pairs = [{ line: 'U6', dest: 'Floridsdorf' }, { line: '13A', dest: 'Hauptbahnhof' }, { line: '49', dest: 'Hütteldorf' }, { line: '5', dest: 'Praterstern' }];
     }
-    if (typeof st.cols !== 'undefined' && btypVal === 0) {
-      html += rowHtml(btypKnown ? 'Aufteilung' : 'Ansicht', 'Karte mit Tafel, oder eine reine Abfahrten-Liste &uuml;ber das ganze Display (1 bis 3 Spalten).',
-        segHtml('cols', ['Karte + Tafel', '1-spaltig', '2-spaltig', '3-spaltig'], parseInt(st.cols, 10) || 0));
+    // Gehweg: Stationswert und Linien-Regeln aus dem Geraete-String
+    var walkSt = 0, walkLn = {};
+    var wk = bdParseWalk(st.walk);
+    Object.keys(wk).forEach(function (tok) {
+      var gt = tok.indexOf('>');
+      if (gt > 0) { var ln = tok.substring(gt + 1).toLowerCase(); walkLn[ln] = Math.max(walkLn[ln] || 0, wk[tok]); }
+      else walkSt = Math.max(walkSt, wk[tok]);
+    });
+    // Beispielzeiten mit unterschiedlichem Takt, damit Nach Takt sichtbar wird
+    var items = pairs.map(function (pr, i) {
+      var h = PV_TAKT[i % PV_TAKT.length], all = [];
+      for (var m = PV_OFF[i % PV_OFF.length]; m <= 90; m += h) all.push(m);
+      var lk = String(pr.line).toLowerCase();
+      var wmin = walkLn[lk] !== undefined ? walkLn[lk] : walkSt;
+      var mins = all.filter(function (x) { return x >= wmin; });
+      // Varianten derselben Richtung (Remise, Kurzfuehrung): jede dritte Abfahrt ab der zweiten
+      var alts = pr.alts || [];
+      var dd = mins.map(function (x, k) { return (alts.length && k % 3 === 1) ? alts[((k - 1) / 3) % alts.length] : pr.dest; });
+      return { line: pr.line, dest: pr.dest, col: pvLineCol(pr.line), late: i === 1 && o.dlyhl, key: bdPairKey(pr.line, pr.dest),
+        alts: alts, mins: mins, dd: dd };
+    }).filter(function (it) { return it.mins.length; });
+    var slots = items.slice().sort(function (a, b) {
+      if (sort === 1) return a.mins[0] - b.mins[0];
+      var c = String(a.line).localeCompare(String(b.line), 'de', { numeric: true });
+      return c || String(a.dest).localeCompare(String(b.dest), 'de');
+    });
+    var model = bdParseGroups(st.groups);
+    // Mitglied trifft die ganze Richtung, auch ueber ein Variantenziel (Auto-Expansion wie Lilygo)
+    var hit = function (m, it) {
+      if (!m.dest) return String(it.line).toLowerCase() === String(m.line).toLowerCase();
+      var mk = bdPairKey(m.line, m.dest);
+      return it.key === mk || it.alts.some(function (a) { return bdPairKey(it.line, a) === mk; });
+    };
+    var cRows = pvCompactRows(model, slots, hit), compactCount = 0;
+    cRows.forEach(function (r) { compactCount += r.kind === 'sec' ? r.items.length + 1 : 1; });
+    var units = null;
+    if (lay < 2 && cols === 0 && list !== 1 && (lay === 1 || list === 2)) {
+      units = pvUnitList(model, items, hit, { sort: sort, lay: lay, force: list === 2, compactCount: compactCount, split: parseInt(st.split, 10) ? 1 : 0 });
     }
-    html += rowHtml('Design', 'Auto folgt dem Tageslicht: hell am Tag, dunkel in der Nacht.',
-      segHtml('design', ['Dunkel', 'Hell', 'Auto'], st.design));
-    html += rowHtml('Helligkeit', '',
-      '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdBright" min="0" max="4" step="1" value="' + st.bright + '">' +
-      '<span class="bd-range-val" id="bdBrightVal">' + pct + ' %</span></div>');
-    html += rowHtml('Abfahrten-Stil', 'Farbig: jede Zeile in der Linienfarbe. Schlicht: ruhige dunkle Zeilen.',
-      segHtml('style', ['Schlicht', 'Farbig'], st.style));
-    // Abfahrten-Panel und Tafel-Position wirken nur bei grosser Karte -> nur dort zeigen
-    if (st.lay === 2) {
-      html += rowHtml('Abfahrten-Panel', 'Ecke: feste Tafel. Pop-up: Abfahrten am Karten-Zentrum. Pro Station: kleine Tafeln an jeder Station.',
-        segHtml('pstyle', ['Ecke', 'Pop-up', 'Pro Station'], st.pstyle));
+    var body = units ? units.map(function (u) { return pvUnitHtml(o, u); }).join('') : pvCompactHtml(o, cRows);
+    var stn = '';
+    var sts = allStations();
+    if (sts.length && sts[0].stopName) stn = String(sts[0].stopName).replace(/^Linz\/Donau\s+/, '');
+    var now = new Date(), clk = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+    box.innerHTML = '<div class="bd-prev"><div class="bd-tb' + (light ? ' light' : '') + (o.style ? ' farbig' : '') + '">' +
+      '<div class="bd-tb-hd"><span class="st">' + esc(stn || 'Deine Station') + '</span><span class="clk">' + clk + '</span></div>' +
+      '<div class="bd-tb-body">' + body + '</div></div>' +
+      '<div class="bd-prev-cap"><span class="bd-live"></span>Live-Vorschau <span class="sep">&middot;</span> ' +
+      (sample ? 'Beispiel-Linien, Zeiten erfunden' : 'deine Linien, Zeiten erfunden') +
+      (units ? ' <span class="sep">&middot;</span> Einzel-Liste' : '') +
+      (walkSt > 0 ? ' <span class="sep">&middot;</span> Gehweg ' + walkSt + ' min' : '') + '</div></div>';
+    var bdy = box.querySelector('.bd-tb-body');
+    if (bdy && bdy.scrollHeight > bdy.clientHeight + 2) bdy.classList.add('cut');
+  }
+
+  // ---------- Erklaer-Szenen (oeffnen sich hinter dem i) ----------
+  function pvQsScene(fn) {
+    var b = pvWith(pvBase(), { lay: 2, pstyle: 0, corner: 0, animate: false });
+    if (fn > 3) fn = 0;
+    var A, B;
+    if (fn === 0) { A = pvCatchScene(pvWith(b, { p: PV.d })); B = pvCatchScene(pvWith(b, { p: PV.l })); }
+    else if (fn === 1) { A = pvCatchScene(pvWith(b, { dly: false })); B = pvCatchScene(pvWith(b, { dly: true })); }
+    else if (fn === 2) { A = pvCatchScene(pvWith(b, { traffic: false })); B = pvCatchScene(pvWith(b, { traffic: true })); }
+    else { A = pvCatchScene(pvWith(b, { lay: 1 })); B = pvCatchScene(pvWith(b, { lay: 2 })); }
+    var lab = ['Dsg', 'Vsp', 'Vkr', 'Kar'][fn];
+    return '<div class="bd-scene-scr">' + pvSvg('<g>' + A + '</g><g class="pv-qsB">' + B + '</g>' +
+      '<rect x="894" y="496" width="114" height="74" rx="16" fill="#222831" stroke="#4a525e" stroke-width="4"/>' +
+      pvTxt(951, 545, 32, '#fff', lab, 'text-anchor="middle" font-weight="700"') +
+      '<circle class="pv-tap" cx="951" cy="533" r="50" fill="none" stroke="#fff" stroke-width="8"/>') + '</div>';
+  }
+  function pvMiniBoard(rows, cls) {
+    return '<div class="bd-tb mini' + (cls ? ' ' + cls : '') + '">' + rows.join('') + '</div>';
+  }
+  function pvMiniRow(line, dest, min, extraCls, badge, badgeCol) {
+    var col = badgeCol || bdLineColor(line) || (BD.grpPairColor && BD.grpPairColor[String(line).toLowerCase()]) || '#e2001a';
+    return '<div class="bd-tb-row' + (extraCls ? ' ' + extraCls : '') + '"><span class="ln' + (String(badge || line).length > 4 ? ' long' : '') + '" style="background:' + esc(col) + ';color:' + badgeFg(col) + ';">' + esc(badge || line) + '</span>' +
+      '<span class="ds">' + esc(dest) + '</span><span class="mn">' + min + '</span></div>';
+  }
+  // Szenen zeichnen im Abfahrten-Stil des Geraets (Schlicht oder Farbig)
+  function pvSceneOpts() {
+    return { style: (BD.state && parseInt(BD.state.style, 10)) ? 1 : 0, blink: 0, dlyhl: false };
+  }
+  // Gruppenfarbe fuer Beispiele, die sich sichtbar von der Linienfarbe abhebt
+  function pvContrastCol(col) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(col || ''));
+    if (!m) return '#eb3924';
+    var r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+    return (r > 150 && g < 120 && b < 120) ? '#17387e' : '#eb3924';
+  }
+  function pvGrpScene() {
+    var o = pvSceneOpts(), ps = BD.grpPairs || [], ex = null;
+    for (var i = 0; i < ps.length && !ex; i++)
+      for (var j = i + 1; j < ps.length; j++)
+        if (String(ps[i].line).toLowerCase() !== String(ps[j].line).toLowerCase()) { ex = [ps[i], ps[j]]; break; }
+    if (!ex) ex = [{ line: '1', dest: 'Universität' }, { line: '2', dest: 'solarCity' }];
+    var a = { line: ex[0].line, dest: ex[0].dest, col: pvLineCol(ex[0].line), mins: [3, 11] };
+    var b = { line: ex[1].line, dest: ex[1].dest, col: pvLineCol(ex[1].line), mins: [7, 18] };
+    function rowOf(it, ccol, blockCol) { return pvRow(o, pvChip(o, it.line, ccol, blockCol), it.dest, it.mins, false); }
+    var plain = pvBlock(o, a.col, rowOf(a, a.col, a.col)) + pvBlock(o, b.col, rowOf(b, b.col, b.col));
+    var swap = '<div class="bd-tb-row bd-tb-swap">' +
+      '<div class="pv-face pv-fa">' + pvBlock(o, a.col, rowOf(a, a.col, a.col)) + '</div>' +
+      '<div class="pv-face pv-fb">' + pvBlock(o, b.col, rowOf(b, b.col, b.col)) + '</div></div>';
+    var sec = pvBlock(o, a.col, '<div class="bd-tb-hdr">Zur Arbeit</div>' + rowOf(a, a.col, a.col) + rowOf(b, b.col, a.col));
+    // Badge-Varianten in einer Gruppe: das Ziel nennt die Variante
+    var gcol = pvContrastCol(b.col);
+    var bmRows = [[1, 'Linienfarbe'], [2, 'Gruppenfarbe'], [0, 'Keine']].map(function (x) {
+      return pvRow(o, pvChip(o, b.line, pvBmCol(x[0], b.col, gcol), gcol), x[1], [7], false);
+    }).join('');
+    return '<div class="bd-scene-grp">' +
+      '<div class="full"><div class="bd-scene-lb">Ohne Gruppe</div>' + pvMiniBoard([plain]) + '</div>' +
+      '<div class="bd-scene-arrow full">&darr;</div>' +
+      '<div><div class="bd-scene-lb">Eine Zeile, wechselt durch</div>' + pvMiniBoard([swap]) + '</div>' +
+      '<div><div class="bd-scene-lb">Mit &Uuml;berschrift</div>' + pvMiniBoard([sec]) + '</div>' +
+      '<div class="full bd-scene-bm"><div class="bd-scene-lb">Badges in einer Gruppe</div>' + pvMiniBoard([pvBlock(o, gcol, bmRows)]) + '</div></div>';
+  }
+  // Drei Linien fuer das Platz-Beispiel: deine, sonst Wiener Beispiele
+  function pvSplitLines() {
+    var ls = [], seen = {};
+    (BD.grpPairs || []).forEach(function (pr) {
+      var k = String(pr.line).toLowerCase();
+      if (!seen[k] && ls.length < 3) { seen[k] = 1; ls.push(pr); }
+    });
+    var sm = [{ line: 'U6', dest: 'Floridsdorf' }, { line: '13A', dest: 'Hauptbahnhof' }, { line: '49', dest: 'Hütteldorf' }];
+    for (var i = 0; i < sm.length && ls.length < 3; i++) {
+      if (seen[sm[i].line.toLowerCase()]) continue;
+      seen[sm[i].line.toLowerCase()] = 1;
+      ls.push(sm[i]);
+    }
+    return ls;
+  }
+  function pvSplitScene() {
+    var o = pvSceneOpts(), ls = pvSplitLines(), takt = [5, 15, 30], off = [1, 4, 9];
+    function board(split) {
+      var us = ls.map(function (pr, i) {
+        var deps = [];
+        for (var m = off[i]; m <= 80; m += takt[i]) deps.push(m);
+        return { pr: pr, col: pvLineCol(pr.line), deps: deps, cap: deps.length, w: split ? deps.length : 1, n: 1 };
+      });
+      pvDhondt(us, 7 - us.length);
+      return pvMiniBoard([us.map(function (u) {
+        if (u.n === 1) return pvBlock(o, u.col, pvRow(o, pvChip(o, u.pr.line, u.col, u.col), u.pr.dest, u.deps.slice(0, 2), false));
+        var rs = '';
+        for (var k = 0; k < u.n; k++) rs += pvRow(o, '', u.pr.dest, [u.deps[k]], false);
+        return pvSpanBlock(o, u.pr.line, u.col, rs);
+      }).join('')]);
+    }
+    return '<div class="bd-scene-grp">' +
+      '<div><div class="bd-scene-lb">Gleich verteilt</div>' + board(0) + '</div>' +
+      '<div><div class="bd-scene-lb">Nach Takt</div>' + board(1) + '</div></div>';
+  }
+  function pvWalkScene() {
+    var ex = (BD.grpPairs && BD.grpPairs.length >= 3) ? BD.grpPairs.slice(0, 3) : [{ line: '1', dest: 'Universität' }, { line: '2', dest: 'solarCity' }, { line: '1', dest: 'Auwiesen' }];
+    var board = pvMiniBoard([
+      pvMiniRow(ex[0].line, ex[0].dest, 2, 'pv-gone'),
+      pvMiniRow(ex[1].line, ex[1].dest, 6),
+      pvMiniRow(ex[2].line, ex[2].dest, 11)
+    ]);
+    return '<div class="bd-scene-walk"><div class="bd-walk-pill"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="13" cy="4" r="2.2" fill="currentColor"/><path d="M10.5 8.5 8 21M11 8.5l2.5 4.5 3 1.5M10.5 8.5 7 11.5v3.5M12.5 13l1 8" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>4 min zur Haltestelle</div>' + board + '</div>';
+  }
+
+  // ---------- Karte: Ansicht (Display-Typ, Aufteilung) ----------
+  function bdRenderAnsicht() {
+    var card = $('bdAnsichtCard'), el = $('bdCtlAnsicht');
+    if (!card || !el) return;
+    var st = BD.state;
+    var hasB = !!st && typeof st.btyp !== 'undefined', hasC = !!st && typeof st.cols !== 'undefined';
+    card.style.display = (hasB || hasC) ? '' : 'none';
+    if (!hasB && !hasC) { el.innerHTML = ''; return; }
+    var b = pvBase(st), bt = hasB ? (parseInt(st.btyp, 10) || 0) : 0, html = '';
+    if (hasB) {
+      html += stackRow('Display-Typ', 'catch it zeigt Karte und Abfahrten in unserem Look. &Ouml;BB, DB und SBB sind originalgetreue Abfahrtsmonitore.',
+        optCards('btyp', [
+          { label: 'catch it', svg: pvCatchScene(pvWith(b, { lay: 2, pstyle: 0, corner: 0 })) },
+          { label: '&Ouml;BB', svg: pvOebbScene() },
+          { label: 'DB', svg: pvDbScene() },
+          { label: 'SBB', svg: pvSbbScene() }
+        ], bt, 'c4'));
+    }
+    if (hasC && bt === 0) {
+      html += stackRow('Aufteilung', 'Mit Karte, oder nur Abfahrten &uuml;ber das ganze Display.',
+        optCards('cols', [
+          { label: 'Karte + Tafel', svg: pvCatchScene(pvWith(b, { lay: 1 })) },
+          { label: '1 Spalte', svg: pvListScene(b, 1) },
+          { label: '2 Spalten', svg: pvListScene(b, 2) },
+          { label: '3 Spalten', svg: pvListScene(b, 3) }
+        ], parseInt(st.cols, 10) || 0, 'c4'));
+    }
+    el.innerHTML = html;
+  }
+
+  function bdMapVisible(st) {
+    st = st || BD.state || {};
+    return !((parseInt(st.btyp, 10) || 0) > 0 || (parseInt(st.cols, 10) || 0) > 0);
+  }
+
+  // ---------- Karte: Groesse, Panel, Position, Weite, Fahrzeuge, Ebenen ----------
+  var LAYERS = [
+    { k: 'roads',   n: 'Stra&szlig;en',             h: 'Stra&szlig;ennetz im Hintergrund.' },
+    { k: 'dly',     n: 'Versp&auml;tung am Fahrzeug', h: 'Plus-Minuten direkt am Fahrzeug.' },
+    { k: 'paths',   n: 'Linienfarbe auf Route',     h: 'Strecken in Linienfarbe statt grau.' },
+    { k: 'traffic', n: 'Verkehr',                   h: 'Staus und z&auml;hen Verkehr einf&auml;rben.' }
+  ];
+  function bdRenderKarte() {
+    var card = $('bdKarteCard'), elA = $('bdCtlKarteA'), el = $('bdCtlKarte');
+    if (!card || !el || !elA) return;
+    var st = BD.state;
+    if (!st) { elA.innerHTML = ''; el.innerHTML = '<div class="bd-empty">Einstellungen erscheinen, sobald dein Display verbunden ist.</div>'; return; }
+    card.style.display = bdMapVisible(st) ? '' : 'none';
+    var b = pvBase(st), lay = b.lay, html = '';
+    html += stackRow('Kartengr&ouml;&szlig;e', '', optCards('lay', [
+      { label: 'Klein', sub: 'breite Tafel', svg: pvCatchScene(pvWith(b, { lay: 0 })) },
+      { label: 'Mittel', sub: 'schmale Tafel', svg: pvCatchScene(pvWith(b, { lay: 1 })) },
+      { label: 'Gro&szlig;', sub: 'Karte voll', svg: pvCatchScene(pvWith(b, { lay: 2 })) }
+    ], lay, 'c3'));
+    if (lay === 2) {
+      html += stackRow('Abfahrten auf der Karte', '', optCards('pstyle', [
+        { label: 'Ecke', sub: 'feste Tafel', svg: pvCatchScene(pvWith(b, { pstyle: 0 })) },
+        { label: 'Pop-up', sub: 'am Zentrum', svg: pvCatchScene(pvWith(b, { pstyle: 1 })) },
+        { label: 'Pro Station', sub: 'an jeder Station', svg: pvCatchScene(pvWith(b, { pstyle: 2 })) }
+      ], b.pstyle, 'c3'));
       var cells = ['', '', '', '', 'ctr', '', '', '', ''];
       var cellIdx = [0, 1, 2, 3, -1, 4, 5, 6, 7];
       var cornerBtns = cells.map(function (c, i) {
         if (c === 'ctr') return '<div class="ctr">Karte</div>';
         var ci = cellIdx[i];
-        return '<button type="button" data-bdcorner="' + ci + '" class="' + (st.corner === ci ? 'on' : '') + '" title="' +
+        return '<button type="button" data-bdcorner="' + ci + '" class="' + (b.corner === ci ? 'on' : '') + '" title="' +
           ['Oben links', 'Oben Mitte', 'Oben rechts', 'Mitte links', 'Mitte rechts', 'Unten links', 'Unten Mitte', 'Unten rechts'][ci] + '"></button>';
       }).join('');
-      html += rowHtml('Position der Tafel', 'Wo die Tafel auf der Karte sitzt.',
+      html += rowHtml('Position der Tafel', b.pstyle ? 'Wo die Kopfzeile mit Uhr und Wetter sitzt.' : 'Wo die Tafel auf der Karte sitzt.',
         '<div class="bd-corner" id="bdCorner">' + cornerBtns + '</div>');
     }
-    html += rowHtml('Schnellschalter-Ecke', 'Ein Fingertipp auf die Display-Ecke schaltet diese Funktion direkt um.',
-      segHtml('qsfn', ['Design', 'Versp&auml;tung', 'Verkehr', 'Karte', 'Aus'], st.qsfn));
-    el.innerHTML = html;
-  }
-
-  var LAYERS = [
-    { k: 'roads',   n: 'Stra&szlig;en',             h: 'Stra&szlig;ennetz als Hintergrund der Karte.' },
-    { k: 'dly',     n: 'Versp&auml;tung am Zug',    h: 'Kleine Plus-Minuten-Labels an den Fahrzeugen.' },
-    { k: 'paths',   n: 'Linienfarbe auf Route',     h: 'Strecken in der Linienfarbe statt grau.' },
-    { k: 'traffic', n: 'Verkehr',                   h: 'Verkehrslage auf den Stra&szlig;en.' }
-  ];
-  function bdRenderKarte() {
-    var el = $('bdCtlKarte');
-    if (!el) return;
-    var st = BD.state;
-    if (!st) { el.innerHTML = '<div class="bd-empty">Einstellungen erscheinen, sobald dein Display verbunden ist.</div>'; return; }
-    var html = '';
-    html += rowHtml('Kartengr&ouml;&szlig;e', 'Klein und Mittel: Tafel links neben der Karte. Gro&szlig;: Karte &uuml;ber das ganze Display.',
-      segHtml('lay', ['Klein', 'Mittel', 'Gro&szlig;'], st.lay));
-    // Kartenweite: wie viele Meter Stadt sichtbar sind (Firmware-Key mapw, 500 bis 1000)
+    elA.innerHTML = html;
     var mw = bdIsNum(st.mapw) ? Math.min(1000, Math.max(500, st.mapw)) : 600;
-    html += rowHtml('Kartenweite', '500 m: nah ans Zentrum gezoomt. 1000 m: viel Stadt im Blick. Nach dem Vergrößern lädt die Karte ihre Ränder in wenigen Minuten nach.',
+    var h2 = rowHtml('Kartenweite', 'Wie viel Stadt rund ums Zentrum zu sehen ist. Nach dem Vergr&ouml;&szlig;ern l&auml;dt die Karte ihre R&auml;nder in wenigen Minuten nach.',
       '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdMapW" min="500" max="1000" step="50" value="' + mw + '">' +
       '<span class="bd-range-val" id="bdMapWVal">' + mw + ' m</span></div>');
+    if (typeof st.vbig !== 'undefined') {
+      // vnum (eigener Schalter) gibt es erst mit neuer Firmware; davor haengt die Nummer an Gross
+      var hasVnum = typeof st.vnum !== 'undefined';
+      var smallV = pvCatchScene(pvWith(b, { lay: 2, pstyle: 0, corner: 2, vbig: false, vnum: hasVnum && b.vnum, zoom: 1.35 }));
+      var bigV = pvCatchScene(pvWith(b, { lay: 2, pstyle: 0, corner: 2, vbig: true, vnum: hasVnum ? b.vnum : true, zoom: 1.35 }));
+      h2 += stackRow('Fahrzeuge', '', optCards('vbig', [
+        { label: 'Standard', svg: smallV },
+        { label: hasVnum ? 'Gro&szlig;' : 'Gro&szlig; mit Liniennummer', svg: bigV }
+      ], st.vbig ? 1 : 0, 'c2'));
+      if (hasVnum) {
+        h2 += rowHtml('Liniennummer im Fahrzeug', 'Zeigt die Liniennummer direkt im Tropfen auf der Karte.',
+          switchHtml('vnum', b.vnum), 'bd-keep');
+      }
+    }
     var ly = st.layers || {};
     LAYERS.forEach(function (d) {
-      html += rowHtml(d.n, d.h, switchHtml(d.k, !!ly[d.k]), 'bd-keep');
+      h2 += rowHtml(d.n, d.h, switchHtml(d.k, !!+ly[d.k]), 'bd-keep');
     });
-    el.innerHTML = html;
+    el.innerHTML = h2;
+    bdRenderMapPrev();
   }
 
   function bdRenderNacht() {
@@ -25453,7 +26333,35 @@ window.addEventListener('DOMContentLoaded', () => {
     el.innerHTML = html;
   }
 
-  // ---------- Rendering: Abfahrten-Tafel (sort / dlyhl / win / walk) ----------
+  // ---------- Anzeige: Design, Helligkeit, Schnellschalter ----------
+  function bdRenderAnzeige() {
+    var el = $('bdCtlAnzeige');
+    if (!el) return;
+    var st = BD.state;
+    if (!st) { el.innerHTML = '<div class="bd-empty">Einstellungen erscheinen, sobald dein Display verbunden ist.</div>'; return; }
+    var b = pvWith(pvBase(st), { lay: 2, pstyle: 0, corner: 0 });
+    var html = stackRow('Design', '', optCards('design', [
+      { label: 'Dunkel', svg: pvCatchScene(pvWith(b, { p: PV.d })) },
+      { label: 'Hell', svg: pvCatchScene(pvWith(b, { p: PV.l })) },
+      { label: 'Auto', sub: 'folgt dem Tageslicht', svg: pvAutoScene(b) }
+    ], parseInt(st.design, 10) || 0, 'c3'));
+    var pct = (st.bright + 1) * 20;
+    html += rowHtml('Helligkeit', '',
+      '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdBright" min="0" max="4" step="1" value="' + st.bright + '">' +
+      '<span class="bd-range-val" id="bdBrightVal">' + pct + ' %</span></div>');
+    var qs = parseInt(st.qsfn, 10);
+    if (isNaN(qs)) qs = 4;
+    var qsNames = ['das Design', 'die Versp&auml;tungen', 'den Verkehr', 'die Kartengr&ouml;&szlig;e'];
+    html += '<div class="bd-row bd-stack"><div class="bd-label"><div class="name">Schnellschalter' + infoBtn('qs') + '</div>' +
+      '<div class="hint">Ein Tipp aufs kleine Feld unten rechts am Display schaltet die gew&auml;hlte Funktion um, ohne Men&uuml;.</div></div>' +
+      segHtml('qsfn', ['Design', 'Versp&auml;tung', 'Verkehr', 'Karte', 'Aus'], qs) + '</div>';
+    html += infoPanel('qs', pvQsScene(qs),
+      qs < 4 ? ('Ein Tipp aufs Feld unten rechts schaltet ' + qsNames[qs] + ' um, ein zweiter Tipp wieder zur&uuml;ck.')
+             : 'W&auml;hle oben eine Funktion. Dann erscheint unten rechts am Display ein kleines Feld, und ein Tipp darauf schaltet sie direkt um. Hier siehst du das Beispiel Design.');
+    el.innerHTML = html;
+  }
+
+  // ---------- Abfahrten-Tafel ----------
   // Jedes Control erscheint nur, wenn die Firmware den Key in /api/state liefert;
   // auf alter Firmware bleibt die ganze Karte unsichtbar.
   function bdRenderTafel(force) {
@@ -25465,163 +26373,253 @@ window.addEventListener('DOMContentLoaded', () => {
                         typeof st.blink !== 'undefined' || typeof st.list !== 'undefined');
     card.style.display = hasAny ? '' : 'none';
     if (!hasAny) return;
+    bdRenderTafelPrev();
     // Nicht neu bauen, waehrend der User gerade in einem Tafel-Feld tippt
-    // (force = bewusste Editor-Aktion wie "+ Gruppe", die trotz Fokus neu baut)
+    // (force = bewusste Editor-Aktion, die trotz Fokus neu baut)
     var ae = document.activeElement;
     if (!force && ae && el.contains(ae) && (ae.hasAttribute && (ae.hasAttribute('data-bdwalk') ||
-        ae.hasAttribute('data-bdwalkline') || ae.hasAttribute('data-bdgrp') ||
-        ae.hasAttribute('data-bdgrpname') || ae.hasAttribute('data-bdgrpcolor') ||
+        ae.hasAttribute('data-bdwalkline') || ae.hasAttribute('data-bdgrpname') || ae.hasAttribute('data-bdgrpcolor') ||
         (ae.classList && ae.classList.contains('bd-wlsel'))))) return;
     var html = '';
     if (typeof st.sort !== 'undefined') {
-      html += rowHtml('Sortierung', 'Nach Linie: Zeilen nach U-Bahn, Tram und Bus geordnet. Nach Zeit: n&auml;chste Abfahrt zuerst.',
+      html += rowHtml('Sortierung', 'Nach Linie: feste Reihenfolge. Nach Zeit: n&auml;chste Abfahrt oben.',
         segHtml('sort', ['Nach Linie', 'Nach Zeit'], parseInt(st.sort, 10) || 0));
     }
     if (typeof st.blink !== 'undefined') {
-      var bv = parseInt(st.blink, 10); if (isNaN(bv)) bv = 2;
-      html += rowHtml('Einfahrt (0 Minuten)', 'Wie die Tafel eine einfahrende Abfahrt zeigt: gelbe 0, blinkende 0 oder das springende Quadrat wie beim kleinen catch it.',
-        segHtml('blink', ['Gelbe 0', 'Blinkende 0', 'Quadrat'], bv));
+      var bv = parseInt(st.blink, 10);
+      if (isNaN(bv)) bv = 2;
+      html += rowHtml('Einfahrt (0 Minuten)', 'So zeigt die Tafel eine Abfahrt, die gerade einf&auml;hrt.',
+        '<div class="bd-seg" data-bdseg="blink">' + ['Gelbe 0', 'Blinkende 0', 'Quadrat'].map(function (t, i) {
+          return '<button type="button" data-v="' + i + '" class="bd-zbtn' + (i === bv ? ' on' : '') + '"><span class="bd-zero z' + i + ' bd-anim"></span>' + t + '</button>';
+        }).join('') + '</div>');
     }
-    if (typeof st.list !== 'undefined' && (parseInt(st.lay, 10) || 0) < 2) {
-      html += rowHtml('Tafel-Liste', 'Automatisch: kurze Listen werden mit den n&auml;chsten Abfahrten aufgef&uuml;llt, lange bleiben kompakt mit zwei Minuten-Spalten.',
-        segHtml('list', ['Automatisch', 'Kompakt', 'Einzel-Abfahrten'], parseInt(st.list, 10) || 0));
+    if (typeof st.list !== 'undefined' && (parseInt(st.lay, 10) || 0) < 2 && (parseInt(st.cols, 10) || 0) === 0) {
+      html += rowHtml('Tafel-Liste', 'Kompakt: eine Zeile pro Richtung mit zwei Zeiten. Einzeln: jede Abfahrt eine Zeile. Automatisch: kurze Listen werden aufgef&uuml;llt.',
+        segHtml('list', ['Automatisch', 'Kompakt', 'Einzeln'], parseInt(st.list, 10) || 0));
     }
+    // Platz je Linie und Gruppe: nur wo das Geraet die Einzel-Liste baut (Karte mittel, oder Einzeln erzwungen)
+    var layT = parseInt(st.lay, 10) || 0, listT = parseInt(st.list, 10) || 0;
+    if (typeof st.split !== 'undefined' && (parseInt(st.btyp, 10) || 0) === 0 && (parseInt(st.cols, 10) || 0) === 0 &&
+        layT < 2 && listT !== 1 && (layT === 1 || listT === 2)) {
+      var sl = pvSplitLines();
+      html += '<div class="bd-row bd-stack"><div class="bd-label"><div class="name">Platz je Linie und Gruppe' + infoBtn('split') + '</div>' +
+        '<div class="hint">In der Einzel-Liste bekommt jede Linie und jede Gruppe einen eigenen Abschnitt.</div></div>' +
+        segHtml('split', ['Gleich verteilt', 'Nach Takt'], parseInt(st.split, 10) ? 1 : 0) + '</div>';
+      html += infoPanel('split', pvSplitScene(),
+        'Beispiel: ' + esc(sl[0].line) + ' f&auml;hrt alle 5 Minuten, ' + esc(sl[1].line) + ' alle 15 und ' + esc(sl[2].line) + ' alle 30. ' +
+        'Gleich verteilt: jede Linie und jede Gruppe bekommt gleich viele Zeilen. Nach Takt: was oft f&auml;hrt, bekommt mehr Zeilen. ' +
+        'Bekommt eine Linie nur eine Zeile, zeigt sie kompakt die n&auml;chsten zwei Abfahrten.');
+    }
+    html += rowHtml('Abfahrten-Stil', 'Farbig: Zeilen in Linienfarbe. Schlicht: ruhige Zeilen, farbige Nummer.',
+      segHtml('style', ['Schlicht', 'Farbig'], parseInt(st.style, 10) ? 1 : 0));
     if (typeof st.dlyhl !== 'undefined') {
-      html += rowHtml('Versp&auml;tung hervorheben', 'Versp&auml;tete Abfahrten zeigen ihre Minuten in Orange.',
-        switchHtml('dlyhl', !!+st.dlyhl), 'bd-keep');
+      var dl = !!+st.dlyhl;
+      html += rowHtml('Versp&auml;tung hervorheben', 'Versp&auml;tete Minuten in Orange.',
+        '<div class="bd-inline"><span class="bd-minichip' + (dl ? ' late' : '') + '">7</span>' + switchHtml('dlyhl', dl) + '</div>', 'bd-keep');
     }
-    if (typeof st.groups !== 'undefined') {
-      html += '<div class="bd-label" style="margin:14px 0 8px;">' +
-        '<div class="name">Zeilen-Gruppen</div>' +
-        '<div class="hint">Fasse Linien und Richtungen zu einer Tafel-Zeile zusammen: sie teilen sich die Zeile und wechseln alle paar Sekunden durch. Optional mit Namen (z. B. Richtung HBF) und eigener Farbe. Die Reihenfolge hier ist die Reihenfolge auf der Tafel.</div></div>';
-      var model = BD.grpEdit || bdParseGroups(st.groups);
-      var selKeys = Object.keys(BD.grpSel || {});
-      html += model.map(function (g, gi) {
-        var hasCol = /^#[0-9a-fA-F]{6}$/.test(g.color || '');
-        var mem = (g.members || []).map(function (m, mi) {
-          return bdPairChip(m.line, m.dest, 'in', 'data-bdgrpmemrm="' + gi + ':' + mi + '"');
-        }).join('');
-        return '<div class="bd-grp">' +
-          '<div class="bd-grp-row">' +
-          '<input type="text" class="bd-input" data-bdgrpname="' + gi + '" maxlength="24" value="' + esc(g.name || '') + '" placeholder="Name der Zeile (optional)">' +
-          '<label class="bd-grp-color" title="Farbe der Zeile"' + (hasCol ? ' style="background:' + esc(g.color) + ';"' : '') + '>' +
-          '<input type="color" data-bdgrpcolor="' + gi + '" data-auto="' + (hasCol ? '0' : '1') + '" value="' + (hasCol ? esc(g.color) : '#eb3924') + '">' +
-          '<span>' + (hasCol ? '' : 'Farbe') + '</span></label>' +
-          (hasCol ? '<button type="button" class="bd-grp-btn" data-bdgrpcolorreset="' + gi + '" title="Farbe wie die Linie">&#8634;</button>' : '') +
-          '<button type="button" class="bd-grp-btn del" data-bdgrpdel="' + gi + '" title="Zeile l&ouml;schen">&times;</button>' +
-          '</div>' +
-          '<div class="bd-grp-row" style="align-items:flex-start;">' +
-          '<div class="bd-grp-members">' + (mem || '<span class="bd-grp-empty">Noch leer: unten Linien antippen und hier hinzuf&uuml;gen.</span>') + '</div>' +
-          '<button type="button" class="bd-grp-btn" data-bdgrpmove="' + gi + ':-1" title="Nach oben">&uarr;</button>' +
-          '<button type="button" class="bd-grp-btn" data-bdgrpmove="' + gi + ':1" title="Nach unten">&darr;</button>' +
-          '</div>' +
-          (selKeys.length ? '<button type="button" class="bd-dirs-link" data-bdgrpaddsel="' + gi + '" style="margin:0 0 8px;">+ Ausgew&auml;hlte hier hinzuf&uuml;gen</button>' : '') +
-          '</div>';
-      }).join('');
-      // Pool: alle Linie+Ziel-Kombinationen der Tafel, die noch in keiner Zeile stecken
-      var pairs = bdVisiblePairs(model);
-      BD.grpPairMap = {};
-      html += '<div class="bd-label" style="margin:10px 0 0;"><div class="name" style="font-size:13px;">Linien und Richtungen</div>' +
-        '<div class="hint">Antippen zum Ausw&auml;hlen, dann zu einer Zeile zusammenfassen.</div></div>';
-      if (pairs === null) {
-        html += '<div class="bd-empty" style="margin-top:8px;">Lade Linien und Richtungen &hellip;</div>';
-      } else if (!pairs.length) {
-        html += '<div class="bd-empty" style="margin-top:8px;">Alle Linien stecken schon in einer Zeile, oder gerade f&auml;hrt nichts.</div>';
-      } else {
-        html += '<div class="bd-pairs">' + pairs.map(function (pr) {
-          var k = bdPairKey(pr.line, pr.dest);
-          BD.grpPairMap[k] = pr;
-          return bdPairChip(pr.line, pr.dest, (BD.grpSel && BD.grpSel[k]) ? 'on' : '', 'data-bdpair="' + esc(k) + '"');
-        }).join('') + '</div>';
-        html += '<div class="bd-pair-actions"><button type="button" class="bd-addr-btn" data-bdgrpmake="1"' + (selKeys.length ? '' : ' disabled') + '>' +
-          (selKeys.length ? 'Zu einer Zeile zusammenfassen (' + selKeys.length + ')' : 'Zu einer Zeile zusammenfassen') + '</button></div>';
-      }
-    }
-    if (typeof st.walk !== 'undefined') {
-      html += '<div class="bd-label" style="margin:14px 0 2px;">' +
-        '<div class="name">Gehweg zur Haltestelle</div>' +
-        '<div class="hint">Abfahrten, die du nicht mehr erreichst, blendet die Tafel aus. 0 = kein Filter, maximal 15 Minuten.</div></div>';
-      var tokMin = bdParseWalk(st.walk);
-      var stationMin = {}, lineRules = [];
-      Object.keys(tokMin).forEach(function (tok) {
-        var gt = tok.indexOf('>');
-        if (gt > 0) lineRules.push({ rbl: tok.substring(0, gt), line: tok.substring(gt + 1), min: tokMin[tok] });
-        else stationMin[tok] = tokMin[tok];
-      });
-      var byKey = {}, order = [];
-      allStations().forEach(function (s) {
-        var key = bdGroupKey(s);
-        if (!byKey[key]) { byKey[key] = { name: s.stopName || s.fullId, sts: [] }; order.push(key); }
-        byKey[key].sts.push(s);
-      });
-      // Linien-Regeln: Draft im Editor hat Vorrang, sonst Stand vom Geraet
-      var wl = BD.walkLines;
-      if (wl === null) {
-        wl = [];
-        order.forEach(function (key) {
-          var toks = bdTokensFromString(bdRblsOf(byKey[key].sts));
-          var perLine = {};
-          lineRules.forEach(function (r) {
-            if (toks.indexOf(r.rbl) < 0) return;
-            var k2 = r.line.toLowerCase();
-            if (!perLine[k2] || r.min > perLine[k2].min) perLine[k2] = { key: key, line: r.line, min: r.min };
-          });
-          Object.keys(perLine).forEach(function (k2) { wl.push(perLine[k2]); });
-        });
-      }
-      var lineOpts = ((st.lines || []).map(function (l) { return l.n; }));
-      function wlRow(entry, idx) {
-        var opts = '<option value="">Linie &hellip;</option>' + lineOpts.map(function (n) {
-          return '<option value="' + esc(n) + '"' + (n === entry.line ? ' selected' : '') + '>' + esc(n) + '</option>';
-        }).join('');
-        if (entry.line && lineOpts.indexOf(entry.line) < 0) {
-          opts += '<option value="' + esc(entry.line) + '" selected>' + esc(entry.line) + '</option>';
-        }
-        return '<div class="bd-row bd-keep bd-walkline" data-bdwlkey="' + esc(entry.key) + '">' +
-          '<div class="bd-label" style="flex:0 0 auto;"><div class="hint" style="margin:0;">abweichend f&uuml;r</div></div>' +
-          '<div class="bd-nighttimes"><select class="bd-time bd-wlsel">' + opts + '</select>' +
-          '<input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + (entry.min || 0) + '" data-bdwalkline="1"> min' +
-          '<button type="button" class="bd-grp-btn del" data-bdwldel="' + idx + '" title="Regel entfernen">&times;</button></div>' +
-          '</div>';
-      }
-      if (!order.length) {
-        html += '<div class="bd-empty">Die Stationen erscheinen hier, sobald dein Display verbunden ist.</div>';
-      } else {
-        var wlIdx = 0;
-        html += order.map(function (key) {
-          var g = byKey[key];
-          var val = 0;
-          bdTokensFromString(bdRblsOf(g.sts)).forEach(function (tok) {
-            if (stationMin[tok] && stationMin[tok] > val) val = stationMin[tok];
-          });
-          var out = '<div class="bd-row bd-keep">' +
-            '<div class="bd-label"><div class="name" style="font-weight:600;">' + esc(g.name) + '</div></div>' +
-            '<div class="bd-nighttimes"><input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + val + '" data-bdwalk="' + esc(key) + '"> min</div>' +
-            '</div>';
-          wl.forEach(function (entry) {
-            if (entry.key !== key) return;
-            out += wlRow(entry, wlIdx);
-            wlIdx++;
-          });
-          out += '<div style="margin:-4px 0 10px;"><button type="button" class="bd-dirs-link" data-bdwladd="' + esc(key) + '">+ Pro Linie abweichend</button></div>';
-          return out;
-        }).join('');
-      }
-    }
+    if (typeof st.groups !== 'undefined') html += bdGroupsSection(st);
+    if (typeof st.walk !== 'undefined') html += bdWalkSection(st);
     el.innerHTML = html;
   }
 
+  // ---------- Zeilen-Gruppen im Stil des Lilygo-Feintunings ----------
+  function bdIsGroupBox(g) {
+    return (g.members || []).length >= 2 || !!g.head || g.bm === 0 || g.bm === 2 || /^#[0-9a-fA-F]{6}$/.test(g.color || '');
+  }
+  function bdGOpt(label, inner) {
+    return '<div class="bd-gopt"><span class="bd-gopt-lb">' + label + '</span>' + inner + '</div>';
+  }
+  function bdGSeg(attr, gi, opts, cur) {
+    return '<div class="bd-seg sm">' + opts.map(function (o2) {
+      return '<button type="button" data-' + attr + '="' + gi + ':' + o2[0] + '" class="' + (cur === o2[0] ? 'on' : '') + '">' + o2[1] + '</button>';
+    }).join('') + '</div>';
+  }
+  // Alle Tafel-Zeilen in Anzeige-Reihenfolge: Segmente (Gruppen + gepinnte Einzelzeilen), danach der Rest
+  function bdOrderRows(model, pairsAll) {
+    var rows = [], used = {};
+    model.forEach(function (g, gi) {
+      if (!(g.members || []).length) return;
+      g.members.forEach(function (m) { used[m.dest ? bdPairKey(m.line, m.dest) : 'L:' + String(m.line).toLowerCase()] = 1; });
+      rows.push({ seg: gi, group: bdIsGroupBox(g), name: g.head ? bdCleanGroupName(g.name) : '', color: g.color, members: g.members });
+    });
+    (pairsAll || []).forEach(function (pr) {
+      if (used[bdPairKey(pr.line, pr.dest)] || used['L:' + String(pr.line).toLowerCase()]) return;
+      rows.push({ seg: -1, group: false, members: [{ line: pr.line, dest: pr.dest }] });
+    });
+    return rows;
+  }
+  function bdGroupsSection(st) {
+    var model = BD.grpEdit || bdParseGroups(st.groups);
+    var html = '<div class="bd-sec"><div class="bd-label"><div class="name">Zeilen-Gruppen' + infoBtn('grp') + '</div>' +
+      '<div class="hint">Fasse Richtungen zusammen: als Zeile, die durchwechselt, oder als Abschnitt mit &Uuml;berschrift.</div></div>';
+    html += infoPanel('grp', pvGrpScene(),
+      'Eine Zeile: die Richtungen teilen sich eine Tafel-Zeile und wechseln alle paar Sekunden. Mit &Uuml;berschrift: der Name steht als Kopfzeile &uuml;ber der Gruppe, darunter hat jede Richtung ihre eigene Zeile. ' +
+      'Die Gruppenfarbe f&auml;rbt im Stil Farbig die ganze Gruppe. Bei den Badges w&auml;hlst du, ob die Liniennummer in Linienfarbe, in Gruppenfarbe oder gar nicht erscheint.');
+    // Badges pro Gruppe (~N im Gruppen-String) kann erst die Firmware, die auch split meldet
+    var boxNo = 0, canBm = typeof st.split !== 'undefined';
+    model.forEach(function (g, gi) {
+      if (!bdIsGroupBox(g)) return;
+      boxNo++;
+      var hasCol = /^#[0-9a-fA-F]{6}$/.test(g.color || '');
+      var nm = bdCleanGroupName(g.name), bm = (g.bm === 0 || g.bm === 2) ? g.bm : 1;
+      html += '<div class="bd-gbox">' +
+        '<div class="bd-gbox-hd"><span class="bd-gbox-title">Gruppe ' + boxNo + (g.head && nm ? ': ' + esc(nm) : '') + '</span>' +
+        '<button type="button" class="bd-gbox-del" data-bdgrpdel="' + gi + '">L&ouml;schen</button></div>' +
+        '<div class="bd-gbox-bd">' +
+        (g.members || []).map(function (m, mi) { return bdPairChip(m.line, m.dest, 'in', 'data-bdgrpmemrm="' + gi + ':' + mi + '"'); }).join('') +
+        '</div><div class="bd-gbox-opts">' +
+        bdGOpt('Darstellung', bdGSeg('bdghead', gi, [['0', 'Eine Zeile'], ['1', 'Mit &Uuml;berschrift']], g.head ? '1' : '0')) +
+        (g.head ? bdGOpt('', '<input type="text" class="bd-input" data-bdgrpname="' + gi + '" maxlength="24" value="' + esc(g.name || '') + '" placeholder="&Uuml;berschrift, z. B. Richtung HBF">') : '') +
+        bdGOpt('Gruppenfarbe', bdGSeg('bdgcol', gi, [['line', 'Wie die Linie'], ['own', 'Eigene']], hasCol ? 'own' : 'line') +
+          (hasCol ? '<label class="bd-grp-color sm" title="Gruppenfarbe w&auml;hlen" style="background:' + esc(g.color) + ';">' +
+            '<input type="color" data-bdgrpcolor="' + gi + '" data-auto="0" value="' + esc(g.color) + '"><span></span></label>' : '')) +
+        (canBm ? bdGOpt('Badges', bdGSeg('bdgbm', gi, [['1', 'Linienfarbe'], ['2', 'Gruppenfarbe'], ['0', 'Keine']], String(bm))) : '') +
+        '</div></div>';
+    });
+    var all = bdBoardPairs();
+    var pool = bdVisiblePairs(model);
+    BD.grpPairMap = {};
+    (all || []).forEach(function (pr) { BD.grpPairMap[bdPairKey(pr.line, pr.dest)] = pr; });
+    var sel = (BD.grpSel || []).filter(function (k) { return BD.grpPairMap[k]; });
+    BD.grpSel = sel;
+    if (BD.grpCreating) {
+      html += '<div class="bd-gbox creating"><div class="bd-gbox-hd cr">Neue Gruppe (' + sel.length + ' ausgew&auml;hlt)</div>' +
+        '<div class="bd-gbox-bd">' + (sel.length ? sel.map(function (k) {
+          var pr = BD.grpPairMap[k];
+          return bdPairChip(pr.line, pr.dest, 'on', 'data-bdpair="' + esc(k) + '"');
+        }).join('') : '<span class="bd-gbox-hint">Tippe unten mindestens 2 Richtungen an.</span>') + '</div>' +
+        '<div class="bd-gbox-act"><button type="button" class="bd-gbtn" data-bdgrpcancel="1">Abbrechen</button>' +
+        '<button type="button" class="bd-gbtn pri" data-bdgrpmake="1"' + (sel.length < 2 ? ' disabled' : '') + '>Gruppe erstellen</button></div></div>';
+    } else if (pool && pool.length >= 2) {
+      html += '<button type="button" class="bd-gnew" data-bdgrpstart="1">+ Neue Gruppe erstellen</button>';
+    }
+    html += '<div class="bd-gpool"><div class="bd-gpool-hd">Verf&uuml;gbare Richtungen</div>';
+    if (pool === null) html += '<div class="bd-gpool-empty">Lade Linien und Richtungen &hellip;</div>';
+    else {
+      var free = pool.filter(function (pr) { return sel.indexOf(bdPairKey(pr.line, pr.dest)) < 0; });
+      if (!free.length) html += '<div class="bd-gpool-empty">' + (pool.length ? 'Alle Richtungen sind ausgew&auml;hlt.' : 'Alle Richtungen sind gruppiert.') + '</div>';
+      else html += '<div class="bd-pairs">' + free.map(function (pr) {
+        return bdPairChip(pr.line, pr.dest, '', 'data-bdpair="' + esc(bdPairKey(pr.line, pr.dest)) + '"' +
+          (pr.alts && pr.alts.length ? ' title="Enth&auml;lt auch: ' + esc(pr.alts.join(', ')) + '"' : ''));
+      }).join('') + '</div>';
+    }
+    html += '</div>';
+    // Reihenfolge aller Tafel-Zeilen (nur bei Sortierung nach Linie sinnvoll)
+    var rows = bdOrderRows(model, all || []);
+    if (all !== null && rows.length >= 2) {
+      if ((parseInt(st.sort, 10) || 0) === 0) {
+        html += '<div class="bd-label" style="margin:16px 0 6px;"><div class="name" style="font-size:13px;">Reihenfolge auf der Tafel</div><div class="hint">Zeile 1 steht ganz oben.</div></div>';
+        html += '<div class="bd-order">' + rows.map(function (r, i) {
+          var badges = (r.name ? '<span class="bd-order-name">' + esc(r.name) + '</span>' : '') + r.members.map(function (m) {
+            var c = pvLineCol(m.line);
+            return '<span class="bd-pair-badge" style="background:' + esc(c) + ';color:' + badgeFg(c) + ';">' + esc(m.line) + '</span>';
+          }).join('<span class="bd-order-plus">+</span>');
+          var dests = [];
+          r.members.forEach(function (m) { var d = m.dest || 'alle Richtungen'; if (dests.indexOf(d) < 0) dests.push(d); });
+          return '<div class="bd-order-row' + (r.group ? ' grp' : '') + '"><span class="bd-order-nr">' + (i + 1) + '</span>' +
+            '<span class="bd-order-badges">' + badges + '</span><span class="bd-order-sub">&rsaquo; ' + esc(dests.join(', ')) + '</span>' +
+            '<span class="bd-order-btns"><button type="button" class="bd-grp-btn" data-bdordmove="' + i + ':-1"' + (i === 0 ? ' disabled' : '') + ' title="Nach oben">&#9650;</button>' +
+            '<button type="button" class="bd-grp-btn" data-bdordmove="' + i + ':1"' + (i === rows.length - 1 ? ' disabled' : '') + ' title="Nach unten">&#9660;</button></span></div>';
+        }).join('') + '</div>';
+      } else {
+        html += '<div class="bd-gpool-empty" style="margin-top:10px;">Die Reihenfolge der Zeilen stellst du bei Sortierung Nach Linie ein.</div>';
+      }
+    }
+    return html + '</div>';
+  }
+
+  // ---------- Gehweg ----------
+  function bdWalkSection(st) {
+    var html = '<div class="bd-sec"><div class="bd-label"><div class="name">Gehweg zur Haltestelle' + infoBtn('walk') + '</div>' +
+      '<div class="hint">Was du zu Fu&szlig; nicht mehr schaffst, verschwindet von der Tafel. 0 = kein Filter, maximal 15 Minuten.</div></div>';
+    html += infoPanel('walk', pvWalkScene(),
+      'Bei 4 Minuten Gehweg verschwinden Abfahrten, die in weniger als 4 Minuten fahren, die schaffst du eh nicht mehr. Auf der Karte fahren die Fahrzeuge trotzdem weiter. Pro Linie kannst du abweichende Zeiten setzen, z. B. wenn ein Steig weiter weg liegt.');
+    var tokMin = bdParseWalk(st.walk);
+    var stationMin = {}, lineRules = [];
+    Object.keys(tokMin).forEach(function (tok) {
+      var gt = tok.indexOf('>');
+      if (gt > 0) lineRules.push({ rbl: tok.substring(0, gt), line: tok.substring(gt + 1), min: tokMin[tok] });
+      else stationMin[tok] = tokMin[tok];
+    });
+    var byKey = {}, order = [];
+    allStations().forEach(function (s) {
+      var key = bdGroupKey(s);
+      if (!byKey[key]) { byKey[key] = { name: s.stopName || s.fullId, sts: [] }; order.push(key); }
+      byKey[key].sts.push(s);
+    });
+    // Linien-Regeln: Draft im Editor hat Vorrang, sonst Stand vom Geraet
+    var wl = BD.walkLines;
+    if (wl === null) {
+      wl = [];
+      order.forEach(function (key) {
+        var toks = bdTokensFromString(bdRblsOf(byKey[key].sts));
+        var perLine = {};
+        lineRules.forEach(function (r) {
+          if (toks.indexOf(r.rbl) < 0) return;
+          var k2 = r.line.toLowerCase();
+          if (!perLine[k2] || r.min > perLine[k2].min) perLine[k2] = { key: key, line: r.line, min: r.min };
+        });
+        Object.keys(perLine).forEach(function (k2) { wl.push(perLine[k2]); });
+      });
+    }
+    var lineOpts = ((st.lines || []).map(function (l) { return l.n; }));
+    function wlRow(entry, idx) {
+      var opts = '<option value="">Linie &hellip;</option>' + lineOpts.map(function (n) {
+        return '<option value="' + esc(n) + '"' + (n === entry.line ? ' selected' : '') + '>' + esc(n) + '</option>';
+      }).join('');
+      if (entry.line && lineOpts.indexOf(entry.line) < 0) {
+        opts += '<option value="' + esc(entry.line) + '" selected>' + esc(entry.line) + '</option>';
+      }
+      return '<div class="bd-row bd-keep bd-walkline" data-bdwlkey="' + esc(entry.key) + '">' +
+        '<div class="bd-label" style="flex:0 0 auto;"><div class="hint" style="margin:0;">abweichend f&uuml;r</div></div>' +
+        '<div class="bd-nighttimes"><select class="bd-time bd-wlsel">' + opts + '</select>' +
+        '<input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + (entry.min || 0) + '" data-bdwalkline="1"> min' +
+        '<button type="button" class="bd-grp-btn del" data-bdwldel="' + idx + '" title="Regel entfernen">&times;</button></div>' +
+        '</div>';
+    }
+    if (!order.length) {
+      html += '<div class="bd-empty">Die Stationen erscheinen hier, sobald dein Display verbunden ist.</div>';
+    } else {
+      var wlIdx = 0;
+      html += order.map(function (key) {
+        var g = byKey[key];
+        var val = 0;
+        bdTokensFromString(bdRblsOf(g.sts)).forEach(function (tok) {
+          if (stationMin[tok] && stationMin[tok] > val) val = stationMin[tok];
+        });
+        var out = '<div class="bd-row bd-keep">' +
+          '<div class="bd-label"><div class="name" style="font-weight:600;">' + esc(g.name) + '</div></div>' +
+          '<div class="bd-nighttimes"><input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + val + '" data-bdwalk="' + esc(key) + '"> min</div>' +
+          '</div>';
+        wl.forEach(function (entry) {
+          if (entry.key !== key) return;
+          out += wlRow(entry, wlIdx);
+          wlIdx++;
+        });
+        out += '<div style="margin:-4px 0 10px;"><button type="button" class="bd-dirs-link" data-bdwladd="' + esc(key) + '">+ Pro Linie abweichend</button></div>';
+        return out;
+      }).join('');
+    }
+    return html + '</div>';
+  }
+
   // ---------- Zeilen-Gruppen (/api/groups): Segmente ; Mitglieder + Ziel > ----------
-  // Segment: "Name=#rrggbb::U6>Floridsdorf+49" (Name und Farbe optional, rueckwaertskompatibel)
+  // Segment: "Name=#rrggbb~N::U6>Floridsdorf+49" (Name, Farbe und Badge-Modus optional, rueckwaertskompatibel)
   function bdParseGroups(s) {
     return String(s || '').split(';').map(function (seg) {
       seg = seg.trim();
       if (!seg) return null;
-      var name = '', color = '', members = seg;
+      var name = '', color = '', members = seg, bm = 1;
       var di = seg.indexOf('::');
       if (di >= 0) {
         var label = seg.substring(0, di);
         members = seg.substring(di + 2);
+        var ti = label.indexOf('~');   // ~0 keine Badges, ~1 Linienfarbe, ~2 Gruppenfarbe (wie die Firmware: toInt)
+        if (ti >= 0) {
+          var bn = parseInt(label.substring(ti + 1), 10);
+          bm = isNaN(bn) ? 0 : Math.max(0, Math.min(2, bn));
+          label = label.substring(0, ti);
+        }
         var eq = label.indexOf('=#');
         if (eq >= 0) {
           var hex = '#' + label.substring(eq + 2).trim();
@@ -25636,11 +26634,11 @@ window.addEventListener('DOMContentLoaded', () => {
         var gt = x.indexOf('>');
         return gt < 0 ? { line: x, dest: '' } : { line: x.substring(0, gt).trim(), dest: x.substring(gt + 1).trim() };
       }).filter(function (m) { return m && m.line; });
-      return { name: name, color: color, members: mem };
+      return { name: name, color: color, members: mem, head: !!name, bm: bm };
     }).filter(Boolean);
   }
   function bdCleanGroupName(n) {
-    return String(n || '').replace(/[;:=#"+>]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 24);
+    return String(n || '').replace(/[;:=#"+>~]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 24);
   }
   function bdCleanTok(t) {
     return String(t || '').replace(/::/g, ' ').replace(/[;+>"]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -25653,24 +26651,30 @@ window.addEventListener('DOMContentLoaded', () => {
         return dest ? line + '>' + dest : line;
       }).filter(Boolean).join('+');
       if (!members) return '';
-      var name = bdCleanGroupName(g.name);
+      var name = g.head ? bdCleanGroupName(g.name) : '';
+      var bm = (g.bm === 0 || g.bm === 2) ? g.bm : 1;
       var color = /^#[0-9a-fA-F]{6}$/.test(g.color || '') ? g.color.toLowerCase() : '';
-      if (!name && !color) return members;
-      return name + (color ? '=' + color : '') + '::' + members;
+      if (!name && !color && bm === 1) return members;
+      // Label an die Firmware: [Name][=#rrggbb][~N]::Mitglieder, ~1 ist Standard und entfaellt
+      return name + (color ? '=' + color : '') + (bm !== 1 ? '~' + bm : '') + '::' + members;
     }).filter(Boolean).join(';');
   }
   // Aktuelles Gruppen-Modell inkl. der gerade getippten Namen/Farben aus dem DOM
   function bdGrpModel() {
     var base = BD.grpEdit || bdParseGroups(BD.state ? BD.state.groups : '');
     var model = base.map(function (g) {
-      return { name: g.name || '', color: g.color || '', members: (g.members || []).map(function (m) { return { line: m.line, dest: m.dest }; }) };
+      return { name: g.name || '', color: g.color || '', head: !!g.head, bm: (g.bm === 0 || g.bm === 2) ? g.bm : 1,
+        members: (g.members || []).map(function (m) { return { line: m.line, dest: m.dest }; }) };
     });
-    var blocks = document.querySelectorAll('.bd-grp');
-    for (var i = 0; i < blocks.length && i < model.length; i++) {
-      var n = blocks[i].querySelector('[data-bdgrpname]');
-      var c = blocks[i].querySelector('[data-bdgrpcolor]');
-      if (n) model[i].name = n.value;
-      if (c) model[i].color = (c.getAttribute('data-auto') !== '1') ? c.value : '';
+    // gerade getippte Namen/Farben (Felder tragen den Segment-Index)
+    var ns = document.querySelectorAll('[data-bdgrpname]'), cs = document.querySelectorAll('[data-bdgrpcolor]');
+    for (var i = 0; i < ns.length; i++) {
+      var gi = parseInt(ns[i].getAttribute('data-bdgrpname'), 10);
+      if (model[gi]) model[gi].name = ns[i].value;
+    }
+    for (var k = 0; k < cs.length; k++) {
+      var gk = parseInt(cs[k].getAttribute('data-bdgrpcolor'), 10);
+      if (model[gk] && cs[k].getAttribute('data-auto') !== '1') model[gk].color = cs[k].value;
     }
     return model;
   }
@@ -25722,10 +26726,11 @@ window.addEventListener('DOMContentLoaded', () => {
             var line = String(l.name || '').trim(), dest = String(l.towards || '').trim();
             if (!line || !dest) return;
             if (l.lineColor) BD.grpPairColor[line.toLowerCase()] = l.lineColor;
+            var n = (l.departures && Array.isArray(l.departures.departure)) ? l.departures.departure.length : 0;
             var k = bdPairKey(line, dest);
-            if (seen[k]) return;
-            seen[k] = 1;
-            pairs.push({ line: line, dest: dest });
+            if (seen[k]) { seen[k].n += n; return; }
+            seen[k] = { line: line, dest: dest, rid: String(l.richtungsId || '').trim(), n: n };
+            pairs.push(seen[k]);
           });
         });
         if (BD.grpPairsKey !== rbls) return;
@@ -25739,16 +26744,16 @@ window.addEventListener('DOMContentLoaded', () => {
         bdRenderTafel();
       });
   }
-  function bdVisiblePairs(model) {
+  // Alle Linie+Ziel-Paare, die auf der Tafel stehen (lsel, Nur-Karte und dirs beachtet),
+  // natuerlich sortiert; null solange die Abfahrten noch laden
+  function bdBoardPairs() {
     if (BD.grpPairs === null || BD.grpPairs === undefined) { bdLoadGrpPairs(); return null; }
     bdLoadGrpPairs();
     var st = BD.state || {};
     var lsel = String(st.lsel || '').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
     var lineInfo = {};
     (st.lines || []).forEach(function (l) { lineInfo[String(l.n).toLowerCase()] = l; });
-    var all = BD.grpPairs.slice();
-    // Picker-Richtungen ergaenzen (Linien, die gerade nicht fahren)
-    var seen = {};
+    var all = BD.grpPairs.map(function (pr) { return { line: pr.line, dest: pr.dest, rid: pr.rid || '', n: pr.n || 0 }; }), seen = {};
     all.forEach(function (pr) { seen[bdPairKey(pr.line, pr.dest)] = 1; });
     allStations().forEach(function (s2) {
       (s2.directions || []).forEach(function (d) {
@@ -25757,17 +26762,10 @@ window.addEventListener('DOMContentLoaded', () => {
         var k = bdPairKey(d.line, dest);
         if (seen[k]) return;
         seen[k] = 1;
-        all.push({ line: String(d.line), dest: dest });
+        all.push({ line: String(d.line), dest: dest, rid: String(d.richtungsId || '').trim(), n: 0 });
       });
     });
-    // Schon gruppierte Paare raus (ein Mitglied ohne Ziel deckt die ganze Linie ab)
-    var inGroup = {}, wholeLine = {};
-    (model || []).forEach(function (g) {
-      (g.members || []).forEach(function (m) {
-        if (!m.dest) wholeLine[String(m.line).toLowerCase()] = 1;
-        else inGroup[bdPairKey(m.line, m.dest)] = 1;
-      });
-    });
+    if (bdRidGrouping()) all = bdCollapseByRid(all);
     return all.filter(function (pr) {
       var ln = String(pr.line).toLowerCase();
       if (lsel.length && lsel.indexOf(ln) < 0) return false;
@@ -25781,11 +26779,55 @@ window.addEventListener('DOMContentLoaded', () => {
         });
         if (!ok) return false;
       }
-      if (wholeLine[ln]) return false;
-      return !inGroup[bdPairKey(pr.line, pr.dest)];
+      return true;
     }).sort(function (a, b) {
       var c = String(a.line).localeCompare(String(b.line), 'de', { numeric: true });
       return c || String(a.dest).localeCompare(String(b.dest), 'de');
+    });
+  }
+  // Firmware bildet Zeilen wie der Lilygo ueber Linie + richtungsId (/api/state: gk);
+  // die masterrow aus dem Konfigurator nimmt sie erst mit mrow in /api/state an
+  function bdRidGrouping() {
+    return !!(BD.state && (typeof BD.state.gk !== 'undefined' || typeof BD.state.mrow !== 'undefined'));
+  }
+  function bdMrowCap() {
+    return !!(BD.state && typeof BD.state.mrow !== 'undefined');
+  }
+  // Wie der Lilygo (GroupKey = Linie + richtungsId): Ziele derselben Linie und Richtung
+  // (Remise, Kurzfuehrungen) sind EINE Richtung, die Bubble traegt das haeufigste Ziel
+  function bdCollapseByRid(pairs) {
+    var byKey = {}, out = [];
+    pairs.forEach(function (pr) {
+      if (!pr.rid) { out.push(pr); return; }
+      var k = String(pr.line).toLowerCase() + '|' + pr.rid;
+      var cur = byKey[k];
+      if (!cur) {
+        cur = byKey[k] = { line: pr.line, dest: pr.dest, rid: pr.rid, n: pr.n || 0, alts: [] };
+        out.push(cur);
+        return;
+      }
+      if ((pr.n || 0) > cur.n) { cur.alts.push(cur.dest); cur.dest = pr.dest; cur.n = pr.n || 0; }
+      else if (pr.dest !== cur.dest && cur.alts.indexOf(pr.dest) < 0) cur.alts.push(pr.dest);
+    });
+    // Picker-Richtung ohne rid, deren Ziel schon Teil einer Richtung ist, entfaellt
+    var inDir = {};
+    out.forEach(function (pr) { (pr.alts || []).forEach(function (a) { inDir[bdPairKey(pr.line, a)] = 1; }); });
+    return out.filter(function (pr) { return pr.alts || !inDir[bdPairKey(pr.line, pr.dest)]; });
+  }
+  // Pool fuer neue Gruppen: Tafel-Paare ohne die, die schon in einer Gruppen-Box stecken
+  function bdVisiblePairs(model) {
+    var all = bdBoardPairs();
+    if (all === null) return null;
+    var inGroup = {}, wholeLine = {};
+    (model || []).forEach(function (g) {
+      if (!bdIsGroupBox(g)) return;
+      (g.members || []).forEach(function (m) {
+        if (!m.dest) wholeLine[String(m.line).toLowerCase()] = 1;
+        else inGroup[bdPairKey(m.line, m.dest)] = 1;
+      });
+    });
+    return all.filter(function (pr) {
+      return !wholeLine[String(pr.line).toLowerCase()] && !inGroup[bdPairKey(pr.line, pr.dest)];
     });
   }
 
@@ -25793,7 +26835,8 @@ window.addEventListener('DOMContentLoaded', () => {
     var str = bdSerializeGroups(segs);
     // Begonnene Zeilen (Name oder Farbe, aber noch ohne Linien) als Entwurf behalten
     var incomplete = segs.some(function (g) {
-      return !(g.members || []).length && (bdCleanGroupName(g.name) || g.color);
+      return (!(g.members || []).length && (bdCleanGroupName(g.name) || g.color || g.head || g.bm !== 1)) ||
+        (g.head && !bdCleanGroupName(g.name));
     });
     BD.grpEdit = incomplete ? segs : null;
     if (BD.state && String(BD.state.groups || '') === str) {
@@ -25875,7 +26918,7 @@ window.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  function bdRenderControls() { bdRenderTafel(); bdRenderAnzeige(); bdRenderKarte(); bdRenderNacht(); }
+  function bdRenderControls() { bdRenderAnsicht(); bdRenderKarte(); bdRenderTafel(); bdRenderAnzeige(); bdRenderNacht(); }
 
   // Karten-Zentrum aus den Abfahrts-Monitoren der gewaehlten Stops (eine Server-Anfrage,
   // Mittelpunkt der Bounding-Box). Klappt es nicht, behaelt das Geraet sein altes Zentrum.
@@ -25922,6 +26965,94 @@ window.addEventListener('DOMContentLoaded', () => {
   // Schreibt Stationen und/oder Karten-Zentrum ans Geraet (POST /api/cfg).
   // sendRbls = String: Stationsliste mitschicken (nach der Stationswahl);
   // sendRbls = null: nur Zentrum + aaddr (Anker im Feintuning umgestellt).
+  // masterrow/timerow fuers Geraet, gebaut wie fuer einen Lilygo. Nur adoptierte Stationen, an
+  // denen im Browser nichts gewaehlt wurde, behalten ihr Segment vom Geraet (sonst wuerde
+  // ihre Auswahl auf "alle Linien" aufgemacht, der Browser kennt sie ja nicht).
+  function bdBuildRows() {
+    var rows = buildMasterAndTimeRows({});
+    var dev = {}, untouched = {};
+    [BD.state && BD.state.mrow, BD.state && BD.state.trow].forEach(function (r) {
+      String(r || '').split(';').forEach(function (seg) {
+        var rbl = String(seg.split('|')[0] || '').trim();
+        if (rbl) dev[rbl] = seg.trim();
+      });
+    });
+    allStations().forEach(function (s) {
+      if (!s.isExisting || (s.directions && s.directions.length) || s.filter || s.allDepartures) return;
+      String(s.fullId || (s.network + ':' + s.stopId)).split(',').forEach(function (fid) {
+        fid = fid.trim();
+        if (fid) untouched[fid] = 1;
+      });
+    });
+    function keep(row) {
+      return String(row || '').split(';').map(function (seg) {
+        var rbl = String(seg.split('|')[0] || '').trim();
+        return (untouched[rbl] && dev[rbl]) ? dev[rbl] : seg;
+      }).join(';');
+    }
+    return { masterrow: keep(rows.masterrow), timerow: keep(rows.timerow) };
+  }
+  // Picker-Auswahl als /api/cfg-Parameter: lsel (Linien-Whitelist) und, wenn die Firmware
+  // wie der Lilygo gruppiert, masterrow/timerow. "Alle Abfahrten" irgendwo gewaehlt -> leeres
+  // lsel (alles zeigen); nur leere Filter (reiner Adopt-Roundtrip) -> lsel weglassen.
+  function bdPickQuery() {
+    var q = [], selAll = false, seen = {}, sel = [], hasUntouched = false, rows = null;
+    function addLsel(tok) {
+      tok = String(tok || '').trim();
+      if (!tok || seen[tok.toLowerCase()]) return;
+      seen[tok.toLowerCase()] = 1;
+      sel.push(tok);
+    }
+    allStations().forEach(function (st2) {
+      if (st2.isExisting && !((st2.directions && st2.directions.length) || st2.filter || st2.allDepartures)) hasUntouched = true;
+      if (st2.allDepartures) selAll = true;
+      String(st2.filter || '').split(',').forEach(addLsel);
+    });
+    // Linien uebernommener, im Browser nicht angefasster Stationen kennt nur das Geraet
+    if (hasUntouched && BD.adoptedLsel) BD.adoptedLsel.split(',').forEach(addLsel);
+    var lselStr = null;
+    if (selAll) lselStr = '';
+    else if (sel.length) lselStr = sel.join(',');
+    if (lselStr !== null) q.push('lsel=' + encodeURIComponent(lselStr));
+    if (bdMrowCap() && typeof buildMasterAndTimeRows === 'function') {
+      try {
+        rows = bdBuildRows();
+        q.push('mrow=' + encodeURIComponent(rows.masterrow || ''));
+        q.push('trow=' + encodeURIComponent(rows.timerow || ''));
+      } catch (e) { rows = null; console.warn('[WALL] masterrow nicht gebaut', e); }
+    }
+    return { q: q, lselStr: lselStr, rows: rows };
+  }
+  function bdApplyPickState(pq) {
+    if (!BD.state || !pq) return;
+    if (typeof pq.lselStr === 'string') { BD.state.lsel = pq.lselStr; BD.adoptedLsel = pq.lselStr; }
+    if (pq.rows) { BD.state.mrow = pq.rows.masterrow || ''; BD.state.trow = pq.rows.timerow || ''; }
+  }
+  // Gleiche Stationen, aber im Picker neu gewaehlt: Linien, Richtungen und masterrow ohne
+  // Voll-Reload nachziehen. Ohne Auswahl im Browser bleibt das Geraet unangetastet.
+  function bdHasPicks() {
+    return allStations().some(function (s) { return (s.directions && s.directions.length) || s.filter || s.allDepartures; });
+  }
+  function bdPushPicks() {
+    if (!bdHasPicks()) return;
+    var pq = bdPickQuery();
+    bdPushPickerDirs().then(function () {
+      if (!pq.q.length) return null;
+      return bdFetch('/api/cfg?' + pq.q.join('&'), { method: 'POST' }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        bdApplyPickState(pq);
+      });
+    }).then(function () {
+      bdToast('Auswahl gespeichert.');
+      bdRenderTafel();
+      bdRenderLines();
+    }).catch(function () {
+      BD.online = false;
+      bdRenderDevice();
+      bdToast('Keine Verbindung zum Display. Auswahl nicht übernommen.', true);
+    });
+  }
+
   function bdPushCfg(sendRbls) {
     if (BD.saving) return;
     BD.saving = true;
@@ -25942,30 +27073,11 @@ window.addEventListener('DOMContentLoaded', () => {
       var aaddrVal = (BD.anchor.mode === 'addr' && bdIsNum(BD.anchor.lat)) ? 1 : 0;
       // Adress-Anker ohne bekannte Koordinaten: aaddr nicht anfassen (Punkt bleibt am Geraet)
       var keepDeviceAnchor = (BD.anchor.mode === 'addr' && !bdIsNum(BD.anchor.lat));
-      var q = [];
+      var q = [], pq = null;
       if (sendRbls) {
         q.push('rbls=' + encodeURIComponent(sendRbls));
-        // Linien-Whitelist (lsel): die im Picker gewaehlten Linien ans Geraet geben.
-        // "Alle Abfahrten" irgendwo gewaehlt -> leeres lsel (alles zeigen); nur leere
-        // Filter (z. B. reiner Adopt-Roundtrip ohne lsel-Wissen) -> Parameter weglassen.
-        var selAll = false, seen = {}, sel = [];
-        function addLsel(tok) {
-          tok = String(tok || '').trim();
-          if (!tok || seen[tok.toLowerCase()]) return;
-          seen[tok.toLowerCase()] = 1;
-          sel.push(tok);
-        }
-        var hasExisting = false;
-        allStations().forEach(function (st2) {
-          if (st2.isExisting) hasExisting = true;
-          if (st2.allDepartures) selAll = true;
-          String(st2.filter || '').split(',').forEach(addLsel);
-        });
-        if (hasExisting && BD.adoptedLsel) BD.adoptedLsel.split(',').forEach(addLsel);
-        var lselStr = null;
-        if (selAll) lselStr = '';
-        else if (sel.length) lselStr = sel.join(',');
-        if (lselStr !== null) q.push('lsel=' + encodeURIComponent(lselStr));
+        pq = bdPickQuery();
+        q = q.concat(pq.q);
       }
       if (center) { q.push('lat=' + center.lat.toFixed(6)); q.push('lon=' + center.lon.toFixed(6)); }
       // aaddr=1: Zentrum ist eine Adresse, die Firmware zeichnet dort den blauen Punkt
@@ -25976,8 +27088,8 @@ window.addEventListener('DOMContentLoaded', () => {
           if (sendRbls) BD.state.rbls = sendRbls;
           if (center) { BD.state.lat = center.lat; BD.state.lon = center.lon; }
           if (!keepDeviceAnchor) BD.state.aaddr = aaddrVal;
-          if (typeof lselStr === 'string') { BD.state.lsel = lselStr; BD.adoptedLsel = lselStr; }
         }
+        if (pq) bdApplyPickState(pq);
         if (!keepDeviceAnchor) BD.sentAaddr = aaddrVal;
         bdSaveAnchor();
         BD.online = true;
@@ -26029,6 +27141,34 @@ window.addEventListener('DOMContentLoaded', () => {
         }).catch(function () { step(i + 1); });
       });
     })(0);
+  }
+
+  // Gruppen-Zeilen der Tafel-Vorschau wechseln wie am Display durch
+  setInterval(function () {
+    if (document.visibilityState !== 'visible') return;
+    var rowsG = document.querySelectorAll('#bdTafelPrev .bd-tb-grp');
+    for (var i = 0; i < rowsG.length; i++) {
+      var faces = rowsG[i].querySelectorAll('.bd-tb-face');
+      if (faces.length < 2) continue;
+      var cur = 0;
+      for (var j = 0; j < faces.length; j++) if (faces[j].classList.contains('on')) cur = j;
+      faces[cur].classList.remove('on');
+      faces[(cur + 1) % faces.length].classList.add('on');
+    }
+  }, 3000);
+  // Animationen nur laufen lassen, solange die jeweilige Karte im Bild ist
+  if ('IntersectionObserver' in window) {
+    var _bdIo = new IntersectionObserver(function (ents) {
+      ents.forEach(function (en) {
+        en.target.classList.toggle('bd-paused', !en.isIntersecting);
+        var svgs = en.target.querySelectorAll('svg');
+        for (var i = 0; i < svgs.length; i++) {
+          try { if (en.isIntersecting) svgs[i].unpauseAnimations(); else svgs[i].pauseAnimations(); } catch (e2) {}
+        }
+      });
+    });
+    var _bdCards = document.querySelectorAll('#bdHome .bd-card');
+    for (var ci2 = 0; ci2 < _bdCards.length; ci2++) _bdIo.observe(_bdCards[ci2]);
   }
 
   // Leiser Dauer-Refresh, solange das Panel offen ist: das Geraet sammelt Linien
@@ -26097,83 +27237,144 @@ window.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       var pk = pairBtn.getAttribute('data-bdpair');
       BD.grpEdit = bdGrpModel();
-      if (BD.grpSel[pk]) delete BD.grpSel[pk]; else BD.grpSel[pk] = true;
+      BD.grpCreating = true;
+      var at = BD.grpSel.indexOf(pk);
+      if (at >= 0) BD.grpSel.splice(at, 1); else BD.grpSel.push(pk);
       bdRenderTafel(true);
       return;
     }
-    function selectedMembers() {
-      return Object.keys(BD.grpSel).map(function (k) { return BD.grpPairMap[k]; })
-        .filter(Boolean).map(function (pr) { return { line: pr.line, dest: pr.dest }; });
+    if (t.closest('[data-bdgrpstart]')) {
+      e.preventDefault();
+      BD.grpEdit = bdGrpModel();
+      BD.grpCreating = true;
+      BD.grpSel = [];
+      bdRenderTafel(true);
+      return;
+    }
+    if (t.closest('[data-bdgrpcancel]')) {
+      e.preventDefault();
+      BD.grpEdit = bdGrpModel();
+      BD.grpCreating = false;
+      BD.grpSel = [];
+      bdRenderTafel(true);
+      return;
     }
     var mk = t.closest('[data-bdgrpmake]');
     if (mk) {
       e.preventDefault();
-      var memsN = selectedMembers();
-      if (!memsN.length) return;
-      var modelN = bdGrpModel();
-      modelN.push({ name: '', color: '', members: memsN });
-      BD.grpSel = {};
+      var mems = BD.grpSel.map(function (k) { return BD.grpPairMap[k]; }).filter(Boolean)
+        .map(function (pr) { return { line: pr.line, dest: pr.dest }; });
+      if (mems.length < 2) return;
+      var modelN = bdGrpModel(), selK = {};
+      mems.forEach(function (mm) { selK[bdPairKey(mm.line, mm.dest)] = 1; });
+      // gepinnte Einzelzeilen der gewaehlten Paare ersetzen, Position der ersten merken
+      var insertAt = -1;
+      for (var x = modelN.length - 1; x >= 0; x--) {
+        var gx = modelN[x];
+        if (!bdIsGroupBox(gx) && gx.members.length === 1 && selK[bdPairKey(gx.members[0].line, gx.members[0].dest)]) { modelN.splice(x, 1); insertAt = x; }
+      }
+      var seg = { name: '', color: '', head: false, bm: 1, members: mems };
+      if (insertAt >= 0) modelN.splice(insertAt, 0, seg);
+      else {
+        var lastBox = -1;
+        modelN.forEach(function (gy, iy) { if (bdIsGroupBox(gy)) lastBox = iy; });
+        modelN.splice(lastBox + 1, 0, seg);
+      }
+      BD.grpSel = [];
+      BD.grpCreating = false;
       bdPushGroups(modelN, true);
-      return;
-    }
-    var addSel = t.closest('[data-bdgrpaddsel]');
-    if (addSel) {
-      e.preventDefault();
-      var memsA = selectedMembers();
-      var modelA = bdGrpModel();
-      var ga = modelA[parseInt(addSel.getAttribute('data-bdgrpaddsel'), 10)];
-      if (!ga || !memsA.length) return;
-      var have = {};
-      ga.members.forEach(function (m) { have[bdPairKey(m.line, m.dest)] = 1; });
-      memsA.forEach(function (m) { if (!have[bdPairKey(m.line, m.dest)]) ga.members.push(m); });
-      BD.grpSel = {};
-      bdPushGroups(modelA, true);
       return;
     }
     var memRm = t.closest('[data-bdgrpmemrm]');
     if (memRm) {
       e.preventDefault();
-      var pr = memRm.getAttribute('data-bdgrpmemrm').split(':');
-      var modelR = bdGrpModel();
-      var gr = modelR[parseInt(pr[0], 10)];
+      var pr2 = memRm.getAttribute('data-bdgrpmemrm').split(':');
+      var modelR = bdGrpModel(), gIdx = parseInt(pr2[0], 10), gr = modelR[gIdx];
       if (!gr) return;
-      gr.members.splice(parseInt(pr[1], 10), 1);
-      if (!gr.members.length && !bdCleanGroupName(gr.name) && !gr.color) modelR.splice(parseInt(pr[0], 10), 1);
+      var removed = gr.members.splice(parseInt(pr2[1], 10), 1)[0];
+      var pinned = modelR.some(function (gz) { return !bdIsGroupBox(gz); });
+      if (!gr.members.length) modelR.splice(gIdx, 1);
+      // Bei fester Reihenfolge bleibt das herausgenommene Paar direkt dahinter stehen
+      if (pinned && removed) modelR.splice(gr.members.length ? gIdx + 1 : gIdx, 0, { name: '', color: '', head: false, bm: 1, members: [removed] });
       bdPushGroups(modelR, true);
-      return;
-    }
-    var grpMove = t.closest('[data-bdgrpmove]');
-    if (grpMove) {
-      e.preventDefault();
-      var mv = grpMove.getAttribute('data-bdgrpmove').split(':');
-      var gi = parseInt(mv[0], 10), dir = parseInt(mv[1], 10);
-      var modelM = bdGrpModel();
-      var ni = gi + dir;
-      if (ni < 0 || ni >= modelM.length) return;
-      var tmp = modelM[gi]; modelM[gi] = modelM[ni]; modelM[ni] = tmp;
-      bdPushGroups(modelM, true);
       return;
     }
     var grpDel = t.closest('[data-bdgrpdel]');
     if (grpDel) {
       e.preventDefault();
-      var modelD = bdGrpModel();
-      modelD.splice(parseInt(grpDel.getAttribute('data-bdgrpdel'), 10), 1);
+      var modelD = bdGrpModel(), dIdx = parseInt(grpDel.getAttribute('data-bdgrpdel'), 10), gd = modelD[dIdx];
+      if (!gd) return;
+      var pinnedD = modelD.some(function (gz) { return !bdIsGroupBox(gz); });
+      var repl = pinnedD ? gd.members.map(function (mm) { return { name: '', color: '', head: false, bm: 1, members: [mm] }; }) : [];
+      Array.prototype.splice.apply(modelD, [dIdx, 1].concat(repl));
       bdPushGroups(modelD, true);
       return;
     }
-    var grpColRes = t.closest('[data-bdgrpcolorreset]');
-    if (grpColRes) {
+    var gHead = t.closest('[data-bdghead]');
+    if (gHead) {
       e.preventDefault();
-      var modelC = bdGrpModel();
-      var gc = modelC[parseInt(grpColRes.getAttribute('data-bdgrpcolorreset'), 10)];
-      if (gc) gc.color = '';
+      var ph = gHead.getAttribute('data-bdghead').split(':');
+      var modelH = bdGrpModel(), gh = modelH[parseInt(ph[0], 10)];
+      if (!gh) return;
+      gh.head = ph[1] === '1';
+      bdPushGroups(modelH, true);
+      if (gh.head) {
+        var nf = document.querySelector('[data-bdgrpname="' + ph[0] + '"]');
+        if (nf && !nf.value) nf.focus();
+      }
+      return;
+    }
+    var gBm = t.closest('[data-bdgbm]');
+    if (gBm) {
+      e.preventDefault();
+      var pm = gBm.getAttribute('data-bdgbm').split(':');
+      var modelM = bdGrpModel(), gm = modelM[parseInt(pm[0], 10)];
+      if (!gm) return;
+      gm.bm = parseInt(pm[1], 10) || 0;
+      // Badges in Gruppenfarbe brauchen eine Gruppenfarbe: Start mit der Farbe der ersten Linie
+      if (gm.bm === 2 && !/^#[0-9a-fA-F]{6}$/.test(gm.color || '')) gm.color = (bdLineColor(gm.members[0] && gm.members[0].line) || '#eb3924').toLowerCase();
+      bdPushGroups(modelM, true);
+      return;
+    }
+    var gCol = t.closest('[data-bdgcol]');
+    if (gCol) {
+      e.preventDefault();
+      var pc = gCol.getAttribute('data-bdgcol').split(':');
+      var modelC = bdGrpModel(), gc = modelC[parseInt(pc[0], 10)];
+      if (!gc) return;
+      if (pc[1] === 'own') {
+        if (!/^#[0-9a-fA-F]{6}$/.test(gc.color || '')) gc.color = (bdLineColor(gc.members[0] && gc.members[0].line) || '#eb3924').toLowerCase();
+      } else {
+        gc.color = '';
+        if (gc.bm === 2) gc.bm = 1;
+      }
       bdPushGroups(modelC, true);
+      return;
+    }
+    var ordMv = t.closest('[data-bdordmove]');
+    if (ordMv) {
+      e.preventDefault();
+      if (ordMv.disabled) return;
+      var po = ordMv.getAttribute('data-bdordmove').split(':');
+      var modelO = bdGrpModel(), rowsO = bdOrderRows(modelO, bdBoardPairs() || []);
+      var a = parseInt(po[0], 10), bTo = a + parseInt(po[1], 10);
+      if (bTo < 0 || bTo >= rowsO.length) return;
+      var tmp = rowsO[a]; rowsO[a] = rowsO[bTo]; rowsO[bTo] = tmp;
+      bdPushGroups(rowsO.map(function (r) {
+        return r.seg >= 0 ? modelO[r.seg] : { name: '', color: '', head: false, bm: 1, members: r.members };
+      }), true);
       return;
     }
   });
   home.addEventListener('click', function (e) {
     var t = e.target;
+    var inf = t.closest('[data-bdinfo]');
+    if (inf) {
+      var ik = inf.getAttribute('data-bdinfo');
+      BD.infoOpen[ik] = !BD.infoOpen[ik];
+      bdRenderControls();
+      return;
+    }
     var anc = t.closest('[data-bdanchor]');
     if (anc) {
       var newMode = anc.getAttribute('data-bdanchor');
@@ -26199,12 +27400,12 @@ window.addEventListener('DOMContentLoaded', () => {
       var key = segBtn.closest('[data-bdseg]').getAttribute('data-bdseg');
       var v = parseInt(segBtn.getAttribute('data-v'), 10) || 0;
       if (!BD.state) return;
+      if (BD.state[key] === v) return;
       BD.state[key] = v;
       bdDisp(key, v);
-      if (key === 'lay') { bdRenderKarte(); bdRenderAnzeige(); bdRenderTafel(); bdCheckAnchorRange(); }
-      else if (key === 'sort' || key === 'blink' || key === 'list') bdRenderTafel();
-      else if (key === 'btyp' || key === 'cols') { bdRenderAnzeige(); bdRenderLines(); }
-      else bdRenderAnzeige();
+      bdRenderControls();
+      bdRenderLines();
+      if (key === 'lay') bdCheckAnchorRange();
       return;
     }
     var corner = t.closest('[data-bdcorner]');
@@ -26213,7 +27414,7 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!BD.state) return;
       BD.state.corner = ci;
       bdDisp('corner', ci);
-      bdRenderAnzeige();
+      bdRenderKarte();
       return;
     }
     var sw = t.closest('[data-bdswitch]');
@@ -26229,6 +27430,10 @@ window.addEventListener('DOMContentLoaded', () => {
         BD.state.dlyhl = +BD.state.dlyhl ? 0 : 1;
         bdDisp('dlyhl', BD.state.dlyhl);
         bdRenderTafel();
+      } else if (k === 'vnum') {
+        BD.state.vnum = +BD.state.vnum ? 0 : 1;
+        bdDisp('vnum', BD.state.vnum);
+        bdRenderKarte();
       } else {
         BD.state.layers = BD.state.layers || {};
         BD.state.layers[k] = BD.state.layers[k] ? 0 : 1;
@@ -26279,6 +27484,7 @@ window.addEventListener('DOMContentLoaded', () => {
       var ml = $('bdMapWVal');
       if (ml) ml.textContent = mv + ' m';
       if (_mapwTimer) clearTimeout(_mapwTimer);
+      bdMapPrevZoom(mv);
       _mapwTimer = setTimeout(function () { bdDisp('mapw', mv); bdCheckAnchorRange(); }, 250);
       return;
     }
@@ -26379,6 +27585,7 @@ window.addEventListener('DOMContentLoaded', () => {
       bdShowHome();
       if (!rbls) { bdToast('Keine Stationen gewählt.', true); return; }
       if (rbls !== bdDeviceRbls()) bdPushCfg(rbls);
+      else bdPushPicks();
     };
   } catch (e) {}
   try {
