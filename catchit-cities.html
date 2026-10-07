@@ -24463,6 +24463,15 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   .bd-grp-btn:hover { background: #f0ead9; }
   .bd-grp-btn.del:hover { background: var(--red); color: #fff; }
+  .bd-grp { border: 2px solid var(--ink); border-radius: 8px; background: #fff; padding: 10px 10px 2px; margin-bottom: 10px; }
+  .bd-grp-color {
+    position: relative; width: 46px; height: 36px; flex-shrink: 0; cursor: pointer;
+    border: 2px solid var(--ink); border-radius: 6px; box-shadow: 2px 2px 0 var(--ink); overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 800; color: var(--ink); font-family: var(--font-main);
+    background: repeating-linear-gradient(45deg, #fff, #fff 4px, #f0ead9 4px, #f0ead9 8px);
+  }
+  .bd-grp-color input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
   .bd-grpchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
   .bd-grpchips .lbl { font-size: 11px; color: #8a8276; font-weight: 700; }
   .bd-grpchip {
@@ -24702,9 +24711,8 @@ window.addEventListener('DOMContentLoaded', () => {
     savingText: '',
     reloadPending: false, // nach /api/cfg: Geraet laedt Karte+Abfahrten neu
     adopted: false,       // stations[] wurde schon aus den Geraete-rbls befuellt
-    dirsOpen: {},         // Linienname -> Richtungsfilter-Editor aufgeklappt
-    lastWin: '',          // letztes aktives Zeitfenster (fuer den An/Aus-Schalter)
     grpEdit: null,        // Zeilen-Gruppen im Editor (Array), null = Stand vom Geraet
+    walkLines: null,      // Gehweg-Linien-Regeln im Editor, null = Stand vom Geraet
     adoptedLsel: ''       // Linien-Whitelist (lsel) vom Geraet, fuer den naechsten Stations-Push
   };
   window._bd = BD;        // Debug-Griff in der Konsole
@@ -24740,12 +24748,6 @@ window.addEventListener('DOMContentLoaded', () => {
     var m = /^(\d{1,2}):(\d{2})$/.exec(String(v || ''));
     if (!m) return null;
     return (parseInt(m[1], 10) % 24) * 60 + (parseInt(m[2], 10) % 60);
-  }
-  // Zeitfenster der Tafel: "360-1320" (Minuten), "0-0" = immer anzeigen
-  function bdParseWin(s) {
-    var m = /^(\d+)-(\d+)$/.exec(String(s || '').trim());
-    if (!m) return { from: 0, to: 0 };
-    return { from: parseInt(m[1], 10) % 1440, to: parseInt(m[2], 10) % 1440 };
   }
   // Gehweg: "250:5,STV:at:46:1234:8" -> Map Token->Minuten (Token kann selbst ':' enthalten)
   function bdParseWalk(s) {
@@ -24954,6 +24956,7 @@ window.addEventListener('DOMContentLoaded', () => {
       });
     });
     BD.adopted = true;
+    BD.walkLines = null;
     BD.adoptedLsel = (BD.state && typeof BD.state.lsel !== 'undefined') ? String(BD.state.lsel || '') : '';
     bdRenderAnchor();
     bdRenderTafel();
@@ -25105,8 +25108,69 @@ window.addEventListener('DOMContentLoaded', () => {
         html += '<div class="bd-anchor-hint">Adresse eingeben und suchen: die Karte zentriert dann auf deine Adresse, mit blauem Standort-Punkt.</div>';
       }
       html += '<div class="bd-anchor-err" id="bdAddrErr" style="display:none;">Adresse nicht gefunden, probiere es genauer.</div>';
+      html += '<div class="bd-anchor-err" id="bdAnchorRangeWarn" style="display:none;"></div>';
     }
     wrap.innerHTML = html;
+    bdCheckAnchorRange();
+  }
+
+  // Adress-Anker: liegen Stationen ausserhalb des sichtbaren Kartenausschnitts?
+  // Halbe Hoehe = mapw Meter; halbe Breite je nach Kartengroesse (Gross 512 px,
+  // Mittel 357 px, Klein 242 px Kartenbreite-Haelfte bei 300 px halber Hoehe).
+  var _coordCache = { key: '', pts: null, pending: null };
+  function bdStationPoints() {
+    var rbls = bdCurrentRbls() || (BD.state ? String(BD.state.rbls || '') : '');
+    if (!rbls) return Promise.resolve([]);
+    if (_coordCache.key === rbls && _coordCache.pts) return Promise.resolve(_coordCache.pts);
+    if (_coordCache.key === rbls && _coordCache.pending) return _coordCache.pending;
+    var api = (typeof DEPARTURES_API === 'string') ? DEPARTURES_API : 'https://api.straba.at/api/v1/wl/departures';
+    _coordCache.key = rbls;
+    _coordCache.pts = null;
+    _coordCache.pending = fetch(api + '?rbl=' + encodeURIComponent(rbls) + '&_=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var mons = (d && d.data && Array.isArray(d.data.monitors)) ? d.data.monitors : [];
+        var pts = [], seen = {};
+        mons.forEach(function (m) {
+          var ls = m && m.locationStop;
+          var c = ls && ls.geometry && ls.geometry.coordinates;
+          if (!Array.isArray(c)) return;
+          var lo = Number(c[0]), la = Number(c[1]);
+          if (!isFinite(lo) || !isFinite(la) || (lo === 0 && la === 0)) return;
+          var nm = (ls.properties && ls.properties.title) || '';
+          var k = nm + '|' + la.toFixed(4) + '|' + lo.toFixed(4);
+          if (seen[k]) return;
+          seen[k] = 1;
+          pts.push({ name: nm, lat: la, lon: lo });
+        });
+        _coordCache.pts = pts;
+        _coordCache.pending = null;
+        return pts;
+      })
+      .catch(function () { _coordCache.pending = null; return []; });
+    return _coordCache.pending;
+  }
+  function bdCheckAnchorRange() {
+    var el = $('bdAnchorRangeWarn');
+    if (!el) return;
+    var a = BD.anchor;
+    if (a.mode !== 'addr' || !bdIsNum(a.lat) || !bdIsNum(a.lon) || !BD.state) { el.style.display = 'none'; return; }
+    var mw = bdIsNum(BD.state.mapw) ? BD.state.mapw : 600;
+    var lay = parseInt(BD.state.lay, 10);
+    var hx = lay === 2 ? 1.7 : (lay === 1 ? 1.19 : 0.8);
+    bdStationPoints().then(function (pts) {
+      var el2 = $('bdAnchorRangeWarn');
+      if (!el2) return;
+      var out = pts.filter(function (p) {
+        var dy = Math.abs(p.lat - a.lat) * 111320;
+        var dx = Math.abs(p.lon - a.lon) * 111320 * Math.cos(a.lat * Math.PI / 180);
+        return dy > mw * 0.92 || dx > mw * hx * 0.92;
+      });
+      if (!out.length) { el2.style.display = 'none'; return; }
+      var names = out.slice(0, 3).map(function (p) { return esc(p.name || 'eine Station'); }).join(', ') + (out.length > 3 ? ' und weitere' : '');
+      el2.innerHTML = 'Au&szlig;erhalb deiner Karte: ' + names + '. Erh&ouml;he die Kartenweite oder w&auml;hle eine n&auml;here Adresse.';
+      el2.style.display = 'block';
+    });
   }
 
   // Geocoding ueber OpenStreetMap Nominatim (frei, CORS offen, sparsam nutzen)
@@ -25188,20 +25252,16 @@ window.addEventListener('DOMContentLoaded', () => {
       var seg = MODE_LABELS.map(function (t, i) {
         return '<button type="button" data-v="' + i + '" class="' + (i === l.m ? 'on' : '') + '">' + t + '</button>';
       }).join('');
-      // Richtungsfilter (Firmware-Key dirs pro Linie): Editor offen, wenn gesetzt oder angefordert
+      // Richtungen waehlt man im Stations-Picker (Paul). Hier erscheint nur noch ein
+      // Feld, wenn am Geraet bereits ein Filter gesetzt ist, damit man ihn leeren kann.
       var dirsHtml = '';
       var hasDirsApi = (typeof l.dirs !== 'undefined');
-      if (hasDirsApi) {
-        var open = BD.dirsOpen[l.n] || (l.dirs && String(l.dirs).length);
-        if (open) {
-          dirsHtml = '<div class="bd-dirs"><span aria-hidden="true">&rarr;</span>' +
-            '<input type="text" class="bd-input" data-bddirs="' + esc(l.n) + '" value="' + esc(l.dirs || '') + '" placeholder="Nur Richtung, z. B. Floridsdorf (leer = alle)">' +
-            '</div>';
-        } else {
-          dirsHtml = '<div class="bd-dirs"><button type="button" class="bd-dirs-link" data-bddirsopen="' + esc(l.n) + '">Richtung filtern</button></div>';
-        }
+      if (hasDirsApi && l.dirs && String(l.dirs).length) {
+        dirsHtml = '<div class="bd-dirs"><span aria-hidden="true">&rarr;</span>' +
+          '<input type="text" class="bd-input" data-bddirs="' + esc(l.n) + '" value="' + esc(l.dirs) + '" placeholder="leer = alle Richtungen">' +
+          '</div>';
       }
-      return '<div class="bd-line' + (hasDirsApi ? ' bd-hasdirs' : '') + '">' +
+      return '<div class="bd-line' + (dirsHtml ? ' bd-hasdirs' : '') + '">' +
         '<span class="bd-badge" style="background:' + esc(col) + ';color:' + badgeFg(col) + ';">' + esc(l.n) + '</span>' +
         '<span class="bd-seg" data-bdline="' + esc(l.n) + '">' + seg + '</span>' +
         '</div>' + dirsHtml;
@@ -25211,7 +25271,6 @@ window.addEventListener('DOMContentLoaded', () => {
   function bdPushDirs(name, dirs) {
     var lines = (BD.state && BD.state.lines) || [];
     for (var i = 0; i < lines.length; i++) if (lines[i].n === name) lines[i].dirs = dirs;
-    if (!dirs) BD.dirsOpen[name] = false;
     bdRenderLines();
     bdFetch('/api/line?name=' + encodeURIComponent(name) + '&dirs=' + encodeURIComponent(dirs), { method: 'POST' })
       .then(function (r) {
@@ -25238,6 +25297,42 @@ window.addEventListener('DOMContentLoaded', () => {
         bdToast('Keine Verbindung zum Display. Linien-Modus nicht übernommen.', true);
         bdSafeReload(false);
       });
+  }
+
+  // Picker-Richtungen ans Geraet uebertragen (nach dem Stations-"Weiter"):
+  // pro Linie die gewaehlten Ziele als dirs-Filter; eine Linie, die ohne
+  // Richtungsangabe gewaehlt wurde, bekommt explizit dirs='' und verliert
+  // damit auch einen alten Filter am Geraet.
+  function bdPushPickerDirs() {
+    var byLine = {};
+    allStations().forEach(function (s2) {
+      String(s2.filter || '').split(',').forEach(function (t) {
+        t = t.trim();
+        if (!t) return;
+        var k = t.toLowerCase();
+        if (!byLine[k]) byLine[k] = { name: t, all: false, seen: {}, list: [] };
+      });
+      (s2.directions || []).forEach(function (d) {
+        if (!d || !d.line) return;
+        var k = String(d.line).toLowerCase();
+        if (!byLine[k]) byLine[k] = { name: d.line, all: false, seen: {}, list: [] };
+        var tw = String(d.towards || '').replace(/^Richtung\s+/i, '').trim();
+        if (!tw) { byLine[k].all = true; return; }
+        var twk = tw.toLowerCase();
+        if (!byLine[k].seen[twk]) { byLine[k].seen[twk] = 1; byLine[k].list.push(tw); }
+      });
+    });
+    var keys = Object.keys(byLine);
+    return new Promise(function (resolve) {
+      (function next(i) {
+        if (i >= keys.length) { resolve(); return; }
+        var e = byLine[keys[i]];
+        var dirs = (e.all || !e.list.length) ? '' : e.list.join(',');
+        bdFetch('/api/line?name=' + encodeURIComponent(e.name) + '&dirs=' + encodeURIComponent(dirs), { method: 'POST', timeout: 5000 })
+          .catch(function () {})
+          .then(function () { next(i + 1); });
+      })(0);
+    });
   }
 
   // ---------- Rendering: Feintuning (Anzeige / Karte / Nacht) ----------
@@ -25280,23 +25375,21 @@ window.addEventListener('DOMContentLoaded', () => {
       '<span class="bd-range-val" id="bdBrightVal">' + pct + ' %</span></div>');
     html += rowHtml('Abfahrten-Stil', 'Farbig: jede Zeile in der Linienfarbe. Schlicht: ruhige dunkle Zeilen.',
       segHtml('style', ['Schlicht', 'Farbig'], st.style));
-    html += rowHtml('Abfahrten-Panel', 'Ecke: feste Tafel. Pop-up: Abfahrten am Karten-Zentrum. Pro Station: kleine Tafeln an jeder Station.',
-      segHtml('pstyle', ['Ecke', 'Pop-up', 'Pro Station'], st.pstyle));
-    // Panel-Position: wirkt nur bei grosser Karte, sonst steht die Tafel fix links
-    var cornerDim = st.lay < 2 ? ' bd-dim' : '';
-    var cornerHint = st.lay < 2
-      ? 'Gilt bei gro&szlig;er Karte. Gerade steht die Tafel fix links neben der Karte.'
-      : 'Wo die Tafel auf der Karte sitzt.';
-    var cells = ['', '', '', '', 'ctr', '', '', '', ''];
-    var cellIdx = [0, 1, 2, 3, -1, 4, 5, 6, 7];
-    var cornerBtns = cells.map(function (c, i) {
-      if (c === 'ctr') return '<div class="ctr">Karte</div>';
-      var ci = cellIdx[i];
-      return '<button type="button" data-bdcorner="' + ci + '" class="' + (st.corner === ci ? 'on' : '') + '" title="' +
-        ['Oben links', 'Oben Mitte', 'Oben rechts', 'Mitte links', 'Mitte rechts', 'Unten links', 'Unten Mitte', 'Unten rechts'][ci] + '"></button>';
-    }).join('');
-    html += rowHtml('Position der Tafel', cornerHint,
-      '<div class="bd-corner' + cornerDim + '" id="bdCorner">' + cornerBtns + '</div>');
+    // Abfahrten-Panel und Tafel-Position wirken nur bei grosser Karte -> nur dort zeigen
+    if (st.lay === 2) {
+      html += rowHtml('Abfahrten-Panel', 'Ecke: feste Tafel. Pop-up: Abfahrten am Karten-Zentrum. Pro Station: kleine Tafeln an jeder Station.',
+        segHtml('pstyle', ['Ecke', 'Pop-up', 'Pro Station'], st.pstyle));
+      var cells = ['', '', '', '', 'ctr', '', '', '', ''];
+      var cellIdx = [0, 1, 2, 3, -1, 4, 5, 6, 7];
+      var cornerBtns = cells.map(function (c, i) {
+        if (c === 'ctr') return '<div class="ctr">Karte</div>';
+        var ci = cellIdx[i];
+        return '<button type="button" data-bdcorner="' + ci + '" class="' + (st.corner === ci ? 'on' : '') + '" title="' +
+          ['Oben links', 'Oben Mitte', 'Oben rechts', 'Mitte links', 'Mitte rechts', 'Unten links', 'Unten Mitte', 'Unten rechts'][ci] + '"></button>';
+      }).join('');
+      html += rowHtml('Position der Tafel', 'Wo die Tafel auf der Karte sitzt.',
+        '<div class="bd-corner" id="bdCorner">' + cornerBtns + '</div>');
+    }
     html += rowHtml('Schnellschalter-Ecke', 'Ein Fingertipp auf die Display-Ecke schaltet diese Funktion direkt um.',
       segHtml('qsfn', ['Design', 'Versp&auml;tung', 'Verkehr', 'Karte', 'Aus'], st.qsfn));
     el.innerHTML = html;
@@ -25352,46 +25445,56 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!card || !el) return;
     var st = BD.state;
     var hasAny = st && (typeof st.sort !== 'undefined' || typeof st.dlyhl !== 'undefined' ||
-                        typeof st.win !== 'undefined' || typeof st.walk !== 'undefined' ||
-                        typeof st.groups !== 'undefined');
+                        typeof st.walk !== 'undefined' || typeof st.groups !== 'undefined' ||
+                        typeof st.blink !== 'undefined' || typeof st.list !== 'undefined');
     card.style.display = hasAny ? '' : 'none';
     if (!hasAny) return;
     // Nicht neu bauen, waehrend der User gerade in einem Tafel-Feld tippt
     // (force = bewusste Editor-Aktion wie "+ Gruppe", die trotz Fokus neu baut)
     var ae = document.activeElement;
-    if (!force && ae && el.contains(ae) && (ae.id === 'bdWinFrom' || ae.id === 'bdWinTo' ||
-        (ae.hasAttribute && (ae.hasAttribute('data-bdwalk') || ae.hasAttribute('data-bdgrp'))))) return;
+    if (!force && ae && el.contains(ae) && (ae.hasAttribute && (ae.hasAttribute('data-bdwalk') ||
+        ae.hasAttribute('data-bdwalkline') || ae.hasAttribute('data-bdgrp') ||
+        ae.hasAttribute('data-bdgrpname') || ae.hasAttribute('data-bdgrpcolor') ||
+        (ae.classList && ae.classList.contains('bd-wlsel'))))) return;
     var html = '';
     if (typeof st.sort !== 'undefined') {
       html += rowHtml('Sortierung', 'Nach Linie: Zeilen nach U-Bahn, Tram und Bus geordnet. Nach Zeit: n&auml;chste Abfahrt zuerst.',
         segHtml('sort', ['Nach Linie', 'Nach Zeit'], parseInt(st.sort, 10) || 0));
     }
+    if (typeof st.blink !== 'undefined') {
+      var bv = parseInt(st.blink, 10); if (isNaN(bv)) bv = 2;
+      html += rowHtml('Einfahrt (0 Minuten)', 'Wie die Tafel eine einfahrende Abfahrt zeigt: gelbe 0, blinkende 0 oder das springende Quadrat wie beim kleinen catch it.',
+        segHtml('blink', ['Gelbe 0', 'Blinkende 0', 'Quadrat'], bv));
+    }
+    if (typeof st.list !== 'undefined' && (parseInt(st.lay, 10) || 0) < 2) {
+      html += rowHtml('Tafel-Liste', 'Automatisch: kurze Listen werden mit den n&auml;chsten Abfahrten aufgef&uuml;llt, lange bleiben kompakt mit zwei Minuten-Spalten.',
+        segHtml('list', ['Automatisch', 'Kompakt', 'Einzel-Abfahrten'], parseInt(st.list, 10) || 0));
+    }
     if (typeof st.dlyhl !== 'undefined') {
       html += rowHtml('Versp&auml;tung hervorheben', 'Versp&auml;tete Abfahrten zeigen ihre Minuten in Orange.',
         switchHtml('dlyhl', !!+st.dlyhl), 'bd-keep');
     }
-    if (typeof st.win !== 'undefined') {
-      var w = bdParseWin(st.win);
-      var winOn = !(w.from === 0 && w.to === 0);
-      html += rowHtml('Zeitfenster', 'Abfahrten nur in diesem Zeitraum zeigen, die Karte l&auml;uft durch. Auch &uuml;ber Mitternacht m&ouml;glich.',
-        switchHtml('winon', winOn), 'bd-keep');
-      html += '<div class="bd-row' + (winOn ? '' : ' bd-dim') + '">' +
-        '<div class="bd-label"><div class="name">Zeitraum</div></div>' +
-        '<div class="bd-nighttimes">von <input type="time" class="bd-time" id="bdWinFrom" value="' + fmtTime(winOn ? w.from : 360) + '"> bis <input type="time" class="bd-time" id="bdWinTo" value="' + fmtTime(winOn ? w.to : 1320) + '"></div>' +
-        '</div>';
-    }
     if (typeof st.groups !== 'undefined') {
       html += '<div class="bd-label" style="margin:14px 0 8px;">' +
         '<div class="name">Zeilen-Gruppen</div>' +
-        '<div class="hint">Mehrere Linien teilen sich eine Tafel-Zeile und wechseln alle paar Sekunden durch. Schreibweise: Linie&gt;Ziel, mehrere mit + verbinden, das Ziel ist optional. Die Reihenfolge der Gruppen ist die Reihenfolge auf der Tafel.</div></div>';
+        '<div class="hint">Mehrere Linien teilen sich eine Tafel-Zeile und wechseln alle paar Sekunden durch. Schreibweise: Linie&gt;Ziel, mehrere mit + verbinden, das Ziel ist optional. Mit Namen (z. B. Richtung HBF) zeigt die Zeile den Namen statt der Liniennummer, die Farbe ist optional. Die Reihenfolge der Gruppen ist die Reihenfolge auf der Tafel.</div></div>';
       var segsArr = BD.grpEdit || bdParseGroups(st.groups);
-      html += segsArr.map(function (seg, gi) {
-        return '<div class="bd-grp-row">' +
-          '<input type="text" class="bd-input" data-bdgrp="' + gi + '" value="' + esc(seg) + '" placeholder="U6&gt;Floridsdorf + 49&gt;H&uuml;tteldorf">' +
+      html += segsArr.map(function (g, gi) {
+        var hasCol = /^#[0-9a-fA-F]{6}$/.test(g.color || '');
+        return '<div class="bd-grp">' +
+          '<div class="bd-grp-row">' +
+          '<input type="text" class="bd-input" data-bdgrpname="' + gi + '" maxlength="24" value="' + esc(g.name || '') + '" placeholder="Name der Zeile (optional)">' +
+          '<label class="bd-grp-color" title="Farbe der Zeile"' + (hasCol ? ' style="background:' + esc(g.color) + ';"' : '') + '>' +
+          '<input type="color" data-bdgrpcolor="' + gi + '" data-auto="' + (hasCol ? '0' : '1') + '" value="' + (hasCol ? esc(g.color) : '#eb3924') + '">' +
+          '<span>' + (hasCol ? '' : 'Farbe') + '</span></label>' +
+          (hasCol ? '<button type="button" class="bd-grp-btn" data-bdgrpcolorreset="' + gi + '" title="Farbe wie die Linie">&#8634;</button>' : '') +
+          '<button type="button" class="bd-grp-btn del" data-bdgrpdel="' + gi + '" title="Zeile l&ouml;schen">&times;</button>' +
+          '</div>' +
+          '<div class="bd-grp-row">' +
+          '<input type="text" class="bd-input" data-bdgrp="' + gi + '" value="' + esc(g.members || '') + '" placeholder="U6&gt;Floridsdorf + 49&gt;H&uuml;tteldorf">' +
           '<button type="button" class="bd-grp-btn" data-bdgrpmove="' + gi + ':-1" title="Nach oben">&uarr;</button>' +
           '<button type="button" class="bd-grp-btn" data-bdgrpmove="' + gi + ':1" title="Nach unten">&darr;</button>' +
-          '<button type="button" class="bd-grp-btn del" data-bdgrpdel="' + gi + '" title="Gruppe l&ouml;schen">&times;</button>' +
-          '</div>';
+          '</div></div>';
       }).join('');
       html += '<button type="button" class="bd-dirs-link" id="bdGrpAdd">+ Gruppe hinzuf&uuml;gen</button>';
       var chipLines = (st.lines || []);
@@ -25407,25 +25510,69 @@ window.addEventListener('DOMContentLoaded', () => {
         '<div class="name">Gehweg zur Haltestelle</div>' +
         '<div class="hint">Abfahrten, die du nicht mehr erreichst, blendet die Tafel aus. 0 = kein Filter, maximal 15 Minuten.</div></div>';
       var tokMin = bdParseWalk(st.walk);
+      var stationMin = {}, lineRules = [];
+      Object.keys(tokMin).forEach(function (tok) {
+        var gt = tok.indexOf('>');
+        if (gt > 0) lineRules.push({ rbl: tok.substring(0, gt), line: tok.substring(gt + 1), min: tokMin[tok] });
+        else stationMin[tok] = tokMin[tok];
+      });
       var byKey = {}, order = [];
       allStations().forEach(function (s) {
         var key = bdGroupKey(s);
         if (!byKey[key]) { byKey[key] = { name: s.stopName || s.fullId, sts: [] }; order.push(key); }
         byKey[key].sts.push(s);
       });
+      // Linien-Regeln: Draft im Editor hat Vorrang, sonst Stand vom Geraet
+      var wl = BD.walkLines;
+      if (wl === null) {
+        wl = [];
+        order.forEach(function (key) {
+          var toks = bdTokensFromString(bdRblsOf(byKey[key].sts));
+          var perLine = {};
+          lineRules.forEach(function (r) {
+            if (toks.indexOf(r.rbl) < 0) return;
+            var k2 = r.line.toLowerCase();
+            if (!perLine[k2] || r.min > perLine[k2].min) perLine[k2] = { key: key, line: r.line, min: r.min };
+          });
+          Object.keys(perLine).forEach(function (k2) { wl.push(perLine[k2]); });
+        });
+      }
+      var lineOpts = ((st.lines || []).map(function (l) { return l.n; }));
+      function wlRow(entry, idx) {
+        var opts = '<option value="">Linie &hellip;</option>' + lineOpts.map(function (n) {
+          return '<option value="' + esc(n) + '"' + (n === entry.line ? ' selected' : '') + '>' + esc(n) + '</option>';
+        }).join('');
+        if (entry.line && lineOpts.indexOf(entry.line) < 0) {
+          opts += '<option value="' + esc(entry.line) + '" selected>' + esc(entry.line) + '</option>';
+        }
+        return '<div class="bd-row bd-keep bd-walkline" data-bdwlkey="' + esc(entry.key) + '">' +
+          '<div class="bd-label" style="flex:0 0 auto;"><div class="hint" style="margin:0;">abweichend f&uuml;r</div></div>' +
+          '<div class="bd-nighttimes"><select class="bd-time bd-wlsel">' + opts + '</select>' +
+          '<input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + (entry.min || 0) + '" data-bdwalkline="1"> min' +
+          '<button type="button" class="bd-grp-btn del" data-bdwldel="' + idx + '" title="Regel entfernen">&times;</button></div>' +
+          '</div>';
+      }
       if (!order.length) {
         html += '<div class="bd-empty">Die Stationen erscheinen hier, sobald dein Display verbunden ist.</div>';
       } else {
+        var wlIdx = 0;
         html += order.map(function (key) {
           var g = byKey[key];
           var val = 0;
           bdTokensFromString(bdRblsOf(g.sts)).forEach(function (tok) {
-            if (tokMin[tok] && tokMin[tok] > val) val = tokMin[tok];
+            if (stationMin[tok] && stationMin[tok] > val) val = stationMin[tok];
           });
-          return '<div class="bd-row bd-keep">' +
+          var out = '<div class="bd-row bd-keep">' +
             '<div class="bd-label"><div class="name" style="font-weight:600;">' + esc(g.name) + '</div></div>' +
             '<div class="bd-nighttimes"><input type="number" class="bd-time bd-min" min="0" max="15" step="1" value="' + val + '" data-bdwalk="' + esc(key) + '"> min</div>' +
             '</div>';
+          wl.forEach(function (entry) {
+            if (entry.key !== key) return;
+            out += wlRow(entry, wlIdx);
+            wlIdx++;
+          });
+          out += '<div style="margin:-4px 0 10px;"><button type="button" class="bd-dirs-link" data-bdwladd="' + esc(key) + '">+ Pro Linie abweichend</button></div>';
+          return out;
         }).join('');
       }
     }
@@ -25433,22 +25580,67 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------- Zeilen-Gruppen (/api/groups): Segmente ; Mitglieder + Ziel > ----------
+  // Segment: "Name=#rrggbb::U6>Floridsdorf+49" (Name und Farbe optional, rueckwaertskompatibel)
   function bdParseGroups(s) {
-    return String(s || '').split(';').map(function (t) { return t.trim(); }).filter(Boolean);
+    return String(s || '').split(';').map(function (seg) {
+      seg = seg.trim();
+      if (!seg) return null;
+      var name = '', color = '', members = seg;
+      var di = seg.indexOf('::');
+      if (di >= 0) {
+        var label = seg.substring(0, di);
+        members = seg.substring(di + 2);
+        var eq = label.indexOf('=#');
+        if (eq >= 0) {
+          var hex = '#' + label.substring(eq + 2).trim();
+          if (/^#[0-9a-fA-F]{6}$/.test(hex)) color = hex.toLowerCase();
+          label = label.substring(0, eq);
+        }
+        name = label.trim();
+      }
+      return { name: name, color: color, members: members.trim() };
+    }).filter(Boolean);
+  }
+  function bdCleanGroupName(n) {
+    return String(n || '').replace(/[;:=#"+>]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 24);
+  }
+  function bdCleanMembers(m) {
+    return String(m || '').split('+').map(function (x) { return x.trim(); }).filter(Boolean).join('+');
+  }
+  function bdSerializeGroups(segs) {
+    return segs.map(function (g) {
+      var members = bdCleanMembers(g.members);
+      if (!members) return '';
+      var name = bdCleanGroupName(g.name);
+      var color = /^#[0-9a-fA-F]{6}$/.test(g.color || '') ? g.color.toLowerCase() : '';
+      if (!name && !color) return members;
+      return name + (color ? '=' + color : '') + '::' + members;
+    }).filter(Boolean).join(';');
   }
   function bdCollectGroupInputs() {
     var out = [];
-    var inputs = document.querySelectorAll('[data-bdgrp]');
-    for (var i = 0; i < inputs.length; i++) out.push(inputs[i].value);
+    var blocks = document.querySelectorAll('.bd-grp');
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      var n = b.querySelector('[data-bdgrpname]');
+      var c = b.querySelector('[data-bdgrpcolor]');
+      var m = b.querySelector('[data-bdgrp]');
+      out.push({
+        name: n ? n.value : '',
+        color: (c && c.getAttribute('data-auto') !== '1') ? c.value : '',
+        members: m ? m.value : ''
+      });
+    }
     return out;
   }
   function bdPushGroups(segs, forceRender) {
-    var clean = segs.map(function (seg) {
-      return seg.split('+').map(function (m) { return m.trim(); }).filter(Boolean).join('+');
-    }).filter(Boolean);
-    var str = clean.join(';');
+    var str = bdSerializeGroups(segs);
+    // Begonnene Zeilen (Name oder Farbe, aber noch keine Linien) als Entwurf behalten
+    var incomplete = segs.some(function (g) {
+      return !bdCleanMembers(g.members) && (bdCleanGroupName(g.name) || g.color);
+    });
+    BD.grpEdit = incomplete ? segs : null;
     if (BD.state && String(BD.state.groups || '') === str) {
-      BD.grpEdit = null;
       bdRenderTafel(forceRender);
       return;
     }
@@ -25456,7 +25648,6 @@ window.addEventListener('DOMContentLoaded', () => {
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         if (BD.state) BD.state.groups = str;
-        BD.grpEdit = null;
         bdToast(str ? 'Gruppen gespeichert.' : 'Gruppen entfernt.');
         bdRenderTafel(forceRender);
       })
@@ -25473,6 +25664,23 @@ window.addEventListener('DOMContentLoaded', () => {
     if (_walkTimer) clearTimeout(_walkTimer);
     _walkTimer = setTimeout(bdPushWalk, 600);
   }
+  // Gehweg-Linien-Regeln aus dem DOM lesen (skipEl ueberspringt eine Zeile beim Loeschen)
+  function bdCollectWalkLines(skipEl) {
+    var out = [];
+    var rows = document.querySelectorAll('.bd-walkline');
+    for (var i = 0; i < rows.length; i++) {
+      if (skipEl && rows[i] === skipEl) continue;
+      var sel = rows[i].querySelector('.bd-wlsel');
+      var inp = rows[i].querySelector('[data-bdwalkline]');
+      var v = inp ? parseInt(inp.value, 10) : 0;
+      out.push({
+        key: rows[i].getAttribute('data-bdwlkey') || '',
+        line: sel ? sel.value : '',
+        min: isNaN(v) ? 0 : Math.min(15, Math.max(0, v))
+      });
+    }
+    return out;
+  }
   function bdPushWalk() {
     var mins = {};
     var inputs = document.querySelectorAll('[data-bdwalk]');
@@ -25480,6 +25688,7 @@ window.addEventListener('DOMContentLoaded', () => {
       var v = parseInt(inputs[i].value, 10);
       mins[inputs[i].getAttribute('data-bdwalk')] = isNaN(v) ? 0 : Math.min(15, Math.max(0, v));
     }
+    BD.walkLines = bdCollectWalkLines();
     var byKey = {};
     allStations().forEach(function (s) {
       var key = bdGroupKey(s);
@@ -25487,9 +25696,13 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     var parts = [];
     Object.keys(byKey).forEach(function (key) {
+      var toks = bdTokensFromString(bdRblsOf(byKey[key]));
       var m = mins[key] || 0;
-      if (!m) return;
-      bdTokensFromString(bdRblsOf(byKey[key])).forEach(function (tok) { parts.push(tok + ':' + m); });
+      if (m) toks.forEach(function (tok) { parts.push(tok + ':' + m); });
+      BD.walkLines.forEach(function (r) {
+        if (r.key !== key || !r.line || !r.min) return;
+        toks.forEach(function (tok) { parts.push(tok + '>' + r.line + ':' + r.min); });
+      });
     });
     var str = parts.join(',');
     if (BD.state && String(BD.state.walk || '') === str) return;
@@ -25567,7 +25780,9 @@ window.addEventListener('DOMContentLoaded', () => {
     var rblsForCenter = sendRbls || bdCurrentRbls() || (BD.state ? String(BD.state.rbls || '') : '');
     // Stations-Push: Vollbild-Ladescreen statt halb leerem Panel, bis die Linien da sind
     if (sendRbls) bdSetReloadOverlay(true);
-    bdAnchorCenter(rblsForCenter).then(function (center) {
+    // Picker-Richtungen zuerst (pro Linie dirs), danach /api/cfg mit dem Voll-Reload
+    var preDirs = sendRbls ? bdPushPickerDirs() : Promise.resolve();
+    preDirs.then(function () { return bdAnchorCenter(rblsForCenter); }).then(function (center) {
       var aaddrVal = (BD.anchor.mode === 'addr' && bdIsNum(BD.anchor.lat)) ? 1 : 0;
       // Adress-Anker ohne bekannte Koordinaten: aaddr nicht anfassen (Punkt bleibt am Geraet)
       var keepDeviceAnchor = (BD.anchor.mode === 'addr' && !bdIsNum(BD.anchor.lat));
@@ -25708,10 +25923,10 @@ window.addEventListener('DOMContentLoaded', () => {
     if (grpAdd) {
       e.preventDefault();
       BD.grpEdit = bdCollectGroupInputs();
-      BD.grpEdit.push('');
+      BD.grpEdit.push({ name: '', color: '', members: '' });
       bdRenderTafel(true);
-      var gInputs = document.querySelectorAll('[data-bdgrp]');
-      if (gInputs.length) gInputs[gInputs.length - 1].focus();
+      var gNames = document.querySelectorAll('[data-bdgrpname]');
+      if (gNames.length) gNames[gNames.length - 1].focus();
       return;
     }
     var grpMove = t.closest('[data-bdgrpmove]');
@@ -25735,18 +25950,44 @@ window.addEventListener('DOMContentLoaded', () => {
       bdPushGroups(segsD, true);
       return;
     }
+    var wlAdd = t.closest('[data-bdwladd]');
+    if (wlAdd) {
+      e.preventDefault();
+      BD.walkLines = bdCollectWalkLines();
+      BD.walkLines.push({ key: wlAdd.getAttribute('data-bdwladd'), line: '', min: 5 });
+      bdRenderTafel(true);
+      return;
+    }
+    var wlDel = t.closest('[data-bdwldel]');
+    if (wlDel) {
+      e.preventDefault();
+      BD.walkLines = bdCollectWalkLines(wlDel.closest('.bd-walkline'));
+      bdRenderTafel(true);
+      bdQueueWalkPush();
+      return;
+    }
+    var grpColRes = t.closest('[data-bdgrpcolorreset]');
+    if (grpColRes) {
+      e.preventDefault();
+      var segsR = bdCollectGroupInputs();
+      var ri = parseInt(grpColRes.getAttribute('data-bdgrpcolorreset'), 10);
+      if (segsR[ri]) segsR[ri].color = '';
+      bdPushGroups(segsR, true);
+      return;
+    }
     var grpChip = t.closest('[data-bdgrpchip]');
     if (grpChip) {
       e.preventDefault();
       var gInputs2 = document.querySelectorAll('[data-bdgrp]');
       if (!gInputs2.length) {
-        BD.grpEdit = [''];
+        BD.grpEdit = [{ name: '', color: '', members: '' }];
         bdRenderTafel(true);
         gInputs2 = document.querySelectorAll('[data-bdgrp]');
       }
       // Ziel: das gerade aktive Gruppen-Feld, sonst das letzte
       var aeC = document.activeElement;
-      var inp2 = (aeC && aeC.hasAttribute && aeC.hasAttribute('data-bdgrp')) ? aeC : gInputs2[gInputs2.length - 1];
+      var blockC = (aeC && aeC.closest) ? aeC.closest('.bd-grp') : null;
+      var inp2 = blockC ? blockC.querySelector('[data-bdgrp]') : gInputs2[gInputs2.length - 1];
       if (!inp2) return;
       var ln = grpChip.getAttribute('data-bdgrpchip');
       inp2.value = inp2.value.trim() ? (inp2.value.replace(/\s+$/, '') + ' + ' + ln) : ln;
@@ -25770,14 +26011,6 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (t.closest('#bdAddrSearchBtn')) { bdDoGeocode(); return; }
-    var dOpen = t.closest('[data-bddirsopen]');
-    if (dOpen) {
-      BD.dirsOpen[dOpen.getAttribute('data-bddirsopen')] = true;
-      bdRenderLines();
-      var inp = document.querySelector('[data-bddirs="' + (window.CSS && CSS.escape ? CSS.escape(dOpen.getAttribute('data-bddirsopen')) : dOpen.getAttribute('data-bddirsopen')) + '"]');
-      if (inp) inp.focus();
-      return;
-    }
     var lineBtn = t.closest('[data-bdline] button');
     if (lineBtn) {
       var name = lineBtn.closest('[data-bdline]').getAttribute('data-bdline');
@@ -25791,8 +26024,8 @@ window.addEventListener('DOMContentLoaded', () => {
       if (!BD.state) return;
       BD.state[key] = v;
       bdDisp(key, v);
-      if (key === 'lay') { bdRenderKarte(); bdRenderAnzeige(); }
-      else if (key === 'sort') bdRenderTafel();
+      if (key === 'lay') { bdRenderKarte(); bdRenderAnzeige(); bdRenderTafel(); bdCheckAnchorRange(); }
+      else if (key === 'sort' || key === 'blink' || key === 'list') bdRenderTafel();
       else if (key === 'btyp' || key === 'cols') { bdRenderAnzeige(); bdRenderLines(); }
       else bdRenderAnzeige();
       return;
@@ -25819,18 +26052,6 @@ window.addEventListener('DOMContentLoaded', () => {
         BD.state.dlyhl = +BD.state.dlyhl ? 0 : 1;
         bdDisp('dlyhl', BD.state.dlyhl);
         bdRenderTafel();
-      } else if (k === 'winon') {
-        var w0 = bdParseWin(BD.state.win);
-        if (w0.from === 0 && w0.to === 0) {
-          var nw = (BD.lastWin && BD.lastWin !== '0-0') ? BD.lastWin : '360-1320';
-          BD.state.win = nw;
-          bdDisp('win', nw);
-        } else {
-          BD.lastWin = BD.state.win;
-          BD.state.win = '0-0';
-          bdDisp('win', '0-0');
-        }
-        bdRenderTafel();
       } else {
         BD.state.layers = BD.state.layers || {};
         BD.state.layers[k] = BD.state.layers[k] ? 0 : 1;
@@ -25848,7 +26069,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (e.target && e.key === 'Enter' && e.target.hasAttribute &&
-        (e.target.hasAttribute('data-bddirs') || e.target.hasAttribute('data-bdgrp'))) {
+        (e.target.hasAttribute('data-bddirs') || e.target.hasAttribute('data-bdgrp') || e.target.hasAttribute('data-bdgrpname'))) {
       e.preventDefault();
       e.target.blur();   // blur loest das change-Event aus, das speichert
     }
@@ -25865,13 +26086,23 @@ window.addEventListener('DOMContentLoaded', () => {
       if (note) note.style.display = 'none';
       return;
     }
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdgrpcolor')) {
+      e.target.setAttribute('data-auto', '0');
+      var lab = e.target.closest('.bd-grp-color');
+      if (lab) {
+        lab.style.background = e.target.value;
+        var sp = lab.querySelector('span');
+        if (sp) sp.textContent = '';
+      }
+      return;
+    }
     if (e.target && e.target.id === 'bdMapW') {
       var mv = parseInt(e.target.value, 10) || 600;
       if (BD.state) BD.state.mapw = mv;
       var ml = $('bdMapWVal');
       if (ml) ml.textContent = mv + ' m';
       if (_mapwTimer) clearTimeout(_mapwTimer);
-      _mapwTimer = setTimeout(function () { bdDisp('mapw', mv); }, 250);
+      _mapwTimer = setTimeout(function () { bdDisp('mapw', mv); bdCheckAnchorRange(); }, 250);
       return;
     }
     if (e.target && e.target.id === 'bdBright') {
@@ -25895,21 +26126,21 @@ window.addEventListener('DOMContentLoaded', () => {
       bdPushDirs(e.target.getAttribute('data-bddirs'), e.target.value.trim());
       return;
     }
-    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdwalk')) {
+    if (e.target && e.target.hasAttribute && (e.target.hasAttribute('data-bdwalk') || e.target.hasAttribute('data-bdwalkline'))) {
       bdQueueWalkPush();
       return;
     }
-    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdgrp')) {
-      bdPushGroups(bdCollectGroupInputs());
+    if (e.target && e.target.classList && e.target.classList.contains('bd-wlsel')) {
+      bdQueueWalkPush();
       return;
     }
-    if (id === 'bdWinFrom' || id === 'bdWinTo') {
-      var wm = parseTimeToMin(e.target.value);
-      if (wm === null || !BD.state) return;
-      var w = bdParseWin(BD.state.win);
-      if (id === 'bdWinFrom') w.from = wm; else w.to = wm;
-      BD.state.win = w.from + '-' + w.to;
-      bdDisp('win', BD.state.win);
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-bdgrpcolor')) {
+      e.target.setAttribute('data-auto', '0');
+      bdPushGroups(bdCollectGroupInputs(), true);
+      return;
+    }
+    if (e.target && e.target.hasAttribute && (e.target.hasAttribute('data-bdgrp') || e.target.hasAttribute('data-bdgrpname'))) {
+      bdPushGroups(bdCollectGroupInputs());
       return;
     }
     if (id !== 'bdNightFrom' && id !== 'bdNightTo') return;
