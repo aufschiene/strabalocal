@@ -24607,6 +24607,8 @@ window.addEventListener('DOMContentLoaded', () => {
   .bd-tb-blk:not(.bare) .bd-tb-face { background: transparent !important; }
   .bd-tb-rows .bd-tb-face { padding-left: 8px; }
   .bd-tb-rows .bd-tb-row.bd-tb-grp { padding-left: 0; }
+  .bd-tb-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 6px; }
+  .bd-tb-grid .bd-tb-row .ds { font-size: 12px; }
   .mn.zero { position: relative; display: inline-block; width: 24px; height: 20px; }
   .mn.zero.z0::after, .mn.zero.z1::after { content: '0'; position: absolute; right: 0; top: 0; line-height: 20px; }
   .mn.zero.z0::after { color: #ffd200; }
@@ -24714,6 +24716,8 @@ window.addEventListener('DOMContentLoaded', () => {
   .bd-order-btns .bd-grp-btn { width: 30px; height: 30px; font-size: 11px; }
   .bd-grp-btn:disabled { opacity: .3; cursor: default; box-shadow: none; }
   .bd-paused *, .bd-paused *::after { animation-play-state: paused !important; }
+  .bd-pop { animation: bdPop .32s cubic-bezier(.2, .9, .3, 1.2); transform-origin: top center; }
+  @keyframes bdPop { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) {
     #bdHome *, #bdHome *::after { animation: none !important; transition: none !important; }
     .pv-qsB, .pv-fb { opacity: 0; }
@@ -25060,8 +25064,11 @@ window.addEventListener('DOMContentLoaded', () => {
     if (dev === 1 && BD.anchor.mode !== 'addr') { BD.anchor.mode = 'addr'; bdSaveAnchor(); bdRenderAnchor(); }
     else if (dev === 0 && BD.anchor.mode === 'addr') { BD.anchor.mode = 'auto'; bdSaveAnchor(); bdRenderAnchor(); }
   }
-  function bdDisp(key, val) {
-    return bdFetch('/api/disp?' + encodeURIComponent(key) + '=' + encodeURIComponent(val), { method: 'POST' })
+  function bdDisp(key, val) { return bdDispPairs([[key, val]]); }
+  // Mehrere Keys in EINEM Request, damit das Geraet nur einmal neu zeichnet
+  function bdDispPairs(pairs) {
+    var qs = pairs.map(function (p) { return encodeURIComponent(p[0]) + '=' + encodeURIComponent(p[1]); }).join('&');
+    return bdFetch('/api/disp?' + qs, { method: 'POST' })
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         if (!BD.online) { BD.online = true; bdRenderDevice(); }
@@ -25600,6 +25607,11 @@ window.addEventListener('DOMContentLoaded', () => {
   function pvTxt(x, y, size, fill, txt, extra) {
     return '<text x="' + x + '" y="' + y + '" font-size="' + size + '" fill="' + fill + '" font-family="Poppins,Arial,sans-serif" ' + (extra || '') + '>' + txt + '</text>';
   }
+  // Liniennummer im Fahrzeug: neue Firmware meldet vnum, alte koppelt sie an vbig
+  function bdVehNumOn(st) {
+    st = st || {};
+    return typeof st.vnum !== 'undefined' ? !!+st.vnum : !!+st.vbig;
+  }
   function pvBase(st) {
     st = st || BD.state || {};
     var ly = st.layers || {};
@@ -25608,7 +25620,7 @@ window.addEventListener('DOMContentLoaded', () => {
       corner: parseInt(st.corner, 10) || 0, style: parseInt(st.style, 10) ? 1 : 0, cols: pvCols(), nums: pvNums(),
       roads: ly.roads === undefined ? true : !!+ly.roads, paths: ly.paths === undefined ? true : !!+ly.paths,
       traffic: !!+ly.traffic, dly: ly.dly === undefined ? true : !!+ly.dly, vbig: !!+st.vbig,
-      vnum: st.vnum === undefined ? !!+st.vbig : !!+st.vnum,
+      vnum: st.vnum === undefined ? !!+st.vbig : !!+st.vnum, bpos: parseInt(st.bpos, 10) || 0,
       anchor: (BD.anchor && BD.anchor.mode === 'addr') ? 'addr' : 'stop'
     };
   }
@@ -25679,7 +25691,7 @@ window.addEventListener('DOMContentLoaded', () => {
     return s;
   }
   // Tafel-Zeilen als Balken (x, y, Breite, Zeilenhoehe, Anzahl); style 1 = Farbig
-  function pvRows(p, x, y, w, rh, n, style, cols, nums) {
+  function pvRows(p, x, y, w, rh, n, style, cols, nums, minOff) {
     var s = '', mins = ['0', '3', '5', '8', '12', '15', '18'];
     nums = nums || pvNums();
     for (var i = 0; i < n; i++) {
@@ -25691,7 +25703,7 @@ window.addEventListener('DOMContentLoaded', () => {
       s += pvTxt(x + pad + cw / 2, yy + Math.round(h * 0.68), Math.round(h * 0.46), style ? fg : badgeFg(c), esc(nums[i % nums.length]), 'text-anchor="middle" font-weight="800"');
       var dx = x + pad + cw + Math.round(h * 0.3), dw = Math.max(24, w - (dx - x) - Math.round(h * 1.4));
       s += '<rect x="' + dx + '" y="' + (yy + Math.round(h * 0.38)) + '" width="' + dw + '" height="' + Math.max(4, Math.round(h * 0.24)) + '" rx="' + Math.round(h * 0.12) + '" fill="' + fg + '" opacity=".85"/>';
-      var m = mins[i % mins.length];
+      var m = mins[(i + (minOff || 0)) % mins.length];
       s += pvTxt(x + w - Math.round(h * 0.35), yy + Math.round(h * 0.68), Math.round(h * 0.48), m === '0' ? PV.zero : fg, m, 'text-anchor="end" font-weight="800"');
     }
     return s;
@@ -25721,13 +25733,34 @@ window.addEventListener('DOMContentLoaded', () => {
       '<rect x="' + (tx - 18) + '" y="' + (y + h - 7) + '" width="36" height="9" fill="' + o.p.panel + '"/>' +
       pvRows(o.p, x + 8, y + 9, w - 16, rh, n, o.style, cols || o.cols, nums || o.nums);
   }
+  // Standard mit Tafel unten (bpos 1/2): 4 Zeilen x 2 Zellen, je Zelle eine kompakte Zeile
+  var _pvClipN = 0;
+  function pvBottomBoard(o) {
+    var p = o.p, s = '<rect x="0" y="408" width="1024" height="192" fill="' + p.hdr + '"/>', cells = [];
+    if (o.bpos === 2) cells = [[0, 0, 0], [0, 1, 0], [1, 0, 1], [1, 1, 1], [2, 0, 2], [3, 0, 3], [3, 1, 3]];
+    else for (var k = 0; k < 8; k++) cells.push([k >> 1, k & 1, k]);
+    cells.forEach(function (c, i) {
+      var ci = c[2] % o.cols.length;
+      s += pvRows(p, c[1] ? 518 : 6, 412 + c[0] * 46, 500, 46, 1, o.style, [o.cols[ci]], [o.nums[c[2] % o.nums.length]], i);
+    });
+    return s;
+  }
   // Komplette catch-it-Ansicht: Karte + Tafel je nach Kartengroesse und Panel-Stil
   function pvCatchScene(o) {
-    var lay = o.lay, mapX0 = lay === 0 ? 540 : (lay === 1 ? 310 : 0);
+    var lay = o.lay, bottom = lay === 1 && o.bpos > 0;
+    var mapX0 = bottom ? 0 : (lay === 0 ? 540 : (lay === 1 ? 310 : 0));
     var cx = Math.round(mapX0 + (1024 - mapX0) / 2), z = o.zoom || 1;
     var s = '<g' + (o.zoomId ? ' id="' + o.zoomId + '"' : '') + ' transform="translate(' + cx + ' 300) scale(' + z + ') translate(' + (-cx) + ' -300)">' +
       pvMap(pvWith(o, { cx: cx })) + '</g>';
     if (o.anchor === 'addr') s += '<circle cx="' + cx + '" cy="300" r="21" fill="#fff"/><circle cx="' + cx + '" cy="300" r="14" fill="' + PV.blue + '"/>';
+    if (bottom) {
+      // Karte 1024 x 408 mit der Mitte dort, Uhr als Pille oben rechts, kein Tafel-Kopf
+      var cid = 'pvcb' + (++_pvClipN);
+      return '<defs><clipPath id="' + cid + '"><rect width="1024" height="408"/></clipPath></defs>' +
+        '<g clip-path="url(#' + cid + ')"><g transform="translate(0 -96)">' + s + '</g></g>' +
+        '<rect x="868" y="14" width="142" height="48" rx="24" fill="' + o.p.panel + '" stroke="' + o.p.brd + '" stroke-width="3"/>' +
+        pvTxt(939, 48, 30, o.p.fg, '12:34', 'text-anchor="middle" font-weight="700"') + pvBottomBoard(o);
+    }
     if (lay < 2) {
       s += pvColBoard(o, mapX0);
     } else if (!o.pstyle) {
@@ -26041,6 +26074,41 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     return body;
   }
+  // Tafel unten (Standard): dieselbe Zeilenliste wie kompakt, verteilt auf 4 Zeilen x 2 Zellen
+  // wie die Firmware: Raster = die ersten 8 Eintraege zeilenweise, je Linie = neue Reihe bei
+  // Linienwechsel. Jede Zelle hat ihre eigene Nummer, Kopfzeilen belegen eine Zelle.
+  function pvBottomHtml(o, cRows, bpos) {
+    var slots = [];
+    cRows.forEach(function (r) {
+      if (r.kind === 'sec') {
+        slots.push({ line: '', html: pvBlock(o, r.col, '<div class="bd-tb-hdr">' + esc(r.name) + '</div>') });
+        r.items.forEach(function (it) {
+          slots.push({ line: it.line, html: pvBlock(o, r.col, pvRowNext(o, pvChip(o, it.line, pvBmCol(r.bm, it.col, r.col), r.col), it, '')) });
+        });
+      } else if (r.kind === 'bundle') {
+        slots.push({ line: r.items[0].line, html: '<div class="bd-tb-blk bare">' + pvBundle(o, r.items, r.col, r.bm, 2) + '</div>' });
+      } else {
+        var it0 = r.items[0];
+        slots.push({ line: it0.line, html: pvBlock(o, it0.col, pvRowNext(o, pvChip(o, it0.line, it0.col, it0.col), it0, '')) });
+      }
+    });
+    var cells = [], row = 0, col = 0, last = '';
+    for (var k = 0; k < slots.length; k++) {
+      if (bpos === 2) {
+        if (k && slots[k].line !== last && col > 0) { row++; col = 0; }
+        if (row >= 4) break;
+        cells.push({ r: row, c: col, html: slots[k].html });
+        last = slots[k].line;
+        if (++col >= 2) { col = 0; row++; }
+      } else {
+        if (k >= 8) break;
+        cells.push({ r: k >> 1, c: k & 1, html: slots[k].html });
+      }
+    }
+    return '<div class="bd-tb-grid">' + cells.map(function (c) {
+      return '<div style="grid-row:' + (c.r + 1) + ';grid-column:' + (c.c + 1) + ';min-width:0;">' + c.html + '</div>';
+    }).join('') + '</div>';
+  }
   function bdRenderTafelPrev() {
     var box = $('bdTafelPrev');
     if (!box) return;
@@ -26094,21 +26162,24 @@ window.addEventListener('DOMContentLoaded', () => {
     };
     var cRows = pvCompactRows(model, slots, hit), compactCount = 0;
     cRows.forEach(function (r) { compactCount += r.kind === 'sec' ? r.items.length + 1 : 1; });
-    var units = null;
-    if (lay < 2 && cols === 0 && list !== 1 && (lay === 1 || list === 2)) {
+    var units = null, bottom = bdBottomBoard(st);
+    if (!bottom && lay < 2 && cols === 0 && list !== 1 && (lay === 1 || list === 2)) {
       units = pvUnitList(model, items, hit, { sort: sort, lay: lay, force: list === 2, compactCount: compactCount, split: parseInt(st.split, 10) ? 1 : 0 });
     }
-    var body = units ? units.map(function (u) { return pvUnitHtml(o, u); }).join('') : pvCompactHtml(o, cRows);
+    var body = bottom ? pvBottomHtml(o, cRows, parseInt(st.bpos, 10) || 0)
+      : (units ? units.map(function (u) { return pvUnitHtml(o, u); }).join('') : pvCompactHtml(o, cRows));
     var stn = '';
     var sts = allStations();
     if (sts.length && sts[0].stopName) stn = String(sts[0].stopName).replace(/^Linz\/Donau\s+/, '');
     var now = new Date(), clk = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+    // Tafel unten: kein Kopf (die Uhr sitzt am Geraet als Pille auf der Karte)
     box.innerHTML = '<div class="bd-prev"><div class="bd-tb' + (light ? ' light' : '') + (o.style ? ' farbig' : '') + '">' +
-      '<div class="bd-tb-hd"><span class="st">' + esc(stn || 'Deine Station') + '</span><span class="clk">' + clk + '</span></div>' +
+      (bottom ? '' : '<div class="bd-tb-hd"><span class="st">' + esc(stn || 'Deine Station') + '</span><span class="clk">' + clk + '</span></div>') +
       '<div class="bd-tb-body">' + body + '</div></div>' +
       '<div class="bd-prev-cap"><span class="bd-live"></span>Live-Vorschau <span class="sep">&middot;</span> ' +
       (sample ? 'Beispiel-Linien, Zeiten erfunden' : 'deine Linien, Zeiten erfunden') +
       (units ? ' <span class="sep">&middot;</span> Einzel-Liste' : '') +
+      (bottom ? ' <span class="sep">&middot;</span> Tafel unten' : '') +
       (walkSt > 0 ? ' <span class="sep">&middot;</span> Gehweg ' + walkSt + ' min' : '') + '</div></div>';
     var bdy = box.querySelector('.bd-tb-body');
     if (bdy && bdy.scrollHeight > bdy.clientHeight + 2) bdy.classList.add('cut');
@@ -26227,28 +26298,87 @@ window.addEventListener('DOMContentLoaded', () => {
     var hasB = !!st && typeof st.btyp !== 'undefined', hasC = !!st && typeof st.cols !== 'undefined';
     card.style.display = (hasB || hasC) ? '' : 'none';
     if (!hasB && !hasC) { el.innerHTML = ''; return; }
-    var b = pvBase(st), bt = hasB ? (parseInt(st.btyp, 10) || 0) : 0, html = '';
-    if (hasB) {
-      html += stackRow('Display-Typ', 'catch it zeigt Karte und Abfahrten in unserem Look. &Ouml;BB, DB und SBB sind originalgetreue Abfahrtsmonitore.',
-        optCards('btyp', [
-          { label: 'catch it', svg: pvCatchScene(pvWith(b, { lay: 2, pstyle: 0, corner: 0 })) },
+    var b = pvBase(st), bt = hasB ? (parseInt(st.btyp, 10) || 0) : 0, cl = hasC ? (parseInt(st.cols, 10) || 0) : 0;
+    var board = bt > 0 || cl > 0, nCols = cl || BD.lastCols || 1;
+    if (board) BD.lastBtyp = bt;
+    if (cl > 0) BD.lastCols = cl;
+    // Die Abfahrtstafel-Karte zeigt die gerade gewaehlte Tafel-Art
+    var boardSvg = bt === 1 ? pvOebbScene() : bt === 2 ? pvDbScene() : bt === 3 ? pvSbbScene() : pvListScene(b, nCols);
+    var html = stackRow('Display-Typ', 'Karte mit Fahrzeugen und Abfahrten, oder eine Anzeigetafel &uuml;ber das ganze Display.',
+      optCards('bdview', [
+        { label: 'Karte', svg: pvCatchScene(b) },
+        { label: 'Anzeigetafel', svg: boardSvg }
+      ], board ? 1 : 0, 'c2'));
+    // Unteroptionen ploppen nur beim Aufklappen auf, nicht bei jedem stillen Neuaufbau
+    var showTafel = board && hasB, showCols = board && bt === 0 && hasC;
+    var popTafel = showTafel && BD._viewShown && !BD._viewShown.tafel;
+    var popCols = showCols && BD._viewShown && !BD._viewShown.cols;
+    BD._viewShown = { tafel: showTafel, cols: showCols };
+    function pop(rowHtmlStr, on) { return on ? rowHtmlStr.replace('class="bd-row bd-stack"', 'class="bd-row bd-stack bd-pop"') : rowHtmlStr; }
+    if (showTafel) {
+      html += pop(stackRow('Tafel-Art', 'catch it ist unser Look ohne Karte. &Ouml;BB, DB und SBB sind originalgetreue Abfahrtsmonitore.',
+        optCards('bdtafel', [
+          { label: 'catch it', svg: pvListScene(b, nCols) },
           { label: '&Ouml;BB', svg: pvOebbScene() },
           { label: 'DB', svg: pvDbScene() },
           { label: 'SBB', svg: pvSbbScene() }
-        ], bt, 'c4'));
+        ], bt, 'c4')), popTafel);
     }
-    if (hasC && bt === 0) {
-      html += stackRow('Aufteilung', 'Mit Karte, oder nur Abfahrten &uuml;ber das ganze Display.',
-        optCards('cols', [
-          { label: 'Karte + Tafel', svg: pvCatchScene(pvWith(b, { lay: 1 })) },
-          { label: '1 Spalte', svg: pvListScene(b, 1) },
-          { label: '2 Spalten', svg: pvListScene(b, 2) },
-          { label: '3 Spalten', svg: pvListScene(b, 3) }
-        ], parseInt(st.cols, 10) || 0, 'c4'));
+    if (showCols) {
+      html += pop(stackRow('Spalten', '', optCards('bdcols', [
+        { label: '1 Spalte', svg: pvListScene(b, 1) },
+        { label: '2 Spalten', svg: pvListScene(b, 2) },
+        { label: '3 Spalten', svg: pvListScene(b, 3) }
+      ], nCols - 1, 'c3')), popCols);
     }
     el.innerHTML = html;
   }
+  // Ansicht auf die Firmware-Keys abbilden: catch it Karte = btyp 0 + cols 0; Abfahrtstafel
+  // Modern = btyp 0 + cols 1 bis 3; OeBB/DB/SBB = btyp 1 bis 3 (cols ignoriert die Firmware dann)
+  function bdSetView(key, v) {
+    var st = BD.state, hasB = typeof st.btyp !== 'undefined';
+    var bt = parseInt(st.btyp, 10) || 0, cl = parseInt(st.cols, 10) || 0, nb = bt, nc = cl;
+    if (key === 'bdview') {
+      if (v === 0) { nb = 0; nc = 0; }
+      else if (bt === 0 && cl === 0) {
+        nb = hasB ? (BD.lastBtyp || 0) : 0;
+        if (nb === 0) nc = BD.lastCols || 1;
+      }
+    } else if (key === 'bdtafel') {
+      nb = v;
+      if (v === 0 && nc === 0) nc = BD.lastCols || 1;
+    } else {
+      nb = 0;
+      nc = v + 1;
+    }
+    if (nc > 0) BD.lastCols = nc;
+    if (nb > 0) BD.lastBtyp = nb;
+    else if (!(key === 'bdview' && v === 0)) BD.lastBtyp = 0;
+    if (nb === bt && nc === cl) return;
+    var pairs = [];
+    if (hasB && nb !== bt) pairs.push(['btyp', nb]);
+    if (nc !== cl) pairs.push(['cols', nc]);
+    st.btyp = nb;
+    st.cols = nc;
+    bdDispPairs(pairs);
+    bdRenderControls();
+    bdRenderLines();
+  }
 
+  // Welche Ansicht laeuft: 'map' (catch it Karte), 'modern' (catch it Tafel 1 bis 3 Spalten),
+  // 'station' (OeBB/DB/SBB-Tafel)
+  function bdViewMode(st) {
+    st = st || BD.state || {};
+    if ((parseInt(st.btyp, 10) || 0) > 0) return 'station';
+    if ((parseInt(st.cols, 10) || 0) > 0) return 'modern';
+    return 'map';
+  }
+  // Kartengroesse Standard mit Tafel unten: immer kompakt im Raster 4 Zeilen x 2 Zellen
+  function bdBottomBoard(st) {
+    st = st || BD.state || {};
+    return (parseInt(st.lay, 10) || 0) === 1 && (parseInt(st.cols, 10) || 0) === 0 &&
+      (parseInt(st.btyp, 10) || 0) === 0 && (parseInt(st.bpos, 10) || 0) > 0;
+  }
   function bdMapVisible(st) {
     st = st || BD.state || {};
     return !((parseInt(st.btyp, 10) || 0) > 0 || (parseInt(st.cols, 10) || 0) > 0);
@@ -26270,9 +26400,21 @@ window.addEventListener('DOMContentLoaded', () => {
     var b = pvBase(st), lay = b.lay, html = '';
     html += stackRow('Kartengr&ouml;&szlig;e', '', optCards('lay', [
       { label: 'Klein', sub: 'breite Tafel', svg: pvCatchScene(pvWith(b, { lay: 0 })) },
-      { label: 'Mittel', sub: 'schmale Tafel', svg: pvCatchScene(pvWith(b, { lay: 1 })) },
+      { label: 'Standard', sub: 'Tafel seitlich oder unten', svg: pvCatchScene(pvWith(b, { lay: 1 })) },
       { label: 'Gro&szlig;', sub: 'Karte voll', svg: pvCatchScene(pvWith(b, { lay: 2 })) }
     ], lay, 'c3'));
+    // Standard: Tafel seitlich oder unten unter der Karte (bpos, nur bei Karte + Tafel)
+    var showBpos = lay === 1 && typeof st.bpos !== 'undefined';
+    var popBpos = showBpos && BD._bposShown === false;
+    BD._bposShown = showBpos;
+    if (showBpos) {
+      var bposRow = stackRow('Tafel', '', optCards('bpos', [
+        { label: 'Seitlich', svg: pvCatchScene(pvWith(b, { lay: 1, bpos: 0 })) },
+        { label: 'Unten', sub: '4 Zeilen, je 2 Linien', svg: pvCatchScene(pvWith(b, { lay: 1, bpos: 1 })) },
+        { label: 'Unten', sub: 'je Linie beide Richtungen', svg: pvCatchScene(pvWith(b, { lay: 1, bpos: 2 })) }
+      ], b.bpos, 'c3'));
+      html += popBpos ? bposRow.replace('class="bd-row bd-stack"', 'class="bd-row bd-stack bd-pop"') : bposRow;
+    }
     if (lay === 2) {
       html += stackRow('Abfahrten auf der Karte', '', optCards('pstyle', [
         { label: 'Ecke', sub: 'feste Tafel', svg: pvCatchScene(pvWith(b, { pstyle: 0 })) },
@@ -26296,18 +26438,9 @@ window.addEventListener('DOMContentLoaded', () => {
       '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdMapW" min="500" max="1000" step="50" value="' + mw + '">' +
       '<span class="bd-range-val" id="bdMapWVal">' + mw + ' m</span></div>');
     if (typeof st.vbig !== 'undefined') {
-      // vnum (eigener Schalter) gibt es erst mit neuer Firmware; davor haengt die Nummer an Gross
-      var hasVnum = typeof st.vnum !== 'undefined';
-      var smallV = pvCatchScene(pvWith(b, { lay: 2, pstyle: 0, corner: 2, vbig: false, vnum: hasVnum && b.vnum, zoom: 1.35 }));
-      var bigV = pvCatchScene(pvWith(b, { lay: 2, pstyle: 0, corner: 2, vbig: true, vnum: hasVnum ? b.vnum : true, zoom: 1.35 }));
-      h2 += stackRow('Fahrzeuge', '', optCards('vbig', [
-        { label: 'Standard', svg: smallV },
-        { label: hasVnum ? 'Gro&szlig;' : 'Gro&szlig; mit Liniennummer', svg: bigV }
-      ], st.vbig ? 1 : 0, 'c2'));
-      if (hasVnum) {
-        h2 += rowHtml('Liniennummer im Fahrzeug', 'Zeigt die Liniennummer direkt im Tropfen auf der Karte.',
-          switchHtml('vnum', b.vnum), 'bd-keep');
-      }
+      // Groesse haengt an der Nummer (Paul): mit Liniennummer gross, ohne normal
+      h2 += rowHtml('Liniennummer im Fahrzeug', 'Mit Nummer werden die Fahrzeuge auf der Karte gr&ouml;&szlig;er.',
+        switchHtml('vnum', bdVehNumOn(st)), 'bd-keep');
     }
     var ly = st.layers || {};
     LAYERS.forEach(function (d) {
@@ -26340,24 +26473,31 @@ window.addEventListener('DOMContentLoaded', () => {
     var st = BD.state;
     if (!st) { el.innerHTML = '<div class="bd-empty">Einstellungen erscheinen, sobald dein Display verbunden ist.</div>'; return; }
     var b = pvWith(pvBase(st), { lay: 2, pstyle: 0, corner: 0 });
-    var html = stackRow('Design', '', optCards('design', [
-      { label: 'Dunkel', svg: pvCatchScene(pvWith(b, { p: PV.d })) },
-      { label: 'Hell', svg: pvCatchScene(pvWith(b, { p: PV.l })) },
-      { label: 'Auto', sub: 'folgt dem Tageslicht', svg: pvAutoScene(b) }
-    ], parseInt(st.design, 10) || 0, 'c3'));
+    var vm = bdViewMode(st), html = '';
+    // OeBB/DB/SBB haben feste Originalfarben: Design wirkt dort nicht
+    if (vm !== 'station') {
+      html += stackRow('Design', '', optCards('design', [
+        { label: 'Dunkel', svg: pvCatchScene(pvWith(b, { p: PV.d })) },
+        { label: 'Hell', svg: pvCatchScene(pvWith(b, { p: PV.l })) },
+        { label: 'Auto', sub: 'folgt dem Tageslicht', svg: pvAutoScene(b) }
+      ], parseInt(st.design, 10) || 0, 'c3'));
+    }
     var pct = (st.bright + 1) * 20;
     html += rowHtml('Helligkeit', '',
       '<div class="bd-brightwrap"><input type="range" class="bd-range" id="bdBright" min="0" max="4" step="1" value="' + st.bright + '">' +
       '<span class="bd-range-val" id="bdBrightVal">' + pct + ' %</span></div>');
-    var qs = parseInt(st.qsfn, 10);
-    if (isNaN(qs)) qs = 4;
-    var qsNames = ['das Design', 'die Versp&auml;tungen', 'den Verkehr', 'die Kartengr&ouml;&szlig;e'];
-    html += '<div class="bd-row bd-stack"><div class="bd-label"><div class="name">Schnellschalter' + infoBtn('qs') + '</div>' +
-      '<div class="hint">Ein Tipp aufs kleine Feld unten rechts am Display schaltet die gew&auml;hlte Funktion um, ohne Men&uuml;.</div></div>' +
-      segHtml('qsfn', ['Design', 'Versp&auml;tung', 'Verkehr', 'Karte', 'Aus'], qs) + '</div>';
-    html += infoPanel('qs', pvQsScene(qs),
-      qs < 4 ? ('Ein Tipp aufs Feld unten rechts schaltet ' + qsNames[qs] + ' um, ein zweiter Tipp wieder zur&uuml;ck.')
-             : 'W&auml;hle oben eine Funktion. Dann erscheint unten rechts am Display ein kleines Feld, und ein Tipp darauf schaltet sie direkt um. Hier siehst du das Beispiel Design.');
+    // Das Schnellschalter-Feld zeichnet die Firmware nur auf der Karte
+    if (vm === 'map') {
+      var qs = parseInt(st.qsfn, 10);
+      if (isNaN(qs)) qs = 4;
+      var qsNames = ['das Design', 'die Versp&auml;tungen', 'den Verkehr', 'die Kartengr&ouml;&szlig;e'];
+      html += '<div class="bd-row bd-stack"><div class="bd-label"><div class="name">Schnellschalter' + infoBtn('qs') + '</div>' +
+        '<div class="hint">Ein Tipp aufs kleine Feld unten rechts am Display schaltet die gew&auml;hlte Funktion um, ohne Men&uuml;.</div></div>' +
+        segHtml('qsfn', ['Design', 'Versp&auml;tung', 'Verkehr', 'Karte', 'Aus'], qs) + '</div>';
+      html += infoPanel('qs', pvQsScene(qs),
+        qs < 4 ? ('Ein Tipp aufs Feld unten rechts schaltet ' + qsNames[qs] + ' um, ein zweiter Tipp wieder zur&uuml;ck.')
+               : 'W&auml;hle oben eine Funktion. Dann erscheint unten rechts am Display ein kleines Feld, und ein Tipp darauf schaltet sie direkt um. Hier siehst du das Beispiel Design.');
+    }
     el.innerHTML = html;
   }
 
@@ -26381,6 +26521,21 @@ window.addEventListener('DOMContentLoaded', () => {
         ae.hasAttribute('data-bdwalkline') || ae.hasAttribute('data-bdgrpname') || ae.hasAttribute('data-bdgrpcolor') ||
         (ae.classList && ae.classList.contains('bd-wlsel'))))) return;
     var html = '';
+    // OeBB/DB/SBB-Tafeln zeigen alles nach Zeit im Original-Look; die Firmware wertet dort
+    // nur den Gehweg aus (und bei OeBB, falls vorhanden, die Spalte neben dem Ziel)
+    if (bdViewMode(st) === 'station') {
+      var sbt = parseInt(st.btyp, 10) || 0;
+      if (sbt === 1 && typeof st.ovia !== 'undefined') {
+        html += stackRow('Neben dem Ziel', 'Was die &Ouml;BB-Tafel rechts vom Ziel zeigt: die Zwischenhalte, den Fahrzeugtyp (z. B. Cityjet) oder nichts, dann hat der Zieltext mehr Platz.',
+          segHtml('ovia', ['Zwischenhalte', 'Fahrzeugtyp', 'Nichts'], parseInt(st.ovia, 10) || 0));
+      } else {
+        html += '<div class="bd-empty">' + ['', 'Die &Ouml;BB-Tafel', 'Die DB-Tafel', 'Die SBB-Tafel'][sbt] +
+          ' zeigt alle Abfahrten nach Zeit im Original-Look. Eigene Einstellungen gibt es daf&uuml;r keine.</div>';
+      }
+      if (typeof st.walk !== 'undefined') html += bdWalkSection(st);
+      el.innerHTML = html;
+      return;
+    }
     if (typeof st.sort !== 'undefined') {
       html += rowHtml('Sortierung', 'Nach Linie: feste Reihenfolge. Nach Zeit: n&auml;chste Abfahrt oben.',
         segHtml('sort', ['Nach Linie', 'Nach Zeit'], parseInt(st.sort, 10) || 0));
@@ -26393,14 +26548,14 @@ window.addEventListener('DOMContentLoaded', () => {
           return '<button type="button" data-v="' + i + '" class="bd-zbtn' + (i === bv ? ' on' : '') + '"><span class="bd-zero z' + i + ' bd-anim"></span>' + t + '</button>';
         }).join('') + '</div>');
     }
-    if (typeof st.list !== 'undefined' && (parseInt(st.lay, 10) || 0) < 2 && (parseInt(st.cols, 10) || 0) === 0) {
+    if (typeof st.list !== 'undefined' && (parseInt(st.lay, 10) || 0) < 2 && (parseInt(st.cols, 10) || 0) === 0 && !bdBottomBoard(st)) {
       html += rowHtml('Tafel-Liste', 'Kompakt: eine Zeile pro Richtung mit zwei Zeiten. Einzeln: jede Abfahrt eine Zeile. Automatisch: kurze Listen werden aufgef&uuml;llt.',
         segHtml('list', ['Automatisch', 'Kompakt', 'Einzeln'], parseInt(st.list, 10) || 0));
     }
     // Platz je Linie und Gruppe: nur wo das Geraet die Einzel-Liste baut (Karte mittel, oder Einzeln erzwungen)
     var layT = parseInt(st.lay, 10) || 0, listT = parseInt(st.list, 10) || 0;
     if (typeof st.split !== 'undefined' && (parseInt(st.btyp, 10) || 0) === 0 && (parseInt(st.cols, 10) || 0) === 0 &&
-        layT < 2 && listT !== 1 && (layT === 1 || listT === 2)) {
+        layT < 2 && listT !== 1 && (layT === 1 || listT === 2) && !bdBottomBoard(st)) {
       var sl = pvSplitLines();
       html += '<div class="bd-row bd-stack"><div class="bd-label"><div class="name">Platz je Linie und Gruppe' + infoBtn('split') + '</div>' +
         '<div class="hint">In der Einzel-Liste bekommt jede Linie und jede Gruppe einen eigenen Abschnitt.</div></div>' +
@@ -26968,27 +27123,37 @@ window.addEventListener('DOMContentLoaded', () => {
   // masterrow/timerow fuers Geraet, gebaut wie fuer einen Lilygo. Nur adoptierte Stationen, an
   // denen im Browser nichts gewaehlt wurde, behalten ihr Segment vom Geraet (sonst wuerde
   // ihre Auswahl auf "alle Linien" aufgemacht, der Browser kennt sie ja nicht).
-  function bdBuildRows() {
-    var rows = buildMasterAndTimeRows({});
-    var dev = {}, untouched = {};
+  function bdDeviceSegments() {
+    var dev = {};
     [BD.state && BD.state.mrow, BD.state && BD.state.trow].forEach(function (r) {
       String(r || '').split(';').forEach(function (seg) {
         var rbl = String(seg.split('|')[0] || '').trim();
-        if (rbl) dev[rbl] = seg.trim();
+        if (rbl && !dev[rbl]) dev[rbl] = seg.trim();
       });
     });
+    return dev;
+  }
+  // Adoptierte Stationen, an denen im Browser nichts gewaehlt wurde, behalten ihr Segment vom
+  // Geraet. Hat das Geraet keins, faellt die Station aus der masterrow heraus: dann filtert die
+  // Firmware sie weiter ueber lsel, statt dass sie mit "*" auf alle Linien aufgeht.
+  function bdBuildRows() {
+    var rows = buildMasterAndTimeRows({});
+    var dev = bdDeviceSegments(), untouched = {};
     allStations().forEach(function (s) {
       if (!s.isExisting || (s.directions && s.directions.length) || s.filter || s.allDepartures) return;
       String(s.fullId || (s.network + ':' + s.stopId)).split(',').forEach(function (fid) {
         fid = fid.trim();
-        if (fid) untouched[fid] = 1;
+        if (!fid) return;
+        untouched[fid] = 1;
+        if (fid.indexOf(':') < 0) untouched[(s.network || 'WL') + ':' + fid] = 1;   // Wien: blanke RBL
       });
     });
     function keep(row) {
       return String(row || '').split(';').map(function (seg) {
         var rbl = String(seg.split('|')[0] || '').trim();
-        return (untouched[rbl] && dev[rbl]) ? dev[rbl] : seg;
-      }).join(';');
+        if (!untouched[rbl]) return seg;
+        return dev[rbl] || null;
+      }).filter(function (seg) { return seg !== null && String(seg).trim() !== ''; }).join(';');
     }
     return { masterrow: keep(rows.masterrow), timerow: keep(rows.timerow) };
   }
@@ -27008,10 +27173,11 @@ window.addEventListener('DOMContentLoaded', () => {
       if (st2.allDepartures) selAll = true;
       String(st2.filter || '').split(',').forEach(addLsel);
     });
-    // Linien uebernommener, im Browser nicht angefasster Stationen kennt nur das Geraet
+    // Linien uebernommener, im Browser nicht angefasster Stationen kennt nur das Geraet; zeigte es
+    // dort alle Linien (lsel leer), muss lsel leer bleiben, sonst schrumpft diese Station
     if (hasUntouched && BD.adoptedLsel) BD.adoptedLsel.split(',').forEach(addLsel);
     var lselStr = null;
-    if (selAll) lselStr = '';
+    if (selAll || (hasUntouched && BD.adoptedLsel === '')) lselStr = '';
     else if (sel.length) lselStr = sel.join(',');
     if (lselStr !== null) q.push('lsel=' + encodeURIComponent(lselStr));
     if (bdMrowCap() && typeof buildMasterAndTimeRows === 'function') {
@@ -27400,6 +27566,7 @@ window.addEventListener('DOMContentLoaded', () => {
       var key = segBtn.closest('[data-bdseg]').getAttribute('data-bdseg');
       var v = parseInt(segBtn.getAttribute('data-v'), 10) || 0;
       if (!BD.state) return;
+      if (key === 'bdview' || key === 'bdtafel' || key === 'bdcols') { bdSetView(key, v); return; }
       if (BD.state[key] === v) return;
       BD.state[key] = v;
       bdDisp(key, v);
@@ -27431,8 +27598,11 @@ window.addEventListener('DOMContentLoaded', () => {
         bdDisp('dlyhl', BD.state.dlyhl);
         bdRenderTafel();
       } else if (k === 'vnum') {
-        BD.state.vnum = +BD.state.vnum ? 0 : 1;
-        bdDisp('vnum', BD.state.vnum);
+        // Nummer und Groesse immer zusammen: an = gross mit Nummer, aus = normal ohne
+        var vOn = bdVehNumOn(BD.state) ? 0 : 1, vPairs = [['vbig', vOn]];
+        BD.state.vbig = vOn;
+        if (typeof BD.state.vnum !== 'undefined') { BD.state.vnum = vOn; vPairs.push(['vnum', vOn]); }
+        bdDispPairs(vPairs);
         bdRenderKarte();
       } else {
         BD.state.layers = BD.state.layers || {};
