@@ -3261,13 +3261,13 @@
       <h1 style="color:var(--ink);font-size:24px;text-align:center;margin:0 0 8px;font-weight:800;">Was möchtest du ändern?</h1>
       <p style="color:#6b6258;font-size:14px;text-align:center;margin:0 0 32px;max-width:340px;">Dein catch-it ist schon eingerichtet. Wähle, was du anpassen willst.</p>
 
-      <button onclick="chooseEditLines()" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:var(--card);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:14px;padding:24px 20px;margin-bottom:20px;cursor:pointer;transition:all 0.12s;" onmouseover="this.style.borderColor='var(--red)';this.style.boxShadow='6px 6px 0 var(--red)'" onmouseout="this.style.borderColor='var(--ink)';this.style.boxShadow='6px 6px 0 var(--ink)'">
+      <button onclick="chooseEditLines(event)" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:var(--card);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:14px;padding:24px 20px;margin-bottom:20px;cursor:pointer;transition:all 0.12s;" onmouseover="this.style.borderColor='var(--red)';this.style.boxShadow='6px 6px 0 var(--red)'" onmouseout="this.style.borderColor='var(--ink)';this.style.boxShadow='6px 6px 0 var(--ink)'">
         <span style="font-size:34px;line-height:1;margin-bottom:10px;">🚏</span>
         <div style="color:var(--ink);font-weight:700;font-size:17px;margin-bottom:5px;">Linien ändern</div>
         <div style="color:#6b6258;font-size:13px;line-height:1.45;max-width:280px;">Haltestellen und Linien hinzufügen, entfernen oder bearbeiten.</div>
       </button>
 
-      <button onclick="chooseEditSettings()" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:var(--card);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:14px;padding:24px 20px;margin-bottom:26px;cursor:pointer;transition:all 0.12s;" onmouseover="this.style.borderColor='var(--red)';this.style.boxShadow='6px 6px 0 var(--red)'" onmouseout="this.style.borderColor='var(--ink)';this.style.boxShadow='6px 6px 0 var(--ink)'">
+      <button onclick="chooseEditSettings(event)" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:var(--card);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:14px;padding:24px 20px;margin-bottom:26px;cursor:pointer;transition:all 0.12s;" onmouseover="this.style.borderColor='var(--red)';this.style.boxShadow='6px 6px 0 var(--red)'" onmouseout="this.style.borderColor='var(--ink)';this.style.boxShadow='6px 6px 0 var(--ink)'">
         <span style="font-size:34px;line-height:1;margin-bottom:10px;">⚙️</span>
         <div style="color:var(--ink);font-weight:700;font-size:17px;margin-bottom:5px;">Einstellungen ändern</div>
         <div style="color:#6b6258;font-size:13px;line-height:1.45;max-width:280px;">Design, Reihenfolge, Helligkeit, Gehweg und mehr, je Display.</div>
@@ -3385,7 +3385,7 @@
         </div>
         <div class="label-box">
           <div class="name">Kompakt</div>
-          <div class="desc">Alles auf einem Display, ein Stil für alle Stationen.</div>
+          <div class="desc">Alles auf einem Display, der Reihe nach: U-Bahn, Tram, Bus, S-Bahn, Zug. Je Richtung eine Zeile, der Rest kommt auf die nächste Seite.</div>
         </div>
       </button>
 
@@ -3406,7 +3406,7 @@
         </div>
         <div class="label-box">
           <div class="name">Spielerisch</div>
-          <div class="desc">Display wechselt nach Station, Stadt usw. Jede Seite kann ihr eigenes Design haben.</div>
+          <div class="desc">Jede Station bekommt ihr eigenes Display, im Design ihres Netzes.</div>
         </div>
       </button>
     </div>
@@ -3646,7 +3646,7 @@
           </div>
           <div class="label-box">
             <div class="name">Kompakt</div>
-            <div class="desc">Alles auf einem Display, ein Stil für alle Stationen.</div>
+            <div class="desc">Alles auf einem Display, der Reihe nach: U-Bahn, Tram, Bus, S-Bahn, Zug. Je Richtung eine Zeile, der Rest kommt auf die nächste Seite.</div>
           </div>
         </button>
         <button class="display-style-btn" data-value="playful" onclick="ftSelectDisplayStyle('playful')">
@@ -3664,7 +3664,7 @@
           </div>
           <div class="label-box">
             <div class="name">Spielerisch</div>
-            <div class="desc">Display wechselt nach Station, Stadt usw.</div>
+            <div class="desc">Jede Station bekommt ihr eigenes Display, im Design ihres Netzes.</div>
           </div>
         </button>
       </div>
@@ -3885,6 +3885,30 @@ window.addEventListener('message', function(event) {
       _pendingConfigMessages.push(event.data);
     }
   }
+});
+
+// Config SOFORT beim Geräte-Portal anfragen, nicht erst bei DOMContentLoaded. Diese Seite
+// ist gut 1,3 MB mit allem Script inline; bis DOMContentLoaded kommt, ist der Parser durch
+// 24.000 weitere Zeilen gelaufen. Das Portal antwortet nur auf Nachfrage, also ist jede
+// Verzögerung hier reine Wartezeit vor dem ersten Pixel. Die Antwort landet notfalls im
+// Puffer oben, der Handler arbeitet sie ab, sobald er steht.
+function _configAnfragen() {
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
+      window.parent.postMessage({ type: 'requestFullConfig' }, '*');
+    }
+  } catch (e) {}
+}
+_configAnfragen();
+// Früh-Staffel: das Portal holt seine Config teils selbst erst vom Gerät und antwortet
+// anfangs ins Leere. Vorher begann das Nachfragen erst bei Sekunde 1 und dann nur alle
+// 2 Sekunden — ein Portal, das bei 1,2 s bereit war, lieferte erst bei 3 s. Nachfragen
+// kostet nichts (identische Antworten werden über _cfgSigsSeen verworfen), die Staffel
+// darf also dicht sein. Der späte Teil (ab Sekunde 1) läuft unten in checkAndRetryConfig
+// weiter, sobald das Script vollständig ist.
+[120, 300, 600].forEach(function(ms) {
+  setTimeout(function() { if (!_pendingConfigMessages.length) _configAnfragen(); }, ms);
 });
 
 // ==================== CONFIG ====================
@@ -5441,6 +5465,51 @@ function setCachedStationName(key, name) {
 }
 function getCachedStationName(key) {
   try { return _stationNameCache()[key] || null; } catch (e) { return null; }
+}
+
+// Zweiter, getrennter Speicher fuer die VORLAEUFIGEN Namen aus der Abfahrts-Antwort. Der
+// kanonische Speicher oben bleibt sauber (nur Namen der Such-API), denn aus ihm baut der
+// Konfigurator auch Beschriftungen. Hier liegt nur, was beim naechsten Oeffnen sofort
+// angezeigt werden darf, damit nicht erneut auf die Abfahrten gewartet werden muss.
+function _stationNameCacheVorl() {
+  try { return JSON.parse(localStorage.getItem('catchit_station_names_vorl') || '{}'); } catch (e) { return {}; }
+}
+function setCachedStationNameVorl(key, name) {
+  if (!key || !name || /^Station\s/.test(name)) return;
+  try {
+    var c = _stationNameCacheVorl();
+    if (c[key] === name) return;
+    c[key] = name;
+    localStorage.setItem('catchit_station_names_vorl', JSON.stringify(c));
+  } catch (e) {}
+}
+function getCachedStationNameVorl(key) {
+  try { return _stationNameCacheVorl()[key] || null; } catch (e) { return null; }
+}
+function loescheCachedStationNameVorl(key) {
+  try {
+    var c = _stationNameCacheVorl();
+    if (c[key] === undefined) return;
+    delete c[key];
+    localStorage.setItem('catchit_station_names_vorl', JSON.stringify(c));
+  } catch (e) {}
+}
+
+// Wann wurde ein Name zuletzt bei der Such-API bestaetigt? Die Suche kostet 5 bis 7
+// Sekunden und lief vorher bei JEDEM Oeffnen fuer jede Station erneut. Einmal am Tag
+// reicht: sie faengt umbenannte Haltestellen weiter ab, belastet den Server aber nicht
+// bei jedem Aufruf (Trainboard drosselt bei zu vielen Anfragen).
+var _NAME_PRUEF_TAG = 24 * 60 * 60 * 1000;
+function nameZuletztGeprueft(key) {
+  try { return Number(JSON.parse(localStorage.getItem('catchit_station_names_geprueft') || '{}')[key]) || 0; }
+  catch (e) { return 0; }
+}
+function nameGeprueftMerken(key) {
+  try {
+    var c = JSON.parse(localStorage.getItem('catchit_station_names_geprueft') || '{}');
+    c[key] = Date.now();
+    localStorage.setItem('catchit_station_names_geprueft', JSON.stringify(c));
+  } catch (e) {}
 }
 let editingStationIndex = null;  // Index der Station die bearbeitet wird (null = neue Station)
 let hasExistingConfig = false;   // True wenn Config vom Gerät geladen wurde
@@ -7619,9 +7688,22 @@ function zurNeuenOberflaeche(cfg) {
           })
         };
       }),
+      // Wie automatisch aufgeteilt werden soll, kommt aus dem Wizard: getrennte Displays
+      // heisst spielerisch, alles auf einem heisst kompakt. Der Nutzer sieht die beiden
+      // Woerter drueben nicht mehr, sie steuern nur die automatische Verteilung.
+      modus: cfg.multiDisplay ? 'spielerisch' : 'kompakt',
+      // Die hier gebauten Zeilen sagen, WAS gewaehlt ist: sie geben den Stand dieser
+      // Seite wieder, also auch gerade abgehakte Linien.
       masterrow: cfg.masterrow || '',
       timerow: cfg.timerow || '',
       displaysettings: cfg.displaysettings || '',
+      // Das Original vom Geraet sagt, WIE es aussieht: Aufteilung, Uhr, Wechselzeiten
+      // und die anderen Felder, die diese Seite nicht kennt und beim Neubau verliert.
+      geraet: _geraetRows ? {
+        masterrow: _geraetRows.masterrow,
+        timerow: _geraetRows.timerow,
+        displaysettings: _geraetRows.displaysettings
+      } : null,
       helligkeit: parseInt(cfg.displaylight || 3, 10)
     }));
   } catch (e) {}
@@ -11936,13 +12018,16 @@ function updateStationsList() {
   // Gruppiere Stationen nach Name und Netzwerk
   const groupedStations = new Map();
   stations.forEach((s, idx) => {
-    // Echten Stationsnamen cachen (überlebt Reload, falls die API später leer liefert)
-    if (s.fullId && s.stopName) setCachedStationName(s.fullId, s.stopName);
+    // Echten Stationsnamen cachen (überlebt Reload, falls die API später leer liefert).
+    // Vorlaeufige Namen aus der Abfahrts-Antwort bleiben draussen — die weichen manchmal
+    // vom kanonischen ab ("Gmunden Rathausplatz" statt "Gmunden"); nameNachtragen merkt
+    // den richtigen, sobald die Suche ihn liefert.
+    if (s.fullId && s.stopName && !s._nameVorlaeufig) setCachedStationName(s.fullId, s.stopName);
     // Zusätzlich netz-unabhängig per blanker stopId (Nicht-Journey): findet den Namen
     // beim Reload auch wenn sich das Netz-Prefix unterscheidet (FV OEBB vs WESTBAHN) →
     // sonst greift resolveStationName mit dem abweichenden Departures-API-Titel
     // (z.B. "Gmunden Rathausplatz" statt "Gmunden").
-    if (s.stopId && s.stopName && !(s.fullId || '').includes('>')) setCachedStationName('#' + s.stopId, s.stopName);
+    if (s.stopId && s.stopName && !s._nameVorlaeufig && !(s.fullId || '').includes('>')) setCachedStationName('#' + s.stopId, s.stopName);
     const key = `${s.network}:${s.stopName}`;
     if (!groupedStations.has(key)) {
       groupedStations.set(key, {
@@ -12144,6 +12229,9 @@ function updateStationsList() {
   const existingChips = stationsContainer.querySelectorAll('.station-chip');
   existingChips.forEach(c => c.remove());
   emptyState.insertAdjacentHTML('beforebegin', chips);
+  // Der Auswahl-Screen steht beim Laden jetzt VOR den Namen (einstiegSofortZeigen), also
+  // seine "Aktuell: …"-Zeile hier mitziehen, sobald die Liste neu steht.
+  try { auswahlHinweisAktualisieren(); } catch (e) {}
 }
 
 function removeStationGroup(key) {
@@ -12187,6 +12275,51 @@ function goToRegionSelectionEmpty() {
 // ==================== AUSWAHL-MENÜ BEI BESTEHENDER CONFIG ====================
 let _configChoiceShown = false;  // verhindert mehrfaches Einblenden bei wiederholtem loadFullConfig
 
+// Die "Aktuell: …"-Zeile im Auswahl-Screen. Eigene Funktion, weil sie jetzt von drei
+// Stellen kommt: beim Einblenden, beim Frueh-Einstieg (da noch aus dem Browser-Cache) und
+// beim Nachtragen eines Namens. Vorher schrieb sie nur maybeShowConfigChoice, und die
+// laeuft genau einmal — die spaeter aufgeloesten Namen kamen dort nie an.
+// Die rbl-Liste des laufenden Aufbaus. Solange stations[] noch leer ist (der Einstieg
+// steht ja schon), kommen die Namen von hier: gemerkt, vorlaeufig aus den Abfahrten oder
+// aus dem Browser-Cache. Sonst muesste der Hinweis warten, bis der ganze Aufbau durch ist,
+// und eine einzige Station ohne Abfahrten hielte die Namen aller anderen auf.
+var _hinweisRblParts = null;
+
+function _namenAusRblListe(rblParts) {
+  var namen = [], gesehen = {};
+  // Die beiden Merker stehen weiter unten im Script; vor ihrer Zeile gaebe es sonst einen
+  // Fehler. Passiert im Betrieb nicht (der Aufbau startet erst nach einer Config-Nachricht),
+  // kostet aber nichts.
+  if (typeof _nameMemo === 'undefined' || typeof _nameVorlaeufig === 'undefined') return namen;
+  (rblParts || []).forEach(function(part) {
+    var ci = part.indexOf(':');
+    var netz = ci > 0 ? part.substring(0, ci) : 'WL';
+    var sid = ci > 0 ? part.substring(ci + 1) : part;
+    var k = String(netz) + '|' + String(sid);
+    var f = _nameMemo.get(k);
+    var nm = (typeof f === 'string' && f) ? f : (_nameVorlaeufig.get(k) || null);
+    if (!nm) {
+      try {
+        nm = getCachedStationName(part)
+          || (sid ? getCachedStationName('#' + sid) : null)
+          || getCachedStationNameVorl(part);
+      } catch (e) {}
+    }
+    if (nm && !gesehen[nm]) { gesehen[nm] = 1; namen.push(nm); }
+  });
+  return namen;
+}
+
+function auswahlHinweisAktualisieren() {
+  const info = document.getElementById('configChoiceStations');
+  if (!info) return;
+  let namen = [...new Set((stations || []).map(s => s && s.stopName).filter(Boolean))]
+    .filter(n => !/^Station\s/i.test(n));
+  if (!namen.length && _hinweisRblParts) namen = _namenAusRblListe(_hinweisRblParts);
+  info.textContent = namen.length
+    ? ('Aktuell: ' + namen.slice(0, 4).join(', ') + (namen.length > 4 ? ' …' : '')) : '';
+}
+
 // Zeigt das Vollbild-Menü "Linien ändern / Einstellungen ändern" wenn eine
 // bestehende Config geladen wurde. Wird nach loadFullConfig aufgerufen.
 function maybeShowConfigChoice() {
@@ -12196,19 +12329,39 @@ function maybeShowConfigChoice() {
   const overlay = document.getElementById('configChoiceOverlay');
   if (!overlay) return;
   _configChoiceShown = true;
-  // Stationsnamen-Hinweis
-  const info = document.getElementById('configChoiceStations');
-  if (info) {
-    const names = [...new Set(stations.map(s => s.stopName).filter(Boolean))];
-    info.textContent = names.length ? ('Aktuell: ' + names.slice(0, 4).join(', ') + (names.length > 4 ? ' …' : '')) : '';
-  }
+  auswahlHinweisAktualisieren();
   overlay.style.display = 'block';
   window.scrollTo(0, 0);
 }
 
+// Der Einstieg steht jetzt, bevor der Aufbau der Stationen fertig ist
+// (einstiegSofortZeigen). Wer sofort klickt, soll keine leere Stationsliste sehen: die
+// zwei Knoepfe im Auswahl-Screen warten auf den laufenden Aufbau und sagen das auch.
+// Im Normalfall (Namen gemerkt, Abfahrten warm) ist er schon durch und es wird nicht gewartet.
+async function aufAufbauWarten(btn) {
+  if (!_loadExistingConfigPromise) return;
+  // Hinweis in die Zeile unter den Knoepfen, das Knopf-Innenleben bleibt unangetastet.
+  var info = document.getElementById('configChoiceStations');
+  var alterHinweis = info ? info.textContent : null;
+  if (info) info.textContent = 'Stationen werden noch geladen \u2026';
+  if (btn) btn.style.opacity = '0.55';
+  try { await _loadExistingConfigPromise; } catch (e) {}
+  // Das Geraet schickt loadExistingConfig und loadFullConfig hintereinander; faengt der
+  // zweite Aufbau direkt an, auch darauf warten.
+  for (var i = 0; i < 20 && _loadExistingConfigPromise; i++) {
+    try { await _loadExistingConfigPromise; } catch (e) {}
+  }
+  if (btn) btn.style.opacity = '';
+  if (info) {
+    try { auswahlHinweisAktualisieren(); }
+    catch (e) { if (alterHinweis !== null) info.textContent = alterHinweis; }
+  }
+}
+
 // "Linien ändern" → Overlay weg, Bundesland-Auswahl des aktuellen Landes zeigen
 // (so kann der User neue Stationen hinzufügen; die Stationen-Übersicht bleibt darunter).
-function chooseEditLines() {
+async function chooseEditLines(ev) {
+  await aufAufbauWarten(ev && ev.currentTarget);
   const overlay = document.getElementById('configChoiceOverlay');
   if (overlay) overlay.style.display = 'none';
   const ft = document.getElementById('stepFinetuning');
@@ -12243,7 +12396,8 @@ function chooseEditLines() {
 }
 
 // "Einstellungen ändern" → Overlay weg, direkt ins Feintuning
-function chooseEditSettings() {
+async function chooseEditSettings(ev) {
+  await aufAufbauWarten(ev && ev.currentTarget);
   const overlay = document.getElementById('configChoiceOverlay');
   if (overlay) overlay.style.display = 'none';
   goToDisplayConfig();        // Config berechnen, danach steht recommendedConfig
@@ -22280,10 +22434,21 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   if (clearFirst) { try { stations.length = 0; } catch (e) {} }
 
   const rblParts = rbl.split(',').map(s => s.trim()).filter(s => s);
+  // ZUERST ZEICHNEN, DANN NACHTRAGEN: sobald die masterrow da ist, stehen rbl und Netz
+  // fest, und fuer bekannte Stationen kennt der Browser den Namen schon. Damit kann der
+  // Einstieg stehen, bevor irgendeine Abfrage zurueck ist. Vorher deckte "Lade
+  // Konfiguration …" alles ab, bis die LETZTE Abfrage fertig war — gemessen 23.10.2026
+  // waren das 7 bis 8 Sekunden, und in drei von vier Laeufen kam zuerst der Not-Fallback
+  // nach 8 Sekunden. Namen und Richtungen tragen sich danach von selbst nach.
+  einstiegSofortZeigen(rblParts);
   // Alle Haltestellen GLEICHZEITIG vorladen. Die Rekonstruktion unten laeuft bewusst
   // nacheinander (Reihenfolge = Segment-Reihenfolge), holt sich die Abfahrten dann aber
   // aus dem Merker statt jedes Mal neu zu warten.
-  _depMemo = new Map();
+  // Den Abfahrts-Merker NICHT wegwerfen, wenn schon einer steht: das Geraet schickt
+  // loadExistingConfig und loadFullConfig hintereinander, beide laufen durch diese
+  // Funktion. Mit frischem Merker fragte der zweite Lauf jede Station erneut ab
+  // (gemessen 23.10.2026: 14 bis 20 Abfragen fuer vier Stationen statt vier).
+  if (!_depMemo) _depMemo = new Map();
   try {
     const _vorlauf = [];
     rblParts.forEach(function(part) {
@@ -22292,16 +22457,40 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       const sid = ci > 0 ? part.substring(ci + 1) : part;
       if (netz === 'OEBBALL' || netz === 'OEBBREGALL' || netz === 'OEBBFERNALL') netz = 'OEBB';
       if (netz === 'WL') return;   // Wien kommt aus wienData, nicht von der API
-      _vorlauf.push(fetchDeparturesUnified(netz + ':' + sid).catch(function() { return null; }));
-      // Den Namen GLEICH MIT vorladen. Er wurde bisher erst unten in der Schleife geholt,
-      // Station fuer Station nacheinander, und kostet je rund 5 Sekunden. Dank des Merkers
-      // in resolveStationName findet die Schleife das Ergebnis dann fertig vor.
-      const bareId = sid.indexOf('>') > 0 ? sid.split('>') : [sid];
-      bareId.forEach(function(one) {
-        if (one) _vorlauf.push(resolveStationName(netz, one).catch(function() { return null; }));
+      // Abfahrten holen UND den Namen gleich aus DERSELBEN Antwort mitnehmen. Vorher lief
+      // je Station zusaetzlich die Namenssuche (/stops/search per Id), und die braucht am
+      // Server verlaesslich 5 bis 15 Sekunden, auch warm — das war der eigentliche
+      // Zeitfresser beim Oeffnen. Der Name steht in der Abfahrts-Antwort schon drin; die
+      // Suche laeuft nur noch im Hintergrund nach (resolveStationNameSchnell) oder dann,
+      // wenn es keine Abfahrten gibt.
+      const bareIds = sid.indexOf('>') > 0 ? sid.split('>').filter(Boolean) : [sid];
+      bareIds.forEach(function(one) {
+        if (!one) return;
+        _vorlauf.push(fetchDeparturesUnified(netz + ':' + one)
+          .then(function(j) {
+            if (nameVorlaeufigMerken(netz, one, j)) {
+              // Jeden Namen einzeln anzeigen, sobald er da ist: eine zaehe Station soll die
+              // schnellen nicht aufhalten (gemessen: eine von zwei brauchte 11,8 s).
+              try { auswahlHinweisAktualisieren(); } catch (e) {}
+              return;
+            }
+            // Keine Abfahrten (nachts, eingestellte Station): dann braucht es die Suche
+            // doch. Hier schon anstossen, damit alle solchen Stationen GLEICHZEITIG
+            // suchen — die Schleife unten findet den Abruf dann in Arbeit vor, statt
+            // Station fuer Station nacheinander zu warten.
+            try { resolveStationName(netz, one).catch(function() {}); } catch (e) {}
+          })
+          .catch(function() { return null; }));
       });
+      // Zug-Anzeige: die Schleife unten fragt zusaetzlich die Strecke selbst ab.
+      if (bareIds.length > 1) {
+        _vorlauf.push(fetchDeparturesUnified(netz + ':' + sid).catch(function() { return null; }));
+      }
     });
     await Promise.all(_vorlauf);
+    // Namen stehen jetzt (vorlaeufig), der Aufbau laeuft noch: Hinweis gleich nachziehen,
+    // statt bis zum Ende der Rekonstruktion zu warten.
+    try { auswahlHinweisAktualisieren(); } catch (e) {}
   } catch (e) { /* Vorladen ist Beschleunigung, kein Muss */ }
   const filterParts = filter ? filter.split('|') : [];
   const allDepStopIds = allDeparturesStopIdsFromRows(masterRowStr);
@@ -22514,23 +22703,32 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     const isJourney = stopId.includes('>');
     let stopName = `Station ${stopId}`;
 
-    // Namensauflösung: ZUERST per Search-API (kanonischer Name wie bei der Auswahl, z.B.
-    // "Gmunden" — deterministisch und abfahrtsunabhängig, funktioniert auch nachts mit 0
-    // Abfahrten). Das HEILT auch einen evtl. alten, falsch gecachten Namen. Nur bei
-    // Fehler/offline aus dem Cache (fullId oder netz-unabhängig per #stopId).
-    let resolvedName = null;
+    // Namensauflösung OHNE Warten: der Name steht schon in der Abfahrts-Antwort, die der
+    // Vorlauf oben fuer dieselbe Station geholt hat. Die Search-API (kanonischer Name wie
+    // bei der Auswahl, z.B. "Gmunden" statt "Gmunden Rathausplatz") laeuft daneben weiter
+    // und traegt nach, sobald sie da ist — sie HEILT damit weiter einen alten, falsch
+    // gecachten Namen, haelt aber den Aufbau nicht mehr auf. Nur Stationen ohne Abfahrten
+    // (nachts) warten noch auf die Suche. Gemerkt wird nur ein kanonischer Name.
+    let resolvedName = null, nameVorlaeufig = false;
     if (isJourney) {
       const [fromId, toId] = stopId.split('>');
-      const fromName = await resolveStationName(network, fromId);
-      const toName = await resolveStationName(network, toId);
+      const fromName = await resolveStationNameSchnell(network, fromId);
+      const toName = await resolveStationNameSchnell(network, toId);
       if (fromName && toName) resolvedName = `${fromName} → ${toName}`;
+      nameVorlaeufig = !!(resolvedName && [fromId, toId].some(function(one) {
+        return typeof _nameMemo.get(String(network) + '|' + String(one)) !== 'string';
+      }));
     } else {
-      resolvedName = await resolveStationName(network, stopId);
+      resolvedName = await resolveStationNameSchnell(network, stopId);
+      nameVorlaeufig = !!resolvedName
+        && typeof _nameMemo.get(String(network) + '|' + String(stopId)) !== 'string';
     }
     if (resolvedName) {
       stopName = resolvedName;
-      setCachedStationName(fullId, resolvedName);
-      if (!isJourney) setCachedStationName('#' + stopId, resolvedName);
+      if (!nameVorlaeufig) {
+        setCachedStationName(fullId, resolvedName);
+        if (!isJourney) setCachedStationName('#' + stopId, resolvedName);
+      }
     } else {
       const cachedName = getCachedStationName(fullId)
         || (!isJourney ? getCachedStationName('#' + stopId) : null);
@@ -22575,6 +22773,10 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       networkName: NETWORKS[network]?.name || network,
       stopId: bareStopId,
       stopName,
+      // Name kommt noch aus der Abfahrts-Antwort, die Suche traegt den kanonischen nach.
+      // Solange die Fahne steht, darf der Name NICHT in den Namens-Cache (sonst merkt sich
+      // der Browser den abweichenden Titel und die Station benennt sich beim naechsten Mal um).
+      _nameVorlaeufig: nameVorlaeufig,
       filter: filterLines.length ? filterLines.join(',') : stationFilter,   // Namen bereits überführt
       fullId,
       isJourney,
@@ -23251,6 +23453,184 @@ function dedupeStationsByFullId() {
 // JEDE Station einzeln und nacheinander. Bei mehreren Nicht-Wien-Stationen summierte sich
 // das auf Minuten, bevor die Konfiguration stand.
 var _nameMemo = new Map();
+
+// ---- Vorlaeufige Namen aus der Abfahrts-Antwort ----
+// Die Abfahrts-Antwort traegt den Stationsnamen schon mit
+// (data.monitors[].locationStop.properties.title), und die Abfahrten holt der Lade-Pfad
+// fuer dieselbe Station sowieso. Dieser Titel ist aber NICHT immer der kanonische Name der
+// Suche ("St.Marienkirchen/Polsenz Sonnberg" statt "St. Marienkirchen an der Polsenz
+// Sonnberg", "Gmunden Rathausplatz (Kammerhofgasse)" statt "Gmunden") und haengt an
+// aktuellen Abfahrten. Darum gilt er nur VORLAEUFIG: die Seite zeichnet sofort mit ihm,
+// die Suche laeuft daneben weiter und traegt den endgueltigen Namen nach
+// (nameNachtragen). Gemerkt wird nur der kanonische, nie der vorlaeufige — sonst
+// wanderte der abweichende Titel in den Cache und die Station benannte sich um.
+var _nameVorlaeufig = new Map();
+
+function nameAusAbfahrten(dep) {
+  var ms = dep && dep.data && dep.data.monitors;
+  var t = (ms && ms[0] && ms[0].locationStop && ms[0].locationStop.properties
+           && ms[0].locationStop.properties.title) || '';
+  t = String(t).trim();
+  return (!t || /^Station\s/i.test(t)) ? '' : t;
+}
+
+function nameVorlaeufigMerken(network, stopId, dep) {
+  var nm = nameAusAbfahrten(dep);
+  if (nm) {
+    _nameVorlaeufig.set(String(network) + '|' + String(stopId), nm);
+    // In den VORLAEUFIGEN Speicher, nicht in den kanonischen: beim naechsten Oeffnen steht
+    // damit sofort ein Name da, auch wenn die Suche noch nie durchgelaufen ist.
+    setCachedStationNameVorl(network + ':' + stopId, nm);
+  }
+  return nm;
+}
+
+// ---- Nachtrag-Schlange fuer die kanonische Namenssuche ----
+// Die Suche heilt einen abweichenden oder alten Namen, kostet aber je Station 5 bis 7
+// Sekunden, und der Server laesst nur eine Handvoll gleichzeitig durch (gemessen
+// 23.10.2026: vier Stationen = 7,1 + 6,8 + 6,4 + 6,3 s, in zwei Schueben nacheinander).
+// Darum laeuft sie nur noch im Hintergrund, eine Station nach der anderen und erst, wenn
+// die Seite schon bedienbar ist. Der Nutzer sieht in der Zwischenzeit den Namen aus der
+// Abfahrts-Antwort; weicht er ab, wird er still ausgetauscht.
+var _heilungSchlange = [];
+var _heilungLaeuft = false;
+var _heilungGeplant = false;
+
+function nameHeilenSpaeter(network, stopId, vorlaeufig) {
+  var k = String(network) + '|' + String(stopId);
+  if (_heilungSchlange.some(function(e) { return e.k === k; })) return;
+  _heilungSchlange.push({ k: k, network: network, stopId: stopId, vorlaeufig: vorlaeufig });
+  if (_heilungGeplant || _heilungLaeuft) return;
+  _heilungGeplant = true;
+  // Zwei Sekunden Vorsprung fuer alles, was der Nutzer gerade wirklich braucht
+  // (Abfahrten, Richtungen, Linienfarben).
+  setTimeout(function() { _heilungGeplant = false; _heilungArbeiten(); }, 2000);
+}
+
+async function _heilungArbeiten() {
+  if (_heilungLaeuft) return;
+  _heilungLaeuft = true;
+  try {
+    // Erst heilen, wenn der Aufbau wirklich durch ist. Der Server laesst nur wenige Suchen
+    // gleichzeitig durch; eine Station OHNE Abfahrten braucht die Suche aber sofort, und
+    // die stand sonst hinter den Heilungen in der Reihe (gemessen 23.10.2026: ein Name
+    // kam nach 45 Sekunden noch nicht).
+    for (var w = 0; w < 120 && _loadExistingConfigPromise; w++) {
+      await new Promise(function(r) { setTimeout(r, 500); });
+    }
+    while (_heilungSchlange.length) {
+      var e = _heilungSchlange.shift();
+      try {
+        var nm = await resolveStationName(e.network, e.stopId);
+        if (nm && nm !== e.vorlaeufig) nameNachtragen(e.network, e.stopId, nm);
+        else if (nm) {
+          // Gleicher Name: trotzdem kanonisch merken, dann braucht es beim naechsten Mal
+          // keine Suche mehr.
+          try {
+            setCachedStationName(e.network + ':' + e.stopId, nm);
+            if (String(e.stopId).indexOf('>') < 0) setCachedStationName('#' + e.stopId, nm);
+          } catch (e2) {}
+          (stations || []).forEach(function(s) {
+            if (s && s.network === e.network && String(s.stopId) === String(e.stopId)) s._nameVorlaeufig = false;
+          });
+        }
+        if (nm) {
+          nameGeprueftMerken(e.k);
+          // Der vorlaeufige Eintrag hat seinen Zweck getan, der kanonische steht jetzt.
+          try { loescheCachedStationNameVorl(e.network + ':' + e.stopId); } catch (e2) {}
+        }
+      } catch (e2) { /* eine fehlgeschlagene Heilung haelt die Schlange nicht auf */ }
+      await new Promise(function(r) { setTimeout(r, 150); });
+    }
+  } finally { _heilungLaeuft = false; }
+}
+
+// Name OHNE Warten, in dieser Reihenfolge:
+//  1. in dieser Sitzung schon kanonisch aufgeloest → sofort,
+//  2. aus einem frueheren Besuch gemerkt → sofort (das ist der Normalfall beim
+//     Wiederoeffnen eines Geraets und spart die Suche ganz),
+//  3. vorlaeufig aus der Abfahrts-Antwort → sofort, Suche wandert in die Nachtrag-Schlange,
+//  4. nichts davon (Station ohne Abfahrten, etwa nachts) → wie bisher auf die Suche warten.
+async function resolveStationNameSchnell(network, stopId) {
+  const memoKey = String(network) + '|' + String(stopId);
+  const fertig = _nameMemo.get(memoKey);
+  if (typeof fertig === 'string' && fertig) return fertig;
+  const vorl = _nameVorlaeufig.get(memoKey);
+  let gemerkt = null;
+  try {
+    gemerkt = getCachedStationName(network + ':' + stopId)
+           || (String(stopId).indexOf('>') < 0 ? getCachedStationName('#' + stopId) : null);
+  } catch (e) {}
+  if (gemerkt) {
+    // Der gemerkte Name ist ein kanonischer (vorlaeufige liegen getrennt). Trotzdem
+    // nachheilen, falls der Betreiber die Station umbenannt hat — aber hoechstens einmal
+    // am Tag, sonst suchte jede Station bei jedem Oeffnen erneut 5 bis 7 Sekunden lang.
+    if (Date.now() - nameZuletztGeprueft(memoKey) > _NAME_PRUEF_TAG) {
+      nameHeilenSpaeter(network, stopId, gemerkt);
+    }
+    return gemerkt;
+  }
+  if (vorl) {
+    nameHeilenSpaeter(network, stopId, vorl);
+    return vorl;
+  }
+  // Noch keine Abfahrten zurueck, aber beim letzten Mal schon einmal einen Namen gesehen:
+  // den zeigen und die Suche nachziehen, statt auf sie zu warten.
+  let vorlGemerkt = null;
+  try { vorlGemerkt = getCachedStationNameVorl(network + ':' + stopId); } catch (e) {}
+  if (vorlGemerkt) {
+    nameHeilenSpaeter(network, stopId, vorlGemerkt);
+    return vorlGemerkt;
+  }
+  return resolveStationName(network, stopId);
+}
+
+// Traegt den kanonischen Namen nach, sobald die Suche ihn liefert: in die Stationen, in den
+// Namens-Cache und in die zwei Stellen, die ihn zeigen (Auswahl-Hinweis und Stationsliste).
+function nameNachtragen(network, stopId, name) {
+  if (!name) return;
+  var geaendert = false;
+  try {
+    (stations || []).forEach(function(s) {
+      if (!s || s.network !== network) return;
+      var sid = String(s.stopId || '');
+      if (sid === String(stopId)) {
+        if (s.stopName !== name) { s.stopName = name; geaendert = true; }
+        s._nameVorlaeufig = false;   // ab jetzt darf er in den Namens-Cache
+        return;
+      }
+      // Zug-Anzeige ("von>nach"): den zusammengesetzten Namen neu bilden, sobald eine
+      // Haelfte steht. Die andere Haelfte kommt aus dem Merker, notfalls vorlaeufig.
+      if (sid.indexOf('>') <= 0) return;
+      var teile = sid.split('>');
+      if (teile.indexOf(String(stopId)) < 0) return;
+      var namen = teile.map(function(one) {
+        if (String(one) === String(stopId)) return name;
+        var k = String(network) + '|' + String(one);
+        var f = _nameMemo.get(k);
+        return (typeof f === 'string' && f) ? f : (_nameVorlaeufig.get(k) || '');
+      });
+      if (namen.every(Boolean)) {
+        var zus = namen.join(' \u2192 ');
+        if (s.stopName !== zus) { s.stopName = zus; geaendert = true; }
+        // Erst wenn BEIDE Haelften kanonisch sind, ist der zusammengesetzte Name endgueltig.
+        s._nameVorlaeufig = teile.some(function(one) {
+          return typeof _nameMemo.get(String(network) + '|' + String(one)) !== 'string';
+        });
+      }
+    });
+  } catch (e) {}
+  if (!geaendert) return;
+  try {
+    setCachedStationName(network + ':' + stopId, name);
+    setCachedStationName('#' + stopId, name);
+  } catch (e) {}
+  // Die beiden sichtbaren Stellen aktualisieren. Der Auswahl-Hinweis wird hier direkt
+  // nachgezogen (maybeShowConfigChoice schreibt ihn nur beim ersten Anzeigen).
+  try { auswahlHinweisAktualisieren(); } catch (e) {}
+  try { if (typeof updateStationsList === 'function') updateStationsList(); } catch (e) {}
+}
+
 async function resolveStationName(network, stopId) {
   const memoKey = String(network) + '|' + String(stopId);
   if (_nameMemo.has(memoKey)) return _nameMemo.get(memoKey);
@@ -23425,8 +23805,25 @@ function _cfgSignature(data) {
   } catch (e) { return null; }
 }
 
+// Die Zeilen, die das GERAET geschickt hat, unveraendert. Diese Seite baut die masterrow
+// beim Speichern neu und kennt die Felder der neuen Anzeigen-Oberflaeche nicht (Uhr z,
+// Display-Nummer d, Sortierung s, Verspaetung p, Wechselzeiten j, Standzeit i, Blinken o,
+// Matrix-Schrift f). Beim Wechsel ins Feintuning wuerden sie darum verloren gehen und
+// alles stuende wieder auf Vorgabe (Paul 23.10.2026). Darum heben wir das Original hier
+// auf und reichen es durch.
+var _geraetRows = null;
+function _geraetRowsMerken(mr, tr, ds) {
+  mr = String(mr || '').trim(); tr = String(tr || '').trim(); ds = String(ds || '').trim();
+  if (!mr && !tr) return;
+  _geraetRows = { masterrow: mr, timerow: tr, displaysettings: ds };
+}
+
 async function handleConfigMessage(data) {
   _configMsgSeen = true;   // sofort, nicht erst wenn der Wiederaufbau fertig ist
+  if (data.type === 'loadExistingConfig') _geraetRowsMerken(data.masterrow, data.timerow, data.displaysettings);
+  if (data.type === 'loadFullConfig' && data.config) {
+    _geraetRowsMerken(data.config.masterrow, data.config.timerow, data.config.displaysettings);
+  }
   // ÖBB-gebrandete Geräte erkennen: die Geräteseite schickt brand in loadExistingConfig mit.
   if (data.type === 'loadExistingConfig' && typeof noteDeviceBrand === 'function') noteDeviceBrand(data.brand);
 
@@ -23659,6 +24056,36 @@ async function handleConfigMessage(data) {
   }
 }
 
+// Zeichnet den Einstieg, sobald die masterrow da ist: Lade-Overlay weg und der
+// Auswahl-Screen ("Linien ändern" / "Einstellungen ändern") mit den Namen, die wir schon
+// haben (Browser-Cache). Fehlende Namen stehen kurz darauf da, sobald die Abfahrten
+// zurueck sind (nameNachtragen). Laeuft nur EINMAL beim Start: fuegt der Nutzer spaeter
+// selbst Stationen hinzu, ist der Einstieg schon entschieden.
+function einstiegSofortZeigen(rblParts) {
+  try {
+    if (_startupResolved || _configChoiceShown) return;
+    if (!Array.isArray(rblParts) || !rblParts.length) return;
+    var overlay = document.getElementById('configChoiceOverlay');
+    if (!overlay) return;
+
+    _hinweisRblParts = rblParts.slice();
+    var namen = _namenAusRblListe(rblParts);
+
+    hasExistingConfig = true;   // eine Config liegt vor, der Aufbau laeuft gerade
+    _configChoiceShown = true;
+    _startupResolved = true;
+    try { applyBrandLock(); } catch (e) {}
+    // Ohne gemerkte Namen bleibt die Zeile kurz leer, statt "Station 444518400" zu zeigen.
+    auswahlHinweisAktualisieren();
+    overlay.style.display = 'block';
+    var sl = document.getElementById('startupLoading');
+    if (sl) sl.style.display = 'none';
+    window.scrollTo(0, 0);
+    console.log('[einstieg] sofort gezeigt, ' + rblParts.length + ' Stationen, '
+      + namen.length + ' Namen schon bekannt');
+  } catch (e) { /* nie den Aufbau stoeren, der Not-Fallback greift weiter */ }
+}
+
 // ==================== STARTUP-GATING ====================
 // Beim Laden zeigt #startupLoading (Zug-Animation) ALLES verdeckt. Sobald die Config-
 // Abfrage entschieden ist: bei vorhandener Config → Auswahl-Screen, sonst → direkt zur
@@ -23702,12 +24129,16 @@ if (_pendingConfigMessages.length > 0) {
 }
 
 // ==================== AUTO-RETRY: Config vom Parent anfordern ====================
-// Falls nach ein paar Sekunden keine Stationen geladen sind, frage aktiv nach
+// Falls keine Stationen geladen sind, aktiv nachfragen. Die ersten Anfragen laufen schon
+// im frühen Script-Block oben (_configAnfragen, Staffel 0/120/300/600 ms); hier geht es
+// gestaffelt weiter, erst dicht, dann ruhiger.
 let _configReceived = false;
 let _configRetryCount = 0;
-const _maxConfigRetries = 5;
+const _configRetryPlan = [900, 1400, 2000, 2000, 3000, 3000, 4000];
+const _maxConfigRetries = _configRetryPlan.length;
 
 function requestConfigFromParent() {
+  if (typeof _configAnfragen === 'function') { _configAnfragen(); return; }
   if (window.parent && window.parent !== window) {
     window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
     window.parent.postMessage({ type: 'requestFullConfig' }, '*');
@@ -23727,11 +24158,11 @@ function checkAndRetryConfig() {
     return;
   }
 
+  const _wartezeit = _configRetryPlan[_configRetryCount] || 4000;
   _configRetryCount++;
   requestConfigFromParent();
 
-  // Nächster Retry in 2 Sekunden
-  setTimeout(checkAndRetryConfig, 2000);
+  setTimeout(checkAndRetryConfig, _wartezeit);
 }
 
 // Markiere Config als erhalten wenn Stationen geladen werden
@@ -23743,15 +24174,12 @@ handleConfigMessage = async function(data) {
   }
 };
 
-// Starte Retry-Mechanismus nach 1 Sekunde
-setTimeout(checkAndRetryConfig, 1000);
+// Spätere Staffel anstoßen; die ersten vier Anfragen sind oben schon raus.
+setTimeout(checkAndRetryConfig, 900);
 
 // ==================== INIT ====================
 window.addEventListener('DOMContentLoaded', () => {
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage({ type: 'requestExistingConfig' }, '*');
-    window.parent.postMessage({ type: 'requestFullConfig' }, '*');
-  }
+  _configAnfragen();   // zusätzlich zur Früh-Staffel oben, falls das Portal spät zuhört
   
   document.addEventListener('click', (e) => {
     if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
@@ -24237,9 +24665,8 @@ window.addEventListener('DOMContentLoaded', () => {
     'Eigenes Display erstellen': 'Create custom display', 'Eigenes Display bearbeiten': 'Edit custom display',
     'Badge-Text und Badge-Hintergrund dürfen nicht gleich sein': 'Badge text and badge background must not be the same',
     'Schrift- und Hintergrundfarbe dürfen nicht gleich sein': 'Text and background color must not be the same',
-    'Alles auf einem Display, ein Stil für alle Stationen.': 'Everything on one display, one style for all stops.',
-    'Display wechselt nach Station, Stadt usw. Jede Seite kann ihr eigenes Design haben.': 'Display changes per stop, city and so on. Each page can have its own design.',
-    'Display wechselt nach Station, Stadt usw.': 'Display changes per stop, city and so on.',
+    'Alles auf einem Display, der Reihe nach: U-Bahn, Tram, Bus, S-Bahn, Zug. Je Richtung eine Zeile, der Rest kommt auf die nächste Seite.': 'Everything on one display, in order: metro, tram, bus, suburban rail, train. One row per direction, the rest moves to the next page.',
+    'Jede Station bekommt ihr eigenes Display, im Design ihres Netzes.': 'Each stop gets its own display, in the design of its network.',
     'Mehr Abfahrten gleichzeitig — kompakte Schrift, sehr viele Linien auf einen Blick.': 'More departures at once — compact type, many lines at a glance.',
     'Größere LED-Punkte — auch aus der Distanz gut lesbar, weniger Linien auf einmal.': 'Bigger LED dots — readable from a distance, fewer lines at once.',
     'Straba Ansicht': 'Straba view', 'Spielerisch': 'Playful',

@@ -434,10 +434,25 @@ const SUCH_API = 'https://api.straba.at/api/v1/stops/search';
 // ---- Zustand -------------------------------------------------------------------------
 // stationen: [{ rbl, name, netz, linien: [{name, ziel, rid, typ, farbe}], gewaehlt: Set, abfahrten: [] }]
 let stationen = [];
-// Kompakt ist der Normalfall: alle Stationen auf EINEM Display, das bei mehr Linien als
-// Zeilen auf mehrere Seiten umbricht. Paul 22.10.2026: der Umschalter ist weg, weil die
-// Frage "wie verteile ich die Stationen" den Nutzer nur aufhaelt.
+// Wie AUTOMATISCH aufgeteilt wird, wenn noch niemand selbst zugewiesen hat. Die Wahl
+// trifft der Wizard im Konfigurator, hier steht sie nie auf der Seite: der Nutzer soll
+// die beiden Woerter gar nicht auseinanderhalten muessen (Paul 23.10.2026). Sobald er
+// selbst ein Brett belegt, bleibt dieses ohnehin unberuehrt.
+//   kompakt      Ein Brett fuer alles. Alle Abfahrten hintereinander, geordnet nach
+//                Fahrzeugart: U-Bahn, Tram, Bus, S-Bahn, Zug. Je Richtung eine Zeile.
+//                Was nicht mehr auf die Seite passt, zeigt das Geraet auf der naechsten.
+//   spielerisch  Jede Station ihr eigenes Brett, jedes im Look seines Netzes.
 let modus = 'kompakt';
+// Rangfolge der Fahrzeugarten, wie der Server sie nennt. Laengere Namen zuerst pruefen:
+// "ptTrainS" faengt mit "ptTrain" an.
+const TYP_RANG = [['ptMetro', 1], ['ptTram', 2], ['ptBus', 3], ['ptTrainS', 4], ['ptTrain', 5]];
+function typRang(vt) {
+  const typ = String(vt || '');
+  for (let i = 0; i < TYP_RANG.length; i++) {
+    if (typ.indexOf(TYP_RANG[i][0]) === 0) return TYP_RANG[i][1];
+  }
+  return 9;
+}
 // Stil und Zeilen gehoeren seit 22.10.2026 ZUM DISPLAY, nicht mehr global: ein Geraet
 // soll Wien im Wiener-Linien-Look und die OEBB-Station in der Bahnhofsanzeige zeigen.
 // Die beiden Variablen bleiben als Vorgabe fuer neue Displays.
@@ -1071,11 +1086,18 @@ function alleRichtungen() {
 }
 function richtungFinden(key) { return alleRichtungen().find(r => r.key === key) || null; }
 
-// Jede Richtung gehoert in GENAU EIN Display. Neue Richtungen wandern ins letzte Display,
-// solange dort Platz ist, sonst entsteht eines dazu. Verschwundene fliegen raus.
-// Der Nutzer kann die Verteilung ueber die Plus-Kachel selbst bestimmen.
+// Jede Richtung gehoert in GENAU EIN Display. Neue Richtungen wandern auf ein Brett mit
+// Platz, sonst entsteht eines dazu. Verschwundene fliegen raus. Welches Brett Platz
+// bekommt, entscheidet der Modus oben. Der Nutzer kann die Verteilung ueber die
+// Plus-Kachel selbst bestimmen, solche Bretter bleiben unberuehrt.
 function displaysAuffuellen() {
-  const vorhanden = alleRichtungen().map(r => r.key);
+  const alle = alleRichtungen();
+  const vorhanden = alle.map(r => r.key);
+  // Einmal nachschlagen statt bei jedem Vergleich neu suchen.
+  const wissen = new Map();
+  alle.forEach((r, i) => wissen.set(r.key, {
+    typ: typRang(r.dep.vt), st: stationen.indexOf(r.station), linie: r.dep.line, i: i
+  }));
   // Eine Richtung darf auf MEHREREN Displays stehen (Paul 22.10.2026: "U2 ist meine
   // Prioritaetslinie und soll immer fixiert sein"). Doppelt wird nur INNERHALB eines
   // Displays verhindert. Weggefallene Richtungen fliegen ueberall raus.
@@ -1090,8 +1112,29 @@ function displaysAuffuellen() {
   const irgendwo = new Set();
   displays.forEach(d => d.richtungen.forEach(k => irgendwo.add(k)));
   const offen = vorhanden.filter(k => !irgendwo.has(k) && !abgelegt.has(k));
+  // Reihenfolge. Kompakt: nach Fahrzeugart, also U-Bahn oben und Zug unten, danach nach
+  // Station und Linie. Spielerisch: zuerst nach Station, denn dort gehoert jede Station
+  // auf ihr eigenes Brett. Ohne das stand alles so da, wie die API es gerade liefert.
+  offen.sort((a, b) => {
+    const x = wissen.get(a) || {}, y = wissen.get(b) || {};
+    if (modus === 'spielerisch' && x.st !== y.st) return x.st - y.st;
+    if (x.typ !== y.typ) return x.typ - y.typ;
+    if (x.st !== y.st) return x.st - y.st;
+    return String(x.linie).localeCompare(String(y.linie), 'de', { numeric: true });
+  });
+  const platz = d => !d.vomNutzer && zeilenEinheiten(d).length < maxZeilen(stilVon(d));
   offen.forEach(k => {
-    let ziel = displays.find(d => !d.vomNutzer && zeilenEinheiten(d).length < maxZeilen(stilVon(d)));
+    const meine = wissen.get(k);
+    let ziel = null;
+    if (modus === 'spielerisch' && meine) {
+      // Ein Brett, auf dem schon Linien DIESER Station stehen, sonst ein leeres.
+      ziel = displays.find(d => platz(d) && d.richtungen.some(k2 => {
+        const w = wissen.get(k2);
+        return w && w.st === meine.st;
+      })) || displays.find(d => platz(d) && !d.richtungen.length);
+    } else {
+      ziel = displays.find(platz);
+    }
     if (!ziel) { ziel = { richtungen: [], vomNutzer: false }; displays.push(ziel); }
     ziel.richtungen.push(k);
   });
@@ -1716,12 +1759,8 @@ function editorZeichnen() {
        + '<button class="pfeil" ' + (i >= einheiten.length - 1 ? 'disabled' : '') + ' title="nach unten"'
        + ' onclick="zeileSchieben(' + di + ',' + i + ',1)">&#9660;</button>'
        + '</span>'
-       // Zusammenfassen beginnt bei DIESER Zeile: sie ist im Dialog schon angekreuzt.
-       + (keys.length > 1
-          ? '<button class="pfeil" title="mit anderen Zeilen zusammenfassen"'
-            + ' onclick="gruppeFragen(' + di + ',' + JSON.stringify(teil).replace(/"/g, '&quot;') + ')">'
-            + SYM_ZUSAMMEN + '</button>'
-          : '')
+       // Kein eigener Knopf je Zeile mehr: "Zeilen zusammenfassen" steht oben ueber der
+       // Liste und macht dasselbe (Paul 23.10.2026).
        + '<button class="pfeil weg-x" title="von diesem Display nehmen"'
        + ' onclick="zeileWeg(' + di + ',' + i + ')">' + SYM_X + '</button>'
        + '</div>';
@@ -2194,10 +2233,25 @@ function geraeteDaten() {
     rbls.push(teile[0]);
     filter.push(teile[1]);
   });
+  // Wie viele Bretter es gibt: das Geraet blaettert nur im Slideshow-Modus
+  // (displaymode 2, main.cpp "isSlideshow = (displayMode == 2)"). Schicken wir das Feld
+  // nicht mit, setzt die Geraeteseite es auf 1 ("data.displaymode || '1'") und zeigt
+  // stur das erste Brett. Zwei Berliner Matrix-Displays standen darum still
+  // (Paul 23.10.2026).
+  const bretter = new Set();
+  (c.masterrow + ';' + c.timerow).split(';').forEach(function (seg) {
+    const m = seg.match(/\|d(\d+)(?:\||$)/);
+    if (m) bretter.add(m[1]);
+  });
+  const anzahlBretter = bretter.size || rbls.length;
   return {
     type: 'setRBL',
     rbl: rbls.join(','),
     filter: filter.join('|'),
+    displaymode: anzahlBretter > 1 ? '2' : '1',
+    // Ohne dieses Feld setzt die Geraeteseite die Zeilenzahl auf 2. Die Wahrheit steht
+    // je Eintrag in der masterrow, das hier ist nur der Rueckfall.
+    zeilen: String(displays.reduce(function (m, d) { return Math.max(m, zeilenVon(d)); }, 1)),
     masterrow: c.masterrow,
     timerow: c.timerow,
     displaysettings: c.displaysettings,
@@ -3071,7 +3125,6 @@ function dialogZeigen(titel, text, knoepfe, art, inhalt) {
 function sagen(titel, text) { dialogZeigen(titel, text, [{ text: 'Alles klar' }]); }
 
 // ---- Bedienung -----------------------------------------------------------------------
-function modusSetzen(m) { modus = m; zeiger = 0; allesZeichnen(); }
 function sortierungSetzen(di, wert) {
   const d = displays[di];
   if (!d) return;
@@ -3359,8 +3412,17 @@ function uebergabeHolen() {
                   richtungen: st.richtungen || [] });
     });
   });
+  // WAS gewaehlt ist, steht in den Zeilen, die der Konfigurator gerade gebaut hat.
+  // WIE es aussieht, steht in dem, was das Geraet geschickt hat: nur dort stehen Uhr,
+  // Display-Nummer, Wechselzeiten und die anderen Felder, die der Konfigurator beim
+  // Neubau verliert. Fehlt das Geraete-Original, gelten die gebauten Zeilen.
+  const g = roh.geraet || null;
+  const bauZeilen = (g && (g.masterrow || g.timerow))
+    ? (g.masterrow || '') + ';' + (g.timerow || '')
+    : (roh.masterrow || '') + ';' + (roh.timerow || '');
   return { stationen: raus, helligkeit: roh.helligkeit, masterrow: roh.masterrow || '',
-           eintraege: eintraegeAusZeilen((roh.masterrow || '') + ';' + (roh.timerow || '')) };
+           modus: (roh.modus === 'spielerisch' || roh.modus === 'kompakt') ? roh.modus : null,
+           eintraege: eintraegeAusZeilen(bauZeilen) };
 }
 
 // Die Bretter so wiederherstellen, wie sie gespeichert wurden: Aufteilung, Stil, Zeilen,
@@ -3382,7 +3444,9 @@ function displaysAusEintraegen(eintraege) {
   let misslungen = false;
   nach.forEach(buendel => {
     const erste = buendel[0];
-    const d = { richtungen: [], vomNutzer: true };
+    // Nicht als "vom Nutzer gesetzt" markieren: sonst koennte der Umschalter oben sie
+    // nie neu verteilen, und eine neue Linie faende kein Brett mit Platz.
+    const d = { richtungen: [], vomNutzer: false };
     const gruppen = [];
     buendel.forEach(ein => {
       // Nur die Stationen dieses Eintrags, sonst zieht ein gleicher Linienname von einer
@@ -3487,6 +3551,8 @@ function tokenTreffer(linien, m, richtungen) {
   ];
   const ueber = uebergabeHolen();
   if (ueber && ueber.helligkeit) helligkeit = ueber.helligkeit;
+  // Der Wizard sagt, wie automatisch verteilt werden soll.
+  if (ueber && ueber.modus) modus = ueber.modus;
 
   const liste = ueber ? ueber.stationen
                       : TEST.map(e => ({ rbl: e.rbl, name: e.name, netz: 'WL', alle: false,
