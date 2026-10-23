@@ -234,6 +234,12 @@
   .pfeil:disabled { opacity: .3; }
 
   .hinweis { font-size: 12px; color: var(--grau); line-height: 1.55; margin-top: 8px; }
+  /* Weg zurueck in die Stations- und Linienauswahl. */
+  .zurueck {
+    background: none; border: 0; box-shadow: none; color: var(--akzent);
+    font-size: 14px; font-weight: 700; padding: 6px 0; margin-bottom: 2px;
+  }
+  .zurueck:hover { text-decoration: underline; }
 
   /* Uhr-Display: gross, mittig, in unserer Schrift. Feste Ziffernbreite, damit beim
      Ticken nichts springt. */
@@ -349,6 +355,7 @@
 </div>
 
 <div class="bahn">
+  <button class="zurueck" onclick="zurueckZuLinien()">&#8592; Zu deinen Linien</button>
   <h1>Meine Anzeigen</h1>
   <p class="unter">Wische seitwärts durch deine Displays. Was du hier siehst, steht genauso am Gerät.</p>
 </div>
@@ -827,6 +834,14 @@ function linienAus(abf) {
 // Spielerisch: ein Bildschirm je Station. Kompakt: alle Stationen auf einem Display,
 // das bei mehr Linien als Zeilen auf mehrere Seiten umbricht.
 // Alle waehlbaren Richtungen ueber alle Stationen: je Linie und Ziel eine.
+// Zurueck in die Linien- und Stationsauswahl. Wir sind von dort gekommen, darum
+// zuerst die Geschichte: so bleiben Marke und Geraete-Parameter in der Adresse
+// erhalten. Nur wenn es keine gibt, direkt auf die Datei daneben (Paul 23.10.2026).
+function zurueckZuLinien() {
+  if (window.history.length > 1) { window.history.back(); return; }
+  window.location.href = '../catchit-cities.html';
+}
+
 // ---- Was ist neu ---------------------------------------------------------------------
 // Jede neue Funktion traegt vier Wochen lang ein NEU, einmal oben am Block und einmal
 // am Schalter selbst (Paul 23.10.2026). Datum = Tag, an dem es eingebaut wurde.
