@@ -3288,7 +3288,7 @@
         <div class="train-door"></div>
       </div>
     </div>
-    <div id="startupLoadingText" style="margin-top:18px;color:var(--ink);font-weight:700;font-size:15px;">Lade Konfiguration …</div>
+    <div id="startupLoadingText" style="margin-top:18px;color:var(--ink);font-weight:700;font-size:15px;text-align:center;">Lade Konfiguration …</div>
     <!-- Fortschritt in Stufen: eine Stufe je Station, deren Abfahrten zurueck sind. Bei
          vier Stationen also 25er-Schritte (Paul 23.10.2026). Nur sichtbar, wenn wirklich
          Stationen geladen werden (reine Wien-Configs holen nichts vor). -->
@@ -5220,6 +5220,56 @@ const API_NETWORK_MAP = {
 };
 function mapNetworkForApi(network) {
   return API_NETWORK_MAP[network] || network;
+}
+
+// ==================== LINIENAUSWAHL-TOKEN (23.10.2026) ====================
+// Der Server versteht fuer Trainboard-Netze ein Linien-Token im rbl: <NETZ>:<id>!<Linie>~<Linie>,
+// z.B. BERLIN:900100003!M4~U2. Mit Token gruppiert und deckelt er nur die gewaehlten Linien,
+// jede Richtung bekommt 3 bis 5 Abfahrten (ohne Token an Knoten wie Alexanderplatz nur eine).
+// Nicht fuer: Wien (WL/WLB), TEST, DB und Daenemark (eigenes !-Schema), OEBB*/Westbahn (>-Via),
+// Netze mit eigenem Client (LINZ, LIEMOBIL, RET/OVAPI, BODO). Linienname exakt wie der Picker
+// (/stops/lines, Feld name). Ein Token, das keine Abfahrt trifft, ignoriert der Server.
+// Das Token lebt NUR in der Geraete-Config (rbl_id, masterrow/timerow, Wall-rbls): station.fullId
+// und station.stopId bleiben die reine Id, damit Suche, Picker und Anzeige unveraendert laufen.
+// Beim Laden einer Config wird es abgetrennt (lineSelStripRows), beim Speichern aus den
+// gewaehlten Richtungen neu gebaut (lineSelToken). Bestandsconfigs: einmal neu speichern.
+const LINESEL_SKIP_NET = /^(WL|WLB|TEST|DB|DBALL|DBSTEIG|DBIRIS|DKTRAIN|DKALL|DKSTEIG|OEBB[A-Z_]*|WESTBAHN|LINZ|LIEMOBIL|RET|OVAPI|BODO)$/;
+function lineSelNetOk(net) {
+  var apiNet = String(mapNetworkForApi(String(net || '').trim()) || '').toUpperCase();
+  return !!apiNet && !LINESEL_SKIP_NET.test(apiNet);
+}
+// Token fuer eine Station: '!M4~U2' oder '' (alle Abfahrten, Zug-Anzeige, Mehrfach-Id, fremdes Netz).
+function lineSelToken(s) {
+  if (!s || s.allDepartures || s.isJourney) return '';
+  if (!lineSelNetOk(s.network)) return '';
+  var fid = String(s.fullId || '');
+  if (fid.indexOf(',') >= 0 || fid.indexOf('>') >= 0 || fid.indexOf('!') >= 0) return '';
+  var names = [], seen = {};
+  function add(n) { n = String(n || '').trim(); if (n && !seen[n]) { seen[n] = 1; names.push(n); } }
+  (s.directions || []).forEach(function(d) { add(d && d.line); });
+  if (!names.length && s.filter) String(s.filter).split(',').forEach(add);
+  if (!names.length) return '';
+  // Trenner im Liniennamen: dann lieber kein Token als ein kaputtes.
+  if (names.some(function(n) { return /[~!,|;]/.test(n); })) return '';
+  return '!' + names.join('~');
+}
+// Token von einem rbl-Eintrag abtrennen ("BERLIN:900100003!M4~U2" -> "BERLIN:900100003").
+// DB und Daenemark behalten ihr eigenes !-Schema (lineSelNetOk ist dort false).
+function lineSelStrip(tok) {
+  var t = String(tok || '').trim();
+  var ci = t.indexOf(':');
+  if (ci <= 0) return t;
+  if (!lineSelNetOk(t.substring(0, ci))) return t;
+  var bang = t.indexOf('!');
+  return bang > 0 ? t.substring(0, bang) : t;
+}
+// Alle Stations-Felder einer rbl-Liste bzw. masterrow/timerow von Tokens befreien (Edit-Restore).
+function lineSelStripRows(str) {
+  return String(str || '').split(';').map(function(seg) {
+    var f = seg.split('|');
+    f[0] = f[0].split(',').map(lineSelStrip).join(',');
+    return f.join('|');
+  }).join(';');
 }
 
 // ==================== STATE ====================
@@ -12509,7 +12559,11 @@ async function aufAufbauWarten(btn) {
   if (auswahl) auswahl.style.display = 'none';
   if (caption) caption.textContent = 'Stationen werden geladen …';
   if (balken && _ladeGesamt > 0) { balken.style.display = ''; ladeFortschrittZeichnen(); }
-  if (ladescreen) ladescreen.style.display = '';
+  // WICHTIG 'flex', nicht '': das Overlay traegt display:flex im style-Attribut, und ein
+  // leerer Wert loescht die Eigenschaft, statt sie wiederherzustellen. Der Block fiel dann
+  // auf display:block zurueck und Text, Zug und Balken standen verstreut statt mittig
+  // (Paul 23.10.2026).
+  if (ladescreen) ladescreen.style.display = 'flex';
   try { await _loadExistingConfigPromise; } catch (e) {}
   // Das Geraet schickt loadExistingConfig und loadFullConfig hintereinander; faengt der
   // zweite Aufbau direkt an, auch darauf warten.
@@ -13339,7 +13393,7 @@ function calculateRecommendedConfig() {
 
   return {
     // Station-Daten
-    rbl: stations.map(s => s.fullId).join(','),
+    rbl: stations.map(s => s.fullId + lineSelToken(s)).join(','),   // mit Linienauswahl-Token
     filter: stations.map(s => s.filter || '').join('|'),
     stationDetails: uniqueStationDetails,
 
@@ -21191,6 +21245,9 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       var r = rankByDirKey[key];
       if (r !== undefined && (rd.rank === undefined || r < rd.rank)) rd.rank = r;
     }
+    // Linienauswahl-Token ('!M4~U2' oder ''): haengt an der rbl des Geraets, die bareId
+    // (Gehweg-Schluessel) bleibt die reine Stop-Id.
+    var _lsTok = lineSelToken(s);
 
     if (dirs.length > 0) {
       dirs.forEach(function(d) {
@@ -21211,7 +21268,7 @@ function buildMasterAndTimeRows(gehwegByStopId) {
         // encodeURIComponent). Ein früher hier eingebautes vorab-%20 hat die Namensauflösung
         // beim Reload zerschossen (fetchDeparturesUnified kodierte das %20 doppelt → Station
         // wurde nicht mehr erkannt).
-        var rbl = net + ':' + sid;
+        var rbl = net + ':' + sid + _lsTok;
         var lp;
         if (net === 'WL') {
           // Wien: Richtung steckt im Bahnsteig (stopId/rbl) — die Firmware gruppiert über
@@ -21262,7 +21319,7 @@ function buildMasterAndTimeRows(gehwegByStopId) {
           rbl = _adPfx + ':' + bareOf(rbl);
         }
         var lines = (!s.allDepartures && s.filter) ? s.filter.split(',').map(function(x){return x.trim();}).filter(Boolean).join('+') : '*';
-        var _rd2 = ensure(rbl, bareOf(rbl));
+        var _rd2 = ensure(rbl + _lsTok, bareOf(rbl));
         _rd2.lineParts.push(lines || '*');
         _rd2.gids.push(0);
         // Rang aus den Filter-Linien (Station ohne directions, z.B. eingemischte S-Bahn).
@@ -21875,7 +21932,7 @@ function saveFromFinetuning() {
         return id.indexOf(':') < 0 ? ('WL:' + id) : id;
       }).filter(Boolean).join(',');
     }
-    return fid;
+    return fid + lineSelToken(s);   // Linienauswahl-Token wie in der masterrow
   }).join(',');
   recommendedConfig.filter = stations.map(s => s.filter || '').join('|');
 
@@ -22528,6 +22585,11 @@ function saveConfig() {
 let _loadExistingConfigPromise = null;
 async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr, clearFirst) {
   if (!rbl || rbl.trim() === '') return;
+  // Linienauswahl-Token (BERLIN:900100003!M4~U2) gehoert nur dem Geraet: hier abtrennen, damit
+  // Stationssuche, Picker (/stops/lines) und Anzeige die reine Id sehen. Beim Speichern baut
+  // lineSelToken() es aus den gewaehlten Richtungen wieder auf.
+  rbl = lineSelStripRows(rbl);
+  masterRowStr = lineSelStripRows(masterRowStr || '');
 
   // Serialisierung: Warte auf vorherigen Aufruf bevor neuer startet
   // Verhindert Race Conditions wenn mehrere loadFullConfig/loadExistingConfig Messages gleichzeitig ankommen
@@ -25887,7 +25949,7 @@ window.addEventListener('DOMContentLoaded', () => {
           t = s.network + ':' + t;
         }
         if (seen[t]) return;
-        seen[t] = 1; out.push(t);
+        seen[t] = 1; out.push(t + lineSelToken(s));   // Linienauswahl-Token wie am Lilygo
       });
     });
     return out.join(',');
