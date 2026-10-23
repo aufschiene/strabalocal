@@ -3274,6 +3274,29 @@
       </button>
 
       <span id="configChoiceStations" style="color:#8a8276;font-size:12px;text-align:center;"></span>
+
+      <!-- Nach dem Klick, solange der Aufbau noch laeuft: dieselbe Zug-Animation wie beim
+           Start. Vorher stand hier nur eine graue Textzeile, und die drei Sekunden sahen
+           aus, als waere nichts passiert (Paul 23.10.2026). -->
+      <div id="configChoiceLoading" style="display:none;text-align:center;">
+        <div class="train-loading">
+          <div class="train-track"></div>
+          <div class="train-body">
+            <div class="train-wheel w1"></div>
+            <div class="train-wheel w2"></div>
+            <div class="train-door"></div>
+          </div>
+        </div>
+        <div style="color:var(--ink);font-weight:700;font-size:14px;">Stationen werden geladen …</div>
+        <!-- Fortschritt in Stufen: eine Stufe je Station, deren Abfahrten zurueck sind.
+             Bei vier Stationen also 25er-Schritte (Paul 23.10.2026). -->
+        <div id="configChoiceProgress" style="display:none;width:200px;margin:12px auto 0;">
+          <div style="height:10px;border:2px solid var(--ink);border-radius:999px;background:var(--card);overflow:hidden;">
+            <div id="configChoiceProgressFill" style="height:100%;width:0;background:var(--ink);transition:width .25s ease;"></div>
+          </div>
+          <div id="configChoiceProgressText" style="margin-top:6px;color:#6b6258;font-size:12px;font-weight:700;">0 %</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -12334,16 +12357,51 @@ function maybeShowConfigChoice() {
   window.scrollTo(0, 0);
 }
 
+// ---- Lade-Fortschritt in Stufen ----
+// Eine Stufe je Station, sobald ihre Abfahrten zurueck sind. Die Abfahrten sind beim
+// Oeffnen die einzige echte Wartezeit, darum zaehlen genau sie. Der Balken steht unter der
+// Zug-Animation und erscheint erst, wenn der Nutzer eine der beiden Karten gewaehlt hat.
+var _ladeGesamt = 0, _ladeFertig = 0;
+
+function ladeFortschrittStarten(gesamt) {
+  _ladeGesamt = gesamt > 0 ? gesamt : 0;
+  _ladeFertig = 0;
+  ladeFortschrittZeichnen();
+}
+
+function ladeFortschrittSchritt() {
+  if (_ladeGesamt <= 0) return;
+  if (_ladeFertig < _ladeGesamt) _ladeFertig++;
+  ladeFortschrittZeichnen();
+}
+
+function ladeFortschrittZeichnen() {
+  var kasten = document.getElementById('configChoiceProgress');
+  if (!kasten) return;
+  // Ohne bekannte Gesamtzahl (reine Wien-Config, nichts vorzuladen) keinen Balken zeigen,
+  // sonst staende er die ganze Zeit auf null.
+  if (_ladeGesamt <= 0) { kasten.style.display = 'none'; return; }
+  var prozent = Math.round(_ladeFertig / _ladeGesamt * 100);
+  var fuellung = document.getElementById('configChoiceProgressFill');
+  var text = document.getElementById('configChoiceProgressText');
+  if (fuellung) fuellung.style.width = prozent + '%';
+  // Nur die Zahl, kein Wort: so braucht die Zeile keinen Uebersetzungs-Eintrag.
+  if (text) text.textContent = prozent + ' %';
+}
+
 // Der Einstieg steht jetzt, bevor der Aufbau der Stationen fertig ist
 // (einstiegSofortZeigen). Wer sofort klickt, soll keine leere Stationsliste sehen: die
 // zwei Knoepfe im Auswahl-Screen warten auf den laufenden Aufbau und sagen das auch.
 // Im Normalfall (Namen gemerkt, Abfahrten warm) ist er schon durch und es wird nicht gewartet.
 async function aufAufbauWarten(btn) {
   if (!_loadExistingConfigPromise) return;
-  // Hinweis in die Zeile unter den Knoepfen, das Knopf-Innenleben bleibt unangetastet.
+  // Zug-Animation statt der Namens-Zeile, das Knopf-Innenleben bleibt unangetastet.
   var info = document.getElementById('configChoiceStations');
-  var alterHinweis = info ? info.textContent : null;
-  if (info) info.textContent = 'Stationen werden noch geladen \u2026';
+  var lader = document.getElementById('configChoiceLoading');
+  if (info) info.style.display = 'none';
+  if (lader) lader.style.display = '';
+  var balken = document.getElementById('configChoiceProgress');
+  if (balken && _ladeGesamt > 0) { balken.style.display = ''; ladeFortschrittZeichnen(); }
   if (btn) btn.style.opacity = '0.55';
   try { await _loadExistingConfigPromise; } catch (e) {}
   // Das Geraet schickt loadExistingConfig und loadFullConfig hintereinander; faengt der
@@ -12352,9 +12410,11 @@ async function aufAufbauWarten(btn) {
     try { await _loadExistingConfigPromise; } catch (e) {}
   }
   if (btn) btn.style.opacity = '';
+  if (lader) lader.style.display = 'none';
+  if (balken) balken.style.display = 'none';
   if (info) {
-    try { auswahlHinweisAktualisieren(); }
-    catch (e) { if (alterHinweis !== null) info.textContent = alterHinweis; }
+    info.style.display = '';
+    try { auswahlHinweisAktualisieren(); } catch (e) {}
   }
 }
 
@@ -22450,6 +22510,19 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // (gemessen 23.10.2026: 14 bis 20 Abfragen fuer vier Stationen statt vier).
   if (!_depMemo) _depMemo = new Map();
   try {
+    // Gesamtzahl fuer den Fortschrittsbalken: alle Stationen, deren Abfahrten geholt
+    // werden. Wien zaehlt nicht mit, das kommt aus wienData ohne eigene Abfrage.
+    var _ladeStationen = 0;
+    rblParts.forEach(function(part) {
+      var ci = part.indexOf(':');
+      var netz = ci > 0 ? part.substring(0, ci) : 'WL';
+      var sid = ci > 0 ? part.substring(ci + 1) : part;
+      if (netz === 'WL') return;
+      _ladeStationen += (sid.indexOf('>') > 0 ? sid.split('>').filter(Boolean).length : 1);
+    });
+    ladeFortschrittStarten(_ladeStationen);
+  } catch (e) { /* Fortschritt ist Anzeige, kein Muss */ }
+  try {
     const _vorlauf = [];
     rblParts.forEach(function(part) {
       const ci = part.indexOf(':');
@@ -22468,6 +22541,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         if (!one) return;
         _vorlauf.push(fetchDeparturesUnified(netz + ':' + one)
           .then(function(j) {
+            try { ladeFortschrittSchritt(); } catch (e) {}
             if (nameVorlaeufigMerken(netz, one, j)) {
               // Jeden Namen einzeln anzeigen, sobald er da ist: eine zaehe Station soll die
               // schnellen nicht aufhalten (gemessen: eine von zwei brauchte 11,8 s).
@@ -22480,7 +22554,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
             // Station fuer Station nacheinander zu warten.
             try { resolveStationName(netz, one).catch(function() {}); } catch (e) {}
           })
-          .catch(function() { return null; }));
+          .catch(function() { try { ladeFortschrittSchritt(); } catch (e) {} return null; }));
       });
       // Zug-Anzeige: die Schleife unten fragt zusaetzlich die Strecke selbst ab.
       if (bareIds.length > 1) {
@@ -24502,6 +24576,7 @@ window.addEventListener('DOMContentLoaded', () => {
   var D = {
     // Start / Grundgerüst
     'Lade Konfiguration …': 'Loading configuration …', 'Lade…': 'Loading…', 'Lade Abfahrten...': 'Loading departures...',
+    'Stationen werden geladen …': 'Loading stops …',
     'Erneut versuchen': 'Try again',
     'Was möchtest du ändern?': 'What would you like to change?',
     'Dein catch-it ist schon eingerichtet. Wähle, was du anpassen willst.': 'Your catch-it is already set up. Choose what you want to adjust.',
