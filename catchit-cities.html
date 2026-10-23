@@ -7609,10 +7609,13 @@ function zurNeuenOberflaeche(cfg) {
           // Nur noch der Rueckfall, falls keine Config berechnet wurde: die Auswahl
           // steht kanonisch in masterrow/timerow (siehe unten).
           filter: st.filter || '',
-          // Zieltexte zu den gewaehlten Richtungen. Die masterrow fuehrt dort, wo es sie
-          // gibt, eine Richtungs-Id, und die kommt in den Abfahrtsdaten nicht vor.
+          // Die gewaehlten Richtungen, mit genau dem Wert, den die Linienauswahl hier
+          // schon benutzt: die richtungsId. Bei OOEVV ist das der Bahnsteig
+          // ("st444518401l1"), anderswo H/R oder eine Nummer. Der Zieltext kommt mit,
+          // falls eine Linie gar keine Id hat (Paul 23.10.2026).
           richtungen: (st.directions || []).map(function (d) {
-            return { line: d.line || '', ziel: d.towards || d.ziel || '' };
+            return { line: d.line || '', ziel: d.towards || d.ziel || '',
+                     rid: String(d.richtungsId || '').trim() };
           })
         };
       }),

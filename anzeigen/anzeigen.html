@@ -688,6 +688,14 @@ function einzelLinie(d) {
 // Wer ein Wien-Display in die timerow schreibt, macht aus colour 1 eine "Zugfarbe":
 // dann gilt sortMode 2 UND rowOrder wird geleert UND maxCountdown springt auf 540,
 // und zwar fuer ALLE Displays mit diesem Stil.
+// Stile, die am Geraet der Matrix-Renderer zeichnet (display_factory.h). Sie entscheiden
+// die Schriftgroesse seit Firmware 2.6 je SEITE: bis 3 Zeilen grosse LEDs, und die Zeilen
+// fuellen ihr Fach ganz aus, mit Punktraster bis zum Rand. Erst ab 4 Zeilen gilt wieder
+// die Zeilenhoehe der groessten Seite dieses Stils (Firmware-Sitzung 23.10.2026).
+const STIL_MATRIX = [2, 15, 18, 21, 23];
+function istMatrix(c) { return STIL_MATRIX.indexOf(parseInt(c, 10)) >= 0; }
+function matrixSeiteGross(c, zeilen) { return istMatrix(c) && zeilen <= 3; }
+
 const STIL_ZEITTYP = [11, 12, 14, 25];      // gehoeren in die timerow
 const STIL_OHNE_SORTIERUNG = [5, 6, 11, 12, 14, 25];   // DISPLAY_TYPE_FEATURES.sorting = false
 // Diese Stile zeigen EINE Abfahrt gross, dort gibt es keine Uhr-Zeile. Das ganze Brett
@@ -865,6 +873,10 @@ async function abfahrten(rbl) {
         const cd = dep && dep.departureTime && dep.departureTime.countdown;
         if (cd == null) return;
         raus.push({ line: l.name || '?', dest: l.towards || '', time: cd,
+                    // Richtungs-Id des Servers. Bei OOEVV ist das der Bahnsteig
+                    // ("st444518401l1"), anderswo H/R oder eine Nummer. Sie ist die
+                    // genaue Richtungs-Referenz, der Zieltext nur der Rueckfall.
+                    rid: l.richtungsId || '',
                     vt: l.type || '', lineColor: l.lineColor || null,
                     lineTextColor: l.lineTextColor || null });
       });
@@ -879,7 +891,7 @@ function linienAus(abf) {
   const map = new Map();
   abf.forEach(d => {
     const k = d.line + '|' + d.dest;
-    if (!map.has(k)) map.set(k, { name: d.line, ziel: d.dest, typ: d.vt });
+    if (!map.has(k)) map.set(k, { name: d.line, ziel: d.dest, typ: d.vt, rid: d.rid || '' });
   });
   return Array.from(map.values());
 }
@@ -1391,7 +1403,8 @@ function streifenZeichnen() {
       // mittig in ihrem Fach (170 - kopf) / eigene Zeilen. Wien 3 und 2 ergibt
       // Zeilenhoehe 56, Fach 85, Zeilen bei 14 und 99.
       const eigene = Math.max(1, s.zeilen || s.daten.length);
-      const gross = istZeitTyp(stilHier) ? eigene : Math.max(eigene, zeilenDesStils(stilHier));
+      const gross = (istZeitTyp(stilHier) || matrixSeiteGross(stilHier, eigene))
+                    ? eigene : Math.max(eigene, zeilenDesStils(stilHier));
       const kopf = (parseInt(stilHier, 10) === 22) ? 18 : 0;
       const hoehe = Math.floor((170 - kopf) / gross);
       const fach = Math.floor((170 - kopf) / eigene);
@@ -1499,7 +1512,8 @@ function editorZeichnen() {
   const maxHier = maxZeilen(stilVon(dHier));
   const seitenHier = s.seiten || 1;
   const grossDesStils = zeilenDesStils(stilVon(dHier));
-  if (!istZeitTyp(stilVon(dHier)) && grossDesStils > zeilenVon(dHier)) {
+  if (!istZeitTyp(stilVon(dHier)) && grossDesStils > zeilenVon(dHier)
+      && !matrixSeiteGross(stilVon(dHier), zeilenVon(dHier))) {
     h += '<div class="hinweis">Steht am Ger\u00e4t verteilt wie eine Ansicht mit so vielen '
        + 'Zeilen, in der Zeilenh\u00f6he der gr\u00f6\u00dften Seite dieses Stils ('
        + grossDesStils + ' Zeilen). Zwischen den Zeilen ist daf\u00fcr mehr Luft.</div>';
@@ -1861,6 +1875,42 @@ function stationenZeichnen() {
   el.innerHTML = h;
 }
 
+// Zieltext als Richtungs-Referenz in der Config. Die Trennzeichen des Formats muessen
+// raus, sonst zerfaellt das Token beim Lesen: Berliner Ziele tragen den Pfeil als '>'
+// ("Herzbergstr./ Siegfriedstr. -> Bus"), und die Firmware las dann eine abgeschnittene
+// Richtung plus einen Rest als eigenes Token. Gleiche Regel wie im alten Konfigurator.
+function zielRef(txt) {
+  return String(txt == null ? '' : txt)
+    .replace(/[\u2192\u27f6\u2794]/g, ' ')
+    .replace(/->/g, ' ')
+    .replace(/[>|;,+]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Ein Token je ZEILE, in der Reihenfolge der Zeilen: "Linie>Ziel", Mitglieder einer
+// Gruppe mit '+' verbunden. Der Zieltext MUSS mit: die Firmware nimmt nur Tokens mit
+// Trenner als Richtungsfilter (main.cpp, lineFilterDest). Stand nur der Linienname da,
+// zeigte das Geraet auch die Gegenrichtung, obwohl nur eine gewaehlt war
+// (Paul 23.10.2026). Wien braucht ihn nicht, dort steckt die Richtung in der rbl.
+function tokenListe(d) {
+  const raus = [];
+  zeilenEinheiten(d).forEach(teil => {
+    const stueck = [];
+    teil.forEach(k => {
+      if (istUhrKey(k)) return;
+      const r = richtungFinden(k);
+      if (!r) return;
+      // Immer zuerst die Richtungs-Id, nur ohne sie den bereinigten Zieltext. Genau
+      // so macht es der alte Konfigurator, und die Firmware vergleicht die Id exakt.
+      const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
+      stueck.push(ref ? r.dep.line + '>' + ref : r.dep.line);
+    });
+    if (stueck.length) raus.push(stueck.join('+'));
+  });
+  return raus;
+}
+
 // Die Config, wie sie das Geraet bekommt. Eine Quelle fuer die Anzeige unten UND fuer
 // das Speichern, damit beides nie auseinanderlaeuft.
 function configBauen() {
@@ -1934,9 +1984,12 @@ function configBauen() {
       const rbls = [], gw = [];
       proStation.forEach((e, rbl) => { rbls.push(rbl); gw.push(gehwegStation(e.station)); });
       const gTeil = gw.every(x => x === gw[0]) ? String(gw[0]) : gw.join(',');
-      stuecke.push(rbls.join(',') + '|' + (alleLinien.length ? alleLinien.join(',') : '*')
+      // Wien: Liniennamen, die Richtung steckt im Bahnsteig, und Gruppen ueber Eintraege
+      // hinweg braucht das m-Feld. Sonst ein Token je Zeile mit Ziel, Gruppen per '+'.
+      const tok = wien ? alleLinien : tokenListe(d);
+      stuecke.push(rbls.join(',') + '|' + (tok.length ? tok.join(',') : '*')
                  + '|c' + c + '|g' + gTeil + '|r' + zeilenVon(d)
-                 + (merges.length ? '|m' + merges.join(',') : '')
+                 + (wien && merges.length ? '|m' + merges.join(',') : '')
                  + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
     }
     // Die timerow traegt die zeitbasierten Display-TYPEN (OEBB, Westbahn, SBB), NICHT
@@ -3140,8 +3193,11 @@ function leisteKlebt() {
 //   Feld '*' oder leer = alle Abfahrten, kein Filter
 //   sonst Tokens mit Komma, '+' verbindet Richtungen zu EINER Zeile (Gruppe),
 //   '>' trennt Linie und Richtung (Richtungs-Id oder Zieltext)
-function wahlAusZeilen(zeilen) {
-  const raus = new Map();
+// Ein Eintrag der Config, vollstaendig zerlegt. Felder wie beim Schreiben:
+//   c Stil, g Gehweg, r Zeilen, m Wien-Gruppen, w Zeitfenster, z Uhr, s Sortierung,
+//   d Display-Nummer, dazu die Design-Buchstaben t b u v h n k o f p j i.
+function eintraegeAusZeilen(zeilen) {
+  const raus = [];
   String(zeilen || '').split(';').forEach(seg => {
     seg = seg.trim();
     if (!seg) return;
@@ -3149,19 +3205,61 @@ function wahlAusZeilen(zeilen) {
     if (teile.length < 2) return;
     const feld = teile[1].trim();
     const alle = !feld || feld === '*';
-    const gruppen = alle ? [] : feld.split(',').map(tok =>
-      tok.split('+').map(m => {
-        const st = m.split('>');
-        return { linie: (st[0] || '').trim(), richtung: (st[1] || '').trim() };
-      }).filter(x => x.linie)
-    ).filter(g => g.length);
+    const e = {
+      rbls: teile[0].split(',').map(x => x.trim()).filter(Boolean),
+      alle: alle,
+      gruppen: alle ? [] : feld.split(',').map(tok =>
+        tok.split('+').map(m => {
+          const st = m.split('>');
+          return { linie: (st[0] || '').trim(), richtung: (st[1] || '').trim() };
+        }).filter(x => x.linie)
+      ).filter(g => g.length),
+      g: [], e: standardEinst()
+    };
+    const zahl = v => { const n = parseInt(v, 10); return isNaN(n) ? null : n; };
+    for (let i = 2; i < teile.length; i++) {
+      const tok = teile[i].trim();
+      if (!tok) continue;
+      const buch = tok[0], wert = tok.slice(1);
+      switch (buch) {
+        case 'c': e.c = zahl(wert); break;
+        case 'r': e.r = zahl(wert); break;
+        case 'z': e.z = zahl(wert); break;
+        case 's': e.s = zahl(wert); break;
+        case 'd': e.dnr = zahl(wert); break;
+        case 'm': e.m = wert; break;
+        case 'g': e.g = wert.split(',').map(x => zahl(x) || 0); break;
+        case 'w': {
+          const st = wert.split('-');
+          if (st.length === 2) e.w = { von: zahl(st[0]) || 0, bis: zahl(st[1]) || 0 };
+          break;
+        }
+        case 'j': {
+          const st = wert.split('-');
+          if (st.length === 2) { e.e.x = zahl(st[0]) || 0; e.e.y = zahl(st[1]) || 0; }
+          break;
+        }
+        // p heisst im Eintrag, was in den displaysettings d heisst: Verspaetung.
+        case 'p': e.e.d = zahl(wert) || 0; break;
+        case 't': case 'b': case 'u': case 'v': case 'h':
+        case 'n': case 'k': case 'o': case 'f': case 'i':
+          e.e[buch] = zahl(wert) || 0; break;
+      }
+    }
+    raus.push(e);
+  });
+  return raus;
+}
+
+// Nur die Auswahl je rbl, abgeleitet aus denselben Eintraegen.
+function wahlAusZeilen(zeilen) {
+  const raus = new Map();
+  eintraegeAusZeilen(zeilen).forEach(ein => {
     // Ein Segment kann mehrere rbls tragen (Wien). Die Linien gelten dann fuer alle,
     // und was an einem Bahnsteig nicht faehrt, findet beim Abgleich ohnehin nichts.
-    teile[0].split(',').forEach(rbl => {
-      rbl = rbl.trim();
-      if (!rbl) return;
+    ein.rbls.forEach(rbl => {
       const e = raus.get(rbl) || { alle: false, gruppen: [] };
-      if (alle) e.alle = true; else e.gruppen = e.gruppen.concat(gruppen);
+      if (ein.alle) e.alle = true; else e.gruppen = e.gruppen.concat(ein.gruppen);
       raus.set(rbl, e);
     });
   });
@@ -3191,7 +3289,71 @@ function uebergabeHolen() {
                   richtungen: st.richtungen || [] });
     });
   });
-  return { stationen: raus, helligkeit: roh.helligkeit, masterrow: roh.masterrow || '' };
+  return { stationen: raus, helligkeit: roh.helligkeit, masterrow: roh.masterrow || '',
+           eintraege: eintraegeAusZeilen((roh.masterrow || '') + ';' + (roh.timerow || '')) };
+}
+
+// Die Bretter so wiederherstellen, wie sie gespeichert wurden: Aufteilung, Stil, Zeilen,
+// Uhr an ihrer Stelle, Zeitfenster, Sortierung, Gehweg, Gruppen und alle Design-Felder.
+// Ohne das faengt jeder Besuch wieder bei der Vorgabe an, und alles Neue (Uhr, Blinken,
+// Wechselzeiten) war beim naechsten Oeffnen weg (Paul 23.10.2026).
+function displaysAusEintraegen(eintraege) {
+  if (!eintraege || !eintraege.length) return false;
+  // Nach Display-Nummer buendeln. Eintraege ohne d<n> kommen von aelterer Firmware oder
+  // aus dem alten Konfigurator: dann ist jeder Eintrag sein eigenes Brett.
+  const nach = new Map();
+  let ohne = 0;
+  eintraege.forEach(ein => {
+    const nr = ein.dnr || ('x' + (++ohne));
+    if (!nach.has(nr)) nach.set(nr, []);
+    nach.get(nr).push(ein);
+  });
+  const neu = [];
+  let misslungen = false;
+  nach.forEach(buendel => {
+    const erste = buendel[0];
+    const d = { richtungen: [], vomNutzer: true };
+    const gruppen = [];
+    buendel.forEach(ein => {
+      // Nur die Stationen dieses Eintrags, sonst zieht ein gleicher Linienname von einer
+      // anderen Station mit herein.
+      const stats = stationen.filter(st => ein.rbls.indexOf(st.rbl) >= 0);
+      // "Alle Abfahrten" steht als '*' in der Config: ein Eintrag, am Geraet aber
+      // mehrere Seiten. Unser Modell kennt ein Display je Seite, das laesst sich nicht
+      // eins zu eins zurueckholen. Dann verteilen wir wie beim ersten Mal.
+      // (Ein Uhr-Brett traegt auch '*', hat aber keine Station, das ist hier egal.)
+      if (ein.alle && stats.length) { misslungen = true; return; }
+      stats.forEach((st, i) => {
+        const gw = ein.g.length ? (ein.g.length > i ? ein.g[i] : ein.g[0]) : 0;
+        if (gw) st.gehweg = gw;
+      });
+      ein.gruppen.forEach(teil => {
+        const keys = [];
+        teil.forEach(m => stats.forEach(st => {
+          tokenTreffer(linienAus(st.abfahrten), m, []).forEach(tr => {
+            const k = tr.name + '|' + tr.ziel;
+            if (st.gewaehlt && st.gewaehlt.size && !st.gewaehlt.has(k)) return;
+            if (keys.indexOf(k) < 0) keys.push(k);
+          });
+        }));
+        keys.forEach(k => { if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k); });
+        if (teil.length > 1 && keys.length > 1) gruppen.push(keys);
+      });
+    });
+    // z1 = das ganze Brett ist eine Uhr, sonst z<Zeile+1>, also z2 fuer die erste Zeile.
+    if (erste.z === 1) d.richtungen = [UHR_KEY];
+    else if (erste.z > 1) d.richtungen.splice(erste.z - 2, 0, UHR_KEY);
+    if (gruppen.length) d.gruppen = gruppen;
+    if (erste.c) d.stil = erste.c;
+    if (erste.r) d.zeilen = erste.r;
+    if (erste.w) d.fenster = erste.w;
+    if (erste.s) d.sortierung = (erste.s === 3) ? 'zeit' : 'fest';
+    d.einst = erste.e;
+    if (d.richtungen.length) neu.push(d);
+  });
+  if (misslungen || !neu.length) return false;
+  displays = neu;
+  return true;
 }
 
 // Welches Ziel der Station ist gemeint? Zuerst genau, sonst eines, das ineinander
@@ -3216,16 +3378,28 @@ function tokenTreffer(linien, m, richtungen) {
   const gleich = linien.filter(x => x.name.trim().toUpperCase() === l);
   if (!gleich.length) return [];
   const r = String(m.richtung || '').trim();
-  if (r && !/^\d+$/.test(r)) {
-    const t = zielTreffer(gleich, r);
-    return t ? [t] : gleich;
+  if (r) {
+    // 1) Richtungs-Id, so wie die Abfahrtsdaten sie fuehren. Bei OOEVV der Bahnsteig.
+    const ueberId = gleich.filter(x => x.rid && x.rid === r);
+    if (ueberId.length) return ueberId;
+    // 2) Zieltext. Eine reine Zahl ist eine fremde Richtungs-Id (Wien, OEBB) und
+    //    trifft keinen Zieltext, die geht unten ueber die Uebergabe.
+    if (!/^\d+$/.test(r)) {
+      const tr = zielTreffer(gleich, r);
+      if (tr) return [tr];
+    }
   }
-  const ziele = (richtungen || [])
-    .filter(x => String(x.line || '').trim().toUpperCase() === l)
-    .map(x => String(x.ziel || '').trim()).filter(Boolean);
-  if (ziele.length) {
+  // 3) Was die Uebergabe zu dieser Linie weiss. Auch hier zuerst die Richtungs-Id: das
+  //    ist derselbe Wert, den die Linienauswahl im Konfigurator schon benutzt.
+  const wunsch = (richtungen || []).filter(x => String(x.line || '').trim().toUpperCase() === l);
+  if (wunsch.length) {
+    const ueberId = gleich.filter(x => x.rid && wunsch.some(w => w.rid && w.rid === x.rid));
+    if (ueberId.length) return ueberId;
     const raus = [];
-    ziele.forEach(z => { const t = zielTreffer(gleich, z); if (t && raus.indexOf(t) < 0) raus.push(t); });
+    wunsch.forEach(w => {
+      const t = zielTreffer(gleich, w.ziel);
+      if (t && raus.indexOf(t) < 0) raus.push(t);
+    });
     if (raus.length) return raus;
   }
   return gleich;
@@ -3285,6 +3459,8 @@ function tokenTreffer(linien, m, richtungen) {
       if (paare.length) st.paare = paare;
     }
   }
+  // Gab es schon eine Config, zaehlt sie: Bretter, Stil, Uhr und Design kommen zurueck.
+  if (displaysAusEintraegen(ueber && ueber.eintraege)) { allesZeichnen(); return; }
   allesZeichnen();
   // Gruppen aus der Uebergabe anlegen. Die Verteilung hat die Zeilen einzeln gezaehlt
   // und kann Mitglieder derselben Gruppe auf zwei Displays gelegt haben, darum holen
