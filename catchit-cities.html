@@ -7609,7 +7609,10 @@ function zurNeuenOberflaeche(cfg) {
       helligkeit: parseInt(cfg.displaylight || 3, 10)
     }));
   } catch (e) {}
-  window.location.href = 'anzeigen/anzeigen.html';
+  // Mit Zeitstempel: GitHub Pages schickt cache-control max-age=600, ohne das sieht man
+  // nach einem Release bis zu zehn Minuten lang die alte Oberflaeche (Paul 23.10.2026,
+  // "der macht immer noch nichts" war genau das).
+  window.location.href = 'anzeigen/anzeigen.html?v=' + Date.now();
 }
 
 // Das alte Feintuning-Overlay bleibt als Funktion erhalten, es haengt an anderen
