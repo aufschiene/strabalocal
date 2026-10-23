@@ -441,7 +441,9 @@ let stationen = [];
 //   kompakt      Ein Brett fuer alles. Alle Abfahrten hintereinander, geordnet nach
 //                Fahrzeugart: U-Bahn, Tram, Bus, S-Bahn, Zug. Je Richtung eine Zeile.
 //                Was nicht mehr auf die Seite passt, zeigt das Geraet auf der naechsten.
-//   spielerisch  Jede Station ihr eigenes Brett, jedes im Look seines Netzes.
+//   spielerisch  Jedes NETZ sein eigenes Brett, in seinem Design. Zwei Wiener Stationen
+//                teilen sich also ein Brett, die Linzer Station daneben bekommt ihr
+//                eigenes (Paul 23.10.2026).
 let modus = 'kompakt';
 // Rangfolge der Fahrzeugarten, wie der Server sie nennt. Laengere Namen zuerst pruefen:
 // "ptTrainS" faengt mit "ptTrain" an.
@@ -461,6 +463,13 @@ let zeilen = 2;
 // Diese Stile zeichnet die Firmware ab dem naechsten Release als einen anderen
 // (Paul 23.10.2026, Graz und WLB "einfach weg"). Damit Vorschau und Geraet dasselbe
 // zeigen, rechnen wir ueberall sofort mit dem Ersatz.
+// Stile, die es am Geraet nicht mehr gibt: die Firmware zeichnet sie als einen anderen.
+// Sie stehen darum NICHT mehr in der Auswahlliste, eine alte Config laeuft aber weiter,
+// weil stilErsatz sie hier uebersetzt (Paul 23.10.2026).
+//   4 WLB Badner Bahn -> Wiener Linien      8 Salzburg AG -> BODO
+//  10 Straba -> BODO                       13 Holding Graz -> BODO
+//  17 Bruenn -> Prag                       19 KVB Koeln -> BODO
+//  20 AVV Aachen -> BODO
 const STIL_ERSATZ = { 4: 1, 8: 7, 10: 7, 13: 7, 17: 16, 19: 7, 20: 7 };
 function stilErsatz(c) {
   const n = parseInt(c, 10);
@@ -524,7 +533,7 @@ function standardEinst() {
 // nur Oberoesterreich gruen (Paul 23.10.2026). Darum stehen Salzburg, Graz, Innsbruck
 // hier anders als im Konfigurator. Wien behaelt seinen Stil, die OEBB ihre Bahnhofstafel.
 const NETZ_VORGABE = {
-  WL: [1, 0], WLB: [4, 0], LINZ: [23, 2], OOEVV: [23, 2],
+  WL: [1, 0], WLB: [1, 0], LINZ: [23, 2], OOEVV: [23, 2],
   STV: [23, 3], STVG: [23, 3], SALZBURG: [23, 3], KAERNTEN: [23, 3],
   VOR: [23, 3], VVT: [23, 3], VVV: [23, 3], INNSBRUCK: [23, 3],
   OEBB: [12, 0], OEBB_FERN: [12, 0], OEBB_REGIONAL: [12, 0], OEBB_SBAHN: [12, 0],
@@ -761,7 +770,7 @@ function zeitZeilen(d) {
 // Welche Stile gehoeren zu welchem Netz? Wie im Konfigurator stehen die passenden oben,
 // damit die Liste nicht 25 Eintraege lang vor einem liegt.
 const NETZ_STILE = {
-  WL:      [1, 10, 24, 23],         // Wiener Linien, Straba, Paper White, Matrix
+  WL:      [1, 24, 23, 21],         // Wiener Linien, Paper White, Matrix, SW-Matrix
   OEBB:    [12, 14, 23, 24],        // OEBB, Westbahn, Matrix, Paper White
   BWEGT:   [7, 23, 12, 24],         // bodo, Matrix, OEBB, Paper White
   WESTBAHN:[12, 14, 23, 24],
@@ -775,7 +784,7 @@ const NETZ_STILE = {
   VVV:     [23, 12, 24, 21]
 };
 // Stile, die ueberall gehen und darum immer angeboten werden.
-const STILE_UNIVERSELL = [23, 21, 24, 10];
+const STILE_UNIVERSELL = [23, 21, 24];
 
 // Aufklappliste eines Displays: erst was zu seinen Netzen passt, dann der Rest,
 // am Ende der Weg zum eigenen Design.
@@ -837,17 +846,12 @@ const STILE = [
   { id: 5,  name: 'DB S-Bahn' },
   { id: 6,  name: 'DB Fernverkehr' },
   { id: 7,  name: 'BODO Bodensee' },
-  { id: 8,  name: 'Salzburg AG' },
   { id: 9,  name: 'RATP Paris' },
   { id: 12, name: 'ÖBB' },
-  { id: 13, name: 'Holding Graz' },
   { id: 14, name: 'Westbahn' },
   { id: 15, name: 'Liechtenstein / Schweiz Nahverkehr' },
   { id: 16, name: 'Prag / CZ-HU (schwarz/weiß)' },
-  { id: 17, name: 'Brünn (DPMB)' },
   { id: 18, name: 'BVG Berlin' },
-  { id: 19, name: 'KVB Köln' },
-  { id: 20, name: 'AVV Aachen' },
   { id: 21, name: 'Schwarz/Weiß Matrix' },
   { id: 22, name: 'MVG' },
   { id: 23, name: 'Matrix' },
@@ -1094,9 +1098,17 @@ function displaysAuffuellen() {
   const alle = alleRichtungen();
   const vorhanden = alle.map(r => r.key);
   // Einmal nachschlagen statt bei jedem Vergleich neu suchen.
+  // Netze in der Reihenfolge, in der sie vorkommen: danach richtet sich spielerisch.
+  const netzRang = new Map();
+  stationen.forEach(st => {
+    const n = st.netz || 'WL';
+    if (!netzRang.has(n)) netzRang.set(n, netzRang.size);
+  });
   const wissen = new Map();
   alle.forEach((r, i) => wissen.set(r.key, {
-    typ: typRang(r.dep.vt), st: stationen.indexOf(r.station), linie: r.dep.line, i: i
+    typ: typRang(r.dep.vt),
+    netz: netzRang.get(r.station.netz || 'WL') || 0,
+    st: stationen.indexOf(r.station), linie: r.dep.line, i: i
   }));
   // Eine Richtung darf auf MEHREREN Displays stehen (Paul 22.10.2026: "U2 ist meine
   // Prioritaetslinie und soll immer fixiert sein"). Doppelt wird nur INNERHALB eines
@@ -1117,7 +1129,7 @@ function displaysAuffuellen() {
   // auf ihr eigenes Brett. Ohne das stand alles so da, wie die API es gerade liefert.
   offen.sort((a, b) => {
     const x = wissen.get(a) || {}, y = wissen.get(b) || {};
-    if (modus === 'spielerisch' && x.st !== y.st) return x.st - y.st;
+    if (modus === 'spielerisch' && x.netz !== y.netz) return x.netz - y.netz;
     if (x.typ !== y.typ) return x.typ - y.typ;
     if (x.st !== y.st) return x.st - y.st;
     return String(x.linie).localeCompare(String(y.linie), 'de', { numeric: true });
@@ -1127,10 +1139,10 @@ function displaysAuffuellen() {
     const meine = wissen.get(k);
     let ziel = null;
     if (modus === 'spielerisch' && meine) {
-      // Ein Brett, auf dem schon Linien DIESER Station stehen, sonst ein leeres.
+      // Ein Brett, auf dem schon Linien DIESES NETZES stehen, sonst ein leeres.
       ziel = displays.find(d => platz(d) && d.richtungen.some(k2 => {
         const w = wissen.get(k2);
-        return w && w.st === meine.st;
+        return w && w.netz === meine.netz;
       })) || displays.find(d => platz(d) && !d.richtungen.length);
     } else {
       ziel = displays.find(platz);
