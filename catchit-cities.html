@@ -7598,6 +7598,10 @@ function zurNeuenOberflaeche(cfg) {
           name: st.stopName,
           netz: st.network,
           alle: !!st.allDepartures,
+          // Netze ohne Richtungsauswahl (HAFAS, z.B. Linz) fuehren die gewaehlten
+          // Linien NUR in filter. Ohne das uebernimmt die neue Oberflaeche alles,
+          // was an der Station faehrt (Paul 23.10.2026).
+          filter: st.filter || '',
           richtungen: (st.directions || []).map(function (d) {
             return { line: d.line || '', ziel: d.towards || d.ziel || '' };
           })

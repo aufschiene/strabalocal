@@ -47,6 +47,20 @@
     perspective-origin: 50% 50%;
   }
   .streifen::-webkit-scrollbar { display: none; }
+  /* Die Leiste bleibt beim Runterscrollen oben stehen: was du unten einstellst, siehst du
+     sofort in der Vorschau (Paul 23.10.2026). "body >" schlaegt die Regel fuer alle Kinder
+     von body (position: relative). Grund und Schatten erst, wenn sie wirklich klebt
+     (Klasse .klebt, siehe leisteKlebt), sonst laege oben ein Balken ueber dem Stadtplan. */
+  body > #streifen.streifen { position: sticky; top: 0; z-index: 5; transition: background-color .2s, box-shadow .2s; }
+  body > #streifen.streifen.klebt {
+    background-color: rgba(242, 234, 217, .96);
+    box-shadow: 0 10px 18px -14px rgba(27, 27, 27, .5);
+  }
+  /* Was wir per scrollIntoView ansteuern, landet unter der Leiste statt dahinter. --leiste
+     setzt leisteKlebt auf ihre Hoehe. Bewusst kein scroll-padding am Dokument: das wirkte
+     auch auf das scrollIntoView der aktiven Karte IN der Leiste und zoege die Seite bei
+     jedem Neuzeichnen wieder nach oben. */
+  .klapp > .klapp-kopf, #stationsliste { scroll-margin-top: calc(var(--leiste, 0px) + 10px); }
   /* Die Karten stehen raeumlich: die mittlere vorn und gerade, die Nachbarn gedreht und
      kleiner. Dadurch sieht man auf einen Blick, dass sich seitwaerts wischen laesst.
      Den Wert setzt das Skript beim Scrollen, siehe raumWirkung(). */
@@ -2980,6 +2994,30 @@ function karteAufStation(st) {
 // hat. Daraus entstand eine Rueckkopplung, die Karte zitterte beim Wischen. offsetLeft
 // bleibt von der Verformung unberuehrt (Paul 22.10.2026).
 let raumStand = null;          // letzter Scrollwert, zu dem gerechnet wurde
+// Auf schmalen Bildschirmen steht eine Nachbarkarte genau bei b = 1, und dort schiebt die
+// Kette in raumWirkung sie weiter hinaus: translateZ steht vor der Drehung, die Drehung macht
+// aus der Tiefe einen Versatz nach aussen. Bei 430 px Breite blieb von der naechsten Karte
+// 1 Pixel im Bild, bei 375 px keiner, und niemand sah, dass es seitwaerts weitergeht (Paul
+// 23.10.2026). Der Zug holt die innere Kante der Nachbarn so weit herein, dass SPITZE Pixel
+// zu sehen sind. Nur aus Layout-Werten gerechnet, wie raumWirkung selbst.
+const SPITZE = 56;
+function nachbarZug(streifen) {
+  const karten = streifen.children;
+  if (karten.length < 2) return 0;
+  const breite = streifen.clientWidth;
+  const abstand = karten[1].offsetLeft - karten[0].offsetLeft;   // Mitte zu Mitte
+  if (2 * abstand < breite) return 0;   // breiter Schirm: die Nachbarn sind ohnehin zu sehen
+  // Wo die innere Kante bei b = 1 ohne Zug landet: dieselbe Kette wie in raumWirkung,
+  // scale(0.86), translateZ(-90), rotateY(-26deg), Perspektive 1100.
+  const w = Math.PI * 26 / 180;
+  const x = -karten[0].offsetWidth / 2 * 0.86, z = -90;
+  const xr = x * Math.cos(w) - z * Math.sin(w);
+  const zr = x * Math.sin(w) + z * Math.cos(w);
+  const f = 1100 / (1100 - zr);
+  const spitze = Math.min(SPITZE, (breite - karten[0].offsetWidth) / 2 - 8);
+  // Die Nachbar-Mitte liegt bei breite / 2 + abstand, ihre Kante soll bei breite - spitze liegen.
+  return Math.max(0, xr - (breite / 2 - spitze - abstand) / f);
+}
 function raumWirkung(erzwingen) {
   const streifen = document.getElementById('streifen');
   if (!streifen) return;
@@ -2989,6 +3027,7 @@ function raumWirkung(erzwingen) {
   if (!erzwingen && raumStand !== null && Math.abs(streifen.scrollLeft - raumStand) < 0.5) return;
   raumStand = streifen.scrollLeft;
   const mitte = streifen.scrollLeft + streifen.clientWidth / 2;
+  const zug = nachbarZug(streifen);
   for (const k of streifen.children) {
     const flaeche = k.querySelector('.raum') || k;
     const d = (k.offsetLeft + k.offsetWidth / 2 - mitte) / (streifen.clientWidth / 2);   // -1 … 0 … 1
@@ -2996,7 +3035,8 @@ function raumWirkung(erzwingen) {
     const dreh  = (-b * 26).toFixed(2);
     const tiefe = (-Math.abs(b) * 90).toFixed(1);
     const klein = (1 - Math.abs(b) * 0.14).toFixed(3);
-    flaeche.style.transform = 'perspective(1100px) rotateY(' + dreh + 'deg) translateZ(' + tiefe + 'px) scale(' + klein + ')';
+    flaeche.style.transform = 'perspective(1100px) translateX(' + (-b * zug).toFixed(1) + 'px) rotateY(' + dreh
+                            + 'deg) translateZ(' + tiefe + 'px) scale(' + klein + ')';
     flaeche.style.filter = 'saturate(' + (1 - Math.abs(b) * 0.45).toFixed(2) + ') brightness(' + (1 - Math.abs(b) * 0.1).toFixed(2) + ')';
     k.style.zIndex = String(100 - Math.round(Math.abs(b) * 50));
   }
