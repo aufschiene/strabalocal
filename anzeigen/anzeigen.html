@@ -3655,11 +3655,31 @@ function uebergabeHolen() {
     String(st.rbl || '').split(',').forEach(rbl => {
       rbl = rbl.trim();
       if (!rbl) return;
+      // CLOCK:<n> ist keine Station, sondern unser Platzhalter fuer ein Uhr-Brett. Das
+      // Geraet fuehrt ihn in rbl_id mit, der Konfigurator macht daraus eine Station, und
+      // dann stand hier eine "Station 3" ohne Abfahrten in der Liste. Schlimmer: die
+      // Wiederherstellung sah eine echte Station mit "Alle Abfahrten" und gab auf, also
+      // kam statt drei Brettern eines zurueck (Paul 23.10.2026).
+      if (/^CLOCK:/i.test(rbl)) return;
+      // EINE Station je rbl. Der Konfigurator fuehrt dieselbe Haltestelle einmal JE
+      // EINTRAG, also zweimal, wenn sie auf zwei Brettern liegt. Ungefiltert wurde seit
+      // dem stationsgenauen Zeilen-Schluessel jede Linie doppelt angelegt
+      // (Paul 23.10.2026). Was die Eintraege wollen, wird vereinigt.
+      const schon = raus.find(x => x.rbl === rbl);
       const w = wahl.get(rbl) || null;
+      const wunsch = st.richtungen || [];
+      if (schon) {
+        if (st.alle || (w && w.alle)) schon.alle = true;
+        wunsch.forEach(r => {
+          const da = schon.richtungen.some(x => x.line === r.line && x.ziel === r.ziel);
+          if (!da) schon.richtungen.push(r);
+        });
+        return;
+      }
       raus.push({ rbl: rbl, name: st.name || rbl, netz: st.netz || 'WL',
                   alle: !!st.alle || !!(w && w.alle),
                   wahl: (w && w.gruppen.length) ? w.gruppen : ausFilter,
-                  richtungen: st.richtungen || [] });
+                  richtungen: wunsch.slice() });
     });
   });
   // WAS gewaehlt ist, steht in den Zeilen, die der Konfigurator gerade gebaut hat.
