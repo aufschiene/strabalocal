@@ -1257,7 +1257,13 @@ function stopIdFormat(d) {
   const erste = ((d && d.richtungen) || []).find(k => !istUhrKey(k));
   const r = richtungFinden(erste);
   if (!r) return false;
-  return /^\d/.test(String(r.station.rbl || ''));
+  const rbl = String(r.station.rbl || '');
+  // Wien bindet jede Linie an ihren BAHNSTEIG (stopId:Linie). Das gilt fuer nackte
+  // Nummern UND fuer WL:/WLB:-Prefixe, und der Konfigurator schickt Wien inzwischen
+  // immer mit Prefix. Ohne den zweiten Fall landeten drei Wiener Stationen in EINEM
+  // Eintrag, und das Geraet band alle Linien an den LETZTEN Stop: statt U1, U1 und 13A
+  // stand dreimal 13A auf dem Brett (Paul 23.10.2026).
+  return /^\d/.test(rbl) || /^WLB?:/i.test(rbl);
 }
 
 function istWienSegment(d) {
@@ -3142,9 +3148,17 @@ function gehwegZeichnen() {
   stationen.forEach((st, si) => {
     const offen = gwOffen.has(st.rbl);
     const abw = Object.keys(st.gehwegLinien || {}).length + Object.keys(st.gehwegRichtungen || {}).length;
+    // Wien fuehrt je BAHNSTEIG eine Station, und zwei davon heissen oft gleich. Dann
+    // sagt die Richtung, welcher Steig gemeint ist, sonst stehen hier zweimal
+    // "Alaudagasse" und man raet (Paul 23.10.2026).
+    const gleichNamig = stationen.some((x, xi) => xi !== si && x.name === st.name);
+    const woHin = gleichNamig
+      ? zeilenEintraege(st).slice(0, 2).map(d => d.line + ' \u2192 ' + d.dest).join(', ')
+      : '';
     h += '<div class="gwzeile"><div class="rumpf"><div class="ziel">' + escapeHtmlFt(st.name) + '</div>'
-       + '<div class="halt">' + (abw ? abw + (abw === 1 ? ' Ausnahme' : ' Ausnahmen')
-                                     : 'gilt f\u00fcr alles an dieser Station') + '</div></div>'
+       + '<div class="halt">' + (woHin ? escapeHtmlFt(woHin) + ' &middot; ' : '')
+       + (abw ? abw + (abw === 1 ? ' Ausnahme' : ' Ausnahmen')
+              : 'gilt f\u00fcr alles an dieser Station') + '</div></div>'
        + '<input type="number" min="0" max="99" value="' + gehwegStation(st) + '"'
        + ' onchange="gehwegStationSetzen(' + si + ',this.value)"> <span class="min">min</span>'
        + '<button class="still klein" onclick="gwGenauer(\'' + st.rbl + '\')">'
