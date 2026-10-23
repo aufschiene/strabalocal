@@ -2046,25 +2046,24 @@ async function speichern() {
       [{ text: 'Alles klar' }], 'warnung');
     return;
   }
-  const form = new URLSearchParams();
-  Object.keys(daten).forEach(function (k) { if (k !== 'type') form.append(k, daten[k]); });
+  // Wie der alte Konfigurator: ein echtes Formular an http://<host>/config. Der Browser
+  // wechselt dabei auf die Seite des Geraets, die sagt, dass gespeichert wird und neu
+  // gestartet. Das umgeht auch jede CORS-Frage, wir muessen die Antwort nicht lesen
+  // (Paul 23.10.2026).
   stand('Speichere auf ' + host + ' ...');
-  try {
-    const r = await fetch('http://' + host + '/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form.toString()
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    stand('Gespeichert um ' + uhrText().slice(0, 5) + '.');
-    sagen('Gespeichert', 'Dein catch it startet gerade neu.');
-  } catch (e) {
-    stand('');
-    dialogZeigen('Hat nicht geklappt',
-      'Von ' + host + ' kam keine Antwort (' + ((e && e.message) || e) + '). '
-      + 'Startet das Display gerade neu, ist es trotzdem angekommen.',
-      [{ text: 'Alles klar' }], 'warnung');
-  }
+  const f = document.createElement('form');
+  f.method = 'POST';
+  f.action = 'http://' + host + '/config';
+  Object.keys(daten).forEach(function (k) {
+    if (k === 'type') return;
+    const i = document.createElement('input');
+    i.type = 'hidden';
+    i.name = k;
+    i.value = daten[k];
+    f.appendChild(i);
+  });
+  document.body.appendChild(f);
+  f.submit();
 
 }
 
