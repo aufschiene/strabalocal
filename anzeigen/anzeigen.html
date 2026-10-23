@@ -500,13 +500,34 @@ function standardEinst() {
   return { t: 1, b: 0, u: 0, v: 4, h: 1, n: 0, k: 0, o: 0,
            f: 0, d: 0, x: 0, y: 0, i: STANDZEIT_VORGABE };
 }
-// Oesterreich faehrt echte LED-Matrizen, und die haben je Bundesland ihre Farbe:
-// Oberoesterreich gruen, die uebrigen orange (Paul 23.10.2026). Wien hat seinen eigenen
-// Stil, und die OEBB ihre blaue Bahnhofsanzeige, darum stehen beide hier nicht.
-// Werte wie in SCHRIFT_WAHL.matrix: 1 Weiss, 2 Gruen, 3 Orange.
-const NETZ_MATRIX_TON = {
-  OOEVV: 2, OEBB_REG_OOE: 2,
-  STVG: 3, SALZBURG: 3, KAERNTEN: 3, VOR: 3, VVT: 3, VVV: 3
+// Welcher Anzeige-Stil passt zu welchem Netz, und in welchem Farbton. Dieselbe Zuordnung
+// wie im Konfigurator (CITY_CAPABILITIES: defaultColour und defaultColorVariant), damit
+// eine Berliner Station nicht als OEBB-Tafel anfaengt (Paul 23.10.2026).
+// [Stil, Farbton]. Farbton 0 = der Stil hat keinen, sonst wie in SCHRIFT_WAHL:
+// Matrix 1 Weiss, 2 Gruen, 3 Orange.
+// Oesterreich weicht bewusst ab: alle Landesverbuende fahren echte LED-Matrizen, orange,
+// nur Oberoesterreich gruen (Paul 23.10.2026). Darum stehen Salzburg, Graz, Innsbruck
+// hier anders als im Konfigurator. Wien behaelt seinen Stil, die OEBB ihre Bahnhofstafel.
+const NETZ_VORGABE = {
+  WL: [1, 0], WLB: [4, 0], LINZ: [23, 2], OOEVV: [23, 2],
+  STV: [23, 3], STVG: [23, 3], SALZBURG: [23, 3], KAERNTEN: [23, 3],
+  VOR: [23, 3], VVT: [23, 3], VVV: [23, 3], INNSBRUCK: [23, 3],
+  OEBB: [12, 0], OEBB_FERN: [12, 0], OEBB_REGIONAL: [12, 0], OEBB_SBAHN: [12, 0],
+  OEBB_STAMM_SBAHN: [12, 0], OEBBREG: [12, 0], OEBBFERN: [12, 0], WESTBAHN: [12, 0],
+  OEBB_REG_NOE: [5, 0], OEBB_REG_OOE: [5, 0],
+  DB: [6, 0], DKTRAIN: [6, 0], BAYERN: [24, 3], BODO: [7, 0], PARIS: [9, 0],
+  LIEMOBIL: [26, 0], CH_OEFFI: [26, 0], SBB: [25, 0], PID: [16, 0],
+  BERLIN: [23, 3], KOELN: [23, 3], NRW: [23, 3], AACHEN: [23, 3], BWEGT: [23, 3],
+  VBN: [23, 3], VRN: [23, 3], VOS: [23, 3], NAHSH: [23, 3], VSN: [23, 3],
+  INSA: [23, 3], MDV: [23, 3], RLP: [23, 3], SACHSEN: [23, 3], ROSTOCK: [23, 3],
+  NVV: [23, 3], VMT: [23, 3], SAARVV: [23, 3],
+  NL_OEFFI: [23, 3], GB_LOCAL: [23, 3], TBILISI: [23, 3], SYDNEY: [23, 3],
+  BUCHAREST: [23, 3], AUCKLAND: [23, 3], AUSTIN: [23, 3],
+  HAMBURG: [1, 0], RMV: [1, 0], VVO: [1, 0], GVB: [1, 0], RET: [1, 0], OVAPI: [1, 0],
+  LONDON: [1, 0], BUDAPEST: [1, 0], HELSINKI: [1, 0], LJUBLJANA: [1, 0], NS: [1, 0],
+  SNCF: [1, 0], UKRAIL: [1, 0], TRENITALIA: [1, 0], VY: [1, 0], TRAFIKLAB: [1, 0],
+  REJSEPLANEN: [1, 0], VR: [1, 0], PEATUS: [1, 0], IRISHRAIL: [1, 0], SNCB: [1, 0],
+  CFL: [1, 0], FLIXBUS: [1, 0], EUSLEEPER: [1, 0]
 };
 // Die Netze der Linien, die auf diesem Display liegen.
 function netzeVon(d) {
@@ -517,10 +538,15 @@ function netzeVon(d) {
   });
   return raus;
 }
+// Vorgabe des ersten bekannten Netzes auf diesem Display.
+function netzVorgabe(d) {
+  let v = null;
+  netzeVon(d).forEach(n => { if (!v && NETZ_VORGABE[n]) v = NETZ_VORGABE[n]; });
+  return v;
+}
 function matrixTon(d) {
-  let ton = 0;
-  netzeVon(d).forEach(n => { if (!ton && NETZ_MATRIX_TON[n]) ton = NETZ_MATRIX_TON[n]; });
-  return ton;
+  const v = netzVorgabe(d);
+  return v ? v[1] : 0;
 }
 function einstFuer(d) {
   if (!d) return standardEinst();
@@ -743,6 +769,11 @@ function stilOptionen(d) {
   (d && d.richtungen || []).forEach(k => { const r = richtungFinden(k); if (r) netze.add(r.station.netz || 'WL'); });
   if (!netze.size) netze.add('WL');
   const passend = [];
+  // Die Vorgabe des Netzes zuerst, danach, was sonst dazu passt.
+  netze.forEach(n => {
+    const v = NETZ_VORGABE[n];
+    if (v && passend.indexOf(v[0]) < 0) passend.push(v[0]);
+  });
   netze.forEach(n => (NETZ_STILE[n] || []).forEach(c => { if (passend.indexOf(c) < 0) passend.push(c); }));
   STILE_UNIVERSELL.forEach(c => { if (passend.indexOf(c) < 0) passend.push(c); });
   const jetzt = stilVon(d);
@@ -764,8 +795,9 @@ function stilOptionen(d) {
 function stilVorschlag(d) {
   const netze = netzeVon(d);
   if (netze.size === 1 && netze.has('WL')) return 1;    // Wiener Linien
-  if (matrixTon(d)) return 23;                          // Matrix, gruen oder orange
-  if (netze.size && !netze.has('WL')) return 12;        // OEBB-Bahnhofsanzeige
+  const v = netzVorgabe(d);
+  if (v) return v[0];
+  if (netze.size && !netze.has('WL')) return 12;        // unbekanntes Netz: Bahnhofstafel
   return stil;
 }
 let zeiger = 0;                // welcher Bildschirm ist ausgewaehlt
@@ -847,10 +879,44 @@ function linienMerken(st) {
   });
   if (paare.length) st.letzteLinien = paare;
 }
+// Kurzfuehrungen gehoeren zu ihrer Richtung, nicht daneben. Regel wie im Konfigurator
+// (Paul 20.09.2026): die Richtungs-Id ist die physische Richtung, mehrere Zieltexte
+// darunter sind Aeste oder Kurzfuehrungen DERSELBEN Richtung. Hat eine Linie an diesem
+// Halt nur EINE Richtungs-Id, trennt die nichts, dann sind die Zieltexte die Richtungen.
+// Linz Unionkreuzung, Linie 1: Auwiesen und Remise Kleinmuenchen teilen sich
+// st444518499l1, Universitaet hat st444518401l1. Also zwei Richtungen, nicht drei
+// (Paul 23.10.2026). Der echte Zieltext bleibt als destRoh erhalten.
+function kurzfuehrungenFalten(liste) {
+  const proLinie = new Map();
+  liste.forEach(d => {
+    if (!d.rid) return;
+    if (!proLinie.has(d.line)) proLinie.set(d.line, new Map());
+    const rids = proLinie.get(d.line);
+    if (!rids.has(d.rid)) rids.set(d.rid, new Map());
+    const ziele = rids.get(d.rid);
+    ziele.set(d.dest, (ziele.get(d.dest) || 0) + 1);
+  });
+  const haupt = new Map();   // Linie|rid -> Ziel der Hauptrichtung
+  proLinie.forEach((rids, linie) => {
+    if (rids.size < 2) return;       // eine einzige Id trennt nichts
+    rids.forEach((ziele, rid) => {
+      if (ziele.size < 2) return;
+      let best = '', n = -1;
+      ziele.forEach((zahl, ziel) => { if (zahl > n) { n = zahl; best = ziel; } });
+      haupt.set(linie + '|' + rid, best);
+    });
+  });
+  liste.forEach(d => {
+    const b = haupt.get(d.line + '|' + d.rid);
+    if (b && b !== d.dest) { d.destRoh = d.dest; d.dest = b; }
+  });
+  return liste;
+}
+
 // Abfahrten einer Station setzen, mit Beispiel-Rueckfall.
 function abfahrtenSetzen(st, liste) {
   if (liste && liste.length) {
-    st.abfahrten = liste;
+    st.abfahrten = kurzfuehrungenFalten(liste);
     st.beispiel = false;
     linienMerken(st);
   } else {
@@ -1491,8 +1557,12 @@ function editorZeichnen() {
        + 'Feste Zeilen</button>'
        + '<button class="' + (zeitbasiert(dHier) ? 'an' : '') + '" onclick="sortierungSetzen(' + s.index + ',\'zeit\')">'
        + 'N\u00e4chste Abfahrten</button></div>';
-    // Ehrlich bleiben: 's' steht je Stil in den displaysettings, nicht je Display.
-    const gleich = displays.filter((x, xi) => xi !== s.index && stilVon(x) === stilVon(dHier));
+    // Seit Firmware 2.6 steht 's' im EINTRAG, die Wahl gilt also je Display. Nur
+    // aeltere Geraete lesen es aus den displaysettings, und dort kennt das Format nur
+    // die colour. Der Hinweis gilt darum nur noch, wenn sich das Geraet aelter meldet
+    // (Paul 23.10.2026).
+    const gleich = (geraetVersion && !fwNeu())
+      ? displays.filter((x, xi) => xi !== s.index && stilVon(x) === stilVon(dHier)) : [];
     if (gleich.length) {
       h += '<div class="hinweis">Bis zum n\u00e4chsten Firmware-Update gilt diese Wahl f\u00fcr '
          + 'alle ' + (gleich.length + 1) + ' Displays mit dem Stil '
