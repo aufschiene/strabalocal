@@ -1,0 +1,3090 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meine Anzeigen</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Silkscreen&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --papier: #f2ead9; --karte: #faf5ec; --tinte: #1b1b1b;
+    --grau: #8b8378; --linie: #ded5c4; --akzent: #eb3924;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 18px 0 80px; background: var(--papier); color: var(--tinte);
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+  .bahn { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+
+  /* Stadtplan als Hintergrund. Liegt hinter allem, nimmt keine Klicks an und ist
+     entfaerbt, damit die Anzeigen davor lesbar bleiben. */
+  #karte {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    filter: grayscale(1) contrast(.75) brightness(1.06) opacity(.35);
+  }
+  #karte::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 30%, rgba(242,234,217,.35), rgba(242,234,217,.92) 70%);
+  }
+  body > *:not(#karte) { position: relative; z-index: 1; }
+  .leaflet-container { background: var(--papier); }
+  h1 { font-size: 24px; margin: 0 0 2px; }
+  .unter { color: var(--grau); font-size: 13px; margin: 0 0 16px; }
+  h2 { font-size: 15px; margin: 22px 0 8px; letter-spacing: .2px; }
+
+  /* ---- Wisch-Leiste der Bildschirme ---- */
+  /* Seitliche Polster von einer halben Bildschirmbreite minus halber Karte: dadurch
+     kann AUCH die erste und die letzte Karte in der Mitte einrasten. Ohne das klebte
+     die erste Karte links am Rand. */
+  .streifen {
+    display: flex; gap: 14px; overflow-x: auto;
+    padding: 18px calc(50vw - 150px) 26px;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    perspective: 1100px;          /* macht die Drehung der Nachbarkarten raeumlich */
+    perspective-origin: 50% 50%;
+  }
+  .streifen::-webkit-scrollbar { display: none; }
+  /* Die Karten stehen raeumlich: die mittlere vorn und gerade, die Nachbarn gedreht und
+     kleiner. Dadurch sieht man auf einen Blick, dass sich seitwaerts wischen laesst.
+     Den Wert setzt das Skript beim Scrollen, siehe raumWirkung(). */
+  /* WICHTIG: die Karte ist NUR das Snap-Ziel und bleibt unverdreht. Gedreht wird das
+     Innere (.raum). Vorher trug dieselbe Box beides: der Browser rastete auf die
+     verdrehte Flaeche ein, das Einrasten verschob den Scrollwert um Bruchteile, das
+     aenderte die Drehung, und so weiter. Die Karte zitterte dauerhaft, ohne dass
+     jemand sie anfasste (gemessen: 265 Scroll-Ereignisse in 2 Sekunden im Leerlauf,
+     Paul 23.10.2026). */
+  .schirm { scroll-snap-align: center; flex: 0 0 auto; cursor: pointer; }
+  .schirm > .raum {
+    transform-style: preserve-3d; will-change: transform;
+    transition: filter .18s ease-out;
+  }
+  /* Das Geraet ist 320 mal 170 Pixel. Die Karte zeigt es verkleinert, aber VOLLSTAENDIG:
+     frueher war die Karte schmaler und schnitt rechts die Minuten ab. */
+  .schirm .glas {
+    width: 300px; height: 159px; position: relative; overflow: hidden;
+    border: 2px solid var(--tinte); border-radius: 12px; background: #000;
+    box-shadow: 4px 4px 0 var(--tinte), 0 10px 24px rgba(27,27,27,.22);
+    transition: box-shadow .18s ease-out;
+  }
+  .schirm .glas > .bild {
+    position: absolute; top: 0; left: 0; width: 320px; height: 170px;
+    transform: scale(0.9375); transform-origin: top left;
+  }
+  .schirm.aktiv .glas { outline: 3px solid var(--akzent); outline-offset: 3px; }
+  .schirm:active .glas { box-shadow: 2px 2px 0 var(--tinte); }
+  .schirm .fuss { margin-top: 8px; text-align: center; font-size: 13px; font-weight: 600; }
+  .schirm .fuss span { display: block; font-weight: 400; color: var(--grau); font-size: 11px; }
+  .neu .glas {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--karte); color: var(--akzent); gap: 6px;
+  }
+  .neu .glas .plus { font-size: 34px; font-weight: 300; line-height: 1; }
+  .neu .glas .wort { font-size: 13px; font-weight: 600; }
+
+  /* ---- Karten ---- */
+  .karte {
+    background: var(--karte); border: 2px solid var(--tinte); border-radius: 14px;
+    box-shadow: 4px 4px 0 var(--tinte); padding: 14px; margin-bottom: 16px;
+  }
+  .kopf { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .kopf .titel { font-size: 17px; font-weight: 700; }
+  .kopf .modus { font-size: 12px; color: var(--akzent); font-weight: 600; }
+
+  .zeile {
+    border: 1px solid var(--linie); border-radius: 10px; padding: 10px 12px;
+    margin-top: 8px; background: #fff;
+  }
+  .zeile .marke { font-size: 11px; font-weight: 700; letter-spacing: .4px;
+                  text-transform: uppercase; color: var(--grau); margin-bottom: 4px; }
+  .zeile .wahl { font-size: 14px; font-weight: 600; color: var(--akzent); cursor: pointer; }
+  .zeile .jetzt { font-size: 13px; color: var(--grau); margin-top: 2px; }
+
+  select, input[type=text] {
+    font-family: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px;
+    border: 2px solid var(--tinte); background: #fff; color: var(--tinte); width: 100%;
+  }
+  label.feld { display: block; font-size: 11px; font-weight: 700; letter-spacing: .4px;
+               text-transform: uppercase; color: var(--grau); margin: 10px 0 4px; }
+  button {
+    font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+    border: 2px solid var(--tinte); border-radius: 10px; padding: 9px 15px;
+    background: var(--akzent); color: #fff; box-shadow: 3px 3px 0 var(--tinte);
+  }
+  button.still { background: #fff; color: var(--tinte); }
+  button.klein { font-size: 12px; padding: 6px 10px; box-shadow: 2px 2px 0 var(--tinte); }
+  .reihe { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+
+  .schalter { display: flex; background: #ece3d2; border-radius: 10px; padding: 4px; gap: 4px; }
+  .schalter button { flex: 1; box-shadow: none; border: none; background: transparent; color: var(--grau); }
+  .schalter button.an { background: #fff; color: var(--tinte); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+
+  /* Schmales Geraet: die Karte kleiner machen, damit die Nachbarn sichtbar hereinragen.
+     Sonst fuellt eine 300er Karte den Bildschirm fast ganz aus und niemand sieht, dass
+     es seitwaerts weitergeht. Das Bild bleibt 320 mal 170 und wird nur staerker skaliert. */
+  @media (max-width: 460px) {
+    .streifen { padding-left: calc(50vw - 125px); padding-right: calc(50vw - 125px); gap: 12px; }
+    .schirm .glas { width: 250px; height: 133px; }
+    .schirm .glas > .bild { transform: scale(0.78125); }
+    .schirm .fuss { font-size: 12px; }
+  }
+
+  /* Eine Zeile je Linie und Richtung: Badge und Ziel gross, die Station ruhig darunter. */
+  .linie {
+    display: flex; align-items: center; gap: 11px; cursor: pointer;
+    border: 1px solid var(--linie); border-radius: 10px; padding: 10px 12px;
+    margin-top: 8px; background: #fff;
+  }
+  .linie.aus { opacity: .45; }
+  .linie b {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    min-width: 40px; height: 30px; padding: 0 9px; border-radius: 8px;
+    font-size: 15px; font-weight: 800; letter-spacing: .2px;
+  }
+  .linie .rumpf { flex: 1; min-width: 0; }
+  .linie .ziel {
+    font-size: 16px; font-weight: 600; color: var(--tinte);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .linie .ziel::before { content: '\2192\00a0'; color: var(--grau); }
+  .linie .halt { font-size: 12px; color: var(--grau); margin-top: 1px; }
+  .linie.gewaehlt { border-color: var(--akzent); border-width: 2px; }
+  .neu-badge {
+    display: inline-block; vertical-align: middle; margin-left: 6px;
+    background: var(--akzent); color: #fff; border-radius: 999px;
+    padding: 2px 7px; font-size: 10px; font-weight: 700; letter-spacing: .3px;
+    text-transform: uppercase;
+  }
+  .klapp-kopf .neu-platz { display: inline; }
+  .linie.ziehbar { cursor: grab; }
+  .linie.zieht {
+    cursor: grabbing; opacity: .75; border-color: var(--akzent);
+    box-shadow: 3px 3px 0 var(--tinte); position: relative; z-index: 3;
+  }
+  /* Noch nirgends zugewiesen: faellt auf, ohne zu zappeln. */
+  @keyframes pochen {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(235, 57, 36, 0); }
+    50%      { box-shadow: 0 0 0 5px rgba(235, 57, 36, .13); }
+  }
+  .linie.neu-dran { border-color: var(--akzent); animation: pochen 2.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .linie.neu-dran { animation: none; } }
+  .linie .haken { flex: 0 0 auto; width: 18px; color: var(--akzent); font-weight: 800; }
+  .weg-x { color: var(--akzent); font-size: 13px; }
+  .weg { font-size: 12px; color: var(--akzent); font-weight: 600; cursor: pointer; flex: 0 0 auto; }
+  .linie .doppel { flex: 0 0 auto; display: flex; color: var(--grau); }
+
+  /* Eigener Dialog im Papier-Stil. Die Kaesten des Browsers nennen die Adresse und
+     passen nicht zum Rest (Paul 22.10.2026). */
+  /* body > :not(#karte) setzt alles auf relative und zaehlt wegen :not(#id) als ID.
+     Darum hier ebenfalls mit body > davor, sonst klebt der Dialog im Seitenfluss. */
+  body > #schleier {
+    position: fixed; inset: 0; z-index: 1200; display: none;
+    background: rgba(27, 27, 27, .45); align-items: center; justify-content: center; padding: 20px;
+  }
+  body > #schleier.an { display: flex; }
+  #schleier .blatt {
+    background: var(--karte); border: 2px solid var(--tinte); border-radius: 14px;
+    box-shadow: 6px 6px 0 var(--tinte); padding: 22px 20px 18px; max-width: 400px; width: 100%;
+    text-align: center;
+  }
+  #schleier .sinn {
+    width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #schleier .sinn.warnung { background: rgba(235, 57, 36, .12); color: var(--akzent); }
+  #schleier .sinn.doppelt { background: rgba(27, 27, 27, .08); color: var(--tinte); }
+  #schleier h3 { margin: 0 0 8px; font-size: 17px; }
+  #schleier p { margin: 0 auto; font-size: 14px; line-height: 1.55; max-width: 32ch; }
+  #schleier .knoepfe { display: flex; gap: 8px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+
+  /* Regler mit Beschriftung links und Wert rechts, wie im alten Konfigurator. */
+  .regler { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .regler .wort { font-size: 13px; font-weight: 600; flex: 0 0 86px; }
+  .regler input[type=range] { flex: 1; accent-color: var(--akzent); min-width: 0; }
+  .regler .wert { font-size: 13px; font-weight: 700; flex: 0 0 34px; text-align: right; }
+
+  .zeilenkopf { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .zeilenkopf h2 { margin-bottom: 0; }
+  button.link {
+    background: none; border: 0; box-shadow: none; padding: 0; font: inherit;
+    font-size: 12px; font-weight: 700; color: var(--akzent); cursor: pointer; text-decoration: underline;
+  }
+
+  /* Zusammengefasste Zeile: die Marken der beteiligten Richtungen nebeneinander, darunter
+     die Ziele mit Mittelpunkt getrennt. Eine Zeile am Geraet, also auch hier eine. */
+  .linie .marken { flex: 0 0 auto; display: flex; gap: 3px; flex-wrap: wrap; max-width: 96px; }
+  .linie.zusammen { border-color: var(--akzent); }
+  .linie .zusatz { font-size: 11px; color: var(--akzent); font-weight: 700; margin-top: 2px; }
+
+  /* Auswahl im Dialog: je Richtung eine antippbare Zeile mit Haken. */
+  #schleier .wahlliste { margin: 14px 0 0; max-height: 46vh; overflow: auto; text-align: left; }
+  #schleier .wahlliste .linie { margin: 0 0 6px; }
+  #schleier .wahlliste .linie:last-child { margin-bottom: 0; }
+  #schleier .wahlliste .linie.fest { opacity: .55; }
+  #schleier .leer { font-size: 13px; color: var(--grau); text-align: center; margin: 14px 0 0; }
+
+  .pfeile { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+  .pfeil {
+    width: 34px; height: 26px; padding: 0; font-size: 12px; line-height: 1;
+    background: #fff; color: var(--tinte); box-shadow: none; border-width: 1px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .pfeil:disabled { opacity: .3; }
+
+  .hinweis { font-size: 12px; color: var(--grau); line-height: 1.55; margin-top: 8px; }
+
+  /* Uhr-Display: gross, mittig, in unserer Schrift. Feste Ziffernbreite, damit beim
+     Ticken nichts springt. */
+  /* Blinken bei 0: ein Takt fuer alle Zeilen, weil alle gleichzeitig entstehen. */
+  @keyframes blinkNull { 0%, 49.9% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  .blinkt { animation: blinkNull 1s steps(1, end) infinite; }
+  /* Winzige Probe im Knopf: zeigt in LED-Schrift, was die Wahl tut. */
+  .bprobe {
+    display: block; margin: 4px auto 0; padding: 3px 6px; border-radius: 4px;
+    width: fit-content; line-height: 0;
+  }
+  .schalter button { line-height: 1.25; }
+  @media (prefers-reduced-motion: reduce) { .blinkt { animation: none; opacity: .5; } }
+
+  .uhr-flaeche {
+    position: absolute; inset: 0;
+    font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 34px; letter-spacing: 0;
+  }
+  /* Die Uhr haengt am Anker, nicht an der Mitte: siehe uhrAnker(). tabular-nums waere
+     hier wirkungslos, Poppins bringt keine gleich breiten Ziffern mit. */
+  .uhr-zeit { position: absolute; top: 50%; transform: translateY(-50%); white-space: pre; }
+
+  /* Grosse Klappbloecke unter den Linien. Eingeklappt steht nur der Name da, ein Tipp
+     oeffnet den Inhalt (Paul 22.10.2026). */
+  .klapp { padding: 0; }
+  .klapp .klapp-kopf small { display: block; font-size: 12px; font-weight: 400; color: var(--grau); margin-top: 2px; }
+  .klapp > .klapp-kopf {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 18px 16px; background: none; border: 0; box-shadow: none;
+    color: var(--tinte); font-size: 16px; font-weight: 700; text-align: left;
+  }
+  .klapp .klapp-pfeil { flex: 0 0 auto; display: flex; color: var(--grau); transition: transform .18s; }
+  .klapp.offen .klapp-pfeil { transform: rotate(180deg); }
+  .klapp .klapp-koerper { padding: 0 16px 16px; }
+  .pooltrenner { border-top: 2px solid var(--linie); padding-top: 14px; margin-top: 18px; }
+
+  /* Schieber fuer die Ja-Nein-Schalter, im Stil der Karten statt als Systemschalter. */
+  .schieber { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; }
+  .schieber + .schieber { border-top: 1px solid var(--linie); }
+  .schieber .wort { font-size: 14px; font-weight: 700; }
+  .schieber .wort small { display: block; font-size: 12px; font-weight: 400; color: var(--grau); margin-top: 2px; }
+  .schiene {
+    width: 54px; height: 30px; flex: 0 0 auto; border-radius: 15px; padding: 0;
+    border: 2px solid var(--tinte); background: #fff; box-shadow: none; position: relative;
+  }
+  .schiene .kugel {
+    position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--tinte); transition: transform .15s;
+  }
+  .schiene.an { background: var(--akzent); }
+  .schiene.an .kugel { transform: translateX(24px); background: #fff; }
+
+  /* Zeile der Gehweg-Liste: Name links, Minutenfeld rechts, darunter eingerueckt die
+     einzelnen Linien derselben Station. */
+  .gwzeile {
+    display: flex; align-items: center; gap: 10px; padding: 10px 0;
+    border-top: 1px solid var(--linie);
+  }
+  /* Eingerueckte Linienzeile: rechts so viel Platz wie der Knopf daneben, damit die
+     Minutenfelder in einer Spalte stehen. */
+  .gwzeile.tiefer { padding-left: 16px; padding-right: 84px; border-top: 1px dashed var(--linie); }
+  .gwzeile.tiefer2 { padding-left: 34px; padding-right: 84px; border-top: 1px dotted var(--linie); }
+  .gwzeile > button { min-width: 74px; }
+  .gwzeile .rumpf { flex: 1; min-width: 0; }
+  .gwzeile .ziel { font-size: 14px; font-weight: 700; }
+  .gwzeile .halt { font-size: 12px; color: var(--grau); margin-top: 1px; }
+  .gwzeile input { width: 64px; flex: 0 0 auto; text-align: center; padding: 7px 4px; }
+  .gwzeile .min { font-size: 12px; color: var(--grau); flex: 0 0 auto; }
+  .gwzeile b {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 26px; border-radius: 7px; font-size: 13px; padding: 0 7px;
+  }
+
+  /* Farbwahl: der Knopf traegt die Farbe selbst, darum kein Akzent als Markierung,
+     sondern Haken und Schatten fuer das Gewaehlte. */
+  .farbreihe { display: flex; gap: 8px; flex-wrap: wrap; }
+  .farbreihe button {
+    flex: 1 1 0; min-width: 96px; padding: 13px 8px; font-size: 13px;
+    box-shadow: none; opacity: .45;
+  }
+  .farbreihe button.an { opacity: 1; box-shadow: 3px 3px 0 var(--tinte); }
+  .kasten {
+    border: 2px solid var(--linie); border-radius: 10px; padding: 10px 12px; margin-top: 10px;
+    background: #fff;
+  }
+  .kasten .titelchen { font-size: 12.5px; font-weight: 700; margin-bottom: 4px; }
+  .haken-zeile {
+    display: flex; align-items: center; gap: 10px; font-size: 14px;
+    cursor: pointer; padding: 7px 0;
+  }
+  .haken-zeile input { width: 22px; height: 22px; flex: 0 0 auto; margin: 0; accent-color: var(--akzent); }
+  .klapp:not(.offen) .klapp-koerper { display: none; }
+  .warn { color: #b3261e; font-weight: 600; font-size: 13px; }
+  code.aus {
+    display: block; font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+    background: #fff; border: 1px solid var(--linie); border-radius: 8px;
+    padding: 8px; margin-top: 6px; word-break: break-all; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div id="karte"></div>
+
+<div id="schleier">
+  <div class="blatt">
+    <div class="sinn" id="dlgSinn"></div>
+    <h3 id="dlgTitel"></h3>
+    <p id="dlgText"></p>
+    <div id="dlgInhalt"></div>
+    <div class="knoepfe" id="dlgKnoepfe"></div>
+  </div>
+</div>
+
+<div class="bahn">
+  <h1>Meine Anzeigen</h1>
+  <p class="unter">Wische seitwärts durch deine Displays. Was du hier siehst, steht genauso am Gerät.</p>
+</div>
+
+<div class="streifen" id="streifen"></div>
+
+<div class="bahn">
+  <div class="karte klapp offen" id="klappLinien">
+    <button class="klapp-kopf" onclick="klappSchalten('klappLinien')"><span>Linien &amp; Reihenfolge<span class="neu-platz"></span></span>
+      <span class="klapp-pfeil"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
+    <div class="klapp-koerper">
+      <div id="editor"></div>
+      <div class="kopf pooltrenner"><div class="titel" id="poolTitel">Deine anderen Linien</div>
+        <div class="modus">tippen legt sie auf das gewählte Display</div></div>
+      <div id="stationsliste"></div>
+    </div>
+  </div>
+
+  <div class="karte klapp" id="klappDesign">
+    <button class="klapp-kopf" onclick="klappSchalten('klappDesign')"><span>Farben &amp; Linien Design</span>
+      <span class="klapp-pfeil"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
+    <div class="klapp-koerper">
+      <div class="hinweis">Noch leer.</div>
+    </div>
+  </div>
+
+  <div class="karte klapp" id="klappFahrzeug">
+    <button class="klapp-kopf" onclick="klappSchalten('klappFahrzeug')"><span>Features<span class="neu-platz"></span><small id="featuresUnter">Hochflurer, Niederflur, Klimaanlage</small></span>
+      <span class="klapp-pfeil"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
+    <div class="klapp-koerper">
+      <div class="hinweis">Noch leer.</div>
+    </div>
+  </div>
+
+  <div class="karte klapp" id="klappGehweg">
+    <button class="klapp-kopf" onclick="klappSchalten('klappGehweg')"><span>Gehweg &amp; Nachtmodus<span class="neu-platz"></span></span>
+      <span class="klapp-pfeil"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
+    <div class="klapp-koerper">
+      <div class="hinweis">Noch leer.</div>
+    </div>
+  </div>
+
+  <div class="karte klapp" id="klappMehr">
+    <button class="klapp-kopf" onclick="klappSchalten('klappMehr')"><span>Erweitert<span class="neu-platz"></span></span>
+      <span class="klapp-pfeil"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
+    <div class="klapp-koerper" id="zeitfenster"></div>
+  </div>
+
+  <div class="karte">
+    <div class="reihe" style="margin:0">
+      <button onclick="speichernFragen()">Ans Gerät speichern</button>
+      <span class="hinweis" id="speicherStand" style="margin:0"></span>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="renderer-host.js"></script>
+<script src="display-renderer.js"></script>
+<script>
+const DEP_API  = 'https://api.straba.at/api/v1/wl/departures';
+const SUCH_API = 'https://api.straba.at/api/v1/stops/search';
+
+// ---- Zustand -------------------------------------------------------------------------
+// stationen: [{ rbl, name, netz, linien: [{name, ziel, rid, typ, farbe}], gewaehlt: Set, abfahrten: [] }]
+let stationen = [];
+// Kompakt ist der Normalfall: alle Stationen auf EINEM Display, das bei mehr Linien als
+// Zeilen auf mehrere Seiten umbricht. Paul 22.10.2026: der Umschalter ist weg, weil die
+// Frage "wie verteile ich die Stationen" den Nutzer nur aufhaelt.
+let modus = 'kompakt';
+// Stil und Zeilen gehoeren seit 22.10.2026 ZUM DISPLAY, nicht mehr global: ein Geraet
+// soll Wien im Wiener-Linien-Look und die OEBB-Station in der Bahnhofsanzeige zeigen.
+// Die beiden Variablen bleiben als Vorgabe fuer neue Displays.
+let stil = 1;
+let zeilen = 2;
+// Diese Stile zeichnet die Firmware ab dem naechsten Release als einen anderen
+// (Paul 23.10.2026, Graz und WLB "einfach weg"). Damit Vorschau und Geraet dasselbe
+// zeigen, rechnen wir ueberall sofort mit dem Ersatz.
+const STIL_ERSATZ = { 4: 1, 8: 7, 10: 7, 13: 7, 17: 16, 19: 7, 20: 7 };
+function stilErsatz(c) {
+  const n = parseInt(c, 10);
+  return STIL_ERSATZ[n] != null ? STIL_ERSATZ[n] : n;
+}
+function stilVon(d) { return stilErsatz((d && d.stil != null) ? d.stil : stil); }
+// Wie viele Zeilen ein Anzeige-Stil kann. Werte aus DISPLAY_TYPE_FEATURES des
+// Konfigurators; wo dort nichts steht, gilt dessen Vorgabe 3
+// (`var rMin = f.minRows || 1, rMax = f.maxRows || 3`). Wiener Linien kann also 3.
+const STIL_ZEILEN = { 2: 4, 13: 4, 15: 4, 18: 4, 21: 4, 23: 5, 24: 4, 26: 5, 101: 5, 102: 5, 103: 5 };
+const ZEILEN_VORGABE = 3;
+
+// Was ein Anzeige-Stil an Farben kann. Gleiche Quelle wie im Konfigurator:
+// DISPLAY_TYPE_FEATURES.textColor (1, 23, 24), Hintergrund nur Wien, Badges
+// DT_BADGE_COLOURS = 1, 3, 16. Steht ein Stil nicht hier, hat er nichts davon.
+// verspaetung: das Display kann eine Verspaetung hervorheben (Feld d). Die Matrix-Stile
+// zeichnen einfarbig und koennen darum nichts hervorheben.
+const STIL_KANN = {
+  1:  { schrift: 'wien',   grund: true, badges: true, fahrzeug: true },
+  3:  { badges: true },
+  16: { badges: true },
+  2:  { blinken: true, verspaetung: true },
+  12: { verspaetung: true },
+  15: { blinken: true, verspaetung: true },
+  18: { blinken: true, verspaetung: true },
+  21: { blinken: true, verspaetung: true },
+  23: { schrift: 'matrix', matrixSchrift: true, blinken: true, verspaetung: true },
+  24: { schrift: 'papier' }
+};
+// Matrix-Schriftart, Feld f: 0 = DACH (font1), 1 = CZ+HU (Matrix8x6). Die zweite traegt
+// die tschechischen und ungarischen Zeichen, die der DACH-Satz nicht hat.
+const MATRIX_SCHRIFT = [[0, 'DACH'], [1, 'CZ + HU']];
+// Die drei Schrift-Varianten teilen sich das Feld t (1, 2, 3), heissen aber je Stil
+// anders und sehen anders aus. [Wert, Name, Hintergrund des Knopfs, Schrift des Knopfs]
+const SCHRIFT_WAHL = {
+  wien:   { titel: 'Schriftfarbe', knoepfe: [[1, 'Gelb', '#FFD700', '#000'], [2, 'Wei\u00df', '#fff', '#000'], [3, 'Orange', '#FF8C00', '#000']] },
+  matrix: { titel: 'Farbton', knoepfe: [[1, 'Wei\u00df', '#ffffff', '#222'], [2, 'Gr\u00fcn', '#94ce39', '#0a2e00'], [3, 'Orange', '#ff8c00', '#3a1d00']] },
+  papier: { titel: 'Farbton', knoepfe: [[1, 'Komplett wei\u00df', '#ffffff', '#222'], [2, 'Wei\u00df/Schwarz', '#1a1a1a', '#ffffff'], [3, 'Wei\u00df/Hellgrau', '#bbbbbb', '#222']] }
+};
+// Fahrzeugarten fuer die Badges, als Bitmaske im Feld v (ohne v gilt 4, nur U-Bahn).
+const BADGE_FAHRZEUGE = [[1, 'Tram'], [2, 'Bus'], [4, 'U-Bahn'], [8, 'Zug/S-Bahn']];
+
+// Die Einstellungen haengen am DISPLAY, nicht am Stil (Paul 23.10.2026: "die farben
+// auch alles pro fenster also display"). Sie gehen als Felder im masterrow-EINTRAG ans
+// Geraet. Zusaetzlich landen sie weiter in den displaysettings der colour, damit
+// aeltere Firmware das bisherige Verhalten behaelt; dort gibt das ERSTE Display dieses
+// Stils den Ton an.
+//   t Schriftfarbe, b Hintergrund Wien, u Badges, v Fahrzeugarten,
+//   h Hochflurer, n Niederflur-Blinken, k Klima, o Blinken bei 0,
+//   f Matrix-Schriftart, d Verspaetung, x/y Wechselzeiten, i Standzeit.
+function standardEinst() {
+  return { t: 1, b: 0, u: 0, v: 4, h: 1, n: 0, k: 0, o: 0,
+           f: 0, d: 0, x: 0, y: 0, i: STANDZEIT_VORGABE };
+}
+function einstFuer(d) {
+  if (!d) return standardEinst();
+  if (!d.einst) d.einst = standardEinst();
+  return d.einst;
+}
+// Nur noch fuer die displaysettings und die Vorschau, die beide eine colour bekommen.
+function einstVon(c) {
+  const d = displays.find(x => stilVon(x) === parseInt(c, 10));
+  return d ? einstFuer(d) : standardEinst();
+}
+// Ein displaysettings-Segment mit genau den Feldern, die der Stil wirklich kann.
+// Vorgabewerte bleiben weg, damit die Zeile kurz bleibt (ohne t gilt 1, ohne v gilt 4).
+// Je Abfahrt 2 bis 10 Sekunden (Paul 22.10.2026), Standzeit 5 bis 60. 0 bei den
+// Wechselzeiten heisst Automatik.
+// Seit Firmware 2.6 liegt die Untergrenze am Geraet bei 2 Sekunden, die alte
+// Anhebung auf 3 gibt es nicht mehr (Firmware-Sitzung 23.10.2026).
+const WECHSEL_MIN = 2, WECHSEL_MAX = 10;
+const STANDZEIT_MIN = 5, STANDZEIT_MAX = 15, STANDZEIT_VORGABE = 10;
+// Ein Uhr-Brett darf kuerzer stehen: es muss keine zwei Abfahrtszeiten zeigen, zwei
+// Sekunden reichen (Paul 23.10.2026).
+const STANDZEIT_MIN_UHR = 2;
+
+// Die Standzeit muss reichen, damit beide Abfahrten drankommen: sonst wechselt das
+// Display weiter, bevor die zweite Zeit ueberhaupt zu sehen war.
+function standzeitMindestens(e) {
+  return Math.max(STANDZEIT_MIN, (e.x || 0) / 10 + (e.y || 0) / 10);
+}
+function standzeitVon(e, nurUhr) {
+  const mind = nurUhr ? STANDZEIT_MIN_UHR : standzeitMindestens(e);
+  return Math.max(mind, Math.min(STANDZEIT_MAX, e.i || STANDZEIT_VORGABE));
+}
+
+// Alle Design-Felder, die dieser Stil kann, fuer DIESES Display. Seit Firmware 2.6
+// liest das Geraet sie je Eintrag (Firmware-Sitzung 23.10.2026). Wichtig: fehlt ein
+// Feld, gilt der Wert aus den displaysettings der colour, also der des ERSTEN Displays
+// dieses Stils. Darum immer alles schreiben, auch Vorgabewerte, auch die 0.
+// Buchstaben wie in den displaysettings, mit zwei Ausnahmen: die Verspaetung heisst im
+// Eintrag p (d ist dort die Display-Nummer), die Wechselzeiten j<x>-<y> (x waere x1).
+function designTeil(d) {
+  const c = stilVon(d), k = STIL_KANN[parseInt(c, 10)] || {}, e = einstFuer(d);
+  let aus = '';
+  if (k.schrift) aus += '|t' + e.t;
+  if (k.grund) aus += '|b' + e.b;
+  if (k.badges) aus += '|u' + e.u + '|v' + e.v;
+  if (k.fahrzeug) aus += '|h' + e.h + '|n' + e.n + '|k' + e.k;
+  if (k.blinken) aus += '|o' + e.o;
+  if (k.matrixSchrift) aus += '|f' + e.f;
+  if (k.verspaetung) aus += '|p' + e.d;
+  aus += '|j' + (e.x || 0) + '-' + (e.y || 0);
+  aus += '|i' + standzeitVon(e, zeigtUhr(d));
+  return aus;
+}
+
+function dsSegment(c, zeilenZahl, fenster, sortierung, d) {
+  // Mit Display: dessen eigene Werte. Ohne: die des ersten Displays dieses Stils, denn
+  // die displaysettings kennen nur die colour.
+  const e = d ? einstFuer(d) : einstVon(c), k = STIL_KANN[parseInt(c, 10)] || {};
+  let seg = 'c' + c + '|r' + zeilenZahl;
+  if (fenster) seg += '|w' + fenster;
+  // s immer schreiben, wo der Stil sortieren kann: sonst bleibt am Geraet ein altes
+  // s2 stehen und wirft unsere feste Reihenfolge um.
+  if (sortierung && kannSortieren(c)) seg += '|s' + sortierung;
+  const standzeit = standzeitVon(e, d ? zeigtUhr(d) : false);
+  if (standzeit !== STANDZEIT_VORGABE) seg += '|i' + standzeit;
+  if (e.x) seg += '|x' + e.x;
+  if (e.y) seg += '|y' + e.y;
+  if (k.matrixSchrift && e.f) seg += '|f' + e.f;
+  if (k.verspaetung && e.d) seg += '|d' + e.d;
+  if (k.schrift && e.t !== 1) seg += '|t' + e.t;
+  if (k.grund && e.b) seg += '|b' + e.b;
+  if (k.badges && e.u) seg += '|u' + e.u;
+  if (k.badges && e.u && e.v !== 4) seg += '|v' + e.v;
+  // Diese drei sind am Geraet von Haus aus aus, darum steht nur die 1 in der Zeile.
+  if (k.fahrzeug && e.h) seg += '|h' + e.h;
+  if (k.fahrzeug && e.h && e.n) seg += '|n' + e.n;
+  if (k.fahrzeug && e.k) seg += '|k' + e.k;
+  if (k.blinken && e.o) seg += '|o' + e.o;
+  return seg;
+}
+function maxZeilen(c) { return STIL_ZEILEN[parseInt(c, 10)] || ZEILEN_VORGABE; }
+
+// ---- Zusammengefasste Zeilen ---------------------------------------------------------
+// Zwei Richtungen, die dieselbe Strecke fahren, brauchen keine zwei Zeilen. Wer sie
+// zusammenfasst, bekommt eine Zeile zurueck. Das Geraet kennt das als '+'-Merge.
+function gruppenVon(d) { return (d && d.gruppen) || []; }
+function gruppeVon(d, key) { return gruppenVon(d).find(g => g.indexOf(key) >= 0) || null; }
+
+// Die Zeilen eines Displays in ihrer Reihenfolge. Eine Gruppe steht dort, wo ihr erstes
+// Mitglied steht, und zaehlt als EINE Zeile.
+function zeilenEinheiten(d) {
+  const keys = (d && d.richtungen) || [];
+  const fertig = new Set();
+  const raus = [];
+  keys.forEach(k => {
+    if (fertig.has(k)) return;
+    const g = gruppeVon(d, k);
+    if (g) {
+      const teil = keys.filter(x => g.indexOf(x) >= 0);
+      teil.forEach(x => fertig.add(x));
+      raus.push(teil);
+    } else {
+      fertig.add(k);
+      raus.push([k]);
+    }
+  });
+  return raus;
+}
+
+// Gruppen gelten nur fuer Richtungen, die auf diesem Display liegen. Faellt eine weg,
+// bleibt der Rest als Gruppe stehen; unter zwei Mitgliedern loest sie sich auf.
+function gruppenPruefen(d) {
+  if (!d || !d.gruppen) return;
+  const drauf = new Set(d.richtungen || []);
+  d.gruppen = d.gruppen
+    .map(g => g.filter(k => drauf.has(k)))
+    .filter(g => g.length > 1);
+  if (!d.gruppen.length) delete d.gruppen;
+}
+
+// Zeilen stellt niemand mehr ein: so viele wie zugewiesen, gedeckelt auf das, was der
+// Stil kann. Sonderfall: EINE Linie heisst drei Zeilen mit ihren naechsten drei
+// Abfahrten, sofern der Stil drei Zeilen kann (Paul 22.10.2026).
+// Jede Seite hat ihre EIGENE Zeilenzahl. Das Geraet legt den Renderer eines Stils mit
+// der groessten Zeilenzahl aller Seiten dieses Stils an und zeichnet kleinere Seiten
+// mittig in dieselbe Zeilenhoehe (Firmware-Sitzung 23.10.2026).
+function zeilenVon(d) { return zeilenSelbst(d); }
+// Groesste Zeilenzahl aller Displays dieses Stils: danach richtet sich die Zeilenhoehe.
+function zeilenDesStils(c) {
+  let gross = 1;
+  displays.forEach(d => { if (stilVon(d) === c) gross = Math.max(gross, zeilenSelbst(d)); });
+  return gross;
+}
+function zeilenSelbst(d) {
+  if (zeitbasiert(d)) return zeitZeilen(d);
+  // Zusammengefasste Richtungen teilen sich eine Zeile, darum die Einheiten zaehlen.
+  const n = zeilenEinheiten(d).length;
+  const max = maxZeilen(stilVon(d));
+  if (n === 1 && max >= 3) return 3;
+  return Math.max(1, Math.min(max, n));
+}
+// Eine einzige Zeile auf dem Display, egal ob eine Linie oder eine Gruppe aus mehreren:
+// dann stehen darunter die naechsten Abfahrten dieser einen Zeile (Paul 22.10.2026).
+function einzelLinie(d) {
+  return !!(d && d.richtungen && d.richtungen.length && zeilenEinheiten(d).length === 1
+            && maxZeilen(stilVon(d)) >= 3 && !zeitbasiert(d));
+}
+
+// Zwei Arten, ein Display zu fuellen:
+//   statisch  = eine feste Zeile je Linie und Richtung, Reihenfolge bestimmst du
+//   zeitlich  = die naechsten Abfahrten aller zugewiesenen Linien, nach Uhrzeit
+//
+// KORREKTUR 23.10.2026: das ist NICHT die masterrow gegen die timerow. Die Firmware hat
+// dafuer ein eigenes Feld in den displaysettings: 's' (1 statisch, 2 chronologisch),
+// siehe initDisplay "Stadt-Display: Sortierung pro Display-Typ aus displaysettings ('s')".
+// Die timerow ist etwas anderes, naemlich die zeitbasierten Display-TYPEN (11, 12, 14, 25).
+// Wer ein Wien-Display in die timerow schreibt, macht aus colour 1 eine "Zugfarbe":
+// dann gilt sortMode 2 UND rowOrder wird geleert UND maxCountdown springt auf 540,
+// und zwar fuer ALLE Displays mit diesem Stil.
+const STIL_ZEITTYP = [11, 12, 14, 25];      // gehoeren in die timerow
+const STIL_OHNE_SORTIERUNG = [5, 6, 11, 12, 14, 25];   // DISPLAY_TYPE_FEATURES.sorting = false
+// Diese Stile zeigen EINE Abfahrt gross, dort gibt es keine Uhr-Zeile. Das ganze Brett
+// als Uhr (z1) geht ueberall (Firmware-Sitzung 23.10.2026).
+const STIL_OHNE_UHRZEILE = [6, 9, 11, 12, 14, 25];
+function kannUhrZeile(c) { return STIL_OHNE_UHRZEILE.indexOf(parseInt(c, 10)) < 0; }
+function istZeitTyp(c) { return STIL_ZEITTYP.indexOf(parseInt(c, 10)) >= 0; }
+function kannSortieren(c) { return STIL_OHNE_SORTIERUNG.indexOf(parseInt(c, 10)) < 0; }
+function zeitbasiert(d) {
+  if (!d) return false;
+  if (istZeitTyp(stilVon(d))) return true;   // Zugbretter sind immer chronologisch
+  return kannSortieren(stilVon(d)) && d.sortierung === 'zeit';
+}
+
+// Zeilen im zeitlichen Modus stellt der Nutzer selbst ein, denn sie haengen nicht mehr
+// an der Zahl der Linien. Vorgabe: so viele, wie der Stil kann, hoechstens 3.
+function zeitZeilen(d) {
+  const max = maxZeilen(stilVon(d));
+  const v = (d && d.zeilen != null) ? d.zeilen : Math.min(3, max);
+  return Math.max(1, Math.min(max, v));
+}
+// Welche Stile gehoeren zu welchem Netz? Wie im Konfigurator stehen die passenden oben,
+// damit die Liste nicht 25 Eintraege lang vor einem liegt.
+const NETZ_STILE = {
+  WL:      [1, 10, 24, 23],         // Wiener Linien, Straba, Paper White, Matrix
+  OEBB:    [12, 14, 23, 24],        // OEBB, Westbahn, Matrix, Paper White
+  BWEGT:   [7, 23, 12, 24],         // bodo, Matrix, OEBB, Paper White
+  WESTBAHN:[12, 14, 23, 24]
+};
+// Stile, die ueberall gehen und darum immer angeboten werden.
+const STILE_UNIVERSELL = [23, 21, 24, 10];
+
+// Aufklappliste eines Displays: erst was zu seinen Netzen passt, dann der Rest,
+// am Ende der Weg zum eigenen Design.
+function stilOptionen(d) {
+  const netze = new Set();
+  (d && d.richtungen || []).forEach(k => { const r = richtungFinden(k); if (r) netze.add(r.station.netz || 'WL'); });
+  if (!netze.size) netze.add('WL');
+  const passend = [];
+  netze.forEach(n => (NETZ_STILE[n] || []).forEach(c => { if (passend.indexOf(c) < 0) passend.push(c); }));
+  STILE_UNIVERSELL.forEach(c => { if (passend.indexOf(c) < 0) passend.push(c); });
+  const jetzt = stilVon(d);
+  const eintrag = id => {
+    const x = STILE.find(y => y.id === id);
+    return x ? '<option value="' + x.id + '"' + (x.id === jetzt ? ' selected' : '') + '>' + escapeHtmlFt(x.name) + '</option>' : '';
+  };
+  let h = '<optgroup label="Passend zu deinen Linien">' + passend.map(eintrag).join('') + '</optgroup>';
+  const rest = STILE.filter(x => passend.indexOf(x.id) < 0);
+  if (rest.length) h += '<optgroup label="Alle weiteren">' + rest.map(x => eintrag(x.id)).join('') + '</optgroup>';
+  h += '<optgroup label="Eigenes"><option value="neu">+ Eigenes Display erstellen</option></optgroup>';
+  return h;
+}
+
+// Passender Stil fuer ein frisches Display: richtet sich nach den Netzen seiner Linien.
+function stilVorschlag(d) {
+  const netze = new Set();
+  (d.richtungen || []).forEach(k => { const r = richtungFinden(k); if (r) netze.add(r.station.netz || 'WL'); });
+  if (netze.size === 1 && netze.has('WL')) return 1;    // Wiener Linien
+  if (netze.size && !netze.has('WL')) return 12;        // OEBB-Bahnhofsanzeige
+  return stil;
+}
+let zeiger = 0;                // welcher Bildschirm ist ausgewaehlt
+let schirme = [];              // errechnete Bildschirme
+// displays: [{ richtungen: ['U1|Leopoldau', …], gruppen: [['U1|Leopoldau','U1|Oberlaa']], vomNutzer: bool }]
+// gruppen fasst Richtungen zusammen, die sich EINE Zeile teilen. Jede Richtung steht in
+// hoechstens einer Gruppe; dadurch wird je Gruppe eine Zeile frei (Paul 22.10.2026).
+// Ein Display ist ein Behaelter mit zugewiesenen Richtungen. Neue Stationen fuellen die
+// vorhandenen auf; ueber die Plus-Kachel legt der Nutzer eigene an und bestimmt selbst,
+// welche Linien darauf sollen (Paul 22.10.2026).
+let displays = [];
+// Richtungen, die der Nutzer per x von einem Display genommen hat. Ohne diesen Merker
+// wuerde displaysAuffuellen sie sofort wieder irgendwo hinlegen, und das x haette keine
+// Wirkung (Paul 22.10.2026).
+let abgelegt = new Set();
+
+// Alle Display-Typen, Namen und Nummern wie im Konfigurator (ftColorSelect).
+const STILE = [
+  { id: 1,  name: 'Wiener Linien' },
+  { id: 2,  name: 'Linz AG' },
+  { id: 3,  name: 'VBB Berlin' },
+  { id: 5,  name: 'DB S-Bahn' },
+  { id: 6,  name: 'DB Fernverkehr' },
+  { id: 7,  name: 'BODO Bodensee' },
+  { id: 8,  name: 'Salzburg AG' },
+  { id: 9,  name: 'RATP Paris' },
+  { id: 12, name: 'ÖBB' },
+  { id: 13, name: 'Holding Graz' },
+  { id: 14, name: 'Westbahn' },
+  { id: 15, name: 'Liechtenstein / Schweiz Nahverkehr' },
+  { id: 16, name: 'Prag / CZ-HU (schwarz/weiß)' },
+  { id: 17, name: 'Brünn (DPMB)' },
+  { id: 18, name: 'BVG Berlin' },
+  { id: 19, name: 'KVB Köln' },
+  { id: 20, name: 'AVV Aachen' },
+  { id: 21, name: 'Schwarz/Weiß Matrix' },
+  { id: 22, name: 'MVG' },
+  { id: 23, name: 'Matrix' },
+  { id: 24, name: 'Paper White' },
+  { id: 25, name: 'SBB' },
+  { id: 26, name: 'CH/LI' }
+];
+
+// ---- Beispieldaten -------------------------------------------------------------------
+// Nachts steht an vielen Stationen gar nichts mehr an. Statt leerer Karten zeigt die
+// Oberflaeche dann erfundene Zeiten zwischen 0 und 9 Minuten, damit man weiterbauen
+// kann (Paul 23.10.2026). Sie sind als Beispiel gekennzeichnet, damit niemand sie
+// fuer echte Abfahrten haelt.
+function beispielZeiten(anzahl) {
+  const raus = [];
+  for (let i = 0; i < anzahl; i++) raus.push(Math.floor(Math.random() * 10));
+  return raus.sort((a, b) => a - b);
+}
+function beispielAbfahrten(st) {
+  // Am liebsten die Linien, die hier schon einmal gefahren sind. Sonst die Vorgabe
+  // aus dem Testaufbau.
+  let paare = (st.letzteLinien && st.letzteLinien.length) ? st.letzteLinien : null;
+  if (!paare && st.vorgabe) paare = [st.vorgabe];
+  if (!paare) return [];
+  const raus = [];
+  paare.forEach(pz => {
+    beispielZeiten(4).forEach(t => {
+      raus.push({ line: pz.line, dest: pz.dest, time: t, vt: pz.vt || '',
+                  lineColor: pz.lineColor || null, lineTextColor: pz.lineTextColor || null,
+                  beispiel: true });
+    });
+  });
+  raus.sort((a, b) => a.time - b.time);
+  return raus;
+}
+// Was hier faehrt, fuer spaeter merken: daraus entstehen nachts die Beispielzeiten.
+function linienMerken(st) {
+  const gesehen = new Set(), paare = [];
+  st.abfahrten.forEach(d => {
+    const k = d.line + '|' + d.dest;
+    if (gesehen.has(k)) return;
+    gesehen.add(k);
+    paare.push({ line: d.line, dest: d.dest, vt: d.vt, lineColor: d.lineColor, lineTextColor: d.lineTextColor });
+  });
+  if (paare.length) st.letzteLinien = paare;
+}
+// Abfahrten einer Station setzen, mit Beispiel-Rueckfall.
+function abfahrtenSetzen(st, liste) {
+  if (liste && liste.length) {
+    st.abfahrten = liste;
+    st.beispiel = false;
+    linienMerken(st);
+  } else {
+    st.abfahrten = beispielAbfahrten(st);
+    st.beispiel = st.abfahrten.length > 0;
+  }
+}
+
+// ---- Daten holen ---------------------------------------------------------------------
+async function abfahrten(rbl) {
+  const r = await fetch(DEP_API + '?rbl=' + encodeURIComponent(rbl) + '&_=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json();
+  const raus = [];
+  ((d && d.data && d.data.monitors) || []).forEach(m => {
+    if (!m || !m.lines) return;
+    m.lines.forEach(l => {
+      const deps = (l.departures && l.departures.departure) || [];
+      deps.forEach(dep => {
+        const cd = dep && dep.departureTime && dep.departureTime.countdown;
+        if (cd == null) return;
+        raus.push({ line: l.name || '?', dest: l.towards || '', time: cd,
+                    vt: l.type || '', lineColor: l.lineColor || null,
+                    lineTextColor: l.lineTextColor || null });
+      });
+    });
+  });
+  raus.sort((a, b) => a.time - b.time);
+  return raus;
+}
+
+// Linien einer Station aus ihren Abfahrten: je Linie und Ziel ein Eintrag.
+function linienAus(abf) {
+  const map = new Map();
+  abf.forEach(d => {
+    const k = d.line + '|' + d.dest;
+    if (!map.has(k)) map.set(k, { name: d.line, ziel: d.dest, typ: d.vt });
+  });
+  return Array.from(map.values());
+}
+
+// ---- Bildschirme berechnen -----------------------------------------------------------
+// Beide Modi enden in derselben Darstellung: einer Folge von Bildschirmen zum Wischen.
+// Spielerisch: ein Bildschirm je Station. Kompakt: alle Stationen auf einem Display,
+// das bei mehr Linien als Zeilen auf mehrere Seiten umbricht.
+// Alle waehlbaren Richtungen ueber alle Stationen: je Linie und Ziel eine.
+// ---- Was ist neu ---------------------------------------------------------------------
+// Jede neue Funktion traegt vier Wochen lang ein NEU, einmal oben am Block und einmal
+// am Schalter selbst (Paul 23.10.2026). Datum = Tag, an dem es eingebaut wurde.
+const NEU_WOCHEN = 4;
+const NEU_SEIT = {
+  uhr:     '2026-10-23',   // Uhrzeit als Zeile oder als ganzes Display
+  blinken: '2026-10-23'    // Blinken bei 0 (Matrix)
+};
+// Welcher Block zeigt das NEU oben? Ein Block ist neu, solange eine seiner Funktionen neu ist.
+const NEU_BLOCK = {
+  klappMehr:    ['uhr'],
+  klappFahrzeug:['blinken'],
+  klappLinien:  ['uhr']
+};
+function istNeu(name) {
+  const tag = NEU_SEIT[name];
+  if (!tag) return false;
+  const bis = new Date(tag + 'T00:00:00');
+  bis.setDate(bis.getDate() + NEU_WOCHEN * 7);
+  return new Date() < bis;
+}
+function neuBadge(name) { return istNeu(name) ? '<span class="neu-badge">Neu</span>' : ''; }
+// Die Koepfe der Bloecke sind festes Markup, darum hier nachtragen.
+function neuMarkieren() {
+  Object.keys(NEU_BLOCK).forEach(id => {
+    const platz = document.querySelector('#' + id + ' .neu-platz');
+    if (!platz) return;
+    platz.innerHTML = NEU_BLOCK[id].some(istNeu) ? '<span class="neu-badge">Neu</span>' : '';
+  });
+}
+
+// ---- Gehweg und Nachtmodus -------------------------------------------------------------
+// Gehweg = Minuten bis zur Haltestelle. Abfahrten darunter schaffst du nicht mehr, sie
+// fallen weg. Grundwert je Station, bei Bedarf feiner je Linie und Richtung.
+// Nachtmodus haengt NICHT an der masterrow, das Geraet hat dafuer eigene Felder
+// (nightModeEnabled/Start/End, Vorgabe 22 bis 7).
+let nacht = { an: false, von: 22, bis: 7 };
+let helligkeit = 3;            // 1 dunkel, 2 mittel, 3 hell — gilt fuers ganze Geraet
+const gwOffen = new Set();        // welche Station gerade feiner eingestellt wird
+
+// Drei Stufen, von grob nach fein. Die feinste gewinnt:
+//   Station  -> Richtung (alle Linien mit demselben Ziel) -> einzelne Linie dorthin.
+// Der Gehweg haengt am Steig, darum ist die Richtung die wichtigste Zwischenstufe:
+// stadteinwaerts stehst du oft auf der anderen Strassenseite (Paul 22.10.2026).
+function gehwegStation(st) { return (st && st.gehweg) || 0; }
+function gehwegRichtung(st, ziel) {
+  const v = st && st.gehwegRichtungen && st.gehwegRichtungen[ziel];
+  return (v != null) ? v : null;
+}
+function gehwegFuer(st, key) {
+  const eigen = st && st.gehwegLinien && st.gehwegLinien[key];
+  if (eigen != null) return eigen;
+  const ziel = String(key).split('|')[1] || '';
+  const r = gehwegRichtung(st, ziel);
+  return (r != null) ? r : gehwegStation(st);
+}
+function gehwegRichtungSetzen(si, ziel, wert) {
+  const st = stationen[si];
+  if (!st) return;
+  if (!st.gehwegRichtungen) st.gehwegRichtungen = {};
+  const n = parseInt(wert, 10);
+  if (String(wert).trim() === '' || isNaN(n)) delete st.gehwegRichtungen[ziel];
+  else st.gehwegRichtungen[ziel] = Math.max(0, Math.min(99, n));
+  allesZeichnen();
+}
+function gehwegStationSetzen(si, wert) {
+  const st = stationen[si];
+  if (!st) return;
+  st.gehweg = Math.max(0, Math.min(99, parseInt(wert, 10) || 0));
+  allesZeichnen();
+}
+function gehwegLinieSetzen(si, key, wert) {
+  const st = stationen[si];
+  if (!st) return;
+  if (!st.gehwegLinien) st.gehwegLinien = {};
+  const n = parseInt(wert, 10);
+  if (String(wert).trim() === '' || isNaN(n)) delete st.gehwegLinien[key];
+  else st.gehwegLinien[key] = Math.max(0, Math.min(99, n));
+  allesZeichnen();
+}
+function gwGenauer(rbl) {
+  if (gwOffen.has(rbl)) gwOffen.delete(rbl); else gwOffen.add(rbl);
+  allesZeichnen();
+}
+function nachtSchalten() { nacht.an = !nacht.an; allesZeichnen(); }
+function nachtZeitSetzen(feld, wert) { nacht[feld] = parseInt(wert, 10) || 0; allesZeichnen(); }
+
+function alleRichtungen() {
+  const raus = [];
+  stationen.forEach(st => zeilenEintraege(st).forEach(d => {
+    raus.push({ key: d.line + '|' + d.dest, dep: d, station: st });
+  }));
+  return raus;
+}
+function richtungFinden(key) { return alleRichtungen().find(r => r.key === key) || null; }
+
+// Jede Richtung gehoert in GENAU EIN Display. Neue Richtungen wandern ins letzte Display,
+// solange dort Platz ist, sonst entsteht eines dazu. Verschwundene fliegen raus.
+// Der Nutzer kann die Verteilung ueber die Plus-Kachel selbst bestimmen.
+function displaysAuffuellen() {
+  const vorhanden = alleRichtungen().map(r => r.key);
+  // Eine Richtung darf auf MEHREREN Displays stehen (Paul 22.10.2026: "U2 ist meine
+  // Prioritaetslinie und soll immer fixiert sein"). Doppelt wird nur INNERHALB eines
+  // Displays verhindert. Weggefallene Richtungen fliegen ueberall raus.
+  displays.forEach(d => {
+    const drin = new Set();
+    d.richtungen = d.richtungen.filter(k => {
+      if (istUhrKey(k)) return !drin.has(k) && drin.add(k) !== null;   // Uhr bleibt immer
+      if (vorhanden.indexOf(k) < 0 || drin.has(k)) return false;
+      drin.add(k); return true;
+    });
+  });
+  const irgendwo = new Set();
+  displays.forEach(d => d.richtungen.forEach(k => irgendwo.add(k)));
+  const offen = vorhanden.filter(k => !irgendwo.has(k) && !abgelegt.has(k));
+  offen.forEach(k => {
+    let ziel = displays.find(d => !d.vomNutzer && zeilenEinheiten(d).length < maxZeilen(stilVon(d)));
+    if (!ziel) { ziel = { richtungen: [], vomNutzer: false }; displays.push(ziel); }
+    ziel.richtungen.push(k);
+  });
+  displays.forEach(gruppenPruefen);
+  // Leere Displays soll es nicht geben (Paul 23.10.2026). Ausnahme ist genau das eine,
+  // das gerade per Plus-Kachel entstanden ist: es wartet ja auf seine erste Linie.
+  for (let i = displays.length - 1; i >= 0; i--) {
+    if (!displays[i].richtungen.length && displays[i] !== frischesDisplay) displays.splice(i, 1);
+  }
+}
+
+// Alle Abfahrten EINER Richtung, schon um den Gehweg bereinigt: was du nicht mehr
+// erreichst, zeigt auch das Geraet nicht.
+function abfahrtenDerRichtung(key) {
+  const r = richtungFinden(key);
+  if (!r) return [];
+  const gw = gehwegFuer(r.station, key);
+  return r.station.abfahrten.filter(x => x.line === r.dep.line && x.dest === r.dep.dest && x.time >= gw);
+}
+
+// Wie die Firmware entscheidet, ob ein Segment ein Wien-Segment ist (initDisplay):
+// Prefix WL:/WLB: zaehlt immer, eine nackte Nummer nur bei colour 1 oder 4.
+// Ob die Firmware Zeilen ueber stopId:Linie zuordnet, entscheidet sie am ersten
+// Zeichen der rbl-Liste: useStopIdFormat = isDigit(rblString[0]). Das haengt NICHT am
+// Anzeige-Stil. Sobald die rbls nackte Nummern sind (Wien), braucht darum jede Station
+// ihren eigenen Eintrag, sonst binden sich alle Linien an den LETZTEN Stop.
+// Am Geraet gesehen (Paul 23.10.2026): drei Wien-Stationen mit Matrix in einem Eintrag
+// ergaben reihenfolge='4921:U1,4921:U2,4921:U3', also zeigte nur die U3.
+function stopIdFormat(d) {
+  const erste = ((d && d.richtungen) || []).find(k => !istUhrKey(k));
+  const r = richtungFinden(erste);
+  if (!r) return false;
+  return /^\d/.test(String(r.station.rbl || ''));
+}
+
+function istWienSegment(d) {
+  // Die erste ECHTE Richtung zaehlt: steht die Uhr-Zeile vorn, sagt sie nichts ueber
+  // das Netz (Paul 23.10.2026, x1 fiel weg sobald die Uhr nach oben rutschte).
+  const erste = ((d && d.richtungen) || []).find(k => !istUhrKey(k));
+  const r = richtungFinden(erste);
+  if (!r) return false;
+  const rbl = String(r.station.rbl || '');
+  if (/^WLB?:/i.test(rbl)) return true;
+  if (rbl.indexOf(':') < 0) { const c = stilVon(d); return (c === 1 || c === 4); }
+  return false;
+}
+
+// Jedes Display ist eine eigene Karte, auch zwei Wiener mit demselben Stil (Paul
+// 23.10.2026: "zwei Wiener Linien soll einfach gehen"). Am Geraet legt die Firmware
+// gleichfarbige Wien-Segmente heute noch zusammen, darum schreiben wir x1 in den
+// Eintrag und sagen es in EINER Zeile, statt die Oberflaeche darum herum zu bauen.
+const VORSCHAU_TRENNT_WIEN = true;
+
+// Ist 2.6 schon auf den Geraeten? Damit kommen w, z1 und z2 bis z5, s und r je
+// Eintrag, d<n>, CLOCK:<n>, die verteilten Zeilen, Wechselzeiten ab 2 s, das Blinken bei
+// 0 und die entfernten Stile. Ein 2.5.15 gibt es nicht als Release, lokale Testbauten
+// mit dieser Nummer gelten darum als zu alt. Solange nicht,
+// lassen wir das Uhr-Brett weg: aeltere Firmware wuerde CLOCK:<n> beim Server abfragen,
+// nichts bekommen und eine leere Seite zeigen (Firmware-Sitzung 23.10.2026). Die anderen
+// Felder (d, z2..z5, s3) ueberliest sie dagegen folgenlos.
+// Statt einer Konstante fragen wir das Geraet selbst: /debug nennt in der ersten Zeile
+// die Firmware-Version. Ab 2.6 kann es CLOCK, d<n>, z2 bis z5 und die verteilten
+// Zeilen (Paul 23.10.2026, vorher stand hier ein Schalter von Hand).
+const FW_MIT_UHR = '2.6';
+let geraetVersion = null;        // null = noch nicht erreicht
+function versionMin(ist, soll) {
+  const a = String(ist || '').split('.').map(x => parseInt(x, 10) || 0);
+  const b = String(soll || '').split('.').map(x => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  }
+  return true;
+}
+// Solange wir das Geraet nicht kennen, bleiben wir vorsichtig: kein CLOCK schreiben.
+function fwNeu() { return !!geraetVersion && versionMin(geraetVersion, FW_MIT_UHR); }
+
+async function versionHolen() {
+  for (const h of GERAETE_HOSTS) {
+    const steuer = new AbortController();
+    const uhr = setTimeout(() => steuer.abort(), 3000);
+    try {
+      const r = await fetch('http://' + h + '/debug', { cache: 'no-store', signal: steuer.signal });
+      clearTimeout(uhr);
+      const t = await r.text();
+      const m = t.match(/Firmware\s+([\d.]+)/);
+      if (m) { geraetVersion = m[1]; allesZeichnen(); return; }
+    } catch (e) { clearTimeout(uhr); }
+  }
+}
+
+// Was das GERAET aus unseren Displays macht. Wien liefert je Bahnsteig ein eigenes
+// Segment, darum legt die Firmware Wien-Segmente mit gleicher colour absichtlich zu
+// EINEM Display zusammen. Zwei getrennte Wien-Bretter mit demselben Stil gibt es nicht
+// (Firmware-Sitzung 22.10.2026, von Paul am Geraet gesehen: zwei Wien-Displays wurden
+// ein Brett mit zwei Seiten).
+function geraeteGruppen() {
+  const raus = [];
+  const wienZiel = new Map();
+  displays.forEach((d, i) => {
+    const c = stilVon(d);
+    const mischt = !VORSCHAU_TRENNT_WIEN && !zeigtUhr(d) && istWienSegment(d);
+    const ziel = mischt ? wienZiel.get(c) : undefined;
+    if (ziel !== undefined) { raus[ziel].quellen.push(i); return; }
+    if (mischt) wienZiel.set(c, raus.length);
+    raus.push({ quellen: [i], colour: c });
+  });
+  return raus;
+}
+
+// Welches Display der Gruppe gerade bearbeitet wird. Normal das erste, ausser der
+// Nutzer hat in der zusammengelegten Karte eines ausgewaehlt.
+let bearbeitet = null;
+function displayWaehlen(i) { bearbeitet = i; allesZeichnen(); }
+
+function schirmeBauen() {
+  schirme = [];
+  if (!stationen.length) { displays = []; return; }
+  displaysAuffuellen();
+  displays.forEach(d => { if (d.stil == null) d.stil = stilVorschlag(d); });
+
+  const gruppen = geraeteGruppen();
+  gruppen.forEach(gruppe => {
+    const quellen = gruppe.quellen;
+    const erste = displays[quellen[0]];
+    // Zeilen: das Geraet kennt sie je Stil, bei mehreren Quellen gewinnt die groesste.
+    const proSeite = Math.max(1, Math.max.apply(null, quellen.map(i => zeilenVon(displays[i]))));
+    const zeitlich = quellen.some(i => zeitbasiert(displays[i]));
+    let seiten;
+    if (zeigtUhr(erste)) {
+      seiten = [[]];
+    } else if (zeitlich) {
+      // Alle Abfahrten der zugewiesenen Richtungen, nach Zeit, keine Gruppierung.
+      let alle = [];
+      quellen.forEach(i => displays[i].richtungen.forEach(k => { alle = alle.concat(abfahrtenDerRichtung(k)); }));
+      alle.sort((a, b) => a.time - b.time);
+      seiten = [alle.slice(0, proSeite)];
+    } else {
+      // Die Zeilen aller Quellen hintereinander, in Display-Reihenfolge.
+      let einheiten = [];
+      quellen.forEach(i => { einheiten = einheiten.concat(zeilenEinheiten(displays[i])); });
+      if (einheiten.length === 1 && proSeite >= 3) {
+        // Eine einzige Zeile: ihre naechsten Abfahrten untereinander. Bei einer Gruppe
+        // sind das die Abfahrten ALLER Richtungen darin, nach Uhrzeit gemischt.
+        let naechste = [];
+        einheiten[0].forEach(k => { naechste = naechste.concat(abfahrtenDerRichtung(k)); });
+        naechste.sort((a, b) => a.time - b.time);
+        seiten = [naechste.slice(0, proSeite)];
+      } else {
+        const alle = einheiten.map(teil => {
+          // Die Uhr-Zeile bleibt als leere Zeile stehen, darueber legt die Vorschau
+          // spaeter die Uhrzeit.
+          if (teil.length === 1 && istUhrKey(teil[0])) return { uhr: true, line: '', dest: '', time: '' };
+          const deps = teil.map(k => { const r = richtungFinden(k); return r && r.dep; }).filter(Boolean);
+          if (!deps.length) return null;
+          const vorn = deps.reduce((a, b) => (b.time < a.time ? b : a));
+          return teil.length > 1 ? Object.assign({}, vorn, { zusammen: teil.length }) : vorn;
+        }).filter(Boolean);
+        seiten = [];
+        for (let x = 0; x < Math.max(alle.length, 1); x += proSeite) seiten.push(alle.slice(x, x + proSeite));
+      }
+    }
+    const wahl = (bearbeitet != null && quellen.indexOf(bearbeitet) >= 0) ? bearbeitet : quellen[0];
+    const d = displays[wahl];
+    const titel = quellen.length > 1
+      ? 'Display ' + quellen.map(i => i + 1).join(' + ')
+      : 'Display ' + (quellen[0] + 1);
+    seiten.forEach((daten, si) => schirme.push({
+      titel: titel,
+      unter: (seiten.length > 1 ? 'Seite ' + (si + 1) + ' von ' + seiten.length
+                                : (gruppen.length > 1 ? 'von ' + gruppen.length : 'einziges Display')),
+      daten,
+      zeilen: proSeite,
+      station: (d.richtungen.length === 1 ? (richtungFinden(d.richtungen[0]) || {}).station : null),
+      display: d, index: wahl, quellen: quellen, seite: si + 1, seiten: seiten.length
+    }));
+  });
+  if (zeiger >= schirme.length) zeiger = Math.max(0, schirme.length - 1);
+}
+
+// zeiger zeigt auf einen SCHIRM, nicht auf ein Display: ein Display mit zwei Seiten
+// belegt zwei Schirme. Darum den Schirm suchen, der zu diesem Display gehoert.
+function zumDisplay(di) {
+  schirmeBauen();
+  const i = schirme.findIndex(x => x.index === di);
+  zeiger = i >= 0 ? i : Math.max(0, schirme.length - 1);
+  allesZeichnen();
+}
+
+// Plus-Kachel: legt ein leeres Display an und fragt sofort, was darauf soll.
+let frischesDisplay = null;    // das eine Display, das gerade leer sein darf
+function displayAnlegen() {
+  frischesDisplay = { richtungen: [], vomNutzer: true };
+  displays.push(frischesDisplay);
+  zumDisplay(displays.length - 1);
+  // Gleich zur Liste springen: das frische Display ist leer und will gefuellt werden.
+  const liste = document.getElementById('stationsliste');
+  if (liste) liste.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+// Neue Seite direkt mit dieser Linie: der Ausweg aus dem Dialog "Display ist voll".
+function displayMitLinie(key) {
+  displays.push({ richtungen: [key], vomNutzer: true });
+  abgelegt.delete(key);
+  zumDisplay(displays.length - 1);
+}
+// Loeschen fragt nach: ein Display ist schnell weg und alles darauf gleich mit.
+function displayLoeschen(i) {
+  const d = displays[i];
+  if (!d) return;
+  const n = d.richtungen.length;
+  const text = n ? 'Die ' + n + (n === 1 ? ' Linie darauf wandert' : ' Linien darauf wandern')
+                   + ' zur\u00fcck zu deinen anderen Linien.'
+                 : 'Das Display ist leer, es geht nichts verloren.';
+  dialogZeigen('Display ' + (i + 1) + ' l\u00f6schen', text, [
+    { text: 'Behalten', still: true },
+    { text: 'L\u00f6schen', tun: function () {
+        d.richtungen.forEach(k => {
+          const nochWo = displays.some((x, xi) => xi !== i && x.richtungen.indexOf(k) >= 0);
+          if (!nochWo) abgelegt.add(k);
+        });
+        displayWeg(i);
+      } }
+  ], 'loeschen');
+}
+
+function displayWeg(i) {
+  if (!displays[i]) return;
+  displays.splice(i, 1);
+  zeiger = Math.max(0, Math.min(zeiger, displays.length - 1));
+  allesZeichnen();
+}
+// Passt noch eine Zeile drauf? Im Zeitmodus immer, denn dort bestimmt die Zahl der
+// Linien die Zeilen nicht: es stehen einfach die naechsten X Abfahrten darauf
+// (Paul 22.10.2026). Sonst zeigt der Dialog gleich den Ausweg, eine neue Seite.
+function platzFrei(d, di, key) {
+  if (zeitbasiert(d)) return true;
+  const max = maxZeilen(stilVon(d));
+  // Zusammengefasste Richtungen teilen sich eine Zeile. Gezaehlt werden darum die
+  // Zeilen, nicht die Linien, sonst meldet sich der Dialog viel zu frueh.
+  if (zeilenEinheiten(d).length < max) return true;
+  const stilName = (STILE.find(x => x.id === stilVon(d)) || {}).name || 'Dieser Stil';
+  dialogZeigen('Display ' + (di + 1) + ' ist voll',
+    stilName + ' zeigt h\u00f6chstens ' + max + (max === 1 ? ' Zeile' : ' Zeilen') + '.'
+    + (max < 5 ? ' Mit dem Stil Matrix w\u00e4ren 5 Zeilen m\u00f6glich.' : '')
+    + ' Oder die Linie kommt auf eine neue Seite.',
+    [{ text: 'Nicht jetzt', still: true },
+     { text: 'Neue Seite anlegen', tun: function () { displayMitLinie(key); } }], 'warnung');
+  return false;
+}
+
+// Richtung auf DIESEM Display anlegen, ohne Rueckfragen.
+function richtungDrauf(di, key) {
+  const d = displays[di];
+  if (!d || d.richtungen.indexOf(key) >= 0) return;
+  if (d === frischesDisplay) frischesDisplay = null;
+  d.richtungen.push(key);
+  d.vomNutzer = true;
+  abgelegt.delete(key);
+  allesZeichnen();
+}
+
+// Richtung auf DIESEM Display an- oder abschalten. Andere Displays bleiben unberuehrt,
+// dieselbe Linie darf also mehrfach stehen.
+function richtungSchalten(di, key, an) {
+  const d = displays[di];
+  if (!d) return;
+  if (an) {
+    if (d.richtungen.indexOf(key) >= 0) return;
+    if (!platzFrei(d, di, key)) return;          // der Dialog uebernimmt
+    if (istUhrKey(key)) { richtungDrauf(di, key); return; }
+    // Dieselbe Linie darf mehrfach stehen, aber nicht aus Versehen: einmal nachfragen.
+    const wo = [];
+    displays.forEach((x, xi) => { if (xi !== di && x.richtungen.indexOf(key) >= 0) wo.push(xi + 1); });
+    if (wo.length) {
+      const r = richtungFinden(key);
+      const wie = r ? r.dep.line + ' nach ' + r.dep.dest : 'Diese Linie';
+      dialogZeigen('Linie liegt schon woanders',
+        wie + ' steht schon auf Display ' + wo.join(' und ')
+        + '. Du kannst sie zus\u00e4tzlich auch auf dieses Display legen.',
+        [{ text: 'Nein', still: true },
+         { text: 'Trotzdem', tun: function () { richtungDrauf(di, key); } }], 'doppelt');
+      return;
+    }
+    richtungDrauf(di, key);
+    return;
+  } else {
+    d.richtungen = d.richtungen.filter(k => k !== key);
+    // Liegt sie danach auf gar keinem Display mehr, bleibt sie bewusst liegen.
+    const nochWo = displays.some(x => x.richtungen.indexOf(key) >= 0);
+    if (!nochWo) abgelegt.add(key);
+  }
+  allesZeichnen();
+}
+
+function seitenTeilen(daten, proSeite) {
+  const out = [];
+  for (let i = 0; i < Math.max(daten.length, 1); i += proSeite) out.push(daten.slice(i, i + proSeite));
+  return out;
+}
+
+// EINE Zeile je gewaehlter Richtung, mit deren naechster Abfahrt. Das ist das Modell des
+// Geraets: pro Linie und Richtung eine Zeile, nicht eine Zeile je Abfahrt. Vorher wurde ueber
+// jede einzelne Abfahrt geblaettert, dadurch wurden aus drei Richtungen fuenfzehn Displays
+// statt zwei (Paul 22.10.2026: "das waere dann ein Display und die 2 waere dann ein Plus").
+function zeilenEintraege(st) {
+  const raus = [];
+  const gesehen = new Set();
+  const knapp = new Map();
+  st.abfahrten.forEach(d => {
+    const k = d.line + '|' + d.dest;
+    if (st.gewaehlt && st.gewaehlt.size && !st.gewaehlt.has(k)) return;
+    if (gesehen.has(k)) return;      // Abfahrten sind nach Zeit sortiert, die erste gewinnt
+    // Gehweg: was du nicht mehr erreichst, zeigt auch das Geraet nicht.
+    if (d.time < gehwegFuer(st, k)) { knapp.set(k, d); return; }
+    gesehen.add(k);
+    raus.push(d);
+  });
+  // Richtungen, bei denen ALLES zu knapp ist, bleiben trotzdem in der Liste: sonst
+  // wuerfe ein zu hoher Gehweg die Zuweisung des Nutzers weg (Paul 22.10.2026).
+  knapp.forEach((d, k) => { if (!gesehen.has(k)) { gesehen.add(k); raus.push(d); } });
+  return raus;
+}
+
+// Alte Bezeichnung bleibt fuer die Linienliste und die masterrow nutzbar.
+function gewaehlteAbfahrten(st) { return zeilenEintraege(st); }
+
+// ---- Zeichnen ------------------------------------------------------------------------
+function allesZeichnen() {
+  schirmeBauen();
+  streifenZeichnen();
+  editorZeichnen();
+  stationenZeichnen();
+  neuMarkieren();
+  designZeichnen();
+  fahrzeugZeichnen();
+  gehwegZeichnen();
+  zeitfensterZeichnen();
+  ausgabeZeichnen();
+}
+
+function streifenZeichnen() {
+  const el = document.getElementById('streifen');
+  el.innerHTML = '';
+  schirme.forEach((s, i) => {
+    const w = document.createElement('div');
+    w.className = 'schirm' + (i === zeiger ? ' aktiv' : '');
+    const raum = document.createElement('div');
+    raum.className = 'raum';
+    const g = document.createElement('div');
+    g.className = 'glas';
+    const bild = document.createElement('div');
+    bild.className = 'bild';
+    g.appendChild(bild);
+    raum.appendChild(g);
+    const f = document.createElement('div');
+    f.className = 'fuss';
+    f.innerHTML = escapeHtmlFt(s.titel) + '<span>' + escapeHtmlFt(s.unter) + '</span>';
+    raum.appendChild(f);
+    w.appendChild(raum);
+    w.onclick = () => { zeiger = i; allesZeichnen(); };
+    el.appendChild(w);
+    try {
+      const stilHier = stilVon(s.display);
+      dvHostLoadDisplaySettings(dsSegment(stilHier, zeilenVon(s.display), null, null, s.display));
+      // Zeilenzahl der SEITE, nicht der Daten: die letzte Seite bleibt sonst nicht
+      // dreizeilig, sondern zeichnet zwei grosse Zeilen. Am Geraet bleibt die unterste
+      // Zeile einfach leer (Paul 23.10.2026).
+      // Zeilenhoehe kommt von der GROESSTEN Seite dieses Stils, die eigene Seite steht
+      // mittig darin. Darum zeichnen wir mit der grossen Zeilenzahl und schieben das
+      // Ergebnis um die halbe Differenz nach unten. Zug-Displays zentriert das Geraet
+      // nicht (Firmware-Sitzung 23.10.2026).
+      // Rechnung wie in der Firmware, alles Ganzzahl-Division (Firmware-Sitzung
+      // 23.10.2026): kopf 18 nur bei MVG (Min-Leiste), zeilenH = (170 - kopf) / groesste
+      // Zeilenzahl dieses Stils. Eine Seite mit WENIGER Zeilen steht nicht als Block in
+      // der Mitte, sondern verteilt wie eine Ansicht mit so vielen Zeilen: jede Zeile
+      // mittig in ihrem Fach (170 - kopf) / eigene Zeilen. Wien 3 und 2 ergibt
+      // Zeilenhoehe 56, Fach 85, Zeilen bei 14 und 99.
+      const eigene = Math.max(1, s.zeilen || s.daten.length);
+      const gross = istZeitTyp(stilHier) ? eigene : Math.max(eigene, zeilenDesStils(stilHier));
+      const kopf = (parseInt(stilHier, 10) === 22) ? 18 : 0;
+      const hoehe = Math.floor((170 - kopf) / gross);
+      const fach = Math.floor((170 - kopf) / eigene);
+      const html = zeigtUhr(s.display)
+        ? uhrHTML(stilHier, bild, s.display)
+        : dvPreviewHTML(stilHier, s.daten, gross, bild)
+          + uhrZeileHTML(stilHier, s.daten, gross, s.display);
+      // Fuer manche Display-Typen gibt es im Konfigurator gar keine Nachbildung
+      // (z.B. 17 Bruenn). Dann sagen wir das, statt eine schwarze Flaeche zu zeigen.
+      bild.innerHTML = (html && html.length > 50) ? html
+        : '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;'
+        + 'color:#9a9384;font:12px sans-serif;text-align:center;padding:14px;">'
+        + 'Für diesen Anzeige-Stil gibt es noch keine Vorschau</div>';
+      if (!zeigtUhr(s.display)) {
+        const zeilenEl = zeilenElemente(bild, kopf, hoehe, gross);
+        if (eigene < gross) seiteVerteilen(zeilenEl, kopf, hoehe, fach, eigene);
+        nullBlinken(stilHier, zeilenEl, s.daten, s.display);
+      }
+    } catch (e) {
+      bild.innerHTML = '<div style="color:#f88;font:12px sans-serif;padding:10px">' + escapeHtmlFt(e.message) + '</div>';
+    }
+  });
+
+  // Kachel „Neue Anzeige"
+  const neu = document.createElement('div');
+  neu.className = 'schirm neu';
+  neu.innerHTML = '<div class="raum">'
+                + '<div class="glas"><div class="plus">+</div><div class="wort">Neue Anzeige</div></div>'
+                + '<div class="fuss">&nbsp;</div></div>';
+  neu.onclick = () => {
+    displayAnlegen();
+  };
+  el.appendChild(neu);
+
+  const aktiv = el.children[zeiger];
+  if (aktiv) aktiv.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  raumWirkung(true);
+  // Nach dem weichen Scrollen noch einmal nachziehen, sonst steht die Drehung kurz schief.
+  setTimeout(function () { raumWirkung(true); }, 260);
+  const s = schirme[zeiger];
+  if (s && s.station) karteAufStation(s.station);
+}
+
+function editorZeichnen() {
+  const el = document.getElementById('editor');
+  const s = schirme[zeiger];
+  if (!s) {
+    el.innerHTML = '<div class="kopf"><div class="titel">Noch nichts eingestellt</div></div>'
+                 + '<div class="hinweis">Die Stationen kommen aus dem Schritt davor, dann erscheint hier dein erstes Display.</div>';
+    return;
+  }
+  // Rechts steht das x, nicht die Seitenzahl: wie viele Seiten es sind, sagt der Hinweis
+  // unter den Einstellungen ohnehin (Paul 22.10.2026).
+  let h = '<div class="kopf"><div class="titel">' + escapeHtmlFt(s.titel) + '</div>'
+        + (displays.length > 1
+           ? '<button class="pfeil weg-x" title="dieses Display l\u00f6schen"'
+             + ' onclick="displayLoeschen(' + s.index + ')">' + SYM_X + '</button>'
+           : '<div class="modus">' + escapeHtmlFt(s.unter) + '</div>')
+        + '</div>';
+
+  const dVor = s.display;
+  // Eine Zeile zur Wahrheit am Geraet, mehr nicht.
+  if (istWienSegment(dVor)) {
+    const wienGleich = displays.filter((x, xi) => xi !== s.index
+      && stilVon(x) === stilVon(dVor) && istWienSegment(x));
+    if (wienGleich.length) {
+      h += '<div class="hinweis">Bis zum n\u00e4chsten Firmware-Update zeigt das Ger\u00e4t '
+         + 'dieses und ' + (wienGleich.length === 1 ? 'das andere Wien-Display' : 'die anderen Wien-Displays')
+         + ' mit diesem Stil als ein Brett mit Seiten.</div>';
+    }
+  }
+
+  const dHier = s.display;
+  h += '<label class="feld" for="stilWahl">Anzeige-Stil dieses Displays</label>'
+     + '<select id="stilWahl" onchange="stilSetzen(this.value)">' + stilOptionen(dHier) + '</select>';
+
+  h += '<label class="feld">Was zeigt dieses Display?</label>';
+  if (!kannSortieren(stilVon(dHier))) {
+    h += '<div class="hinweis">Dieser Anzeige-Stil zeigt immer die n\u00e4chsten Abfahrten '
+       + 'nach Uhrzeit, eine feste Zeilenfolge gibt es dort nicht.</div>';
+  } else {
+    h += '<div class="schalter">'
+       + '<button class="' + (zeitbasiert(dHier) ? '' : 'an') + '" onclick="sortierungSetzen(' + s.index + ',\'statisch\')">'
+       + 'Feste Zeilen</button>'
+       + '<button class="' + (zeitbasiert(dHier) ? 'an' : '') + '" onclick="sortierungSetzen(' + s.index + ',\'zeit\')">'
+       + 'N\u00e4chste Abfahrten</button></div>';
+    // Ehrlich bleiben: 's' steht je Stil in den displaysettings, nicht je Display.
+    const gleich = displays.filter((x, xi) => xi !== s.index && stilVon(x) === stilVon(dHier));
+    if (gleich.length) {
+      h += '<div class="hinweis">Bis zum n\u00e4chsten Firmware-Update gilt diese Wahl f\u00fcr '
+         + 'alle ' + (gleich.length + 1) + ' Displays mit dem Stil '
+         + escapeHtmlFt((STILE.find(y => y.id === stilVon(dHier)) || {}).name || '') + '.</div>';
+    }
+  }
+  if (zeitbasiert(dHier)) {
+    h += '<label class="feld" for="zeilenWahl">Wie viele Abfahrten</label>'
+       + '<select id="zeilenWahl" onchange="zeitZeilenSetzen(' + s.index + ',this.value)">';
+    for (let z = 1; z <= maxZeilen(stilVon(dHier)); z++) {
+      h += '<option value="' + z + '"' + (z === zeitZeilen(dHier) ? ' selected' : '') + '>' + z + '</option>';
+    }
+    h += '</select>';
+  }
+
+  const nHier = (dHier && dHier.richtungen.length) || 0;
+  const maxHier = maxZeilen(stilVon(dHier));
+  const seitenHier = s.seiten || 1;
+  const grossDesStils = zeilenDesStils(stilVon(dHier));
+  if (!istZeitTyp(stilVon(dHier)) && grossDesStils > zeilenVon(dHier)) {
+    h += '<div class="hinweis">Steht am Ger\u00e4t verteilt wie eine Ansicht mit so vielen '
+       + 'Zeilen, in der Zeilenh\u00f6he der gr\u00f6\u00dften Seite dieses Stils ('
+       + grossDesStils + ' Zeilen). Zwischen den Zeilen ist daf\u00fcr mehr Luft.</div>';
+  }
+  h += '<div class="hinweis">'
+     + (zeigtUhr(dHier)
+        ? 'Nur die Uhrzeit, gro\u00df \u00fcber das ganze Display.'
+        : zeitbasiert(dHier)
+        ? nHier + (nHier === 1 ? ' Linie' : ' Linien') + ' im Display, davon stehen die '
+          + zeitZeilen(dHier) + ' n\u00e4chsten Abfahrten darauf, nach Uhrzeit sortiert.'
+        : einzelLinie(dHier)
+        ? (gruppenVon(dHier).length ? 'Eine zusammengefasste Zeile, darum ' : 'Eine Linie, darum ')
+          + zeilenVon(dHier) + ' Zeilen mit ihren n\u00e4chsten Abfahrten.'
+        : nHier + (nHier === 1 ? ' Richtung' : ' Richtungen') + ' zugewiesen, '
+          + zeilenVon(dHier) + (zeilenVon(dHier) === 1 ? ' Zeile' : ' Zeilen') + ' pro Seite'
+          + (seitenHier > 1 ? ', also ' + seitenHier + ' Seiten zum Durchwechseln' : '') + '.')
+     + ' Dieser Stil kann h\u00f6chstens ' + maxHier + ' Zeilen.'
+     + ' Insgesamt <b>' + displays.length + (displays.length === 1 ? ' Display' : ' Displays')
+     + '</b>.</div>';
+
+  // Je Zeile zeigen, was darauf steht, mit Pfeilen zum Umsortieren innerhalb des Displays.
+  // Kopf mit Link: Zusammenfassen ist die eine Sache, die man hier noch tun kann, und
+  // sie gehoert neben die Ueberschrift der Zeilen (Paul 22.10.2026).
+  h += '<div class="zeilenkopf"><h2>'
+     + (zeitbasiert(dHier) ? 'Linien auf diesem Display' : 'Zeilen dieses Displays') + '</h2>'
+     + (!zeitbasiert(dHier) && (dHier.richtungen || []).length > 1
+        ? '<button class="link" onclick="gruppeFragen(' + s.index + ')">Zeilen zusammenfassen</button>'
+        : '')
+     + '</div>';
+  if (zeitbasiert(dHier)) {
+    // Hier steht keine Zeilen-Zuordnung: welche Linie gerade oben landet, macht der
+    // Fahrplan. Darum einfach die gewaehlten Linien, keine Pfeile, nichts grau, auch
+    // wenn mehr Linien zugewiesen sind als Zeilen da sind (Paul 22.10.2026).
+    const dz = s.index;
+    const keysZ = (dHier.richtungen || []);
+    if (!keysZ.length) {
+      h += '<div class="zeile"><div class="jetzt">Noch nichts zugewiesen. '
+         + 'W\u00e4hle unten eine Linie aus.</div></div>';
+    }
+    keysZ.forEach(k => {
+      const r = richtungFinden(k);
+      if (!r) return;
+      const fz = badgeFarben(r.dep);
+      h += '<div class="linie">'
+         + '<b style="background:' + fz.bg + ';color:' + fz.fg + '">' + escapeHtmlFt(r.dep.line) + '</b>'
+         + '<div class="rumpf"><div class="ziel">' + escapeHtmlFt(r.dep.dest) + '</div>'
+         + '<div class="halt">' + escapeHtmlFt(r.station.name) + '</div></div>'
+         + '<button class="pfeil weg-x" title="von diesem Display nehmen"'
+         + ' onclick="richtungSchalten(' + dz + ',\'' + k.replace(/'/g, "\\'") + '\',false)">' + SYM_X + '</button>'
+         + '</div>';
+    });
+  }
+  if (!zeitbasiert(dHier)) {
+  const di = s.index;
+  h += '<div id="zeilenListe">';
+  const keys = (s.display && s.display.richtungen) || [];
+  if (!keys.length) {
+    h += '<div class="zeile"><div class="jetzt">Noch nichts zugewiesen. '
+       + 'W\u00e4hle unten eine Linie aus.</div></div>';
+  }
+  // Je ZEILE ein Eintrag: eine zusammengefasste Zeile steht einmal da, mit den Marken
+  // aller beteiligten Richtungen.
+  const einheiten = zeilenEinheiten(dHier);
+  for (let i = 0; i < einheiten.length; i++) {
+    const teil = einheiten[i];
+    if (teil.length === 1 && istUhrKey(teil[0])) {
+      h += '<div class="linie ziehbar" data-idx="' + i + '"'
+         + ' onpointerdown="zeileGreifen(event,' + di + ',this)"'
+         + ' onpointermove="zeileZiehen(event)" onpointerup="zeileLoslassen()"'
+         + ' onpointercancel="zeileLoslassen()">'
+         + '<b style="background:#1b1b1b;color:#fff">' + SYM_UHR + '</b>'
+         + '<div class="rumpf"><div class="ziel">Uhrzeit</div>'
+         + '<div class="halt">Zeile ' + (i + 1) + ' &middot; '
+         + (einheiten.length === 1 ? 'allein auf dem Display, also die gro\u00dfe Uhr'
+                                   : 'frei verschiebbar wie jede Zeile') + '</div>'
+         + (einheiten.length === 1
+            ? ((fwNeu() || !geraetVersion) ? ''
+               : '<div class="hinweis">Geht ab Firmware ' + FW_MIT_UHR + ', dein Ger\u00e4t meldet '
+                 + escapeHtmlFt(geraetVersion) + '. Fehlt die Seite am Ger\u00e4t, fehlt '
+                 + 'noch das Release.</div>')
+            : (!kannUhrZeile(stilVon(dHier))
+               ? '<div class="zusatz">' + escapeHtmlFt((STILE.find(y => y.id === stilVon(dHier)) || {}).name || 'Dieser Stil')
+                 + ' zeigt eine Abfahrt gro\u00df und kann keine Uhr-Zeile. Allein auf einem '
+                 + 'Display geht die Uhr auch dort.</div>'
+               : '')) + '</div>'
+         + '<span class="pfeile">'
+         + '<button class="pfeil" ' + (i === 0 ? 'disabled' : '') + ' title="nach oben"'
+         + ' onclick="zeileSchieben(' + di + ',' + i + ',-1)">&#9650;</button>'
+         + '<button class="pfeil" ' + (i >= einheiten.length - 1 ? 'disabled' : '') + ' title="nach unten"'
+         + ' onclick="zeileSchieben(' + di + ',' + i + ',1)">&#9660;</button>'
+         + '</span>'
+         + '<button class="pfeil weg-x" title="von diesem Display nehmen"'
+         + ' onclick="richtungSchalten(' + di + ',\'' + UHR_KEY + '\',false)">' + SYM_X + '</button>'
+         + '</div>';
+      continue;
+    }
+    const zusammen = teil.length > 1;
+    const treffer = teil.map(k => richtungFinden(k));
+    const rr = treffer[0];
+    const dep = rr ? rr.dep : null;
+    const zeit = (s.daten[i] && !einzelLinie(dHier)) ? s.daten[i]
+               : (dep && s.daten.find(x => x.line === dep.line && x.dest === dep.dest));
+    const marken = teil.map((k, n) => {
+      const t = treffer[n];
+      const f = t ? badgeFarben(t.dep) : { bg: '#4a4a4a', fg: '#fff' };
+      return '<b style="background:' + f.bg + ';color:' + f.fg + '">'
+           + escapeHtmlFt(t ? t.dep.line : '?') + '</b>';
+    }).join('');
+    const ziele = teil.map((k, n) => escapeHtmlFt(treffer[n] ? treffer[n].dep.dest : k))
+                      .join(' &middot; ');
+    const halte = [];
+    treffer.forEach(t => { if (t && halte.indexOf(t.station.name) < 0) halte.push(t.station.name); });
+    h += '<div class="linie ziehbar' + (zusammen ? ' zusammen' : '') + '" data-idx="' + i + '"'
+       + ' onpointerdown="zeileGreifen(event,' + di + ',this)"'
+       + ' onpointermove="zeileZiehen(event)" onpointerup="zeileLoslassen()"'
+       + ' onpointercancel="zeileLoslassen()">'
+       + (zusammen ? '<span class="marken">' + marken + '</span>' : marken)
+       + '<div class="rumpf"><div class="ziel">' + ziele + '</div>'
+       + '<div class="halt">Zeile ' + (i + 1)
+       + (halte.length ? ' &middot; ' + escapeHtmlFt(halte.join(', ')) : '')
+       + (zeit ? ' &middot; in ' + zeit.time + ' min' : ' &middot; gerade keine Abfahrt') + '</div>'
+       + (zusammen
+          ? '<div class="zusatz">' + teil.length + ' Richtungen in einer Zeile &middot; '
+            + '<button class="link" onclick="gruppeLoesen(' + di + ',' + i + ')">trennen</button></div>'
+          : '')
+       + '</div>'
+       + '<span class="pfeile">'
+       + '<button class="pfeil" ' + (i === 0 ? 'disabled' : '') + ' title="nach oben"'
+       + ' onclick="zeileSchieben(' + di + ',' + i + ',-1)">&#9650;</button>'
+       + '<button class="pfeil" ' + (i >= einheiten.length - 1 ? 'disabled' : '') + ' title="nach unten"'
+       + ' onclick="zeileSchieben(' + di + ',' + i + ',1)">&#9660;</button>'
+       + '</span>'
+       // Zusammenfassen beginnt bei DIESER Zeile: sie ist im Dialog schon angekreuzt.
+       + (keys.length > 1
+          ? '<button class="pfeil" title="mit anderen Zeilen zusammenfassen"'
+            + ' onclick="gruppeFragen(' + di + ',' + JSON.stringify(teil).replace(/"/g, '&quot;') + ')">'
+            + SYM_ZUSAMMEN + '</button>'
+          : '')
+       + '<button class="pfeil weg-x" title="von diesem Display nehmen"'
+       + ' onclick="zeileWeg(' + di + ',' + i + ')">' + SYM_X + '</button>'
+       + '</div>';
+  }
+  h += '</div>';
+  }
+
+  el.innerHTML = h;
+}
+
+// Farbe eines Linien-Badges: zuerst die offizielle Farbe aus den Abfahrten, sonst die
+// eingebaute Wiener U-Bahn-Tabelle, sonst neutral. Genau die Quelle, aus der auch das
+// Geraet seine Badges faerbt.
+const U_BAHN_FARBEN = { U1: '#e2001a', U2: '#a862a4', U3: '#f39200', U4: '#008d3d', U5: '#00b8aa', U6: '#944210' };
+function badgeFarben(dep) {
+  const bg = (typeof dvLineColorCss === 'function' ? dvLineColorCss(dep.lineColor) : null)
+          || U_BAHN_FARBEN[String(dep.line || '').toUpperCase()] || '#4a4a4a';
+  const fg = (typeof dvLineColorCss === 'function' ? dvLineColorCss(dep.lineTextColor) : null) || '#ffffff';
+  return { bg, fg };
+}
+
+// Liste der LINIEN, nicht der Stationen: die Fahrtrichtung ist das Wesentliche, die
+// Station steht als ruhige Unterzeile darunter (Paul 22.10.2026).
+// Zeitfenster: kommt spaeter dran und steht darum in einer eigenen Karte ganz unten
+// (Paul 22.10.2026). Inhalt unveraendert, nur der Platz ist ein anderer.
+function zeitfensterZeichnen() {
+  const el = document.getElementById('zeitfenster');
+  if (!el) return;
+  const s = schirme[zeiger];
+  if (!s) { el.innerHTML = ''; return; }
+  const dHier = s.display;
+  const di = s.index;
+  let h = '';
+
+  // Die Uhr selbst legt man unten aus dem Linien-Topf aufs Display. Hier steht nur,
+  // wie sie aussieht.
+  h += '<label class="feld">Uhrzeit ' + neuBadge('uhr') + '</label>'
+     + '<div class="schieber"><div class="wort">Uhrzeit anzeigen'
+     + '<small>Legt die Uhr unten zu deinen Linien, als Zeile oder als ganzes Display</small></div>'
+     + '<button class="schiene' + (uhrAn ? ' an' : '') + '" role="switch"'
+     + ' aria-checked="' + (uhrAn ? 'true' : 'false') + '" onclick="uhrFeatureSchalten()">'
+     + '<span class="kugel"></span></button></div>';
+  if (uhrAn) {
+    h += '<label class="feld">Zeitformat</label><div class="schalter">'
+       + '<button class="' + (uhrSekunden ? 'an' : '') + '" onclick="sekundenSetzen(1)">14:07:32</button>'
+       + '<button class="' + (uhrSekunden ? '' : 'an') + '" onclick="sekundenSetzen(0)">14:07</button>'
+       + '</div>';
+  }
+  // Zeitfenster dieses Displays. Das Geraet haengt es am Anzeige-STIL auf, nicht am
+  // einzelnen Display: zwei Displays mit demselben Stil teilen sich darum das Fenster.
+  // Darauf weisen wir hin, statt es stillschweigend zu ueberschreiben.
+  // Helligkeit gilt fuers ganze Geraet, nicht je Display.
+  h += '<label class="feld">Helligkeit</label><div class="schalter">';
+  [[1, 'Dunkel'], [2, 'Mittel'], [3, 'Hell']].forEach(b => {
+    h += '<button class="' + (helligkeit === b[0] ? 'an' : '') + '"'
+       + ' onclick="helligkeitSetzen(' + b[0] + ')">' + b[1] + '</button>';
+  });
+  h += '</div>';
+
+  // Wechselzeiten und Standzeit gehoeren zum Display, wie die Farben auch.
+  const c = stilVon(dHier);
+  const e = einstFuer(dHier);
+  const auto = !e.x && !e.y;
+  // Ein Uhr-Brett hat keine Abfahrten, also auch nichts zum Wechseln. Dort bleibt nur
+  // die Frage, wie lange die Seite steht (Paul 23.10.2026).
+  const nurUhr = zeigtUhr(dHier);
+  if (!nurUhr) {
+    h += '<label class="feld" style="margin-top:18px">Abfahrtszeiten im Wechsel</label>'
+       + '<div class="hinweis" style="margin-top:0">Wie lange jede der beiden Abfahrtszeiten '
+       + 'steht, bevor die andere kommt.</div>'
+       + '<div class="schalter">'
+       + '<button class="' + (auto ? 'an' : '') + '" onclick="wechselAutomatik(' + di + ',true)">'
+       + 'Automatisch</button>'
+       + '<button class="' + (auto ? '' : 'an') + '" onclick="wechselAutomatik(' + di + ',false)">'
+       + 'Selbst einstellen</button></div>';
+    if (!auto) {
+      [['x', '1. Abfahrt'], ['y', '2. Abfahrt']].forEach(r => {
+        h += '<div class="regler"><span class="wort">' + r[1] + '</span>'
+           + '<input type="range" min="' + WECHSEL_MIN + '" max="' + WECHSEL_MAX + '" step="1"'
+           + ' value="' + (e[r[0]] / 10) + '"'
+           + ' oninput="wechselSetzen(' + di + ',\'' + r[0] + '\',this.value)">'
+           + '<span class="wert">' + (e[r[0]] / 10) + ' s</span></div>';
+      });
+    }
+  }
+
+  // Dritter Regler: so lange steht das Display, bevor die naechste Seite kommt. Unter
+  // der Summe der beiden Wechselzeiten waere die zweite Zeit nie zu sehen.
+  const mind = nurUhr ? STANDZEIT_MIN_UHR : standzeitMindestens(e);
+  h += '<label class="feld" style="margin-top:14px">Wie lange dieses Display steht</label>'
+     + '<div class="regler"><span class="wort">Standzeit</span>'
+     + '<input type="range" min="' + mind + '" max="' + STANDZEIT_MAX + '" step="1"'
+     + ' value="' + standzeitVon(e, nurUhr) + '" oninput="standzeitSetzen(' + di + ',this.value)">'
+     + '<span class="wert">' + standzeitVon(e, nurUhr) + ' s</span></div>'
+     + '<div class="hinweis" style="margin-top:0">'
+     + ((nurUhr || auto)
+        ? 'Mindestens ' + mind + ' Sekunden.'
+        : 'Mindestens ' + mind + ' Sekunden, so lange brauchen die beiden Abfahrtszeiten '
+          + 'zusammen (' + (e.x / 10) + ' + ' + (e.y / 10) + ').') + '</div>';
+
+  // Bedient sich wie der Nachtmodus: ein Schalter, darunter die zwei Zeiten. Dieselbe
+  // Frage, dieselbe Form (Paul 22.10.2026).
+  h += '<label class="feld" style="margin-top:18px">Zeitfenster</label>';
+  const f = dHier && dHier.fenster;
+  h += '<div class="schieber"><div class="wort">Nur zu bestimmten Zeiten zeigen'
+     + '<small>Display ' + (di + 1) + ' wird sonst \u00fcbersprungen</small></div>'
+     + '<button class="schiene' + (f ? ' an' : '') + '" role="switch"'
+     + ' aria-checked="' + (f ? 'true' : 'false') + '" onclick="fensterSchalten(' + di + ')">'
+     + '<span class="kugel"></span></button></div>';
+  if (f) {
+    const stunden = function (feld, wert) {
+      let o = '<select onchange="fensterSetzen(' + di + ',\'' + feld + '\',this.value)">';
+      for (let x = 0; x < 24; x++) {
+        const t = (x < 10 ? '0' + x : x) + ':00';
+        o += '<option value="' + t + '"' + (t === wert ? ' selected' : '') + '>' + t + '</option>';
+      }
+      return o + '</select>';
+    };
+    h += '<div class="reihe" style="align-items:flex-end">'
+       + '<div style="flex:1"><label class="feld">An ab</label>' + stunden('von', f.von) + '</div>'
+       + '<div style="flex:1"><label class="feld">Wieder aus</label>' + stunden('bis', f.bis) + '</div>'
+       + '</div>';
+  }
+  // Jedes Display hat jetzt sein eigenes Fenster im masterrow-Eintrag. Bleibt eine
+  // Ausnahme: Wien schickt je Bahnsteig einen Eintrag, darum legt die Firmware
+  // WL-Eintraege mit gleicher colour absichtlich zu EINEM Display zusammen. Dort gilt
+  // das erste gesetzte Fenster (Firmware-Sitzung 22.10.2026).
+  const gleicheStile = displays.filter((x, xi) => xi !== di && stilVon(x) === stilVon(dHier));
+  const wienHier = istWienDisplay(dHier);
+  const wienAuch = gleicheStile.filter(istWienDisplay);
+  // Das Fenster steht als w im EINTRAG, gilt also je Seite. Erst eine alte Firmware
+  // ohne d<n> legt gleichfarbige Wien-Seiten zusammen und teilt es dann (Paul 23.10.2026).
+  if (f && wienHier && wienAuch.length) {
+    h += '<div class="hinweis">Gilt für diese Seite. Bis zum nächsten Firmware-Update '
+       + 'teilt sich ' + (wienAuch.length === 1 ? 'das andere Wien-Display' : 'die anderen Wien-Displays')
+       + ' mit diesem Stil das Fenster noch mit, weil sie dort ein Brett sind.</div>';
+  } else if (f) {
+    h += '<div class="hinweis">Gilt für diese Seite.</div>';
+  }
+
+  el.innerHTML = h;
+}
+
+function stationenZeichnen() {
+  const el = document.getElementById('stationsliste');
+  if (!stationen.length) {
+    el.innerHTML = '<div class="hinweis">Noch keine Linie. Die kommen aus dem Schritt davor.</div>';
+    return;
+  }
+  // Weg ist nur, was auf dem GERADE GEWAEHLTEN Display liegt. Alles andere bleibt
+  // waehlbar, auch wenn es schon auf einem anderen Display steht.
+  const sHier = schirme[zeiger];
+  const diHier = sHier ? sHier.index : 0;
+  const hier = displays[diHier];
+  const vergeben = new Set((hier && hier.richtungen) || []);
+  const anderswo = new Map();
+  displays.forEach((d, di) => { if (d !== hier) d.richtungen.forEach(k => {
+    if (!anderswo.has(k)) anderswo.set(k, []);
+    anderswo.get(k).push(di + 1);
+  }); });
+  // Was noch auf KEINEM Display liegt, kommt nach oben und pocht leise. Sonst
+  // uebersieht man genau die Linie, die noch fehlt (Paul 23.10.2026).
+  let offen = '', schonWo = '', leer = '';
+  let uebrig = 0;
+  stationen.forEach((st, si) => {
+    const gesehen = new Set();
+    st.abfahrten.forEach(d => {
+      const k = d.line + '|' + d.dest;
+      if (gesehen.has(k)) return;
+      gesehen.add(k);
+      if (vergeben.has(k)) return;
+      uebrig++;
+      const f = badgeFarben(d);
+      const wo = anderswo.get(k) || [];
+      // Schon woanders? Trotzdem voll sichtbar und waehlbar, nur mit einem Zeichen
+      // daneben. Entfernen gibt es hier nicht: aus dem Pool verschwindet nichts.
+      const zeile = '<div class="linie' + (wo.length ? '' : ' neu-dran') + '"'
+         + ' title="auf das gew\u00e4hlte Display legen"'
+         + ' onclick="richtungSchalten(' + diHier + ',\'' + k.replace(/'/g, "\\'") + '\',true)">'
+         + '<b style="background:' + f.bg + ';color:' + f.fg + '">' + escapeHtmlFt(d.line) + '</b>'
+         + '<div class="rumpf"><div class="ziel">' + escapeHtmlFt(d.dest) + '</div>'
+         + '<div class="halt">' + escapeHtmlFt(st.name)
+         + (d.beispiel ? ' &middot; Beispielzeiten' : '')
+         + (wo.length ? ' &middot; schon auf Display ' + wo.join(' und ') : '') + '</div></div>'
+         + (wo.length ? '<span class="doppel" title="liegt schon auf Display '
+                        + wo.join(' und ') + '">' + DOPPEL_ICON + '</span>' : '')
+         + '</div>';
+      if (wo.length) schonWo += zeile; else offen += zeile;
+    });
+    if (!gesehen.size) {
+      leer += '<div class="linie aus"><div class="rumpf"><div class="ziel">' + escapeHtmlFt(st.name)
+         + '</div><div class="halt">'
+         + (st.fehler ? 'nicht geladen, ' + escapeHtmlFt(st.fehler) : 'keine Abfahrten geladen')
+         + '</div></div></div>';
+    }
+  });
+  let h = '';
+  if (offen) h += '<label class="feld" style="margin-top:2px">Noch auf keinem Display</label>' + offen;
+  if (schonWo) h += '<label class="feld">Liegen schon woanders</label>' + schonWo;
+  h += leer;
+  // Die Uhr liegt im selben Topf wie die Linien: antippen legt sie aufs Display.
+  // Bei Stilen ohne Uhr-Zeile geht nur das ganze Brett als Uhr, also nur auf einem
+  // Display, das sonst leer ist.
+  const uhrGeht = hier && (kannUhrZeile(stilVon(hier)) || !hier.richtungen.length);
+  if (uhrAn && uhrGeht && !hatUhrZeile(hier)) {
+    h = h + '<label class="feld">Dazu</label>'
+      + '<div class="linie" title="Uhrzeit auf dieses Display legen"'
+      + ' onclick="richtungSchalten(' + diHier + ',\'' + UHR_KEY + '\',true)">'
+      + '<b style="background:#1b1b1b;color:#fff">' + SYM_UHR + '</b>'
+      + '<div class="rumpf"><div class="ziel">Uhrzeit ' + neuBadge('uhr') + '</div>'
+      + '<div class="halt">eine Zeile mit der aktuellen Zeit, allein auf dem Display '
+      + 'wird daraus die gro\u00dfe Uhr</div></div></div>';
+    uebrig++;
+  }
+  if (!uebrig) h = '<div class="hinweis">Alle deine Linien liegen bereits auf diesem Display.</div>';
+  const t = document.getElementById('poolTitel');
+  if (t) t.textContent = 'Linien f\u00fcr Display ' + (diHier + 1);
+  el.innerHTML = h;
+}
+
+// Die Config, wie sie das Geraet bekommt. Eine Quelle fuer die Anzeige unten UND fuer
+// das Speichern, damit beides nie auseinanderlaeuft.
+function configBauen() {
+  const teile = [], zeitTeile = [];
+  displays.forEach((d, di) => {
+    // WIEN: die Firmware bindet jede Linie an einen Stop (stopId:Linie). Steht in EINEM
+    // Eintrag eine Liste aus mehreren rbls, landen am Ende alle Linien am LETZTEN Stop
+    // der Liste, und alles was dort nicht faehrt verschwindet. Am Geraet gesehen
+    // (Paul 23.10.2026): "4111,4201|U1,U2" wurde zu "4201:U1,4201:U2", also blieb nur
+    // die U2 uebrig. Darum fuer Wien EIN EINTRAG JE STATION, so wie es der alte
+    // Konfigurator macht. Fremdnetze duerfen mehrere rbls in einem Eintrag fuehren,
+    // dort ist der Schluessel Linie:Ziel und das Multi-rbl-Segment ist gewollt.
+    const proStation = new Map();   // rbl -> { station, linien: [] }
+    d.richtungen.forEach(k => {
+      const r = richtungFinden(k);
+      if (!r) return;
+      if (!proStation.has(r.station.rbl)) proStation.set(r.station.rbl, { station: r.station, linien: [] });
+      const eintrag = proStation.get(r.station.rbl);
+      if (eintrag.linien.indexOf(r.dep.line) < 0) eintrag.linien.push(r.dep.line);
+    });
+    if (!proStation.size && !zeigtUhr(d)) return;   // leeres Display kommt nicht ans Geraet
+
+    const wien = stopIdFormat(d);
+    const c = stilVon(d);
+    const w = fensterToken(d);
+    // s: 1 = feste Reihenfolge, 2 = je Linie eine Zeile mit erster und zweiter Abfahrt
+    // im Wechsel, 3 = flach nach Uhrzeit. Unser "Naechste Abfahrten" ist die 3
+    // (Firmware-Sitzung 23.10.2026).
+    const sTeil = kannSortieren(c) ? '|s' + (zeitbasiert(d) ? '3' : '1') : '';
+    const zTeil = uhrToken(d);
+    // d<n> = Nummer des Displays. Eintraege mit gleichem d sind EIN Brett, egal welches
+    // Netz und welche Farbe. Das loest den Wien-Merge und x1 gleich mit ab
+    // (Firmware-Sitzung 23.10.2026). Alte Firmware ueberliest das Feld.
+    const dTeil = '|d' + (di + 1);
+    // Design je Display, in JEDEN Eintrag dieses Displays.
+    const dsgTeil = designTeil(d);
+    // Gruppen-Marker: nur sinnvoll, solange alle Linien in EINEM Eintrag stehen.
+    const alleLinien = [];
+    proStation.forEach(e => e.linien.forEach(l => { if (alleLinien.indexOf(l) < 0) alleLinien.push(l); }));
+    const merges = [];
+    zeilenEinheiten(d).forEach((teil, gi) => {
+      if (teil.length < 2) return;
+      teil.forEach(k => {
+        const r = richtungFinden(k);
+        const idx = r ? alleLinien.indexOf(r.dep.line) : -1;
+        const marke = idx + ':' + (gi + 1);
+        if (idx >= 0 && merges.indexOf(marke) < 0) merges.push(marke);
+      });
+    });
+
+    const stuecke = [];
+    if (!proStation.size) {
+      // Nur die Uhr, keine Station: Platzhalter-Station CLOCK:<n>, eindeutig je Brett.
+      // Die Firmware fragt sie nie beim Server ab und zaehlt das Brett in der Rotation
+      // immer als zeigbar (Firmware-Sitzung 23.10.2026).
+      // Wird IMMER geschrieben (Paul 23.10.2026). Kennt ein Geraet CLOCK noch nicht,
+      // bleibt dort eine Seite leer, kaputt geht nichts.
+      stuecke.push('CLOCK:' + (di + 1) + '|*|c' + c + '|g0|r' + zeilenVon(d)
+                 + (w ? '|w' + w : '') + '|z1' + sTeil + dTeil + dsgTeil);
+    } else if (wien && proStation.size > 1) {
+      // Je Station ein Eintrag. Sie gehoeren zusammen, also KEIN x1: das Geraet legt
+      // gleichfarbige Wien-Eintraege zu einem Brett zusammen, und genau das wollen wir
+      // hier. Dass dadurch auch ein zweites Wien-Display mit gleichem Stil mithineinfaellt,
+      // steht als Hinweis in der Oberflaeche.
+      proStation.forEach((e, rbl) => {
+        stuecke.push(rbl + '|' + (e.linien.length ? e.linien.join(',') : '*')
+                   + '|c' + c + '|g' + gehwegStation(e.station) + '|r' + zeilenVon(d)
+                   + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
+      });
+    } else {
+      const rbls = [], gw = [];
+      proStation.forEach((e, rbl) => { rbls.push(rbl); gw.push(gehwegStation(e.station)); });
+      const gTeil = gw.every(x => x === gw[0]) ? String(gw[0]) : gw.join(',');
+      stuecke.push(rbls.join(',') + '|' + (alleLinien.length ? alleLinien.join(',') : '*')
+                 + '|c' + c + '|g' + gTeil + '|r' + zeilenVon(d)
+                 + (merges.length ? '|m' + merges.join(',') : '')
+                 + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
+    }
+    // Die timerow traegt die zeitbasierten Display-TYPEN (OEBB, Westbahn, SBB), NICHT
+    // die Sortierung. Die steht als 's' in den displaysettings.
+    const topf = istZeitTyp(c) ? zeitTeile : teile;
+    stuecke.forEach(x => topf.push(x));
+  });
+  // colour-Liste parallel zu den Segmenten: Firmware vor 2.5.3 erkennt eine
+  // Multi-Display-Config nur am Komma in dieser Liste (catchit-cities, Kunde Johann).
+  const farben = [];
+  teile.concat(zeitTeile).forEach(seg => {
+    const m = seg.match(/\|c(\d+)(?:\||$)/);
+    if (m) farben.push(m[1]);
+  });
+  // Was diese Oberflaeche kann, das Geraeteformat aber noch nicht traegt.
+  const feiner = [];
+  stationen.forEach(st => {
+    Object.keys(st.gehwegRichtungen || {}).forEach(z => {
+      feiner.push(st.rbl + ' Richtung ' + z + ': ' + st.gehwegRichtungen[z] + ' min');
+    });
+    Object.keys(st.gehwegLinien || {}).forEach(k => {
+      feiner.push(st.rbl + ' ' + k.replace('|', ' nach ') + ': ' + st.gehwegLinien[k] + ' min');
+    });
+  });
+  // Uhr-Bretter ohne Station: der Eintrag steht in der Zeile, die Firmware muss die
+  // Gruppe ohne rbl aber erst lernen.
+  // Nur noch ein Hinweis, falls das Geraet sich aelter meldet: geschrieben wird es immer.
+  const uhren = [];
+  if (geraetVersion && !fwNeu()) displays.forEach((d, i) => {
+    if (zeigtUhr(d) && d.richtungen.length <= 1) uhren.push('Display ' + (i + 1));
+  });
+  return {
+    masterrow: teile.join(';'),
+    timerow: zeitTeile.join(';'),
+    displaysettings: displaysettingsBauen(),
+    colourListe: farben.join(','),
+    uhren: uhren,
+    feiner: feiner
+  };
+}
+
+// Die Rohzeile steht nicht mehr auf der Seite (Paul 23.10.2026). configBauen bleibt,
+// davon lebt das Speichern; hier wird nur noch gezeichnet, wenn das Feld existiert.
+function ausgabeZeichnen() {
+  const el = document.getElementById('mrowAus');
+  if (!el) return;
+  if (!stationen.length) { el.textContent = '(noch keine Station)'; return; }
+  const c = configBauen();
+  el.textContent = (c.masterrow ? 'masterrow: ' + c.masterrow : '(keine feste Zeile)')
+                 + (c.uhren.length ? '\n\nUhr ohne Station geht ab Firmware ' + FW_MIT_UHR
+                                   + ', dein Ger\u00e4t meldet ' + geraetVersion
+                                   + '. Fehlt die Seite am Ger\u00e4t, fehlt das Release:\n'
+                                   + c.uhren.join(', ') : '')
+                 + (c.timerow ? '\n\ntimerow: ' + c.timerow : '')
+                 + (c.displaysettings ? '\n\ndisplaysettings: ' + c.displaysettings : '')
+                 + '\n\nhelligkeit: ' + ['', 'dunkel', 'mittel', 'hell'][helligkeit]
+                 + '\n\nnachtmodus: ' + (nacht.an ? nacht.von + '-' + nacht.bis + ' Uhr aus' : 'aus')
+                 + (c.feiner.length ? '\n\nGehweg feiner als je Station (kennt die alte Firmware noch nicht):\n'
+                                    + c.feiner.join('\n') : '');
+}
+
+// ---- Ans Geraet speichern ---------------------------------------------------------------
+// Das Geraet nimmt die Config als Formular auf http://<host>/config entgegen. Es startet
+// dabei von seiner BESTEHENDEN Config und ueberschreibt nur Felder, die mitkommen
+// (Config new_config = global_settings.GetConfig() im Handler). Darum schicken wir genau
+// das, was diese Oberflaeche einstellt, und fassen den Rest nicht an.
+const GERAETE_HOSTS = (function () {
+  const eigen = new URLSearchParams(location.search).get('device');
+  return eigen ? [eigen] : ['catch.local', 'straba.local'];
+})();
+
+function stand(text) {
+  const el = document.getElementById('speicherStand');
+  if (el) el.textContent = text || '';
+}
+
+// Erreichbarkeit: HEAD ohne CORS. Die Antwort ist undurchsichtig, aber sie kommt nur,
+// wenn der Host ueberhaupt da ist. Nach 4 Sekunden geben wir auf und nehmen den naechsten.
+async function hostSuchen() {
+  for (const h of GERAETE_HOSTS) {
+    stand('Suche ' + h + ' ...');
+    const steuer = new AbortController();
+    const uhr = setTimeout(() => steuer.abort(), 4000);
+    try {
+      await fetch('http://' + h + '/', { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: steuer.signal });
+      clearTimeout(uhr);
+      return h;
+    } catch (e) {
+      clearTimeout(uhr);
+    }
+  }
+  return null;
+}
+
+function speichernFragen() {
+  const c = configBauen();
+  if (!c.masterrow && !c.timerow) {
+    sagen('Nichts zu speichern', 'Es ist noch kein Display mit Linien da.');
+    return;
+  }
+  dialogZeigen('Auf das Ger\u00e4t schreiben',
+    'Die Einstellungen gehen an ' + GERAETE_HOSTS[0] + '. Dein catch it startet danach neu.',
+    [{ text: 'Abbrechen', still: true }, { text: 'Speichern', tun: speichern }], 'warnung');
+}
+
+// Laeuft die Seite im Geraete-Portal (catch.local/lines zeigt uns in einem iframe)?
+// Dann darf sie NICHT selbst zu http://catch.local greifen: das Portal laedt uns ueber
+// https, der Browser blockt den Mischverkehr. Stattdessen reicht die Elternseite die
+// Config weiter, genau wie bei catchit-cities (Paul 23.10.2026).
+function imRahmen() {
+  try { return !!(window.parent && window.parent !== window); } catch (e) { return false; }
+}
+
+// Ein Datensatz fuer beide Wege. Das Geraete-Portal setzt ALLE Formularfelder und
+// nimmt fuer fehlende seine Vorgaben, darum schicken wir auch die alten Einzelfelder
+// mit, sonst faende sich danach Helligkeit 3 und Nachtmodus aus wieder.
+function geraeteDaten() {
+  const c = configBauen();
+  const erste = displays[0];
+  const e = erste ? einstFuer(erste) : standardEinst();
+  return {
+    type: 'setRBL',
+    masterrow: c.masterrow,
+    timerow: c.timerow,
+    displaysettings: c.displaysettings,
+    colour: c.colourListe,
+    // Ohne sortmode behaelt das Geraet seinen alten Wert. Steht dort 2 (chronologisch),
+    // ignoriert es unsere feste Zeilenfolge. Displays in der timerow erzwingen 2 selbst.
+    sortmode: c.masterrow ? '1' : '2',
+    displaylight: String(helligkeit),
+    nightmode: nacht.an ? '1' : '0',
+    nightstart: String(nacht.von),
+    nightend: String(nacht.bis),
+    stopinterval: String(standzeitVon(e, erste ? zeigtUhr(erste) : false)),
+    // Alt-Felder je Geraet: seit 2.6 zaehlen die Werte im Eintrag, aber das Portal
+    // wuerde sie sonst auf Vorgabe setzen.
+    chopper: String(e.h || 0),
+    niederflurblink: String(e.n || 0),
+    silberpfeil: String(e.k || 0),
+    textcolor: String(e.t || 1),
+    wienbadges: String(e.u || 0)
+  };
+}
+
+async function speichern() {
+  const daten = geraeteDaten();
+  if (imRahmen()) {
+    // Im Portal: die Elternseite fuellt ihr Formular und schickt es ab, danach startet
+    // das Geraet neu. Eine Antwort bekommen wir nicht, darum sagen wir es direkt.
+    stand('Schicke an das Ger\u00e4t ...');
+    try { window.parent.postMessage(daten, '*'); } catch (e) {}
+    setTimeout(function () {
+      stand('Gespeichert um ' + uhrText().slice(0, 5) + '.');
+      sagen('Gespeichert', 'Dein catch it startet gerade neu.');
+    }, 600);
+    return;
+  }
+
+  const host = await hostSuchen();
+  if (!host) {
+    stand('');
+    dialogZeigen('Kein Ger\u00e4t gefunden',
+      GERAETE_HOSTS.join(' und ') + ' antwortet nicht. Ist dein catch it eingeschaltet, '
+      + 'und h\u00e4ngst du im selben WLAN?',
+      [{ text: 'Alles klar' }], 'warnung');
+    return;
+  }
+  const form = new URLSearchParams();
+  Object.keys(daten).forEach(function (k) { if (k !== 'type') form.append(k, daten[k]); });
+  stand('Speichere auf ' + host + ' ...');
+  try {
+    const r = await fetch('http://' + host + '/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString()
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    stand('Gespeichert um ' + uhrText().slice(0, 5) + '.');
+    sagen('Gespeichert', 'Dein catch it startet gerade neu.');
+  } catch (e) {
+    stand('');
+    dialogZeigen('Hat nicht geklappt',
+      'Von ' + host + ' kam keine Antwort (' + ((e && e.message) || e) + '). '
+      + 'Startet das Display gerade neu, ist es trotzdem angekommen.',
+      [{ text: 'Alles klar' }], 'warnung');
+  }
+
+}
+
+function gewaehlteNamen(st) {
+  const linien = linienAus(st.abfahrten);
+  const raus = [];
+  linien.forEach(l => {
+    const k = l.name + '|' + l.ziel;
+    if (!st.gewaehlt.size || st.gewaehlt.has(k)) { if (raus.indexOf(l.name) < 0) raus.push(l.name); }
+  });
+  return raus;
+}
+
+
+// Das w-Feld traegt STUNDEN ("6-22"), nicht Uhrzeiten: die Firmware liest beide Seiten
+// mit toInt und vergleicht sie gegen die aktuelle Stunde (isTimeWindowActiveNow).
+// "0700-0900" waere 700 und 900 und damit nie aktiv.
+// Wien (WL/WLB) ist der Sonderfall beim Zusammenlegen, darum eigens geprueft.
+function istWienDisplay(d) {
+  return ((d && d.richtungen) || []).some(k => {
+    const r = richtungFinden(k);
+    return !!(r && /^WLB?$/i.test(String(r.station.netz || '')));
+  });
+}
+
+// ---- Uhr-Display -----------------------------------------------------------------------
+// Ein Display, das keine Abfahrten zeigt, sondern nur die Uhrzeit, gross in Poppins.
+// Farben kommen aus dem jeweiligen Stil, damit die Uhr aussieht wie das Brett daneben.
+// Die Werte stammen 1:1 aus display-renderer.js (Paul 22.10.2026).
+function uhrLook(c, d) {
+  const e = d ? einstFuer(d) : einstVon(c);
+  const ci = parseInt(c, 10);
+  switch (ci) {
+    case 1: case 3:
+      return { bg: (e.b === 1 ? '#051e0f' : '#000500'),
+               fg: (e.t === 2 ? '#ffffff' : (e.t === 3 ? '#f8a400' : '#fff05d')) };
+    case 11: case 12: case 14:
+      return { bg: '#000094', fg: '#ffffff' };
+    case 2: case 15: case 18: case 21: case 23: {
+      const v = (ci === 2) ? 2 : ((ci === 15 || ci === 18) ? 3 : (ci === 21 ? 1 : e.t));
+      return v === 2 ? { bg: '#001405', fg: '#94ce39', raster: '#001e0a' }
+           : v === 3 ? { bg: '#0f0500', fg: '#ff8c00', raster: '#281200' }
+                     : { bg: '#000000', fg: '#ffffff', raster: '#181818' };
+    }
+    case 5:  return { bg: '#0a1628', fg: '#ffffff' };
+    case 24: return { bg: '#ffffff', fg: '#1a1a1a' };
+    case 25: return { bg: '#264c9a', fg: '#ffffff' };
+    // Seit dem Release geht z1 fuer ALLE Stile (Firmware-Sitzung 23.10.2026). Wo wir
+    // die Hausfarben nicht kennen, zeigt die Uhr weiss auf schwarz.
+    default: return { bg: '#000000', fg: '#ffffff' };
+  }
+}
+// Die Uhr ist eine ZEILE wie eine Linie: man legt sie unten aus der Liste aufs Display.
+// Ist sie die einzige Zeile, wird das ganze Brett zur Uhr (Feld z1 am Geraet), sonst
+// belegt sie die unterste Zeile (z2) (Paul 23.10.2026).
+const UHR_KEY = '@UHR';
+function istUhrKey(k) { return k === UHR_KEY; }
+function hatUhrZeile(d) { return !!(d && d.richtungen && d.richtungen.indexOf(UHR_KEY) >= 0); }
+
+// Die Uhr ist von Haus aus AUS. Erst der Schalter unter Erweitert holt sie hervor,
+// dann erscheint auch die Formatwahl und die Zeile im Linien-Topf (Paul 23.10.2026).
+let uhrAn = false;
+let uhrSekunden = true;          // Format, sobald die Uhr an ist
+// Leere Displays soll es nicht geben (Paul 23.10.2026). Nur das eine, das gerade per
+// Plus-Kachel entstanden ist, darf kurz leer sein, bis eine Linie darauf liegt.
+function leereWeg(ausnahme) {
+  for (let i = displays.length - 1; i >= 0; i--) {
+    if (displays[i] !== ausnahme && !(displays[i].richtungen || []).length) displays.splice(i, 1);
+  }
+}
+
+function uhrFeatureSchalten() {
+  uhrAn = !uhrAn;
+  if (!uhrAn) {
+    // Ausgeschaltet heisst ausgeschaltet: liegengebliebene Uhr-Zeilen kommen weg, sonst
+    // steht in der Config ein z, das die Oberflaeche gar nicht mehr zeigt. Ein Display,
+    // das nur die Uhr trug, ist danach leer und faellt mit weg.
+    displays.forEach(d => { d.richtungen = (d.richtungen || []).filter(k => !istUhrKey(k)); });
+    leereWeg(null);
+    allesZeichnen();
+    return;
+  }
+  // Einschalten legt eine eigene Uhr-Seite an und rollt nach oben, damit man sieht, was
+  // passiert ist. Steht schon ein leeres Display herum, bekommt das die Uhr, statt noch
+  // eines danebenzulegen.
+  if (!displays.some(d => hatUhrZeile(d))) {
+    let ziel = displays.find(d => !(d.richtungen || []).length);
+    if (ziel) ziel.richtungen = [UHR_KEY];
+    else {
+      ziel = { richtungen: [UHR_KEY], vomNutzer: true, stil: stilVon(displays[0] || {}) };
+      displays.push(ziel);
+    }
+    allesZeichnen();
+    zumDisplay(displays.indexOf(ziel));
+    const kopf = document.querySelector('h1');
+    if (kopf) kopf.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    return;
+  }
+  allesZeichnen();
+}
+function sekundenSetzen(wert) { uhrSekunden = !!wert; allesZeichnen(); }
+
+// Die Uhr wird gesetzt wie normaler Text, in den echten Poppins-Breiten. Damit sie
+// trotzdem nicht zappelt, haengt sie an einem festen Anker statt an der Mitte:
+//   x0 = (Breite - Breite("HH:MM:") - Breite("00")) / 2
+// Ab x0 steht "HH:MM:SS" linksbuendig. Dadurch ruehrt sich eine Minute lang nichts,
+// nur die letzte Ziffer rueckt, und beim Minutenwechsel zentriert es sich neu
+// (Firmware-Sitzung 23.10.2026). Die Zellen-Variante von vorhin ist damit hinfaellig.
+let _uhrMass = null;
+function uhrMess(fs) {
+  if (!_uhrMass) _uhrMass = document.createElement('canvas').getContext('2d');
+  _uhrMass.font = '700 ' + fs + 'px Poppins, sans-serif';
+  return _uhrMass;
+}
+function uhrAnker(txt, fs, breite) {
+  const ctx = uhrMess(fs);
+  const dp = String(txt).lastIndexOf(':');
+  const kopf = dp >= 0 ? String(txt).slice(0, dp + 1) : '';
+  return Math.round((breite - ctx.measureText(kopf).width - ctx.measureText('00').width) / 2);
+}
+
+function uhrText() {
+  const d = new Date(), z = n => (n < 10 ? '0' + n : String(n));
+  return z(d.getHours()) + ':' + z(d.getMinutes()) + (uhrSekunden ? ':' + z(d.getSeconds()) : '');
+}
+function uhrHTML(c, el, d) {
+  const look = uhrLook(c, d);
+  if (!look) return '';
+  el.style.background = look.bg;
+  el.style.backgroundImage = look.raster
+    ? 'radial-gradient(circle, ' + look.raster + ' 1.5px, transparent 1.5px)' : 'none';
+  el.style.backgroundSize = look.raster ? '5px 5px' : 'auto';
+  const t = uhrText();
+  return '<div class="uhr-flaeche" style="color:' + look.fg + '">'
+       + '<span class="uhr-zeit" data-fs="34" data-breite="320" style="left:'
+       + uhrAnker(t, 34, 320) + 'px">' + escapeHtmlFt(t) + '</span></div>';
+}
+// Ganzes Brett = Uhr: wenn die Uhr die EINZIGE Zeile ist.
+// Eine Seite mit weniger Zeilen als der groesste Bruder desselben Stils: die Zeilen
+// behalten ihre Hoehe und Schrift, verteilen sich aber ueber den ganzen Schirm, jede
+// mittig in ihrem Fach. Der Renderer hat sie vorher dicht untereinander gesetzt, hier
+// ruecken sie auf ihren Platz (Firmware-Sitzung 23.10.2026).
+// Die gezeichneten Zeilen in ihrer Reihenfolge einsammeln. Die meisten Renderer legen
+// sie in einen Rahmen von 320 mal 170, darum eine Ebene tiefer mitsuchen.
+function zeilenElemente(el, kopf, zeilenH, anzahl) {
+  const raus = [];
+  if (!el) return raus;
+  let kandidaten = [];
+  Array.prototype.forEach.call(el.children, k => {
+    kandidaten.push(k);
+    if (!k.style.top) kandidaten = kandidaten.concat(Array.prototype.slice.call(k.children));
+  });
+  kandidaten.forEach(k => {
+    const oben = parseFloat(k.style.top);
+    if (isNaN(oben)) return;
+    const i = Math.round((oben - kopf) / zeilenH);
+    if (i < 0 || i >= anzahl) return;
+    if (Math.abs((kopf + i * zeilenH) - oben) > 1) return;   // keine Zeile, z.B. die Min-Leiste
+    raus[i] = k;
+  });
+  return raus;
+}
+
+function seiteVerteilen(zeilen, kopf, zeilenH, fach, eigene) {
+  if (fach <= zeilenH) return;
+  const versatz = Math.floor((fach - zeilenH) / 2);
+  zeilen.forEach((k, i) => {
+    if (!k || i >= eigene) return;
+    k.style.top = (kopf + i * fach + versatz) + 'px';
+  });
+}
+
+// Blinken bei 0, nur Matrix. o1 laesst die Null blinken, o2 nimmt die Zahl weg und
+// laesst daf\u00fcr das Ziel blinken. Die Vorschau bildet das in der grossen Ansicht nach
+// (bis 3 Zeilen), dort ist die Zeile Linie, Ziel, Zahl (Firmware-Sitzung 23.10.2026).
+function nullBlinken(colour, zeilen, daten, d) {
+  const kann = (STIL_KANN[parseInt(colour, 10)] || {}).blinken;
+  const o = (d ? einstFuer(d) : einstVon(colour)).o;
+  if (!kann || !o) return;
+  zeilen.forEach((k, i) => {
+    const dep = daten[i];
+    if (!k || !dep || parseInt(dep.time, 10) !== 0) return;
+    const teile = Array.prototype.slice.call(k.children);
+    if (teile.length < 3) return;          // kleine Ansicht sieht anders aus
+    const zahl = teile[teile.length - 1];
+    const ziel = teile[1];
+    if (o === 1) { zahl.classList.add('blinkt'); }
+    else { zahl.style.visibility = 'hidden'; ziel.classList.add('blinkt'); }
+  });
+}
+
+// Die Uhrzeit in ihrer Zeile, in der Schrift des Stils. Ab 4 Zeilen wird sie klein,
+// genau wie die Linien und Abfahrten daneben (Paul 23.10.2026).
+function uhrZeileHTML(colour, daten, zeilen, d) {
+  const i = daten.findIndex(x => x && x.uhr);
+  if (i < 0) return '';
+  const look = uhrLook(colour, d) || { bg: '#000', fg: '#fff' };
+  const kopf = (parseInt(colour, 10) === 22) ? 18 : 0;   // MVG traegt oben die Min-Leiste
+  const rowH = Math.floor((170 - kopf) / zeilen);
+  const oben = kopf + i * rowH;
+  const klein = zeilen >= 4;
+  const ci = parseInt(colour, 10);
+  let inhalt;
+  if ([2, 15, 18, 21, 23].indexOf(ci) >= 0 && typeof dvLedTextSvg === 'function') {
+    // Matrix zeichnet mit dem LED-Font: gross = Pixelgroesse 4, klein = 2.
+    inhalt = dvLedTextSvg(uhrText(), klein ? 2 : 4, look.fg, true);
+  } else {
+    const fs = Math.min(klein ? 22 : 34, Math.round(rowH * 0.62));
+    const t = uhrText();
+    inhalt = '<span class="uhr-zeit" data-fs="' + fs + '" data-breite="320"'
+           + ' style="font-family:\'Poppins\',sans-serif;font-weight:700;'
+           + 'font-size:' + fs + 'px;left:' + uhrAnker(t, fs, 320) + 'px">'
+           + escapeHtmlFt(t) + '</span>';
+  }
+  return '<div style="position:absolute;left:0;top:' + oben + 'px;width:320px;height:' + rowH
+       + 'px;color:' + look.fg + ';">' + inhalt + '</div>';
+}
+
+function zeigtUhr(d) {
+  return !!(d && hatUhrZeile(d) && zeilenEinheiten(d).length === 1);
+}
+// Eine Uhr-Zeile neben Abfahrten.
+function hatUhrNeben(d) { return hatUhrZeile(d) && !zeigtUhr(d); }
+
+// Die Uhr-Zeile ist frei verschiebbar wie jede andere Zeile (Paul 23.10.2026). Darum
+// braucht das Geraet ihre Position: z1 = ganzes Brett, sonst z<Zeile+1>, also z2 fuer
+// die erste Zeile, z3 fuer die zweite und so weiter.
+function uhrZeilenNr(d) {
+  if (!d || !hatUhrZeile(d)) return 0;
+  const i = zeilenEinheiten(d).findIndex(teil => teil.length === 1 && istUhrKey(teil[0]));
+  return i < 0 ? 0 : (i + 1);
+}
+function uhrToken(d) {
+  if (zeigtUhr(d)) return '|z1';                 // ganzes Brett, geht bei jedem Stil
+  if (!hatUhrNeben(d)) return '';
+  if (!kannUhrZeile(stilVon(d))) return '';      // dort ignoriert die Firmware z2..z5
+  return '|z' + (uhrZeilenNr(d) + 1);
+}
+
+function fensterToken(d) {
+  const f = d && d.fenster;
+  if (!f) return '';
+  return parseInt(f.von, 10) + '-' + parseInt(f.bis, 10);
+}
+
+function fensterSchalten(di) {
+  const d = displays[di];
+  if (!d) return;
+  d.fenster = d.fenster ? null : { von: '07:00', bis: '09:00' };
+  allesZeichnen();
+}
+function fensterSetzen(di, welches, wert) {
+  const d = displays[di];
+  if (!d || !d.fenster) return;
+  d.fenster[welches] = wert;
+  allesZeichnen();
+}
+// displaysettings fuers Geraet: je Anzeige-Stil ein Segment mit Zeilen und Zeitfenster.
+function displaysettingsBauen() {
+  const proStil = new Map();
+  displays.forEach(d => {
+    const c = stilVon(d);
+    const alt = proStil.get(c) || { r: 0, w: '', s: 0 };
+    alt.r = Math.max(alt.r, zeilenVon(d));
+    // Rueckfall fuer aeltere Geraete: die kennen das Fenster nur je Anzeige-Stil.
+    if (d.fenster && !alt.w) alt.w = fensterToken(d);
+    // Sortierung haengt am Stil, nicht am Display. Will EIN Display dieses Stils
+    // chronologisch, gilt das fuer alle mit diesem Stil.
+    if (!alt.s && zeitbasiert(d)) alt.s = 3;
+    proStil.set(c, alt);
+  });
+  const teile = [];
+  proStil.forEach((v, c) => { teile.push(dsSegment(c, v.r, v.w, v.s || 1)); });
+  return teile.join(';');
+}
+
+// Zeile innerhalb eines Displays verschieben. Gezaehlt wird in ZEILEN, nicht in
+// Richtungen: eine zusammengefasste Zeile wandert mit allen ihren Mitgliedern.
+function zeileSchieben(di, i, richtung) {
+  const d = displays[di];
+  if (!d) return;
+  const einheiten = zeilenEinheiten(d);
+  const j = i + richtung;
+  if (j < 0 || j >= einheiten.length) return;
+  const t = einheiten[i]; einheiten[i] = einheiten[j]; einheiten[j] = t;
+  d.richtungen = einheiten.reduce((alle, teil) => alle.concat(teil), []);
+  d.vomNutzer = true;
+  allesZeichnen();
+}
+
+// ---- Zeilen ziehen -------------------------------------------------------------------
+// Die Pfeile bleiben, aber man kann eine Zeile auch einfach nehmen und verschieben
+// (Paul 23.10.2026). Auf dem Handy erst nach kurzem Halten, sonst waere das Scrollen
+// der Seite blockiert. Waehrend des Ziehens wird nur das DOM umgehaengt, die Daten
+// kommen beim Loslassen dran, sonst wuerde der Neuaufbau das gezogene Element wegreissen.
+let ziehen = null;
+function zeileGreifen(ev, di, el) {
+  if (ev.target.closest('button, input, select, a')) return;
+  const z = { di: di, el: el, y: ev.clientY, id: ev.pointerId, aktiv: false };
+  z.timer = setTimeout(function () {
+    z.aktiv = true;
+    el.classList.add('zieht');
+    el.style.touchAction = 'none';
+    try { el.setPointerCapture(z.id); } catch (e) {}
+  }, 180);
+  ziehen = z;
+}
+function zeileZiehen(ev) {
+  if (!ziehen) return;
+  if (!ziehen.aktiv) {
+    // Finger wandert, bevor das Halten durch ist: das war Scrollen, kein Ziehen.
+    if (Math.abs(ev.clientY - ziehen.y) > 8) { clearTimeout(ziehen.timer); ziehen = null; }
+    return;
+  }
+  ev.preventDefault();
+  const liste = ziehen.el.parentElement;
+  let davor = null;
+  Array.prototype.forEach.call(liste.children, function (x) {
+    if (x === ziehen.el || !x.classList.contains('linie')) return;
+    const r = x.getBoundingClientRect();
+    if (!davor && ev.clientY < r.top + r.height / 2) davor = x;
+  });
+  if (davor !== ziehen.el.nextElementSibling) liste.insertBefore(ziehen.el, davor);
+}
+function zeileLoslassen() {
+  if (!ziehen) return;
+  clearTimeout(ziehen.timer);
+  const z = ziehen;
+  ziehen = null;
+  if (!z.aktiv) return;
+  z.el.classList.remove('zieht');
+  z.el.style.touchAction = '';
+  const folge = Array.prototype.filter.call(z.el.parentElement.children,
+                  x => x.classList.contains('linie'))
+                .map(x => parseInt(x.dataset.idx, 10));
+  zeilenNeuOrdnen(z.di, folge);
+}
+// Reihenfolge der Zeilen uebernehmen: aus den Einheiten in der neuen Folge wieder die
+// flache Liste der Richtungen bauen.
+function zeilenNeuOrdnen(di, folge) {
+  const d = displays[di];
+  if (!d) return;
+  const einheiten = zeilenEinheiten(d);
+  const neu = folge.map(n => einheiten[n]).filter(Boolean);
+  if (neu.length !== einheiten.length) { allesZeichnen(); return; }
+  d.richtungen = neu.reduce((alle, teil) => alle.concat(teil), []);
+  d.vomNutzer = true;
+  allesZeichnen();
+}
+
+// ---- Zeilen zusammenfassen -----------------------------------------------------------
+// Der Dialog erklaert kurz, wozu das gut ist, und laesst die Richtungen dieses Displays
+// ankreuzen. Zwei reichen; wer mehr nimmt, legt sie alle in eine Zeile.
+let gruppeWahl = new Set();
+
+function gruppeFragen(di, vorgabe) {
+  const d = displays[di];
+  if (!d) return;
+  gruppeWahl = new Set(vorgabe || []);
+  gruppeDialogZeichnen(di);
+}
+
+function gruppeHaken(di, key) {
+  if (gruppeWahl.has(key)) gruppeWahl.delete(key); else gruppeWahl.add(key);
+  gruppeDialogZeichnen(di);
+}
+
+function gruppeDialogZeichnen(di) {
+  const d = displays[di];
+  if (!d) return;
+  const frei = zeilenEinheiten(d).length - 1;   // so viele Zeilen hat das Display danach
+  let liste = '';
+  (d.richtungen || []).forEach(k => {
+    const r = richtungFinden(k);
+    if (!r) return;
+    const schon = gruppeVon(d, k);
+    const an = gruppeWahl.has(k);
+    const f = badgeFarben(r.dep);
+    liste += '<div class="linie' + (an ? ' gewaehlt' : '') + (schon ? ' fest' : '') + '"'
+           + (schon ? '' : ' onclick="gruppeHaken(' + di + ',\'' + k.replace(/'/g, "\\'") + '\')"')
+           + ' style="cursor:' + (schon ? 'default' : 'pointer') + '">'
+           + '<span class="haken">' + (an ? '&#10003;' : '') + '</span>'
+           + '<b style="background:' + f.bg + ';color:' + f.fg + '">' + escapeHtmlFt(r.dep.line) + '</b>'
+           + '<div class="rumpf"><div class="ziel">' + escapeHtmlFt(r.dep.dest) + '</div>'
+           + '<div class="halt">' + escapeHtmlFt(r.station.name)
+           + (schon ? ' &middot; steht schon in einer Zeile zusammen' : '') + '</div></div>'
+           + '</div>';
+  });
+  const reicht = gruppeWahl.size > 1;
+  dialogZeigen('Zeilen zusammenfassen',
+    'Richtungen, die dieselbe Strecke fahren, brauchen keine eigene Zeile. Kreuze an, '
+    + 'welche sich eine teilen sollen. Das Display zeigt dann die n\u00e4chste Abfahrt davon '
+    + 'und hat eine Zeile mehr frei.',
+    [{ text: 'Abbrechen', still: true },
+     { text: reicht ? 'Zusammenfassen' : 'Mindestens zwei w\u00e4hlen', aus: !reicht, offen: !reicht,
+       tun: function () { gruppeAnlegen(di); } }],
+    'doppelt',
+    '<div class="wahlliste">' + (liste || '<div class="leer">Keine Richtung auf diesem Display.</div>')
+      + '</div>');
+}
+
+function gruppeAnlegen(di) {
+  const d = displays[di];
+  if (!d) return;
+  const teil = (d.richtungen || []).filter(k => gruppeWahl.has(k) && !gruppeVon(d, k));
+  if (teil.length < 2) return;
+  if (!d.gruppen) d.gruppen = [];
+  d.gruppen.push(teil);
+  // Die Mitglieder ruecken zusammen, damit die Zeile dort steht, wo das erste Mitglied war.
+  d.vomNutzer = true;
+  gruppeWahl = new Set();
+  allesZeichnen();
+}
+
+// Eine zusammengefasste Zeile wieder in ihre Richtungen aufloesen.
+function gruppeLoesen(di, i) {
+  const d = displays[di];
+  if (!d) return;
+  const teil = zeilenEinheiten(d)[i];
+  if (!teil || teil.length < 2) return;
+  d.gruppen = gruppenVon(d).filter(g => g !== gruppeVon(d, teil[0]));
+  if (!d.gruppen.length) delete d.gruppen;
+  allesZeichnen();
+}
+
+// Das x nimmt die ganze Zeile vom Display, also auch alle Richtungen einer Gruppe.
+function zeileWeg(di, i) {
+  const d = displays[di];
+  if (!d) return;
+  const teil = zeilenEinheiten(d)[i];
+  if (!teil) return;
+  teil.forEach(k => richtungSchalten(di, k, false));
+}
+
+// Zusammenfassen: zwei Spuren laufen zu einer zusammen, wie beim Einfaedeln. Der alte
+// Pfeil zeigte nach rechts, waehrend die Linien nach links liefen (Paul 22.10.2026).
+const SYM_ZUSAMMEN =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"'
+  + ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M3 6h3.5Q12 6 12 12M3 18h3.5Q12 18 12 12M12 12h6.5"/>'
+  + '<path d="m16.2 8.8 3.2 3.2-3.2 3.2"/></svg>';
+
+// Entfernen: ein sauberes Kreuz mit runden Enden, statt des duennen Schriftzeichens.
+const SYM_X =
+  '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"'
+  + ' stroke-width="2.6" stroke-linecap="round" aria-hidden="true">'
+  + '<path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/></svg>';
+
+const DLG_SINN = {
+  warnung: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"'
+         + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+         + '<path d="M12 3.6 1.8 20.4h20.4z"/><path d="M12 9.6v4.8"/><circle cx="12" cy="17.6" r="1.1" fill="currentColor" stroke="none"/></svg>',
+  loeschen: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"'
+         + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+         + '<path d="M3.5 6h17M9 6V3.8h6V6M5.8 6l1 14.2h10.4L18.2 6"/>'
+         + '<path d="M10 10v6.4M14 10v6.4"/></svg>',
+  doppelt: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"'
+         + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+         + '<rect x="2.4" y="3.6" width="19.2" height="13" rx="2.6"/>'
+         + '<path d="M8.6 20.8h6.8M12 16.6v4.2"/></svg>'
+};
+
+// Zwei Rechtecke heissen bei uns Gruppieren, darum hier ein Bildschirm: die Linie liegt
+// schon auf einem anderen Display (Paul 22.10.2026).
+// Zifferblatt fuer die Uhr-Zeile im Linien-Topf.
+const SYM_UHR =
+  '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"'
+  + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+  + '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></svg>';
+
+const DOPPEL_ICON =
+  '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+  + '<rect x="2.6" y="4" width="18.8" height="12.6" rx="2.4"/>'
+  + '<path d="M9 20.6h6M12 16.6v4"/></svg>';
+
+// ---- Farben & Linien Design ------------------------------------------------------------
+// Gezeigt wird, was der Stil des GEWAEHLTEN Displays kann. Kann er nichts davon, steht
+// das auch so da, statt leere Schalter anzubieten (Paul 22.10.2026).
+function designZeichnen() {
+  const el = document.querySelector('#klappDesign .klapp-koerper');
+  if (!el) return;
+  const sHier = schirme[zeiger];
+  const d = sHier && sHier.display;
+  if (!d) { el.innerHTML = '<div class="hinweis">Noch kein Display da.</div>'; return; }
+  const c = stilVon(d);
+  const k = STIL_KANN[parseInt(c, 10)] || {};
+  const e = einstFuer(d);
+  const stilName = (STILE.find(x => x.id === c) || {}).name || ('Stil ' + c);
+  const di = displays.indexOf(d);
+  let h = '';
+
+  // Auch die Verspaetung und der Zeichensatz zaehlen: sonst verschluckt der fruehe
+  // Ausstieg einen Schalter, sobald ein Stil nur diese kann.
+  if (!k.schrift && !k.grund && !k.badges && !k.verspaetung && !k.matrixSchrift) {
+    h += '<div class="hinweis">' + escapeHtmlFt(stilName)
+       + ' bringt seine Farben fest mit, hier gibt es nichts einzustellen. '
+       + 'Wiener Linien, Matrix und Paper White lassen sich f\u00e4rben.</div>';
+    el.innerHTML = h;
+    return;
+  }
+
+  if (k.schrift) {
+    const w = SCHRIFT_WAHL[k.schrift];
+    h += '<label class="feld">' + w.titel + '</label><div class="farbreihe">';
+    w.knoepfe.forEach(b => {
+      h += '<button class="' + (e.t === b[0] ? 'an' : '') + '"'
+         + ' style="background:' + b[2] + ';color:' + b[3] + '"'
+         + ' onclick="schriftSetzen(' + di + ',' + b[0] + ')">'
+         + (e.t === b[0] ? '&#10003; ' : '') + b[1] + '</button>';
+    });
+    h += '</div>';
+  }
+
+  if (k.matrixSchrift) {
+    h += '<label class="feld">Zeichensatz</label><div class="schalter">';
+    MATRIX_SCHRIFT.forEach(b => {
+      h += '<button class="' + (e.f === b[0] ? 'an' : '') + '"'
+         + ' onclick="matrixSchriftSetzen(' + di + ',' + b[0] + ')">' + b[1] + '</button>';
+    });
+    h += '</div>'
+       + '<div class="hinweis">CZ + HU bringt die tschechischen und ungarischen Zeichen mit, '
+       + 'die der DACH-Satz nicht hat. Sonst sind die beiden gleich.</div>';
+  }
+
+  if (k.grund) {
+    h += '<label class="feld">Hintergrundfarbe</label><div class="farbreihe">'
+       + '<button class="' + (e.b === 0 ? 'an' : '') + '" style="background:#000;color:#FFD700"'
+       + ' onclick="grundSetzen(' + di + ',0)">' + (e.b === 0 ? '&#10003; ' : '') + 'Schwarz</button>'
+       + '<button class="' + (e.b === 1 ? 'an' : '') + '" style="background:#0a3d1f;color:#FFD700"'
+       + ' onclick="grundSetzen(' + di + ',1)">' + (e.b === 1 ? '&#10003; ' : '') + 'Gr\u00fcn</button>'
+       + '</div>'
+       + '<div class="hinweis">Schwarz ist kontrastreicher, Gr\u00fcn schlichter und n\u00e4her am Original.</div>';
+  }
+
+  if (k.badges) {
+    h += '<label class="feld">Linien-Badges</label><div class="schalter">';
+    [[0, 'Aus'], [1, 'Linie'], [2, 'Ganze Zeile']].forEach(b => {
+      h += '<button class="' + (e.u === b[0] ? 'an' : '') + '"'
+         + ' onclick="badgeSetzen(' + di + ',' + b[0] + ')">' + b[1] + '</button>';
+    });
+    h += '</div>'
+       + '<div class="hinweis">Farbige Linien-K\u00e4stchen in der offiziellen Linienfarbe, '
+       + 'wie auf den echten Anzeigen.</div>';
+    if (e.u) {
+      h += '<div class="kasten"><div class="titelchen">Badges f\u00fcr</div>';
+      BADGE_FAHRZEUGE.forEach(bv => {
+        h += '<label class="haken-zeile"><input type="checkbox" ' + ((e.v & bv[0]) ? 'checked ' : '')
+           + 'onchange="badgeFahrzeugSetzen(' + di + ',' + bv[0] + ',this.checked)">' + bv[1] + '</label>';
+      });
+      h += '<div class="hinweis">Nur Linien mit hinterlegter Linienfarbe bekommen ein Badge. '
+         + 'F\u00fcr die Wiener U-Bahn sind die Farben fest eingebaut.</div></div>';
+    }
+  }
+
+  // Ehrlich bleiben: das Geraet kennt diese Werte nur je Stil, nicht je Display.
+  const gleiche = displays.filter(x => stilVon(x) === c).length;
+  if (gleiche > 1) {
+    h += '<div class="hinweis"><b>Gilt f\u00fcr alle ' + gleiche + ' Displays mit dem Stil '
+       + escapeHtmlFt(stilName) + '.</b> Das Ger\u00e4t merkt sich Farben je Anzeige-Stil, '
+       + 'nicht je Display.</div>';
+  }
+  el.innerHTML = h;
+}
+// ---- Gehweg & Nachtmodus ---------------------------------------------------------------
+function gehwegZeichnen() {
+  const el = document.querySelector('#klappGehweg .klapp-koerper');
+  if (!el) return;
+  let h = '';
+
+  h += '<div class="schieber"><div class="wort">Nachtmodus aktivieren'
+     + '<small>Display nachts ausschalten</small></div>'
+     + '<button class="schiene' + (nacht.an ? ' an' : '') + '" role="switch"'
+     + ' aria-checked="' + (nacht.an ? 'true' : 'false') + '" onclick="nachtSchalten()">'
+     + '<span class="kugel"></span></button></div>';
+  if (nacht.an) {
+    const stunden = function (feld, wert) {
+      let o = '<select onchange="nachtZeitSetzen(\'' + feld + '\',this.value)">';
+      for (let x = 0; x < 24; x++) o += '<option value="' + x + '"' + (x === wert ? ' selected' : '') + '>'
+                                     + (x < 10 ? '0' + x : x) + ':00</option>';
+      return o + '</select>';
+    };
+    h += '<div class="reihe" style="align-items:flex-end">'
+       + '<div style="flex:1"><label class="feld">Aus ab</label>' + stunden('von', nacht.von) + '</div>'
+       + '<div style="flex:1"><label class="feld">Wieder an</label>' + stunden('bis', nacht.bis) + '</div>'
+       + '</div>';
+  }
+
+  // Eigene Ueberschrift: als Feld-Label gelesen wirkte der Gehweg wie eine Einstellung
+  // des Nachtmodus darueber (Paul 22.10.2026).
+  h += '<h2 style="margin-top:22px">Gehweg zur Haltestelle</h2>'
+     + '<div class="hinweis" style="margin-top:0">Abfahrten unter dieser Minutenzahl werden '
+     + 'ausgeblendet.</div>';
+  if (!stationen.length) {
+    h += '<div class="hinweis">Noch keine Station da.</div>';
+    el.innerHTML = h;
+    return;
+  }
+  stationen.forEach((st, si) => {
+    const offen = gwOffen.has(st.rbl);
+    const abw = Object.keys(st.gehwegLinien || {}).length + Object.keys(st.gehwegRichtungen || {}).length;
+    h += '<div class="gwzeile"><div class="rumpf"><div class="ziel">' + escapeHtmlFt(st.name) + '</div>'
+       + '<div class="halt">' + (abw ? abw + (abw === 1 ? ' Ausnahme' : ' Ausnahmen')
+                                     : 'gilt f\u00fcr alles an dieser Station') + '</div></div>'
+       + '<input type="number" min="0" max="99" value="' + gehwegStation(st) + '"'
+       + ' onchange="gehwegStationSetzen(' + si + ',this.value)"> <span class="min">min</span>'
+       + '<button class="still klein" onclick="gwGenauer(\'' + st.rbl + '\')">'
+       + (offen ? 'fertig' : 'genauer') + '</button></div>';
+    if (!offen) return;
+    const eintraege = zeilenEintraege(st);
+    if (!eintraege.length) h += '<div class="hinweis">Keine Linien geladen.</div>';
+    // Nach Ziel buendeln: das ist die Richtung, und am Steig entscheidet sich der Weg.
+    const nachZiel = new Map();
+    eintraege.forEach(dep => {
+      if (!nachZiel.has(dep.dest)) nachZiel.set(dep.dest, []);
+      nachZiel.get(dep.dest).push(dep);
+    });
+    nachZiel.forEach((deps, ziel) => {
+      const rWert = gehwegRichtung(st, ziel);
+      const badges = deps.slice(0, 4).map(function (d) {
+        const f = badgeFarben(d);
+        return '<b style="background:' + f.bg + ';color:' + f.fg + '">' + escapeHtmlFt(d.line) + '</b>';
+      }).join('');
+      h += '<div class="gwzeile tiefer">' + badges
+         + '<div class="rumpf"><div class="ziel">&#8594; ' + escapeHtmlFt(ziel) + '</div>'
+         + '<div class="halt">' + (rWert != null ? 'eigener Wert f\u00fcr diese Richtung'
+                                    : 'wie die Station, ' + gehwegStation(st) + ' min')
+         + (deps.length > 1 ? ' &middot; ' + deps.length + ' Linien' : '') + '</div></div>'
+         + '<input type="number" min="0" max="99" placeholder="' + gehwegStation(st) + '"'
+         + ' value="' + (rWert != null ? rWert : '') + '"'
+         + ' onchange="gehwegRichtungSetzen(' + si + ',\'' + String(ziel).replace(/'/g, "\\'") + '\',this.value)">'
+         + ' <span class="min">min</span></div>';
+      // Einzelne Linien nur, wenn in dieser Richtung ueberhaupt mehrere fahren.
+      if (deps.length < 2) return;
+      deps.forEach(dep => {
+        const k = dep.line + '|' + dep.dest;
+        const eigen = (st.gehwegLinien || {})[k];
+        const erbt = (rWert != null) ? rWert : gehwegStation(st);
+        const f = badgeFarben(dep);
+        h += '<div class="gwzeile tiefer2">'
+           + '<b style="background:' + f.bg + ';color:' + f.fg + '">' + escapeHtmlFt(dep.line) + '</b>'
+           + '<div class="rumpf"><div class="halt">'
+           + (eigen != null ? 'eigener Wert' : 'wie die Richtung, ' + erbt + ' min') + '</div></div>'
+           + '<input type="number" min="0" max="99" placeholder="' + erbt + '"'
+           + ' value="' + (eigen != null ? eigen : '') + '"'
+           + ' onchange="gehwegLinieSetzen(' + si + ',\'' + k.replace(/'/g, "\\'") + '\',this.value)">'
+           + ' <span class="min">min</span></div>';
+      });
+    });
+  });
+  h += '<div class="hinweis">Leer lassen heisst: der Wert kommt von der Stufe dar\u00fcber. '
+     + 'Das Ger\u00e4t kann heute nur den Wert je Station, Richtung und Linie brauchen noch '
+     + 'einen neuen Firmware-Token.</div>';
+  el.innerHTML = h;
+}
+
+// ---- Features -----------------------------------------------------------------
+// Nur Wien hat das (DISPLAY_TYPE_FEATURES chopper und silberpfeil). Bei allen anderen
+// Stilen verschwindet der ganze Block, statt leer dazustehen (Paul 22.10.2026).
+function fahrzeugZeichnen() {
+  const block = document.getElementById('klappFahrzeug');
+  const el = block && block.querySelector('.klapp-koerper');
+  if (!el) return;
+  const sHier = schirme[zeiger];
+  const d = sHier && sHier.display;
+  const c = d ? stilVon(d) : 0;
+  const k = STIL_KANN[parseInt(c, 10)] || {};
+  const kann = k.fahrzeug || k.verspaetung || k.blinken;
+  block.style.display = kann ? '' : 'none';
+  if (!kann) { block.classList.remove('offen'); return; }
+  const e = einstFuer(d);
+  const di = displays.indexOf(d);
+  const unter = document.getElementById('featuresUnter');
+  if (unter) {
+    const worte = [];
+    if (k.blinken) worte.push('Blinken bei 0');
+    if (k.verspaetung) worte.push('Versp\u00e4tung');
+    if (k.fahrzeug) worte.push('Hochflurer, Niederflur, Klimaanlage');
+    unter.textContent = worte.join(', ');
+  }
+  const schieber = function (wort, zusatz, an, ruf) {
+    return '<div class="schieber"><div class="wort">' + wort
+         + (zusatz ? '<small>' + zusatz + '</small>' : '') + '</div>'
+         + '<button class="schiene' + (an ? ' an' : '') + '" role="switch" aria-checked="' + (an ? 'true' : 'false')
+         + '" onclick="' + ruf + '"><span class="kugel"></span></button></div>';
+  };
+  let h = '';
+  // Blinken bei 0, nur Matrix. Kommt am Geraet mit 2.6, aeltere Firmware ueberliest
+  // das Feld o folgenlos (Paul 23.10.2026).
+  if (k.blinken) {
+    // Jeder Knopf zeigt klein, was er tut. Das ersetzt den erklaerenden Satz
+    // (Paul 23.10.2026: "einfach im Toggle das zeigen").
+    const look = uhrLook(c, d) || { bg: '#000000', fg: '#ffffff' };
+    const probe = function (txt, blinkt) {
+      const inner = (typeof dvLedTextSvg === 'function') ? dvLedTextSvg(txt, 2, look.fg, true)
+                                                         : escapeHtmlFt(txt);
+      return '<span class="bprobe" style="background:' + look.bg + '">'
+           + '<span class="' + (blinkt ? 'blinkt' : '') + '">' + inner + '</span></span>';
+    };
+    h += '<label class="feld">Wenn eine Abfahrt bei 0 steht ' + neuBadge('blinken')
+       + '</label><div class="schalter">';
+    [[0, 'Still', probe('0', false)],
+     [1, '0 blinkt', probe('0', true)],
+     [2, 'Wie in Berlin', probe('Ziel', true)]].forEach(b => {
+      h += '<button class="' + (e.o === b[0] ? 'an' : '') + '"'
+         + ' onclick="blinkenSetzen(' + di + ',' + b[0] + ')">' + b[1] + b[2] + '</button>';
+    });
+    h += '</div>';
+  }
+  if (k.verspaetung) {
+    h += schieber('Versp\u00e4tung herausstechend',
+                  'Zeigt "+X" farbig und f\u00e4rbt die Abfahrtszeit',
+                  e.d === 1, 'verspaetungSchalten(' + di + ')');
+  }
+  if (k.fahrzeug) {
+    h += schieber('Hochflurer markieren', '', e.h === 1, 'fzSetzen(' + di + ',\'h\')');
+    if (e.h === 1) {
+      h += schieber('Niederflur-Hinweis blinken',
+                    'Markierung pulsiert, wenn ein Niederflur-Fahrzeug naht',
+                    e.n === 1, 'fzSetzen(' + di + ',\'n\')');
+    }
+    h += schieber('Bim+U-Bahn Klima Anzeige', 'Alle Busse in Wien sind schon klimatisiert.',
+                  e.k === 1, 'fzSetzen(' + di + ',\'k\')');
+  }
+  el.innerHTML = h;
+}
+function fzSetzen(di, feld) {
+  const e = einstFuer(displays[di]);
+  e[feld] = e[feld] ? 0 : 1;
+  allesZeichnen();
+}
+
+// Alle Setzer bekommen die Nummer des DISPLAYS, nicht mehr die colour.
+function schriftSetzen(di, v) { einstFuer(displays[di]).t = parseInt(v, 10); allesZeichnen(); }
+function grundSetzen(di, v) { einstFuer(displays[di]).b = parseInt(v, 10); allesZeichnen(); }
+function badgeSetzen(di, v) { einstFuer(displays[di]).u = parseInt(v, 10); allesZeichnen(); }
+function blinkenSetzen(di, v) { einstFuer(displays[di]).o = parseInt(v, 10); allesZeichnen(); }
+
+function badgeFahrzeugSetzen(di, bit, an) {
+  const e = einstFuer(displays[di]);
+  e.v = an ? (e.v | bit) : (e.v & ~bit);
+  // Ganz ohne Fahrzeugart bekaeme nichts ein Badge. Dann lieber die Badges ausschalten.
+  if (!e.v) { e.v = 4; e.u = 0; }
+  allesZeichnen();
+}
+
+// Klappbloecke: immer nur einer offen, sonst scrollt man sich tot (Paul 22.10.2026).
+function klappSchalten(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const wirdOffen = !el.classList.contains('offen');
+  document.querySelectorAll('.klapp.offen').forEach(x => x.classList.remove('offen'));
+  if (!wirdOffen) return;
+  el.classList.add('offen');
+  // Beim Zuklappen des vorherigen rutscht die Seite, darum den neuen Kopf herholen.
+  const kopf = el.querySelector('.klapp-kopf');
+  if (kopf) kopf.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// ---- Eigener Dialog --------------------------------------------------------------------
+// Statt alert und confirm: gleiche Schrift, gleiche Kanten, und vor allem freie Knoepfe,
+// damit der Dialog gleich einen Ausweg anbieten kann (Paul 22.10.2026).
+function matrixSchriftSetzen(di, wert) { einstFuer(displays[di]).f = wert; allesZeichnen(); }
+function verspaetungSchalten(di) { const e = einstFuer(displays[di]); e.d = e.d ? 0 : 1; allesZeichnen(); }
+function wechselSetzen(di, welches, sekunden) {
+  const e = einstFuer(displays[di]);
+  e[welches] = Math.round(Math.max(WECHSEL_MIN, Math.min(WECHSEL_MAX, sekunden)) * 10);
+  allesZeichnen();
+}
+function wechselAutomatik(di, automatisch) {
+  const e = einstFuer(displays[di]);
+  if (automatisch) { e.x = 0; e.y = 0; } else { e.x = e.x || 40; e.y = e.y || 30; }
+  e.x = e.x && Math.min(WECHSEL_MAX * 10, Math.max(WECHSEL_MIN * 10, e.x));
+  e.y = e.y && Math.min(WECHSEL_MAX * 10, Math.max(WECHSEL_MIN * 10, e.y));
+  allesZeichnen();
+}
+function standzeitSetzen(di, sekunden) {
+  const d = displays[di];
+  const e = einstFuer(d);
+  const mind = zeigtUhr(d) ? STANDZEIT_MIN_UHR : standzeitMindestens(e);
+  e.i = Math.max(mind, Math.min(STANDZEIT_MAX, parseInt(sekunden, 10) || 0));
+  allesZeichnen();
+}
+// Helligkeit gilt fuers ganze Geraet, nicht je Display: die Firmware kennt sie als eine
+// Einstellung (1 dunkel, 2 mittel, 3 hell).
+function helligkeitSetzen(wert) { helligkeit = wert; allesZeichnen(); }
+
+function dialogZeigen(titel, text, knoepfe, art, inhalt) {
+  const schleier = document.getElementById('schleier');
+  const sinn = document.getElementById('dlgSinn');
+  sinn.className = 'sinn ' + (art === 'doppelt' ? 'doppelt' : 'warnung');
+  sinn.innerHTML = DLG_SINN[art] || DLG_SINN.warnung;
+  document.getElementById('dlgTitel').textContent = titel;
+  document.getElementById('dlgText').textContent = text;
+  document.getElementById('dlgInhalt').innerHTML = inhalt || '';
+  const k = document.getElementById('dlgKnoepfe');
+  k.innerHTML = '';
+  knoepfe.forEach(b => {
+    const el = document.createElement('button');
+    el.textContent = b.text;
+    if (b.still) el.className = 'still';
+    if (b.aus) el.disabled = true;
+    el.onclick = () => { if (!b.offen) schleier.classList.remove('an'); if (b.tun) b.tun(); };
+    k.appendChild(el);
+  });
+  schleier.classList.add('an');
+}
+function sagen(titel, text) { dialogZeigen(titel, text, [{ text: 'Alles klar' }]); }
+
+// ---- Bedienung -----------------------------------------------------------------------
+function modusSetzen(m) { modus = m; zeiger = 0; allesZeichnen(); }
+function sortierungSetzen(di, wert) {
+  const d = displays[di];
+  if (!d) return;
+  d.sortierung = wert;
+  allesZeichnen();
+}
+function zeitZeilenSetzen(di, wert) {
+  const d = displays[di];
+  if (!d) return;
+  d.zeilen = parseInt(wert, 10) || 3;
+  allesZeichnen();
+}
+
+function stilSetzen(v) {
+  if (v === 'neu') {
+    // Der Design-Baukasten fuer eigene Displays steckt noch im alten Konfigurator.
+    // Lieber offen sagen als so tun, als waere er hier schon drin.
+    sagen('Eigenes Display',
+          'Den Baukasten f\u00fcr eigene Designs gibt es bisher nur im alten Konfigurator. '
+          + 'Hier kommt er noch.');
+    allesZeichnen();
+    return;
+  }
+  const d = displays[zeiger];
+  if (d) d.stil = parseInt(v, 10) || 1; else stil = parseInt(v, 10) || 1;
+  allesZeichnen();
+}
+
+function blaettern(d)   { zeiger = Math.max(0, Math.min(schirme.length - 1, zeiger + d)); allesZeichnen(); }
+function linieSchalten(si, k, an) {
+  const st = stationen[si];
+  if (!st) return;
+  // Erste Abwahl: aus „alles" eine echte Auswahl machen, sonst faellt alles weg.
+  if (!st.gewaehlt.size) linienAus(st.abfahrten).forEach(l => st.gewaehlt.add(l.name + '|' + l.ziel));
+  if (an) st.gewaehlt.add(k); else st.gewaehlt.delete(k);
+  allesZeichnen();
+}
+// Aus dem Pool wird nie etwas entfernt (Paul 22.10.2026). Stationen loescht man im
+// Schritt davor, bei der Stationssuche. Die Funktion wartet hier auf diesen Schritt.
+function stationWeg(si) { stationen.splice(si, 1); zeiger = 0; allesZeichnen(); }
+
+async function neuLaden() {
+  for (const st of stationen) {
+    try { abfahrtenSetzen(st, await abfahrten(st.rbl)); } catch (e) { /* alte Daten behalten */ }
+  }
+  allesZeichnen();
+}
+
+// ---- Stationssuche -------------------------------------------------------------------
+// Die Stationssuche sitzt im Schritt DAVOR (Paul 22.10.2026). Diese Oberflaeche
+// bekommt die Stationen uebergeben und kuemmert sich nur noch um die Displays.
+// stationNehmen ist die Uebergabestelle und bleibt deshalb erhalten.
+async function stationNehmen(rbl, name, lat, lon, netz) {
+  if (stationen.some(s => s.rbl === rbl)) return;
+  const st = { rbl, name, netz: netz || 'WL', abfahrten: [], gewaehlt: new Set(),
+               lat: (lat != null ? Number(lat) : null), lon: (lon != null ? Number(lon) : null) };
+  stationen.push(st);
+  allesZeichnen();
+  try { st.abfahrten = await abfahrten(rbl); } catch (e) { /* bleibt leer */ }
+  allesZeichnen();
+}
+
+// ---- Stadtplan im Hintergrund ---------------------------------------------------------
+// Nur Schmuck: keine Klicks, entfaerbt, und er folgt der gerade gewaehlten Station,
+// sobald wir deren Koordinaten kennen (die Stationssuche liefert sie mit).
+let karte = null;
+function karteAufbauen() {
+  if (karte || typeof L === 'undefined') return;
+  karte = L.map('karte', {
+    zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false,
+    doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false
+  }).setView([48.2082, 16.3738], 14);   // Wien als Ausgangspunkt
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap'
+  }).addTo(karte);
+}
+function karteAufStation(st) {
+  if (!karte || !st || st.lat == null || st.lon == null) return;
+  karte.setView([st.lat, st.lon], 15, { animate: true });
+}
+
+// ---- Raumwirkung der Wisch-Leiste -----------------------------------------------------
+// Je weiter eine Karte von der Mitte weg ist, desto staerker ist sie weggedreht und
+// zurueckgesetzt. Rein optisch, damit erkennbar ist, dass es seitwaerts weitergeht.
+// Gemessen wird die LAYOUT-Lage der Karte, nicht ihre sichtbare: getBoundingClientRect
+// rechnet die Drehung und die Verkleinerung mit, die diese Funktion selbst gerade gesetzt
+// hat. Daraus entstand eine Rueckkopplung, die Karte zitterte beim Wischen. offsetLeft
+// bleibt von der Verformung unberuehrt (Paul 22.10.2026).
+let raumStand = null;          // letzter Scrollwert, zu dem gerechnet wurde
+function raumWirkung(erzwingen) {
+  const streifen = document.getElementById('streifen');
+  if (!streifen) return;
+  // Unter einem halben Pixel ist nichts zu sehen, aber jedes Rechnen kann ein neues
+  // Einrasten ausloesen. Darum nur bei echter Bewegung, ausser der Aufrufer besteht
+  // darauf (nach einem Neuaufbau oder beim Fenstergroesse aendern).
+  if (!erzwingen && raumStand !== null && Math.abs(streifen.scrollLeft - raumStand) < 0.5) return;
+  raumStand = streifen.scrollLeft;
+  const mitte = streifen.scrollLeft + streifen.clientWidth / 2;
+  for (const k of streifen.children) {
+    const flaeche = k.querySelector('.raum') || k;
+    const d = (k.offsetLeft + k.offsetWidth / 2 - mitte) / (streifen.clientWidth / 2);   // -1 … 0 … 1
+    const b = Math.max(-1, Math.min(1, d));
+    const dreh  = (-b * 26).toFixed(2);
+    const tiefe = (-Math.abs(b) * 90).toFixed(1);
+    const klein = (1 - Math.abs(b) * 0.14).toFixed(3);
+    flaeche.style.transform = 'perspective(1100px) rotateY(' + dreh + 'deg) translateZ(' + tiefe + 'px) scale(' + klein + ')';
+    flaeche.style.filter = 'saturate(' + (1 - Math.abs(b) * 0.45).toFixed(2) + ') brightness(' + (1 - Math.abs(b) * 0.1).toFixed(2) + ')';
+    k.style.zIndex = String(100 - Math.round(Math.abs(b) * 50));
+  }
+}
+
+// ---- Start ---------------------------------------------------------------------------
+dvHostLoadDisplaySettings('c' + stil + '|r' + zeilen);
+karteAufbauen();
+versionHolen();   // im Hintergrund, die Oberflaeche wartet nicht darauf
+// Abfahrten halten sich selbst frisch, darum braucht es keinen Knopf (Paul 22.10.2026).
+// Alle 60 Sekunden, und nur wenn das Fenster ueberhaupt sichtbar ist.
+setInterval(function () { if (!document.hidden) neuLaden(); }, 60000);
+// Die Uhr tickt sekuendlich, aber ohne die Seite neu zu bauen: nur der Text wechselt.
+setInterval(function () {
+  if (document.hidden) return;
+  const t = uhrText();
+  document.querySelectorAll('.uhr-zeit').forEach(function (e) {
+    const fs = parseFloat(e.dataset.fs) || parseFloat(getComputedStyle(e).fontSize) || 34;
+    const breite = parseFloat(e.dataset.breite) || 320;
+    e.textContent = t;
+    e.style.left = uhrAnker(t, fs, breite) + 'px';
+  });
+  // Matrix zeichnet die Uhr als Pixel-SVG, das laesst sich nicht per Text tauschen:
+  // dort den Streifen neu zeichnen, aber nur wenn eine LED-Uhr sichtbar ist.
+  const ledUhr = displays.some(d => (hatUhrZeile(d) || zeigtUhr(d))
+                 && [2, 15, 18, 21, 23].indexOf(parseInt(stilVon(d), 10)) >= 0);
+  if (ledUhr) streifenZeichnen();
+}, 1000);
+(function wischBeobachten() {
+  const streifen = document.getElementById('streifen');
+  let laeuft = false;
+  const takt = () => { laeuft = false; raumWirkung(); };
+  streifen.addEventListener('scroll', () => {
+    if (!laeuft) { laeuft = true; requestAnimationFrame(takt); }
+  }, { passive: true });
+  window.addEventListener('resize', function () { raumWirkung(true); });
+})();
+// Stationen, die der Konfigurator uebergibt. catchit-cities legt sie beim Klick auf
+// "Feintuning" in den sessionStorage und wechselt hierher (Paul 23.10.2026). Eine
+// Wien-Station kann mehrere Bahnsteige tragen, die werden hier zu je einer Station.
+function uebergabeHolen() {
+  let roh = null;
+  try { roh = JSON.parse(sessionStorage.getItem('catchit_feintuning') || 'null'); } catch (e) {}
+  if (!roh || !roh.stationen || !roh.stationen.length) return null;
+  const raus = [];
+  roh.stationen.forEach(st => {
+    String(st.rbl || '').split(',').forEach(rbl => {
+      rbl = rbl.trim();
+      if (!rbl) return;
+      raus.push({ rbl: rbl, name: st.name || rbl, netz: st.netz || 'WL',
+                  alle: !!st.alle, richtungen: st.richtungen || [] });
+    });
+  });
+  return { stationen: raus, helligkeit: roh.helligkeit, masterrow: roh.masterrow || '' };
+}
+
+// Welche Richtung der Uebergabe passt zu welcher Abfahrt? Zuerst Linie und Ziel genau,
+// sonst Linie und ein Ziel, das ineinander steckt (der Konfigurator kuerzt Ziele anders
+// als die Abfahrts-API), sonst nur die Linie.
+function richtungTreffer(linien, wunsch) {
+  const l = String(wunsch.line || '').trim().toUpperCase();
+  const z = String(wunsch.ziel || '').trim().toLowerCase();
+  let treffer = linien.find(x => x.name.toUpperCase() === l && x.ziel.toLowerCase() === z);
+  if (!treffer && z) {
+    treffer = linien.find(x => x.name.toUpperCase() === l
+      && (x.ziel.toLowerCase().indexOf(z) >= 0 || z.indexOf(x.ziel.toLowerCase()) >= 0));
+  }
+  if (!treffer) treffer = linien.find(x => x.name.toUpperCase() === l);
+  return treffer || null;
+}
+
+(async function start() {
+  // Testaufbau, solange niemand etwas uebergibt: fuenf Wiener Stationen mit je einer
+  // Linie. Damit sieht man sofort, wie aus Zeilen Seiten werden und wie die Stile wirken.
+  const TEST = [
+    { rbl: '4111', name: 'Stephansplatz', linie: 'U1', ziel: 'Leopoldau',   lat: 48.2083, lon: 16.3725 },
+    { rbl: '4201', name: 'Schottenring',  linie: 'U2', ziel: 'Karlsplatz',  lat: 48.2163, lon: 16.3724 },
+    { rbl: '4921', name: 'Westbahnhof',   linie: 'U3', ziel: 'Simmering',   lat: 48.1966, lon: 16.3386 },
+    { rbl: '4421', name: 'Karlsplatz',    linie: 'U4', ziel: 'Heiligenstadt', lat: 48.2005, lon: 16.3690 },
+    { rbl: '4621', name: 'Thaliastra\u00dfe', linie: 'U6', ziel: 'Floridsdorf', lat: 48.2098, lon: 16.3368 }
+  ];
+  const ueber = uebergabeHolen();
+  if (ueber && ueber.helligkeit) helligkeit = ueber.helligkeit;
+
+  const liste = ueber ? ueber.stationen
+                      : TEST.map(e => ({ rbl: e.rbl, name: e.name, netz: 'WL', alle: false,
+                                         lat: e.lat, lon: e.lon,
+                                         richtungen: [{ line: e.linie, ziel: e.ziel }] }));
+  for (const e of liste) {
+    const st = { rbl: e.rbl, name: e.name, netz: e.netz || 'WL', abfahrten: [],
+                 gewaehlt: new Set(), lat: e.lat, lon: e.lon,
+                 vorgabe: e.richtungen && e.richtungen[0]
+                          ? { line: e.richtungen[0].line, dest: e.richtungen[0].ziel } : null };
+    stationen.push(st);
+    // Mehrere Anfragen direkt hintereinander laufen schnell in die Ratengrenze der API.
+    // Ein leeres catch wuerde den Fehler verschlucken und die Seite bliebe stumm leer.
+    try {
+      abfahrtenSetzen(st, await abfahrten(e.rbl));
+    } catch (err) {
+      await new Promise(r => setTimeout(r, 1500));
+      try { abfahrtenSetzen(st, await abfahrten(e.rbl)); }
+      catch (err2) { st.fehler = String((err2 && err2.message) || err2); abfahrtenSetzen(st, []); }
+    }
+    // Angehakt wird, was der Konfigurator gewaehlt hat. "Alle Abfahrten" laesst die
+    // Auswahl leer, das heisst in dieser Oberflaeche ohnehin "alles".
+    if (!e.alle) {
+      const linien = linienAus(st.abfahrten);
+      (e.richtungen || []).forEach(wunsch => {
+        const treffer = richtungTreffer(linien, wunsch);
+        if (treffer) st.gewaehlt.add(treffer.name + '|' + treffer.ziel);
+      });
+    }
+  }
+  allesZeichnen();
+
+})();
+</script>
+</body>
+</html>
