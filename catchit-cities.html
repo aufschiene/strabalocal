@@ -15944,14 +15944,19 @@ function dsStrVal(cid, key) {
 // F=Schriftart (1 Modern/Poppins, 2 Classic/ÖBB, 3 Matrix DACH, 4 Matrix CZ),
 // M=Ziel-Position (fehlt oder 0 = oben wie bisher, 1 = mittig).
 var FC_DEFAULTS = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff', G: '1', F: '1', A: '1', W: '0', M: '0' };  // A: Linien-Badges (1=an, FW-Default) · W: Ziel-Text dick (0=dünn) · M: Ziel-Position (0=oben, FW-Default)
-// Offizielle MVG-Linienfarben (U-Bahn + Tram, Netzplan/MVGO). Tram 14 aus dem offiziellen
-// Tramnetz-Plan (März 2026) gesampelt, Rest = publizierte MVG-Palette. Nachtlinien = Taglinie.
+// Offizielle MVG-Linienfarben (U-Bahn + Tram). Seit 19.10.2026 direkt aus den Badge-
+// Fuellfarben des MVG-Tramnetzplans 2026 (PDF-Contentstream), nicht mehr gesampelt.
+// Die vier NachtTrams teilen sich laut Nachtnetzplan EIN Rot und erben NICHT die Farbe
+// ihrer Tageslinie. Es gibt genau 16 Tramlinien; 13/15/22/24/26/29 existieren nicht.
 var MVG_LINE_COLORS = {
   U1: '438136', U2: 'c8024c', U3: 'ed6720', U4: '00a984', U5: 'bc7a00', U6: '0065ae', U7: '438136', U8: 'c8024c',
-  '12': '8f3f96', '14': 'd22d7c', '16': '006cb4', '17': '875a45', '18': '20b14a', '19': 'ee1c25',
-  '20': '17c0e9', '21': 'bc7a00', '23': '92c71f', '25': 'f48e99', '27': 'fca61d', '28': 'fca61d', '29': 'ee1d23',
-  N17: '875a45', N19: 'ee1c25', N20: '17c0e9', N27: 'fca61d'
+  '12': '96368b', '14': 'e5007d', '16': '0065ae', '17': '8b563e', '18': '13a538', '19': 'e30613',
+  '20': '16bae7', '21': 'bc7a00', '23': 'bccf00', '25': 'f1919c', '27': 'f7a600', '28': 'f7a600',
+  N17: 'e3000f', N19: 'e3000f', N20: 'e3000f', N27: 'e3000f'
 };
+// Schrift auf dem Badge: MVG druckt ueberall weiss, bei diesen hellen Toenen faellt der
+// Kontrast aber unter 2,3:1 und ist am Display unlesbar → dort schwarz.
+var MVG_DARK_TEXT_LINES = { '20': 1, '23': 1, '25': 1, '27': 1, '28': 1 };
 var FC_MIN_COLOUR = 101, FC_MAX_COLOUR = 103;   // 3 Slots im Konfigurator (Firmware kann 101-109)
 var customRowBySlot = {};   // slot -> { N,B,T,U,H,V,P,G,F,A,W,M } (raw, Hex ohne '#'; A=Badges 1/0, M=Ziel-Position 0/1)
 
@@ -19095,9 +19100,22 @@ function dvMvgHTML(colour, data, rows, previewEl) {
     + '<span style="overflow:hidden;white-space:nowrap;">' + escapeHtmlFt(stationName) + '</span><span>Min</span></div>';
   html += data.map(function(dep, i) {
     var l = String(dep.line || '').toUpperCase();
-    var uCol = (typeof MVG_LINE_COLORS !== 'undefined' && MVG_LINE_COLORS[l] && /^U\d/.test(l)) ? '#' + MVG_LINE_COLORS[l] : null;
+    // Badge fuer JEDE Linie mit Farbe, nicht nur U-Bahn (Kunde Patrick 19.10.2026: Tram 14
+    // rosa, 18 gruen wie im Netzplan). Reihenfolge wie in der Firmware (display_mvg.cpp):
+    // Server-Linienfarbe zuerst, dann die gemerkte Farbe der Station, dann die MVG-Tabelle.
+    var uCol = dvLineColorCss(dep.lineColor);
+    var uTxt = dvLineColorCss(dep.lineTextColor);
+    if (!uCol && typeof _lineColorMap !== 'undefined') {
+      var _e = _lineColorMap[String(dep.line == null ? '' : dep.line).trim()];
+      if (_e) { uCol = _e.c; uTxt = uTxt || _e.t; }
+    }
+    if (!uCol && typeof MVG_LINE_COLORS !== 'undefined' && MVG_LINE_COLORS[l]) {
+      uCol = '#' + MVG_LINE_COLORS[l];
+      if (typeof MVG_DARK_TEXT_LINES !== 'undefined' && MVG_DARK_TEXT_LINES[l]) uTxt = '#000';
+    }
+    if (!uTxt) uTxt = '#fff';
     var lineHtml = uCol
-      ? '<span style="background:' + uCol + ';border:2px solid #fff;box-shadow:inset 0 0 0 1px ' + uCol + ', inset 0 0 0 2px #fff;color:#fff;font-weight:700;font-size:15px;height:32px;display:inline-flex;align-items:center;padding:0 8px;">' + escapeHtmlFt(dep.line) + '</span>'
+      ? '<span style="background:' + uCol + ';border:2px solid #fff;box-shadow:inset 0 0 0 1px ' + uCol + ', inset 0 0 0 2px #fff;color:' + uTxt + ';font-weight:700;font-size:15px;height:32px;display:inline-flex;align-items:center;padding:0 8px;">' + escapeHtmlFt(dep.line) + '</span>'
       : '<span style="color:#fff;font-weight:600;font-size:19px;">' + escapeHtmlFt(dep.line) + '</span>';
     return '<div style="position:absolute;left:0;top:' + (headerH + i * rowH) + 'px;width:320px;height:' + rowH + 'px;display:flex;align-items:center;padding:0 8px;gap:10px;color:#fff;">'
       + lineHtml
@@ -22211,14 +22229,23 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // aus dem Merker statt jedes Mal neu zu warten.
   _depMemo = new Map();
   try {
-    await Promise.all(rblParts.map(function(part) {
+    const _vorlauf = [];
+    rblParts.forEach(function(part) {
       const ci = part.indexOf(':');
       let netz = ci > 0 ? part.substring(0, ci) : 'WL';
       const sid = ci > 0 ? part.substring(ci + 1) : part;
       if (netz === 'OEBBALL' || netz === 'OEBBREGALL' || netz === 'OEBBFERNALL') netz = 'OEBB';
-      if (netz === 'WL') return null;   // Wien kommt aus wienData, nicht von der API
-      return fetchDeparturesUnified(netz + ':' + sid).catch(function() { return null; });
-    }).filter(Boolean));
+      if (netz === 'WL') return;   // Wien kommt aus wienData, nicht von der API
+      _vorlauf.push(fetchDeparturesUnified(netz + ':' + sid).catch(function() { return null; }));
+      // Den Namen GLEICH MIT vorladen. Er wurde bisher erst unten in der Schleife geholt,
+      // Station fuer Station nacheinander, und kostet je rund 5 Sekunden. Dank des Merkers
+      // in resolveStationName findet die Schleife das Ergebnis dann fertig vor.
+      const bareId = sid.indexOf('>') > 0 ? sid.split('>') : [sid];
+      bareId.forEach(function(one) {
+        if (one) _vorlauf.push(resolveStationName(netz, one).catch(function() { return null; }));
+      });
+    });
+    await Promise.all(_vorlauf);
   } catch (e) { /* Vorladen ist Beschleunigung, kein Muss */ }
   const filterParts = filter ? filter.split('|') : [];
   const allDepStopIds = allDeparturesStopIdsFromRows(masterRowStr);
@@ -22464,7 +22491,21 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     const filterLines = stationFilter ? stationFilter.split(',').map(f => _stripModePrefix(f)).filter(Boolean) : [];
     // Richtungs-Filter dieser Station: PRIMÄR aus der masterrow (richtungsId-genau), sonst der
     // global geparste linefilterdestination/linegroups-Fallback.
-    const stationDests = _pickBySeg(masterDirsByRbl, part, _occ) || lineDestinations;
+    // WICHTIG: Der Fallback ist eine GLOBALE Liste ueber ALLE Stationen. Ungefiltert
+    // uebernommen erbt jede Station die Linien aller anderen: Kunde Thomas (22.10.2026)
+    // hatte Marienplatz mit U1/U14/41/43 und Feuersee mit S4/S5/S6, nach dem Neuladen
+    // standen 41 und 43 auch bei Feuersee, und das Geraet zeigte sie doppelt.
+    // Das eigene filter-Feld der Station sagt, welche Linien hierher gehoeren; nur deren
+    // Richtungen duerfen aus der globalen Liste kommen. Hat die Station gar kein
+    // filter-Feld, bleibt es beim bisherigen Verhalten.
+    let stationDests = _pickBySeg(masterDirsByRbl, part, _occ);
+    if (!stationDests) {
+      stationDests = filterLines.length
+        ? lineDestinations.filter(function(ld) {
+            return filterLines.indexOf(_stripModePrefix(ld.line)) >= 0;
+          })
+        : lineDestinations;
+    }
     const bareStopId = isJourney ? stopId.split('>')[0] : stopId;
     // "Alle Abfahrten"-Station? Primär am "*"-Marker der masterrow erkennen; Fallback:
     // gar kein Filter UND keine Richtungs-Filter irgendwo (reine alle-Abfahrten-Config).
@@ -23147,7 +23188,28 @@ function dedupeStationsByFullId() {
 }
 
 // Versucht Stationsnamen von API zu holen
+// Merker fuer die Namensaufloesung: pro (Netz, stopId) hoechstens EIN Abruf je Sitzung,
+// und parallele Aufrufer teilen sich denselben laufenden Abruf. Die Suche nach einer
+// numerischen Id braucht am Server verlaesslich rund 5 Sekunden (gemessen 13.10.2026,
+// /stops/search?q=1131826&network=OEBBREG: 4,8 s und 5,0 s, auch warm), und sie lief fuer
+// JEDE Station einzeln und nacheinander. Bei mehreren Nicht-Wien-Stationen summierte sich
+// das auf Minuten, bevor die Konfiguration stand.
+var _nameMemo = new Map();
 async function resolveStationName(network, stopId) {
+  const memoKey = String(network) + '|' + String(stopId);
+  if (_nameMemo.has(memoKey)) return _nameMemo.get(memoKey);
+  const lauf = _resolveStationNameRoh(network, stopId).then(function(name) {
+    // Nur ECHTE Treffer behalten. Ein null (Netzfehler, Drosselung) darf sich nicht
+    // fuer die ganze Sitzung festsetzen, sonst bliebe die Station dauerhaft namenlos.
+    if (!name) _nameMemo.delete(memoKey);
+    else _nameMemo.set(memoKey, name);
+    return name;
+  }).catch(function(e) { _nameMemo.delete(memoKey); throw e; });
+  _nameMemo.set(memoKey, lauf);
+  return lauf;
+}
+
+async function _resolveStationNameRoh(network, stopId) {
   try {
     // Für WL: Name kommt NUR aus wienData (andere Datenquelle als die Unified-API).
     if (network === 'WL') {
@@ -26897,11 +26959,24 @@ window.addEventListener('DOMContentLoaded', () => {
             var line = String(l.name || '').trim(), dest = String(l.towards || '').trim();
             if (!line || !dest) return;
             if (l.lineColor) BD.grpPairColor[line.toLowerCase()] = l.lineColor;
-            var n = (l.departures && Array.isArray(l.departures.departure)) ? l.departures.departure.length : 0;
-            var k = bdPairKey(line, dest);
-            if (seen[k]) { seen[k].n += n; return; }
-            seen[k] = { line: line, dest: dest, rid: String(l.richtungsId || '').trim(), n: n };
-            pairs.push(seen[k]);
+            var deps = (l.departures && Array.isArray(l.departures.departure)) ? l.departures.departure : [];
+            var rid = String(l.richtungsId || '').trim(), byDest = {};
+            // Ziel je Abfahrt (Wien: Kurzfuehrungen wie U2 Aspernstrasse stecken als vehicle.towards
+            // im Eintrag); die Firmware mit GroupKey-Zeilen fuehrt sie als Variante der Richtung
+            // Der Server benennt den Eintrag nach der NAECHSTEN Abfahrt (U2 mal Seestadt, mal
+            // Aspernstrasse), darum zaehlt jedes Ziel nur seine eigenen Fahrten
+            byDest[dest] = 0;
+            deps.forEach(function (x) {
+              var vt = bdRidGrouping() ? String((x.vehicle && x.vehicle.towards) || '').trim() : '';
+              vt = vt || dest;
+              byDest[vt] = (byDest[vt] || 0) + 1;
+            });
+            Object.keys(byDest).forEach(function (dd) {
+              var k = bdPairKey(line, dd);
+              if (seen[k]) { seen[k].n += byDest[dd]; return; }
+              seen[k] = { line: line, dest: dd, rid: rid, n: byDest[dd] };
+              pairs.push(seen[k]);
+            });
           });
         });
         if (BD.grpPairsKey !== rbls) return;
@@ -26925,32 +27000,57 @@ window.addEventListener('DOMContentLoaded', () => {
     var lineInfo = {};
     (st.lines || []).forEach(function (l) { lineInfo[String(l.n).toLowerCase()] = l; });
     var all = BD.grpPairs.map(function (pr) { return { line: pr.line, dest: pr.dest, rid: pr.rid || '', n: pr.n || 0 }; }), seen = {};
-    all.forEach(function (pr) { seen[bdPairKey(pr.line, pr.dest)] = 1; });
+    all.forEach(function (pr) { seen[bdPairKey(pr.line, pr.dest)] = pr; });
+    // Im Picker gewaehlte Richtungen sind der Name, den der Kunde kennt (pick)
     allStations().forEach(function (s2) {
       (s2.directions || []).forEach(function (d) {
         if (!d || !d.line || !d.towards) return;
         var dest = String(d.towards).replace(/^Richtung\s+/i, '').trim();
         var k = bdPairKey(d.line, dest);
-        if (seen[k]) return;
-        seen[k] = 1;
-        all.push({ line: String(d.line), dest: dest, rid: String(d.richtungsId || '').trim(), n: 0 });
+        if (seen[k]) { seen[k].pick = true; return; }
+        seen[k] = { line: String(d.line), dest: dest, rid: String(d.richtungsId || '').trim(), n: 0, pick: true };
+        all.push(seen[k]);
       });
     });
+    function dirsHit(li, dest) {
+      var nd = bdNormDest(dest);
+      return String(li.dirs).split(',').some(function (dd) {
+        var x = bdNormDest(dd);
+        return x && (nd.indexOf(x) >= 0 || x.indexOf(nd) >= 0);
+      });
+    }
+    // Uebernommene Stationen: die am Geraet gespeicherten Richtungen (dirs) sind ebenfalls der
+    // Name, den der Kunde gewaehlt hat
+    all.forEach(function (pr) {
+      var li = lineInfo[String(pr.line).toLowerCase()];
+      if (!pr.pick && li && li.dirs && dirsHit(li, pr.dest)) pr.pick = true;
+    });
     if (bdRidGrouping()) all = bdCollapseByRid(all);
-    return all.filter(function (pr) {
+    // Richtungsfilter wie die Firmware: erlaubt, wenn irgendein Ziel der Richtung den dirs-Text trifft
+    // oder das Geraet die Richtung (Linie|rid) schon gelernt hat (/api/state drid)
+    var drid = {};
+    String(st.drid || '').split(';').forEach(function (t) { t = t.trim().toLowerCase(); if (t) drid[t] = 1; });
+    function dirOk(pr, li) {
+      if (!li || !li.dirs) return true;
+      if ([pr.dest].concat(pr.alts || []).some(function (d) { return dirsHit(li, d); })) return true;
+      return !!(pr.rid && drid[String(pr.line).toLowerCase() + '|' + String(pr.rid).toLowerCase()]);
+    }
+    var base = all.filter(function (pr) {
       var ln = String(pr.line).toLowerCase();
       if (lsel.length && lsel.indexOf(ln) < 0) return false;
       var li = lineInfo[ln];
-      if (li && li.m === 1) return false;                   // Nur Karte: steht nicht auf der Tafel
-      if (li && li.dirs) {
-        var nd = bdNormDest(pr.dest);
-        var ok = String(li.dirs).split(',').some(function (dd) {
-          var x = bdNormDest(dd);
-          return x && (nd.indexOf(x) >= 0 || x.indexOf(nd) >= 0);
-        });
-        if (!ok) return false;
-      }
-      return true;
+      return !(li && li.m === 1);                           // Nur Karte: steht nicht auf der Tafel
+    });
+    // Linie mit Richtungsfilter, aber ohne Treffer und ohne gelernte Richtung: Zieltext veraltet
+    // (Umleitung, z. B. 46 nach Huetteldorf), die Firmware zeigt dann die ganze Linie
+    var lineHit = {};
+    base.forEach(function (pr) {
+      var ln = String(pr.line).toLowerCase();
+      if (dirOk(pr, lineInfo[ln])) lineHit[ln] = 1;
+    });
+    return base.filter(function (pr) {
+      var ln = String(pr.line).toLowerCase();
+      return !lineHit[ln] || dirOk(pr, lineInfo[ln]);
     }).sort(function (a, b) {
       var c = String(a.line).localeCompare(String(b.line), 'de', { numeric: true });
       return c || String(a.dest).localeCompare(String(b.dest), 'de');
@@ -26973,11 +27073,13 @@ window.addEventListener('DOMContentLoaded', () => {
       var k = String(pr.line).toLowerCase() + '|' + pr.rid;
       var cur = byKey[k];
       if (!cur) {
-        cur = byKey[k] = { line: pr.line, dest: pr.dest, rid: pr.rid, n: pr.n || 0, alts: [] };
+        cur = byKey[k] = { line: pr.line, dest: pr.dest, rid: pr.rid, n: pr.n || 0, pick: !!pr.pick, alts: [] };
         out.push(cur);
         return;
       }
-      if ((pr.n || 0) > cur.n) { cur.alts.push(cur.dest); cur.dest = pr.dest; cur.n = pr.n || 0; }
+      // Hauptname: im Picker gewaehlt vor haeufigstem Ziel (der Servername springt mit der naechsten Abfahrt)
+      var better = (!!pr.pick && !cur.pick) || (!!pr.pick === cur.pick && (pr.n || 0) > cur.n);
+      if (better) { cur.alts.push(cur.dest); cur.dest = pr.dest; cur.n = pr.n || 0; cur.pick = !!pr.pick; }
       else if (pr.dest !== cur.dest && cur.alts.indexOf(pr.dest) < 0) cur.alts.push(pr.dest);
     });
     // Picker-Richtung ohne rid, deren Ziel schon Teil einer Richtung ist, entfaellt
