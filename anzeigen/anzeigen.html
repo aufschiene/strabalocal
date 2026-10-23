@@ -746,6 +746,42 @@ const STIL_MATRIX = [2, 15, 18, 21, 23];
 function istMatrix(c) { return STIL_MATRIX.indexOf(parseInt(c, 10)) >= 0; }
 function matrixSeiteGross(c, zeilen) { return istMatrix(c) && zeilen <= 3; }
 
+// ---- Eigene Displays -----------------------------------------------------------------
+// Drei Slots, colour 101 bis 103. Das Aussehen steht als eigenes customrow-Segment am
+// Geraet, gezeichnet wird es dort von display_free_color. Die Buchstaben sind der
+// Vertrag mit der Firmware (20.09.2026):
+//   B Hintergrund, T Schrift, H Badge-Grund, V Badge-Schrift, U Badge-Rand,
+//   G 1 glatt / 2 Punktraster, F 1 Modern / 2 Classic / 3 Matrix,
+//   A 1 Badges / 0 Linienname gross, W 1 Ziel fett, M 1 Ziel mittig, N Name.
+const EIGEN_MIN = 101, EIGEN_MAX = 103;
+function istEigen(c) { c = parseInt(c, 10); return c >= EIGEN_MIN && c <= EIGEN_MAX; }
+let eigene = {};   // colour -> Design
+function eigenStd() {
+  return { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff',
+           G: '1', F: '1', A: '1', W: '0', M: '0', N: '', P: {} };
+}
+function eigenVon(c) {
+  c = parseInt(c, 10);
+  if (!eigene[c]) { eigene[c] = eigenStd(); eigene[c].N = 'Mein Display ' + (c - 100); }
+  return eigene[c];
+}
+function eigenFrei() {
+  for (let c = EIGEN_MIN; c <= EIGEN_MAX; c++) if (!eigene[c]) return c;
+  return 0;
+}
+// Name eines Stils, auch fuer die eigenen.
+function stilTitel(c) {
+  c = parseInt(c, 10);
+  if (istEigen(c)) return (eigene[c] && eigene[c].N) || ('Mein Display ' + (c - 100));
+  return (STILE.find(x => x.id === c) || {}).name || ('Stil ' + c);
+}
+// Was der Baukasten anbietet. [Wert, Beschriftung]
+const EIGEN_SCHRIFT = [['1', 'Modern'], ['2', 'Klassisch'], ['3', 'Matrix']];
+const EIGEN_GRUND = [['1', 'Glatt'], ['2', 'Punktraster']];
+// Farbfelder: [Buchstabe, Beschriftung]
+const EIGEN_FARBEN = [['B', 'Hintergrund'], ['T', 'Schrift'],
+                      ['H', 'Badge-Fl\u00e4che'], ['V', 'Badge-Schrift'], ['U', 'Badge-Rand']];
+
 const STIL_ZEITTYP = [11, 12, 14, 25];      // gehoeren in die timerow
 const STIL_OHNE_SORTIERUNG = [5, 6, 11, 12, 14, 25];   // DISPLAY_TYPE_FEATURES.sorting = false
 // Diese Stile zeigen EINE Abfahrt gross, dort gibt es keine Uhr-Zeile. Das ganze Brett
@@ -808,7 +844,14 @@ function stilOptionen(d) {
   let h = '<optgroup label="Passend zu deinen Linien">' + passend.map(eintrag).join('') + '</optgroup>';
   const rest = STILE.filter(x => passend.indexOf(x.id) < 0);
   if (rest.length) h += '<optgroup label="Alle weiteren">' + rest.map(x => eintrag(x.id)).join('') + '</optgroup>';
-  h += '<optgroup label="Eigenes"><option value="neu">+ Eigenes Display erstellen</option></optgroup>';
+  // Schon angelegte eigene Designs stehen hier mit ihrem Namen, danach erst das Anlegen.
+  let eig = '';
+  Object.keys(eigene).map(Number).sort().forEach(c => {
+    eig += '<option value="' + c + '"' + (c === jetzt ? ' selected' : '') + '>'
+         + escapeHtmlFt(stilTitel(c)) + '</option>';
+  });
+  if (eigenFrei()) eig += '<option value="neu">+ Eigenes Display erstellen</option>';
+  h += '<optgroup label="Eigenes">' + eig + '</optgroup>';
   return h;
 }
 
@@ -1595,6 +1638,27 @@ function editorZeichnen() {
       h += '<div class="hinweis">Bis zum n\u00e4chsten Firmware-Update zeigt das Ger\u00e4t '
          + 'dieses und ' + (wienGleich.length === 1 ? 'das andere Wien-Display' : 'die anderen Wien-Displays')
          + ' mit diesem Stil als ein Brett mit Seiten.</div>';
+    }
+  }
+
+  // Dieselbe Station auf zwei Brettern kann erst Firmware 2.6. Aeltere legen beide
+  // Eintraege zusammen, der zweite geht verloren (Firmware-Sitzung 23.10.2026, Pauls
+  // Berlin-Fall: U8 und U5 auf zwei Displays, am Geraet blieb nur U8). Darum sagen wir
+  // es, solange sich das Geraet aelter meldet.
+  if (geraetVersion && !fwNeu()) {
+    const meine = new Set();
+    (dVor.richtungen || []).forEach(k => {
+      const r = richtungFinden(k);
+      if (r) meine.add(r.station.rbl);
+    });
+    const auchWoanders = displays.some((x, xi) => xi !== s.index && (x.richtungen || []).some(k => {
+      const r = richtungFinden(k);
+      return r && meine.has(r.station.rbl);
+    }));
+    if (auchWoanders) {
+      h += '<div class="hinweis">Dieselbe Station steht auf mehr als einem Display. '
+         + 'Das kann erst Firmware ' + FW_MIT_UHR + ', dein Ger\u00e4t meldet '
+         + escapeHtmlFt(geraetVersion) + '. Bis dahin zeigt es nur das erste davon.</div>';
     }
   }
 
@@ -3151,17 +3215,40 @@ function zeitZeilenSetzen(di, wert) {
 }
 
 function stilSetzen(v) {
+  // zeiger ist die SEITE, nicht das Display. Ein Display mit mehreren Seiten haette
+  // sonst den Stil der falschen Zeile bekommen.
+  const sHier = schirme[zeiger];
+  const d = sHier ? displays[sHier.index] : null;
   if (v === 'neu') {
-    // Der Design-Baukasten fuer eigene Displays steckt noch im alten Konfigurator.
-    // Lieber offen sagen als so tun, als waere er hier schon drin.
-    sagen('Eigenes Display',
-          'Den Baukasten f\u00fcr eigene Designs gibt es bisher nur im alten Konfigurator. '
-          + 'Hier kommt er noch.');
+    const frei = eigenFrei();
+    if (!frei) {
+      dialogZeigen('Kein Platz mehr',
+        'Mehr als ' + (EIGEN_MAX - EIGEN_MIN + 1) + ' eigene Designs kann das Ger\u00e4t nicht halten. '
+        + 'W\u00e4hle eines der vorhandenen aus oder \u00e4ndere es.',
+        [{ text: 'Alles klar' }], 'warnung');
+      allesZeichnen();
+      return;
+    }
+    eigenVon(frei);                       // legt das Design mit den Vorgaben an
+    if (d) d.stil = frei; else stil = frei;
+    klappOffen = 'klappDesign';           // der Baukasten geht gleich auf
     allesZeichnen();
     return;
   }
-  const d = displays[zeiger];
   if (d) d.stil = parseInt(v, 10) || 1; else stil = parseInt(v, 10) || 1;
+  allesZeichnen();
+}
+
+// ---- Baukasten: einzelne Werte setzen ----
+function eigenSetzen(c, key, wert) {
+  const e = eigenVon(c);
+  e[key] = String(wert == null ? '' : wert).replace('#', '').toLowerCase();
+  allesZeichnen();
+}
+function eigenSchalten(c, key, an) { eigenVon(c)[key] = an ? '1' : '0'; allesZeichnen(); }
+function eigenNameSetzen(c, wert) {
+  // Die Trennzeichen des Formats duerfen nicht in den Namen.
+  eigenVon(c).N = String(wert || '').replace(/[|;:,]/g, ' ').trim().slice(0, 24);
   allesZeichnen();
 }
 
@@ -3425,13 +3512,17 @@ function uebergabeHolen() {
     });
   });
   // WAS gewaehlt ist, steht in den Zeilen, die der Konfigurator gerade gebaut hat.
-  // WIE es aussieht, steht in dem, was das Geraet geschickt hat: nur dort stehen Uhr,
+  // WIE es aussieht, NUR in dem, was das Geraet geschickt hat: dort stehen Uhr,
   // Display-Nummer, Wechselzeiten und die anderen Felder, die der Konfigurator beim
-  // Neubau verliert. Fehlt das Geraete-Original, gelten die gebauten Zeilen.
+  // Neubau verliert.
+  // Die gebauten Zeilen taugen dafuer ausdruecklich NICHT: sie entstehen frisch aus den
+  // Stationen und wuerden je Station ein Brett vorgeben. Damit haette die automatische
+  // Aufteilung (kompakt oder spielerisch) nie eine Chance, obwohl noch niemand etwas
+  // zugewiesen hat. Ohne Geraete-Config verteilen wir also selbst (Paul 23.10.2026).
   const g = roh.geraet || null;
   const bauZeilen = (g && (g.masterrow || g.timerow))
     ? (g.masterrow || '') + ';' + (g.timerow || '')
-    : (roh.masterrow || '') + ';' + (roh.timerow || '');
+    : '';
   return { stationen: raus, helligkeit: roh.helligkeit, masterrow: roh.masterrow || '',
            modus: (roh.modus === 'spielerisch' || roh.modus === 'kompakt') ? roh.modus : null,
            eintraege: eintraegeAusZeilen(bauZeilen) };

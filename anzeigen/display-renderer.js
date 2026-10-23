@@ -688,8 +688,138 @@ function dvBodoHTML(colour, data, rows, previewEl) {
 }
 
 // Dispatcher: colour → Nachbildung. null = kein Renderer (generisches Brett).
-function dvPreviewHTML(colour, data, rows, previewEl) {
+
+// ===== Eigenes Display (colour 101-103) ==============================================
+// Nachbildung von display_free_color.cpp, 1:1 uebernommen aus dem alten Konfigurator
+// (fcDevicePreviewHTML). Alles Aussehen steckt in cfg, das ist ein customrow-Segment:
+//   B Hintergrund, T Schrift, U Badge-Rand, H Badge-Hintergrund, V Badge-Schrift,
+//   G 1 glatt / 2 Punktraster, F 1 Modern / 2 Classic / 3 Matrix,
+//   A 1 Badges / 0 Linienname gross, W 1 Ziel fett, M 1 Ziel mittig statt oben,
+//   P Linienfarben je Linie, N Name.
+var FC_STD = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff',
+               G: '1', F: '1', A: '1', W: '0', M: '0', P: {} };
+
+// Hintergrund des Bretts, mit Punktraster wie am Geraet (DOT_SIZE 3, DOT_SPACING 5).
+function dvFreeColorBg(cfg) {
+  var aus = 'background:#' + cfg.B + ';';
+  if (cfg.G !== '2') return aus;
+  var bgInt = parseInt(cfg.B, 16);
+  var lum = (((bgInt >> 16) & 255) * 3 + ((bgInt >> 8) & 255) * 6 + (bgInt & 255)) / 10;
+  var d = lum > 128 ? -18 : 18;
+  var ch = function (v) { return Math.max(0, Math.min(255, v + d)); };
+  var grid = 'rgb(' + ch((bgInt >> 16) & 255) + ',' + ch((bgInt >> 8) & 255) + ',' + ch(bgInt & 255) + ')';
+  return aus + 'background-image:radial-gradient(circle, ' + grid + ' 1.5px, transparent 1.5px);'
+             + 'background-size:5px 5px;';
+}
+
+function dvFreeColorHTML(colour, data, rows, previewEl, cfg) {
+  cfg = cfg || FC_STD;
+  var r = parseInt(rows, 10);
+  if (!r || isNaN(r)) r = Math.min(3, Math.max(2, data.length));
+  r = Math.max(1, Math.min(5, r));
+  data = data.slice(0, r);
+  var W = 320, H = 170, rowH = Math.floor(H / r);
+  var margin = 8;
+  var isMatrix = (cfg.F === '3' || cfg.F === '4');
+  var font = isMatrix ? "'Silkscreen','Courier New',monospace"
+           : (cfg.F === '2' ? 'Arial,Helvetica,sans-serif' : "'Poppins',sans-serif");
+  // Ab 4 Zeilen schaltet die Firmware auf kleinere Schriftgrade um. Gross = 1-3.
+  var big = (r <= 3);
+  var FC_FONTS = isMatrix
+    ? { badge: [15, 15], dest: [12, 12], cd: [26, 20], fh: [18, 16], ls: [4, 2],
+        badgeH: [38, 26], badgeW: [[38, 54, 70, 84], [28, 38, 50, 60]], cdSpace: [55, 42] }
+    : (cfg.F === '2'
+        ? { badge: [17, 17], dest: [13, 13], cd: [30, 20], fh: [(cfg.W === '1' ? 22 : 17), 15], ls: [4, 2],
+            badgeH: [38, 26], badgeW: [[38, 54, 70, 84], [28, 38, 50, 60]], cdSpace: [55, 42] }
+        : { badge: [20, 13], dest: [14, 10], cd: [34, 23], fh: [19, 14], ls: [4, 2],
+            badgeH: [38, 26], badgeW: [[38, 54, 70, 84], [28, 38, 50, 60]], cdSpace: [55, 42] });
+  var fsIdx = big ? 0 : 1;
+  var badgeFs = FC_FONTS.badge[fsIdx], destFs = FC_FONTS.dest[fsIdx], cdFs = FC_FONTS.cd[fsIdx];
+  // Matrix hat keine fette Variante, Classic bleibt klein bei FreeSans 9pt.
+  var destBoldActive = (cfg.W === '1' && !isMatrix && !(cfg.F === '2' && !big));
+  var destWeight = destBoldActive ? (big ? 700 : 600) : 400;
+  var destFh = FC_FONTS.fh[fsIdx];
+  var destLH = destFh + FC_FONTS.ls[fsIdx];
+  var badgeWTab = FC_FONTS.badgeW[fsIdx];
+  var badgeWFor = function (ln) {
+    var l = String(ln || '').length;
+    return badgeWTab[Math.max(0, Math.min(3, l - 1))];
+  };
+  var ledCdPx = big ? 4 : 3;
+  var maxW = 0;
+  data.forEach(function (dp) {
+    var w;
+    if (cfg.A === '0') w = isMatrix ? dvLedWidth(dp.line, ledCdPx)
+                                    : Math.ceil(String(dp.line || '').length * cdFs * 0.62);
+    else w = badgeWFor(dp.line);
+    if (w > maxW) maxW = w;
+  });
+  var badgeW = maxW + 4, badgeH = Math.min(FC_FONTS.badgeH[fsIdx], rowH - 6);
+  var glowT = isMatrix ? 'text-shadow:0 0 5px #' + cfg.T + ';' : '';
+  var html = '';
+  data.forEach(function (dep, i) {
+    var lc = (cfg.P || {})[dep.line] || null;
+    var bBg = (lc && lc.bg) ? '#' + lc.bg : '#' + cfg.H;
+    var bTx = (lc && lc.tx) ? '#' + lc.tx : '#' + cfg.V;
+    var bOl = lc ? ((lc.ol ? '#' + lc.ol : bBg)) : '#' + cfg.U;
+    var showOl = bOl.toLowerCase() !== bBg.toLowerCase();
+    var destX = margin + maxW + 12;
+    var destW = W - destX - FC_FONTS.cdSpace[fsIdx];
+    html += '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:' + W + 'px;height:' + rowH + 'px;">';
+    if (cfg.A === '0') {
+      html += '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;width:' + badgeW
+            + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">'
+            + (isMatrix ? dvLedTextSvg(dep.line, ledCdPx, '#' + cfg.T, true) : escapeHtmlFt(dep.line)) + '</div>';
+    } else {
+      html += '<div style="position:absolute;left:' + margin + 'px;top:' + Math.round((rowH - badgeH) / 2)
+            + 'px;width:' + badgeW + 'px;height:' + badgeH + 'px;background:' + bBg + ';border-radius:6px;'
+            + (showOl ? 'box-shadow:inset 0 0 0 2px ' + bOl + ';' : '')
+            + 'display:flex;align-items:center;justify-content:center;color:' + bTx + ';font-weight:600;font-size:'
+            + badgeFs + 'px;">' + (isMatrix ? dvLedTextSvg(dep.line, 2, bTx, false) : escapeHtmlFt(dep.line)) + '</div>';
+    }
+    // Ziel: M0 steht auf der oberen von zwei gedachten Zeilen, M1 mittig im Fach.
+    var destBox;
+    if (cfg.M === '1') {
+      destBox = 'top:0;height:' + rowH + 'px;display:flex;align-items:center;';
+    } else {
+      destBox = 'top:' + Math.max(Math.round((rowH - destLH * 2) / 2), 0) + 'px;height:' + (destLH * 2) + 'px;';
+    }
+    if (isMatrix) {
+      var mLines = dvLedWrap2(dep.dest, Math.max(3, Math.floor(destW / 12)));
+      var mOff = Math.max(0, Math.round((destLH - 16) / 2));
+      var mInner = mLines.map(function (ml, li) {
+        return '<div style="position:absolute;left:0;top:' + (li * destLH + mOff) + 'px;">'
+             + dvLedTextSvg(ml, 2, '#' + cfg.T, true) + '</div>';
+      }).join('');
+      if (cfg.M === '1') {
+        var mBlockH = mLines.length * destLH;
+        html += '<div style="position:absolute;left:' + destX + 'px;top:' + Math.max(0, Math.round((rowH - mBlockH) / 2))
+              + 'px;height:' + mBlockH + 'px;width:' + destW + 'px;">' + mInner + '</div>';
+      } else {
+        html += '<div style="position:absolute;left:' + destX + 'px;top:'
+              + Math.max(Math.round((rowH - destLH * 2) / 2), 0) + 'px;height:' + (destLH * 2)
+              + 'px;width:' + destW + 'px;">' + mInner + '</div>';
+      }
+    } else {
+      html += '<div style="position:absolute;left:' + destX + 'px;' + destBox + 'width:' + destW
+            + 'px;color:#' + cfg.T + ';font-weight:' + destWeight + ';font-size:' + destFs
+            + 'px;line-height:' + destLH + 'px;' + glowT
+            + '"><span style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">'
+            + escapeHtmlFt(dep.dest) + '</span></div>';
+    }
+    html += '<div style="position:absolute;right:' + margin + 'px;top:0;height:' + rowH
+          + 'px;display:flex;align-items:center;color:#' + cfg.T + ';font-weight:700;font-size:' + cdFs + 'px;' + glowT + '">'
+          + (isMatrix ? dvLedTextSvg(String(dep.time), ledCdPx, '#' + cfg.T, true) : dep.time) + '</div>';
+    html += '</div>';
+  });
+  return '<div style="position:relative;width:' + W + 'px;height:' + H + 'px;font-family:' + font
+       + ';overflow:hidden;' + dvFreeColorBg(cfg) + '">' + html + '</div>';
+}
+
+function dvPreviewHTML(colour, data, rows, previewEl, cfg) {
   switch (colour) {
+    case 101: case 102: case 103:
+      return dvFreeColorHTML(colour, data, rows, previewEl, cfg);
     case 1: case 3:
       return dvWienHTML(colour, data, rows, previewEl, null);
     case 16:   // Prag / CZ-HU = Wien-Layout in schwarz/weiß (display_czhu.h)

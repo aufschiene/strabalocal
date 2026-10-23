@@ -3275,28 +3275,6 @@
 
       <span id="configChoiceStations" style="color:#8a8276;font-size:12px;text-align:center;"></span>
 
-      <!-- Nach dem Klick, solange der Aufbau noch laeuft: dieselbe Zug-Animation wie beim
-           Start. Vorher stand hier nur eine graue Textzeile, und die drei Sekunden sahen
-           aus, als waere nichts passiert (Paul 23.10.2026). -->
-      <div id="configChoiceLoading" style="display:none;text-align:center;">
-        <div class="train-loading">
-          <div class="train-track"></div>
-          <div class="train-body">
-            <div class="train-wheel w1"></div>
-            <div class="train-wheel w2"></div>
-            <div class="train-door"></div>
-          </div>
-        </div>
-        <div style="color:var(--ink);font-weight:700;font-size:14px;">Stationen werden geladen …</div>
-        <!-- Fortschritt in Stufen: eine Stufe je Station, deren Abfahrten zurueck sind.
-             Bei vier Stationen also 25er-Schritte (Paul 23.10.2026). -->
-        <div id="configChoiceProgress" style="display:none;width:200px;margin:12px auto 0;">
-          <div style="height:10px;border:2px solid var(--ink);border-radius:999px;background:var(--card);overflow:hidden;">
-            <div id="configChoiceProgressFill" style="height:100%;width:0;background:var(--ink);transition:width .25s ease;"></div>
-          </div>
-          <div id="configChoiceProgressText" style="margin-top:6px;color:#6b6258;font-size:12px;font-weight:700;">0 %</div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -3310,7 +3288,16 @@
         <div class="train-door"></div>
       </div>
     </div>
-    <div style="margin-top:18px;color:var(--ink);font-weight:700;font-size:15px;">Lade Konfiguration …</div>
+    <div id="startupLoadingText" style="margin-top:18px;color:var(--ink);font-weight:700;font-size:15px;">Lade Konfiguration …</div>
+    <!-- Fortschritt in Stufen: eine Stufe je Station, deren Abfahrten zurueck sind. Bei
+         vier Stationen also 25er-Schritte (Paul 23.10.2026). Nur sichtbar, wenn wirklich
+         Stationen geladen werden (reine Wien-Configs holen nichts vor). -->
+    <div id="startupProgress" style="display:none;width:200px;margin:14px auto 0;">
+      <div style="height:10px;border:2px solid var(--ink);border-radius:999px;background:var(--card);overflow:hidden;">
+        <div id="startupProgressFill" style="height:100%;width:0;background:var(--ink);transition:width .25s ease;"></div>
+      </div>
+      <div id="startupProgressText" style="margin-top:6px;color:#6b6258;font-size:12px;font-weight:700;text-align:center;">0 %</div>
+    </div>
   </div>
 
   <!-- Step: Schnellansicht nach Station-Auswahl -->
@@ -4802,7 +4789,7 @@ const NETWORKS = {
   KAERNTEN:   { name: 'Kärnten',                shortName: 'KÄR',  region: 'AT', desc: 'Bus (Kärntner Linien, ganz Kärnten)', searchType: 'trainboard', trainboard: { path: '/at/kaernten' }, placeholder: 'z.B. Klagenfurt, Villach, Wolfsberg...', isJourneyBased: false },
   VVT:        { name: 'Tirol (VVT)',            shortName: 'VVT',  region: 'AT', desc: 'Bus, Tram, Bahn (ganz Tirol)', searchType: 'trainboard', trainboard: { path: '/at/vvt' }, placeholder: 'z.B. Innsbruck, Kufstein, Wörgl, Lienz...', isJourneyBased: false },
   VVV:        { name: 'Vorarlberg (VVV)',       shortName: 'VVV',  region: 'AT', desc: 'Bus, Bahn (ganz Vorarlberg)', searchType: 'trainboard', trainboard: { path: '/at/vvv' }, placeholder: 'z.B. Bregenz, Dornbirn, Feldkirch, Bludenz...', isJourneyBased: false },
-  VBN:        { name: 'Niedersachsen & Bremen', shortName: 'VBN', region: 'DE', desc: 'Bus, Tram, Bahn (VBN, Ems-Jade …)', searchType: 'trainboard', trainboard: { path: '/de/vbn' }, placeholder: 'z.B. Bremen, Oldenburg, Wilhelmshaven, Emden...', isJourneyBased: false },
+  VBN:        { name: 'Hannover, Niedersachsen & Bremen', shortName: 'VBN', region: 'DE', desc: 'Stadtbahn Hannover, Bus, Tram, Bahn (VBN, GVH, Ems-Jade …)', searchType: 'trainboard', trainboard: { path: '/de/vbn' }, placeholder: 'z.B. Hannover, Bremen, Oldenburg, Wilhelmshaven...', isJourneyBased: false },
   VRN:        { name: 'Rhein-Neckar (VRN)',     shortName: 'VRN',  region: 'DE', desc: 'Bus, Tram, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vrn' }, placeholder: 'z.B. Mannheim, Heidelberg, Ludwigshafen...', isJourneyBased: false },
   VOS:        { name: 'Osnabrück (VOS)',        shortName: 'VOS',  region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/vos' }, placeholder: 'z.B. Osnabrück, Bramsche, Melle...', isJourneyBased: false },
   NAHSH:      { name: 'Schleswig-Holstein (NAH.SH)', shortName: 'NAH.SH', region: 'DE', desc: 'Bus, Bahn', searchType: 'trainboard', trainboard: { path: '/de/nahsh' }, placeholder: 'z.B. Kiel, Lübeck, Flensburg...', isJourneyBased: false },
@@ -5629,7 +5616,7 @@ const REGION_HERO = {
 // Netz-spezifischer Hero (überschreibt Land/Bundesland, wenn dieses Netz gewählt ist)
 const NETWORK_HERO = {
   LONDON: { photo: 'fotos/LONDON .jpg', title: 'London' },
-  VBN:    { photo: 'fotos/Bremen.jpg',      title: 'Niedersachsen & Bremen' },
+  VBN:    { photo: 'fotos/Bremen.jpg',      title: 'Hannover, Niedersachsen & Bremen' },
   VRN:    { photo: 'fotos/Rhein-Nekar.jpg', title: 'Rhein-Neckar' },
   VOS:    { photo: 'fotos/Osnabrück.webp',  title: 'Osnabrück' },
   NAHSH:  { photo: 'fotos/Schleswig.jpg',   title: 'Schleswig-Holstein' },
@@ -6473,7 +6460,7 @@ DISPLAY_PRESETS.niedersachsen = {
   parent: 'DE',
   photo: 'fotos/Bremen.jpg',
   networks: [
-    { id: 'VBN', label: 'Nordwest & Bremen',  desc: 'Bus, Tram, Bahn (VBN, Ems-Jade)', jumpTo: { region: 'DE' } },
+    { id: 'VBN', label: 'Hannover, Nordwest & Bremen',  desc: 'Stadtbahn Hannover, Bus, Tram, Bahn (VBN, GVH, Ems-Jade)', jumpTo: { region: 'DE' } },
     { id: 'VOS', label: 'Osnabrück',           desc: 'Bus, Bahn (VOS)',                 jumpTo: { region: 'DE' } },
     { id: 'VSN', label: 'Süd-Niedersachsen',   desc: 'Bus, Bahn (Göttingen, VSN)',      jumpTo: { region: 'DE' } },
     { id: 'DB',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
@@ -7687,6 +7674,20 @@ function wizardOpenFinetuning() {
 // (OEBBREG/OEBBFERN/OEBBALL). Alle sechs muenden ohnehin in dieses eine Feld, denn nur
 // das sieht das Geraet. Darum uebernimmt die neue Oberflaeche es direkt und muss von
 // den sechs Mechanismen nichts wissen (Paul 23.10.2026, Linz uebernahm alle Linien).
+// masterrow/timerow fuer die Uebergabe: erst aus der Config (beide Schreibweisen),
+// sonst frisch aus den Stationen bauen. Nie mit leeren Zeilen uebergeben, die neue
+// Oberflaeche liest daraus, WAS gewaehlt ist.
+function _uebergabeZeilen(cfg) {
+  cfg = cfg || {};
+  var mr = cfg.masterRow || cfg.masterrow || '';
+  var tr = cfg.timeRow || cfg.timerow || '';
+  if (mr) return { masterrow: mr, timerow: tr };
+  try {
+    var _r = buildMasterAndTimeRows(gehwegByStopIdState || {});
+    return { masterrow: _r.masterrow || '', timerow: _r.timerow || '' };
+  } catch (e) { return { masterrow: '', timerow: tr }; }
+}
+
 function zurNeuenOberflaeche(cfg) {
   cfg = cfg || (typeof recommendedConfig !== 'undefined' ? recommendedConfig : null) || {};
   try {
@@ -7717,9 +7718,15 @@ function zurNeuenOberflaeche(cfg) {
       modus: cfg.multiDisplay ? 'spielerisch' : 'kompakt',
       // Die hier gebauten Zeilen sagen, WAS gewaehlt ist: sie geben den Stand dieser
       // Seite wieder, also auch gerade abgehakte Linien.
-      masterrow: cfg.masterrow || '',
-      timerow: cfg.timerow || '',
-      displaysettings: cfg.displaysettings || '',
+      // ACHTUNG Schreibweise: die Config fuehrt die Felder als masterRow/timeRow/
+      // displaySettings (grosses R bzw. S), hier standen sie klein. Damit war die
+      // Uebergabe IMMER leer, ohne dass es auffiel — das ODER griff still auf ''
+      // (gefunden 23.10.2026). Beide Schreibweisen lesen, und falls gar nichts da ist,
+      // die Zeilen hier bauen: zurNeuenOberflaeche(null) kommt aus "Einstellungen
+      // aendern", und dort ist noch keine Config berechnet worden.
+      masterrow: _uebergabeZeilen(cfg).masterrow,
+      timerow: _uebergabeZeilen(cfg).timerow,
+      displaysettings: cfg.displaysettings || cfg.displaySettings || '',
       // Das Original vom Geraet sagt, WIE es aussieht: Aufteilung, Uhr, Wechselzeiten
       // und die anderen Felder, die diese Seite nicht kennt und beim Neubau verliert.
       geraet: _geraetRows ? {
@@ -9971,8 +9978,13 @@ function renderLines() {
 
       renderDirs.forEach(dir => {
         if (dir.idxs && dir.idxs.length > 0) {
-          // Aggregiert: alle idxs müssen selected sein für "selected"
-          const selected = dir.idxs.every(i => selectedLines.has(i));
+          // Aggregiert: der Haken steht, sobald EINE der zusammengelegten Richtungen in der
+          // Auswahl ist. Vorher brauchte es ALLE, und genau das log: eine geladene Config
+          // traegt pro Richtung nur den rid, die Wiederherstellung markierte davon eine der
+          // beiden Zieltext-Varianten, und die Zeile stand trotzdem ohne Haken da. Der
+          // Nutzer sah "nicht gewaehlt", gespeichert wurde die Linie aber mit (Paul,
+          // Berlin M4 "Hohenschoenhausen / Falkenberg", 23.10.2026).
+          const selected = dir.idxs.some(i => selectedLines.has(i));
           const idxsJson = JSON.stringify(dir.idxs);
           html += `
             <div class="direction-option ${selected ? 'selected' : ''}" onclick='toggleLineIdxs(${idxsJson})'>
@@ -10261,8 +10273,13 @@ function toggleLineGroup(lineName) {
 // Toggelt mehrere idxs gleichzeitig (für aggregierte richtungsId-Cards bei BODO etc.)
 function toggleLineIdxs(idxs) {
   if (!Array.isArray(idxs) || idxs.length === 0) return;
-  const allSelected = idxs.every(i => selectedLines.has(i));
-  if (allSelected) {
+  // Passend zum Haken oben: steht EINE der zusammengelegten Richtungen in der Auswahl,
+  // raeumt der Klick die ganze Zeile. Sonst nimmt er alle dazu. Vorher brauchte das
+  // Leeren, dass ALLE drin sind — bei einer halb gefuellten Zeile (so kommt sie aus einer
+  // geladenen Config) fuellte der erste Klick auf, obwohl die Zeile fuer den Nutzer
+  // schon gesetzt aussah, und erst der zweite leerte sie.
+  const schonDrin = idxs.some(i => selectedLines.has(i));
+  if (schonDrin) {
     idxs.forEach(i => { selectedLines.delete(i); selectedVias.delete(i); });
   } else {
     idxs.forEach(i => selectedLines.add(i));
@@ -12376,14 +12393,14 @@ function ladeFortschrittSchritt() {
 }
 
 function ladeFortschrittZeichnen() {
-  var kasten = document.getElementById('configChoiceProgress');
+  var kasten = document.getElementById('startupProgress');
   if (!kasten) return;
   // Ohne bekannte Gesamtzahl (reine Wien-Config, nichts vorzuladen) keinen Balken zeigen,
   // sonst staende er die ganze Zeit auf null.
   if (_ladeGesamt <= 0) { kasten.style.display = 'none'; return; }
   var prozent = Math.round(_ladeFertig / _ladeGesamt * 100);
-  var fuellung = document.getElementById('configChoiceProgressFill');
-  var text = document.getElementById('configChoiceProgressText');
+  var fuellung = document.getElementById('startupProgressFill');
+  var text = document.getElementById('startupProgressText');
   if (fuellung) fuellung.style.width = prozent + '%';
   // Nur die Zahl, kein Wort: so braucht die Zeile keinen Uebersetzungs-Eintrag.
   if (text) text.textContent = prozent + ' %';
@@ -12395,27 +12412,27 @@ function ladeFortschrittZeichnen() {
 // Im Normalfall (Namen gemerkt, Abfahrten warm) ist er schon durch und es wird nicht gewartet.
 async function aufAufbauWarten(btn) {
   if (!_loadExistingConfigPromise) return;
-  // Zug-Animation statt der Namens-Zeile, das Knopf-Innenleben bleibt unangetastet.
-  var info = document.getElementById('configChoiceStations');
-  var lader = document.getElementById('configChoiceLoading');
-  if (info) info.style.display = 'none';
-  if (lader) lader.style.display = '';
-  var balken = document.getElementById('configChoiceProgress');
+  // Knoepfe weg, nur noch der Ladescreen (Paul 23.10.2026): der Auswahl-Screen
+  // verschwindet, es laeuft wieder dasselbe Lade-Overlay wie beim Start, diesmal mit dem
+  // Fortschritt der Stationen darunter.
+  var auswahl = document.getElementById('configChoiceOverlay');
+  var ladescreen = document.getElementById('startupLoading');
+  var caption = document.getElementById('startupLoadingText');
+  var balken = document.getElementById('startupProgress');
+  if (auswahl) auswahl.style.display = 'none';
+  if (caption) caption.textContent = 'Stationen werden geladen …';
   if (balken && _ladeGesamt > 0) { balken.style.display = ''; ladeFortschrittZeichnen(); }
-  if (btn) btn.style.opacity = '0.55';
+  if (ladescreen) ladescreen.style.display = '';
   try { await _loadExistingConfigPromise; } catch (e) {}
   // Das Geraet schickt loadExistingConfig und loadFullConfig hintereinander; faengt der
   // zweite Aufbau direkt an, auch darauf warten.
   for (var i = 0; i < 20 && _loadExistingConfigPromise; i++) {
     try { await _loadExistingConfigPromise; } catch (e) {}
   }
-  if (btn) btn.style.opacity = '';
-  if (lader) lader.style.display = 'none';
+  if (ladescreen) ladescreen.style.display = 'none';
   if (balken) balken.style.display = 'none';
-  if (info) {
-    info.style.display = '';
-    try { auswahlHinweisAktualisieren(); } catch (e) {}
-  }
+  if (caption) caption.textContent = 'Lade Konfiguration …';
+  try { auswahlHinweisAktualisieren(); } catch (e) {}
 }
 
 // "Linien ändern" → Overlay weg, Bundesland-Auswahl des aktuellen Landes zeigen
@@ -22484,6 +22501,33 @@ function gehwegByStopIdFromRows(masterRowStr) {
   return map;
 }
 
+// Sieht dieser Wert nach einer Richtungs-Id aus statt nach einem Zieltext? Die
+// Heuristik steht an mehreren Stellen in kurzer Form; diese hier deckt zusaetzlich die
+// Berliner Bahnsteig-Kennungen ab ("pPos. 16s100003", "p1 (U2)s100003", "p4s100003"), die
+// nach einem p KEINE Ziffer haben und deshalb bisher als Zieltext durchgingen. Im Chip
+// stand dann woertlich "248 → pPos. 17s100003".
+function _siehtNachRichtungsIdAus(ref) {
+  var r = String(ref == null ? '' : ref).trim();
+  if (!r) return false;
+  return /^d\d/.test(r) || /^\d+$/.test(r) || r === 'H' || r === 'R'
+      || /^st/.test(r) || /^hh/.test(r) || /^bv/.test(r)
+      || /^p\d/.test(r)
+      // Bahnsteig-Kennung mit angehaengter Stations-Id: beginnt mit p, endet auf s<Ziffern>.
+      || /^p.*s\d+$/.test(r);
+}
+
+// Zieltext einer Richtungs-Id aus dem Linien-Index der Haltestelle (fetchStopLinesCached
+// legt ihn in window._dirTextByStop ab). Mehrere Ziele unter einer Id: der erste genuegt
+// als Beschriftung, die Auswahl selbst haengt an der Id.
+function _zielAusLinienIndex(network, stopId, line, rid) {
+  try {
+    var m = (window._dirTextByStop || {})[network + ':' + stopId] || {};
+    var v = m[String(line) + '|' + String(rid)];
+    if (Array.isArray(v)) return v[0] || '';
+    return v ? String(v) : '';
+  } catch (e) { return ''; }
+}
+
 async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr, clearFirst) {
 
   // Race-Fix: loadFullConfig ist autoritativ (trägt die volle masterrow). Falls parallel ein
@@ -23219,6 +23263,34 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         });
       }
     } catch (e) { /* Aufräumen ist optional */ }
+
+    // LETZTER SCHLIFF: Steht in einer Richtung eine Richtungs-Id als ZIELTEXT, dann ist sie
+    // durch einen der Nachtraege oben gefallen, ohne als Id erkannt zu werden. Sie gehoert
+    // ins richtungsId-Feld, und beschriftet wird aus dem Linien-Index der Haltestelle.
+    // Ohne das zeigte der Chip die nackte Id ("248 → pPos. 17s100003"), was wie ein Fehler
+    // aussieht (23.10.2026). Den Index holen wir nur, wenn es wirklich etwas zu heilen gibt.
+    try {
+      var _zuHeilen = (station.directions || []).filter(function(d) {
+        return d && d.line && !String(d.richtungsId || '').trim()
+            && _siehtNachRichtungsIdAus(d.towards);
+      });
+      if (_zuHeilen.length && !isJourney) {
+        await fetchStopLinesCached(network, bareStopId);
+        _zuHeilen.forEach(function(d) {
+          var rid = String(d.towards || '').trim();
+          d.richtungsId = rid;
+          d.towards = _zielAusLinienIndex(network, bareStopId, d.line, rid);
+        });
+        // Nach dem Geraderuecken koennen Dubletten entstehen (dieselbe Linie und Id einmal
+        // geheilt, einmal schon korrekt aus den Abfahrten).
+        var _gesehen = {};
+        station.directions = (station.directions || []).filter(function(d) {
+          var k = String(d.line) + '|' + String(d.richtungsId || '') + '|' + String(d.towards || '');
+          if (_gesehen[k]) return false;
+          _gesehen[k] = 1; return true;
+        });
+      }
+    } catch (e) { /* Beschriftung ist Kosmetik, nie den Aufbau stoeren */ }
 
     stations.push(station);
     _builtThisRun.push(station);
@@ -24783,7 +24855,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Straßenbahn, Bus': 'Tram, bus', 'Metro, Tram, Bus, Fähre – live': 'Metro, tram, bus, ferry – live',
     'Nahverkehr Dänemark': 'Local transit Denmark',
     'Niederlande Nahverkehr': 'Netherlands local transit', 'Bus, Tram landesweit (OVapi)': 'Bus, tram nationwide (OVapi)',
-    'Nordwest & Bremen': 'Northwest & Bremen', 'Bus, Tram, Bahn (VBN, Ems-Jade)': 'Bus, tram, rail (VBN, Ems-Jade)',
+    'Hannover, Nordwest & Bremen': 'Hanover, Northwest & Bremen', 'Stadtbahn Hannover, Bus, Tram, Bahn (VBN, GVH, Ems-Jade)': 'Hanover light rail, bus, tram, rail (VBN, GVH, Ems-Jade)',
     'Tram, Bus, S-Bahn (LVB, Leipzig, Halle)': 'Tram, bus, S-Bahn (LVB, Leipzig, Halle)',
     'Tram, Bus (LVB, Leipzig, Halle)': 'Tram, bus (LVB, Leipzig, Halle)',
     'Bus, Bahn (auch Eifel, Hunsrück, Westerwald)': 'Bus, rail (incl. Eifel, Hunsrück, Westerwald)',
@@ -24802,7 +24874,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Tram, Bus, S-Bahn (Dresden, Chemnitz)': 'Tram, bus, S-Bahn (Dresden, Chemnitz)',
     'Süd-Niedersachsen': 'South Lower Saxony', 'Bus, Bahn (Göttingen, VSN)': 'Bus, rail (Göttingen, VSN)',
     'Bus, Bahn (VOS)': 'Bus, rail (VOS)', 'Osnabrück': 'Osnabrück',
-    'Niedersachsen & Bremen': 'Lower Saxony & Bremen', 'Bus, Tram, Bahn (VBN, Ems-Jade …)': 'Bus, tram, rail (VBN, Ems-Jade …)', 'Züge Dänemark': 'Trains Denmark', 'Rejseplanen Züge': 'Rejseplanen trains',
+    'Niedersachsen & Bremen': 'Lower Saxony & Bremen', 'Hannover, Niedersachsen & Bremen': 'Hanover, Lower Saxony & Bremen', 'Stadtbahn Hannover, Bus, Tram, Bahn (VBN, GVH, Ems-Jade …)': 'Hanover light rail, bus, tram, rail (VBN, GVH, Ems-Jade …)', 'Züge Dänemark': 'Trains Denmark', 'Rejseplanen Züge': 'Rejseplanen trains',
     'Liechtenstein / Schweiz Nahverkehr': 'Liechtenstein / Switzerland local transit',
     'ÖBB Fernverkehr': 'ÖBB long-distance', 'ÖBB Regional': 'ÖBB regional', 'ÖBB Regionalverkehr': 'ÖBB regional',
     'ÖBB Regional NÖ': 'ÖBB regional Lower Austria', 'ÖBB Regional OÖ': 'ÖBB regional Upper Austria',
