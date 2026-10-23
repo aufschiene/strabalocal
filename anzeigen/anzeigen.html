@@ -2189,6 +2189,11 @@ function configBauen() {
     // s: 1 = feste Reihenfolge, 2 = je Linie eine Zeile mit erster und zweiter Abfahrt
     // im Wechsel, 3 = flach nach Uhrzeit. Unser "Naechste Abfahrten" ist die 3
     // (Firmware-Sitzung 23.10.2026).
+    // Auch bei nur EINER Linie bleibt es bei s1. Das Geraet erkennt ein einzelnes
+    // Zeilen-Token und zeigt dann die naechsten Abfahrten genau dieser Linie UND
+    // Richtung. s3 wuerde stattdessen alle Richtungen der Linie zeigen, denn es filtert
+    // nur nach Liniennamen (Firmware-Sitzung 23.10.2026). Leere Zeilen kamen vom
+    // Server-Deckel an grossen Knoten, nicht von der Sortierung.
     const sTeil = kannSortieren(c) ? '|s' + (zeitbasiert(d) ? '3' : '1') : '';
     const zTeil = uhrToken(d);
     // d<n> = Nummer des Displays. Eintraege mit gleichem d sind EIN Brett, egal welches
@@ -2387,22 +2392,17 @@ function geraeteDaten() {
     });
     filter.push(namen.join(',') || '*');
   });
-  // Wie viele Bretter es gibt: das Geraet blaettert nur im Slideshow-Modus
-  // (displaymode 2, main.cpp "isSlideshow = (displayMode == 2)"). Schicken wir das Feld
-  // nicht mit, setzt die Geraeteseite es auf 1 ("data.displaymode || '1'") und zeigt
-  // stur das erste Brett. Zwei Berliner Matrix-Displays standen darum still
-  // (Paul 23.10.2026).
-  const bretter = new Set();
-  (c.masterrow + ';' + c.timerow).split(';').forEach(function (seg) {
-    const m = seg.match(/\|d(\d+)(?:\||$)/);
-    if (m) bretter.add(m[1]);
-  });
-  const anzahlBretter = bretter.size || rbls.length;
   return {
     type: 'setRBL',
     rbl: rbls.join(','),
     filter: filter.join('|'),
-    displaymode: anzahlBretter > 1 ? '2' : '1',
+    // IMMER 1. Die 2 ist NICHT "mehrere Bretter", sondern die alte Slideshow: das Geraet
+    // zerlegt dann JEDES Brett zusaetzlich in eine Seite je Linie und Richtung, und
+    // sowohl die feste Zeilenfolge als auch die chronologische sind dabei aus (beide
+    // pruefen _displayMode != 2). Pauls U8 und U2 standen darum auf zwei Seiten statt
+    // untereinander. Zwischen den Brettern blaettert das Geraet auch in Modus 1
+    // (Firmware-Sitzung 23.10.2026).
+    displaymode: '1',
     // Ohne dieses Feld setzt die Geraeteseite die Zeilenzahl auf 2. Die Wahrheit steht
     // je Eintrag in der masterrow, das hier ist nur der Rueckfall.
     zeilen: String(displays.reduce(function (m, d) { return Math.max(m, zeilenVon(d)); }, 1)),
