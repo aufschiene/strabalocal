@@ -3270,7 +3270,7 @@
       <button onclick="chooseEditSettings()" style="display:flex;flex-direction:column;align-items:center;text-align:center;width:100%;background:var(--card);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);border-radius:14px;padding:24px 20px;margin-bottom:26px;cursor:pointer;transition:all 0.12s;" onmouseover="this.style.borderColor='var(--red)';this.style.boxShadow='6px 6px 0 var(--red)'" onmouseout="this.style.borderColor='var(--ink)';this.style.boxShadow='6px 6px 0 var(--ink)'">
         <span style="font-size:34px;line-height:1;margin-bottom:10px;">⚙️</span>
         <div style="color:var(--ink);font-weight:700;font-size:17px;margin-bottom:5px;">Einstellungen ändern</div>
-        <div style="color:#6b6258;font-size:13px;line-height:1.45;max-width:280px;">Design, Reihenfolge, Helligkeit, Gehweg und mehr im Feintuning.</div>
+        <div style="color:#6b6258;font-size:13px;line-height:1.45;max-width:280px;">Design, Reihenfolge, Helligkeit, Gehweg und mehr, je Display.</div>
       </button>
 
       <span id="configChoiceStations" style="color:#8a8276;font-size:12px;text-align:center;"></span>
@@ -7580,9 +7580,15 @@ function wizardFinish() {
 function wizardOpenFinetuning() {
   var cfg = wizardBuildConfig();
   if (!cfg) return;
-  // Das Feintuning liegt jetzt in der neuen Oberflaeche (anzeigen/anzeigen.html).
-  // Stationen und Config wandern per sessionStorage mit: gleiche Herkunft, keine
-  // Laengengrenze wie in der Adresszeile (Paul 23.10.2026).
+  zurNeuenOberflaeche(cfg);
+}
+
+// Das Feintuning liegt jetzt in der neuen Oberflaeche (anzeigen/anzeigen.html).
+// Stationen und Config wandern per sessionStorage mit: gleiche Herkunft, keine
+// Laengengrenze wie in der Adresszeile (Paul 23.10.2026). Von hier fuehren zwei Wege
+// hinueber: der Knopf "Feintuning" im Wizard und "Einstellungen aendern" im Menue.
+function zurNeuenOberflaeche(cfg) {
+  cfg = cfg || (typeof recommendedConfig !== 'undefined' ? recommendedConfig : null) || {};
   try {
     sessionStorage.setItem('catchit_feintuning', JSON.stringify({
       stand: Date.now(),
@@ -7604,7 +7610,6 @@ function wizardOpenFinetuning() {
     }));
   } catch (e) {}
   window.location.href = 'anzeigen/anzeigen.html';
-  return;
 }
 
 // Das alte Feintuning-Overlay bleibt als Funktion erhalten, es haengt an anderen
@@ -12222,8 +12227,8 @@ function chooseEditLines() {
 function chooseEditSettings() {
   const overlay = document.getElementById('configChoiceOverlay');
   if (overlay) overlay.style.display = 'none';
-  goToDisplayConfig();  // Config berechnen
-  goToFinetuning();     // direkt Feintuning
+  goToDisplayConfig();        // Config berechnen, danach steht recommendedConfig
+  zurNeuenOberflaeche(null);  // und hinueber in die neue Oberflaeche
 }
 
 // Nächster Schritt nach Stationen-Auswahl
