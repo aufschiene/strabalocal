@@ -3294,7 +3294,7 @@
          Stationen geladen werden (reine Wien-Configs holen nichts vor). -->
     <div id="startupProgress" style="display:none;width:200px;margin:14px auto 0;">
       <div style="height:10px;border:2px solid var(--ink);border-radius:999px;background:var(--card);overflow:hidden;">
-        <div id="startupProgressFill" style="height:100%;width:0;background:var(--ink);transition:width .25s ease;"></div>
+        <div id="startupProgressFill" style="height:100%;width:0;background:var(--ink);transition:width .08s linear;"></div>
       </div>
       <div id="startupProgressText" style="margin-top:6px;color:#6b6258;font-size:12px;font-weight:700;text-align:center;">0 %</div>
     </div>
@@ -4976,15 +4976,43 @@ function lineColourFor(network, name) {
 // spaeter die anderen drei"). Ausserhalb des Ladens ist der Merker aus, der Picker sieht
 // also weiterhin immer frische Daten.
 var _depMemo = null;
-async function fetchDeparturesUnified(fullId) {
+var _depMemoTimer = null;
+// Sitzungs-Cache: dieselbe Station nicht bei jedem Schritt neu holen. Vorher lud der
+// Picker die Abfahrten jedes Mal von vorn — auf "Linien" umstellen: laden. Station
+// bearbeiten: wieder laden. Zurueck und nochmal: wieder laden (Paul 23.10.2026). Eine
+// gute Minute reicht fuer einen Arbeitsgang und ist kurz genug, dass eine Server-
+// Korrektur gleich darauf wieder durchkommt. Wer wirklich frische Daten braucht, ruft
+// fetchDeparturesUnified(id, true).
+var _depKurzCache = new Map();
+var _DEP_KURZ_TTL = 90000;
+function depKurzCacheLeeren() { _depKurzCache.clear(); }
+// Frische Abfahrten erzwingen: der Picker MUSS aktuelle Richtungen sehen, sonst zeigt er
+// nach einem Server-Fix noch die alten Ziele. Er raeumt den Merker darum selbst weg,
+// statt dass der Lade-Pfad ihn sofort nach dem Aufbau wegwirft.
+function depMerkerLeeren() {
+  if (_depMemoTimer) { clearTimeout(_depMemoTimer); _depMemoTimer = null; }
+  _depMemo = null;
+}
+async function fetchDeparturesUnified(fullId, frisch) {
   if (!fullId) return { data: { monitors: [] } };
+  if (frisch) {
+    _depKurzCache.delete(fullId);
+    const pf = _fetchDeparturesUnifiedRaw(fullId);
+    _depKurzCache.set(fullId, { zeit: Date.now(), wert: pf });
+    return pf;
+  }
   if (_depMemo) {
     if (_depMemo.has(fullId)) return _depMemo.get(fullId);
     const p = _fetchDeparturesUnifiedRaw(fullId);
     _depMemo.set(fullId, p);
+    _depKurzCache.set(fullId, { zeit: Date.now(), wert: p });
     return p;
   }
-  return _fetchDeparturesUnifiedRaw(fullId);
+  const e = _depKurzCache.get(fullId);
+  if (e && (Date.now() - e.zeit) < _DEP_KURZ_TTL) return e.wert;
+  const p2 = _fetchDeparturesUnifiedRaw(fullId);
+  _depKurzCache.set(fullId, { zeit: Date.now(), wert: p2 });
+  return p2;
 }
 async function _fetchDeparturesUnifiedRaw(fullId) {
   if (!fullId) return { data: { monitors: [] } };
@@ -5020,12 +5048,14 @@ async function _fetchDeparturesUnifiedRaw(fullId) {
         await new Promise(res => setTimeout(res, wait));
         continue;  // erneut versuchen
       }
+      _depKurzCache.delete(fullId);      // Fehlschlag nicht fuer 90 s festhalten
       return { data: { monitors: [] } };  // 4xx (außer 429) → nicht retrien
     } catch (e) {
       if (attempt < MAX - 1) {
         await new Promise(res => setTimeout(res, 400 * Math.pow(2, attempt) + Math.random() * 250));
         continue;  // Netzwerkfehler → Backoff + Retry
       }
+      _depKurzCache.delete(fullId);      // Fehlschlag nicht fuer 90 s festhalten
       return { data: { monitors: [] } };
     }
   }
@@ -12379,10 +12409,32 @@ function maybeShowConfigChoice() {
 // Oeffnen die einzige echte Wartezeit, darum zaehlen genau sie. Der Balken steht unter der
 // Zug-Animation und erscheint erst, wenn der Nutzer eine der beiden Karten gewaehlt hat.
 var _ladeGesamt = 0, _ladeFertig = 0;
+// Der Balken springt nicht auf sein Ziel, er gleitet hin: rund zwei Sekunden bis zum
+// naechsten Ziel, egal wie viele Stationen auf einmal fertig geworden sind. Sonst stand
+// bei warmen Daten sofort "100 %", und das sieht aus, als waere der Balken nur Deko
+// (Paul 23.10.2026). _ladeAnzeige ist der gezeigte Wert, _ladeZiel der echte.
+var _ladeAnzeige = 0, _ladeZiel = 0, _ladeVon = 0, _ladeSeit = 0, _ladeTicker = null;
+var _LADE_GLEITZEIT = 2000;
+// Vor der ersten Station kroch der Balken gar nicht, bei kalten Daten stand er sechs
+// Sekunden auf null und sah eingefroren aus (Paul 23.10.2026). Jetzt laeuft er immer ein
+// halbes Feld VOR dem Erreichten her: vor der ersten Station kriecht er langsam dorthin,
+// danach zieht ihn jede fertige Station ein ganzes Feld weiter. Mehr als ein halbes Feld
+// nimmt er nie vorweg, er behauptet also nie, eine Station sei schon da.
+var _LADE_VORLAUF = 0.5;
+var _LADE_KRIECHZEIT = 9000;
+var _ladeGleitzeit = 2000;
+// Solange noch gearbeitet wird, bleibt der Balken unter 100: die letzten Prozent gehoeren
+// dem Augenblick, in dem es wirklich fertig ist.
+var _LADE_DECKEL = 96;
+var _ladeFertigGemeldet = false;
 
 function ladeFortschrittStarten(gesamt) {
   _ladeGesamt = gesamt > 0 ? gesamt : 0;
   _ladeFertig = 0;
+  _ladeAnzeige = 0; _ladeVon = 0; _ladeZiel = 0; _ladeSeit = 0;
+  _ladeGleitzeit = _LADE_GLEITZEIT;
+  _ladeFertigGemeldet = false;
+  if (_ladeTicker) { clearInterval(_ladeTicker); _ladeTicker = null; }
   ladeFortschrittZeichnen();
 }
 
@@ -12392,18 +12444,53 @@ function ladeFortschrittSchritt() {
   ladeFortschrittZeichnen();
 }
 
+// Alles erledigt: jetzt darf der Balken die letzten Prozent gehen.
+function ladeFortschrittAbschliessen() {
+  _ladeFertigGemeldet = true;
+  ladeFortschrittZeichnen();
+}
+
+function _ladeZielProzent() {
+  if (_ladeGesamt <= 0) return 0;
+  if (_ladeFertigGemeldet) return 100;
+  var roh = (_ladeFertig + _LADE_VORLAUF) / _ladeGesamt * 100;
+  return Math.min(roh, _LADE_DECKEL);
+}
+
+function _ladeMalen() {
+  var fuellung = document.getElementById('startupProgressFill');
+  var text = document.getElementById('startupProgressText');
+  var p = Math.round(_ladeAnzeige);
+  if (fuellung) fuellung.style.width = p + '%';
+  // Nur die Zahl, kein Wort: so braucht die Zeile keinen Uebersetzungs-Eintrag.
+  if (text) text.textContent = p + ' %';
+}
+
+function _ladeTick() {
+  var jetzt = Date.now();
+  var anteil = _ladeGleitzeit > 0 ? Math.min(1, (jetzt - _ladeSeit) / _ladeGleitzeit) : 1;
+  // Sanft auslaufen, damit das Ankommen am Ziel nicht abgehackt wirkt.
+  var weich = 1 - Math.pow(1 - anteil, 3);
+  _ladeAnzeige = _ladeVon + (_ladeZiel - _ladeVon) * weich;
+  _ladeMalen();
+  if (anteil >= 1) { clearInterval(_ladeTicker); _ladeTicker = null; _ladeAnzeige = _ladeZiel; _ladeMalen(); }
+}
+
 function ladeFortschrittZeichnen() {
   var kasten = document.getElementById('startupProgress');
   if (!kasten) return;
   // Ohne bekannte Gesamtzahl (reine Wien-Config, nichts vorzuladen) keinen Balken zeigen,
   // sonst staende er die ganze Zeit auf null.
   if (_ladeGesamt <= 0) { kasten.style.display = 'none'; return; }
-  var prozent = Math.round(_ladeFertig / _ladeGesamt * 100);
-  var fuellung = document.getElementById('startupProgressFill');
-  var text = document.getElementById('startupProgressText');
-  if (fuellung) fuellung.style.width = prozent + '%';
-  // Nur die Zahl, kein Wort: so braucht die Zeile keinen Uebersetzungs-Eintrag.
-  if (text) text.textContent = prozent + ' %';
+  var ziel = _ladeZielProzent();
+  if (ziel === _ladeZiel && _ladeTicker) return;   // laeuft schon dorthin
+  _ladeZiel = ziel;
+  _ladeVon = _ladeAnzeige;
+  _ladeSeit = Date.now();
+  // Vor der ersten Station bewusst langsam, danach die gewohnten zwei Sekunden je Feld.
+  _ladeGleitzeit = (_ladeFertig === 0 && !_ladeFertigGemeldet) ? _LADE_KRIECHZEIT : _LADE_GLEITZEIT;
+  if (_ladeZiel <= _ladeVon) { _ladeAnzeige = _ladeZiel; _ladeMalen(); return; }
+  if (!_ladeTicker) _ladeTicker = setInterval(_ladeTick, 40);
 }
 
 // Der Einstieg steht jetzt, bevor der Aufbau der Stationen fertig ist
@@ -12429,6 +12516,7 @@ async function aufAufbauWarten(btn) {
   for (var i = 0; i < 20 && _loadExistingConfigPromise; i++) {
     try { await _loadExistingConfigPromise; } catch (e) {}
   }
+  try { ladeFortschrittAbschliessen(); } catch (e) {}
   if (ladescreen) ladescreen.style.display = 'none';
   if (balken) balken.style.display = 'none';
   if (caption) caption.textContent = 'Lade Konfiguration …';
@@ -12601,6 +12689,7 @@ function handleStationsNextStep() {
 }
 
 async function editStation(idx) {
+  depMerkerLeeren();   // Lade-Merker beenden; der Sitzungs-Cache bleibt und spart die Abfrage
   const station = stations[idx];
   if (!station) return;
 
@@ -22451,7 +22540,14 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
     await _loadExistingConfigPromise;
   } finally {
     _loadExistingConfigPromise = null;
-    _depMemo = null;   // ab jetzt wieder frische Abfragen (Picker)
+    // Den Merker NICHT sofort wegwerfen. Das Geraet schickt loadExistingConfig und
+    // loadFullConfig hintereinander; laufen beide wirklich durch (je nach Timing greift
+    // die 300-ms-Bremse oben nicht), fragte der zweite Lauf mit leerem Merker JEDE Station
+    // erneut ab. Der Nutzer sieht dann dasselbe zweimal laden (Paul 23.10.2026). Ein paar
+    // Sekunden Nachlauf decken die Nachzuegler ab; danach ist wieder alles frisch.
+    // Der Picker leert den Merker ohnehin selbst, bevor er Linien holt.
+    if (_depMemoTimer) clearTimeout(_depMemoTimer);
+    _depMemoTimer = setTimeout(function() { _depMemo = null; _depMemoTimer = null; }, 4000);
   }
 }
 

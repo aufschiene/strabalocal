@@ -303,6 +303,16 @@
     position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
     background: var(--tinte); transition: transform .15s;
   }
+  /* Farbwahl im Baukasten der eigenen Displays: ein Feld je Farbe, Beschriftung darunter. */
+  .farbfelder { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .farbfeld { display: flex; flex-direction: column; align-items: center; gap: 4px;
+              font-size: 11px; color: var(--grau); }
+  .farbfeld input[type=color] {
+    width: 52px; height: 36px; padding: 0; border: 2px solid var(--rand);
+    border-radius: 10px; background: none; cursor: pointer;
+  }
+  .farbfeld input[type=color]::-webkit-color-swatch-wrapper { padding: 2px; }
+  .farbfeld input[type=color]::-webkit-color-swatch { border: none; border-radius: 7px; }
   .schiene.an { background: var(--akzent); }
   .schiene.an .kugel { transform: translateX(24px); background: #fff; }
 
@@ -426,7 +436,9 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="renderer-host.js"></script>
-<script src="display-renderer.js"></script>
+<!-- Die Versionsnummer bei jeder Aenderung am Renderer hochzaehlen: GitHub Pages
+     liefert die Datei sonst bis zu zehn Minuten aus dem Cache weiter. -->
+<script src="display-renderer.js?v=2"></script>
 <script>
 const DEP_API  = 'https://api.straba.at/api/v1/wl/departures';
 const SUCH_API = 'https://api.straba.at/api/v1/stops/search';
@@ -1574,7 +1586,7 @@ function streifenZeichnen() {
       const fach = Math.floor((170 - kopf) / eigene);
       const html = zeigtUhr(s.display)
         ? uhrHTML(stilHier, bild, s.display)
-        : dvPreviewHTML(stilHier, s.daten, gross, bild)
+        : dvPreviewHTML(stilHier, s.daten, gross, bild, istEigen(stilHier) ? eigenVon(stilHier) : null)
           + uhrZeileHTML(stilHier, s.daten, gross, s.display);
       // Fuer manche Display-Typen gibt es im Konfigurator gar keine Nachbildung
       // (z.B. 17 Bruenn). Dann sagen wir das, statt eine schwarze Flaeche zu zeigen.
@@ -2096,6 +2108,59 @@ function tokenListe(d) {
   return raus;
 }
 
+// Die eigenen Designs als customrow: ein Segment je Slot, "c<slot>|B…|T…|N…".
+// Geschrieben wird nur, was von der Vorgabe abweicht, damit die Zeile kurz bleibt.
+// Reihenfolge und Buchstaben wie im alten Konfigurator, die Firmware liest beides gleich.
+const EIGEN_VORGABE = eigenStd();
+function customrowBauen() {
+  const segs = [];
+  for (let c = EIGEN_MIN; c <= EIGEN_MAX; c++) {
+    const g = eigene[c];
+    if (!g) continue;
+    const teile = [];
+    ['B', 'T', 'U', 'H', 'V'].forEach(x => { if (g[x] && g[x] !== EIGEN_VORGABE[x]) teile.push(x + g[x]); });
+    ['G', 'F', 'A', 'W', 'M'].forEach(x => { if (g[x] && g[x] !== EIGEN_VORGABE[x]) teile.push(x + g[x]); });
+    // Linienfarben unveraendert durchreichen, der Baukasten hier stellt sie nicht ein.
+    const p = [];
+    Object.keys(g.P || {}).forEach(ln => {
+      const lc = g.P[ln] || {};
+      const name = String(ln).replace(/[|;:,]/g, '');
+      if (name) p.push(name + ':' + (lc.bg || '') + ':' + (lc.tx || '') + ':' + (lc.ol || ''));
+    });
+    if (p.length) teile.push('P' + p.join(','));
+    if (g.N) teile.push('N' + g.N);
+    if (teile.length) segs.push('c' + (c - 100) + '|' + teile.join('|'));
+  }
+  return segs.join(';');
+}
+function customrowLesen(zeile) {
+  String(zeile || '').split(';').forEach(seg => {
+    seg = seg.trim();
+    if (!seg) return;
+    const teile = seg.split('|');
+    const m = /^c(\d+)$/.exec(teile[0].trim());
+    if (!m) return;
+    const c = 100 + parseInt(m[1], 10);
+    if (!istEigen(c)) return;
+    const g = eigenVon(c);
+    g.N = '';
+    for (let i = 1; i < teile.length; i++) {
+      const tok = teile[i];
+      if (!tok) continue;
+      const buch = tok[0], wert = tok.slice(1);
+      if (buch === 'N') g.N = wert;
+      else if (buch === 'P') {
+        g.P = {};
+        wert.split(',').forEach(x => {
+          const st = x.split(':');
+          if (st[0]) g.P[st[0]] = { bg: st[1] || '', tx: st[2] || '', ol: st[3] || '' };
+        });
+      } else if ('BTUHVGFAWM'.indexOf(buch) >= 0) g[buch] = wert;
+    }
+    if (!g.N) g.N = 'Mein Display ' + (c - 100);
+  });
+}
+
 // Die Config, wie sie das Geraet bekommt. Eine Quelle fuer die Anzeige unten UND fuer
 // das Speichern, damit beides nie auseinanderlaeuft.
 function configBauen() {
@@ -2307,7 +2372,20 @@ function geraeteDaten() {
     const teile = seg.split('|');
     if (teile.length < 2) return;
     rbls.push(teile[0]);
-    filter.push(teile[1]);
+    // In das alte filter-Feld gehoeren NUR Liniennamen, keine Richtungen. Die Tokens
+    // der masterrow tragen seit 23.10.2026 ein ">Richtung", und das haette hier
+    // "U8>p1 (U8)s100003" als Liniennamen ergeben, den keine Abfahrt traegt. Das Feld
+    // ist ohnehin nur der Rueckfall, die Wahrheit steht in der masterrow.
+    const feld = teile[1].trim();
+    if (!feld || feld === '*') { filter.push('*'); return; }
+    const namen = [];
+    feld.split(',').forEach(function (tok) {
+      tok.split('+').forEach(function (teil) {
+        const n = teil.split('>')[0].trim();
+        if (n && namen.indexOf(n) < 0) namen.push(n);
+      });
+    });
+    filter.push(namen.join(',') || '*');
   });
   // Wie viele Bretter es gibt: das Geraet blaettert nur im Slideshow-Modus
   // (displaymode 2, main.cpp "isSlideshow = (displayMode == 2)"). Schicken wir das Feld
@@ -2331,6 +2409,9 @@ function geraeteDaten() {
     masterrow: c.masterrow,
     timerow: c.timerow,
     displaysettings: c.displaysettings,
+    // Die Designs der eigenen Displays. Ohne das Feld setzt die Geraeteseite es leer
+    // und das Aussehen waere nach dem Speichern weg.
+    customrow: customrowBauen(),
     colour: c.colourListe,
     // Ohne sortmode behaelt das Geraet seinen alten Wert. Steht dort 2 (chronologisch),
     // ignoriert es unsere feste Zeilenfolge. Displays in der timerow erzwingen 2 selbst.
@@ -2870,6 +2951,15 @@ const DOPPEL_ICON =
 // ---- Farben & Linien Design ------------------------------------------------------------
 // Gezeigt wird, was der Stil des GEWAEHLTEN Displays kann. Kann er nichts davon, steht
 // das auch so da, statt leere Schalter anzubieten (Paul 22.10.2026).
+// Ein Schalter mit Titel und Erklaerung, dasselbe Bauteil wie im Features-Block.
+function schalterZeile(titel, text, an, klick) {
+  return '<div class="schieber"><div class="wort">' + titel
+       + (text ? '<small>' + text + '</small>' : '') + '</div>'
+       + '<button class="schiene' + (an ? ' an' : '') + '" role="switch"'
+       + ' aria-checked="' + (an ? 'true' : 'false') + '" onclick="' + klick + '">'
+       + '<span class="kugel"></span></button></div>';
+}
+
 function designZeichnen() {
   const el = document.querySelector('#klappDesign .klapp-koerper');
   if (!el) return;
@@ -2879,9 +2969,46 @@ function designZeichnen() {
   const c = stilVon(d);
   const k = STIL_KANN[parseInt(c, 10)] || {};
   const e = einstFuer(d);
-  const stilName = (STILE.find(x => x.id === c) || {}).name || ('Stil ' + c);
+  const stilName = stilTitel(c);
   const di = displays.indexOf(d);
   let h = '';
+
+  // Eigenes Display: hier wird das Aussehen gebaut, nicht nur gefaerbt.
+  if (istEigen(c)) {
+    const g = eigenVon(c);
+    h += '<label class="feld" for="eigenName">Name dieses Designs</label>'
+       + '<input id="eigenName" type="text" maxlength="24" value="' + escapeHtmlFt(g.N) + '"'
+       + ' oninput="eigenNameSetzen(' + c + ', this.value)">';
+    h += '<label class="feld">Farben</label><div class="farbfelder">';
+    EIGEN_FARBEN.forEach(f => {
+      h += '<label class="farbfeld"><span>' + f[1] + '</span>'
+         + '<input type="color" value="#' + g[f[0]] + '"'
+         + ' oninput="eigenSetzen(' + c + ',\'' + f[0] + '\', this.value)"></label>';
+    });
+    h += '</div>';
+    h += '<label class="feld">Schrift</label><div class="schalter">';
+    EIGEN_SCHRIFT.forEach(b => {
+      h += '<button class="' + (g.F === b[0] ? 'an' : '') + '"'
+         + ' onclick="eigenSetzen(' + c + ',\'F\',\'' + b[0] + '\')">' + b[1] + '</button>';
+    });
+    h += '</div>';
+    h += '<label class="feld">Hintergrund</label><div class="schalter">';
+    EIGEN_GRUND.forEach(b => {
+      h += '<button class="' + (g.G === b[0] ? 'an' : '') + '"'
+         + ' onclick="eigenSetzen(' + c + ',\'G\',\'' + b[0] + '\')">' + b[1] + '</button>';
+    });
+    h += '</div>';
+    h += schalterZeile('Linien-Badges', 'Die Linie steht in einem farbigen Feld. Aus: sie steht gro\u00df daneben.',
+                       g.A === '1', 'eigenSchalten(' + c + ',\'A\',' + (g.A === '1' ? 'false' : 'true') + ')');
+    h += schalterZeile('Ziel fett', 'Kr\u00e4ftigere Schrift f\u00fcr den Zieltext.',
+                       g.W === '1', 'eigenSchalten(' + c + ',\'W\',' + (g.W === '1' ? 'false' : 'true') + ')');
+    h += schalterZeile('Ziel mittig', 'Sonst steht das Ziel oben in der Zeile, wie ab Werk.',
+                       g.M === '1', 'eigenSchalten(' + c + ',\'M\',' + (g.M === '1' ? 'false' : 'true') + ')');
+    h += '<div class="hinweis">Eigene Farben je Linie gibt es hier noch nicht, die stellst '
+       + 'du vorerst im alten Konfigurator ein. Sie bleiben erhalten.</div>';
+    el.innerHTML = h;
+    return;
+  }
 
   // Auch die Verspaetung und der Zeichensatz zaehlen: sonst verschluckt der fruehe
   // Ausstieg einen Schalter, sobald ein Stil nur diese kann.
@@ -3231,8 +3358,9 @@ function stilSetzen(v) {
     }
     eigenVon(frei);                       // legt das Design mit den Vorgaben an
     if (d) d.stil = frei; else stil = frei;
-    klappOffen = 'klappDesign';           // der Baukasten geht gleich auf
     allesZeichnen();
+    // Der Baukasten geht gleich auf, sonst sucht man ihn.
+    if (!document.getElementById('klappDesign').classList.contains('offen')) klappSchalten('klappDesign');
     return;
   }
   if (d) d.stil = parseInt(v, 10) || 1; else stil = parseInt(v, 10) || 1;
@@ -3519,6 +3647,8 @@ function uebergabeHolen() {
   // Stationen und wuerden je Station ein Brett vorgeben. Damit haette die automatische
   // Aufteilung (kompakt oder spielerisch) nie eine Chance, obwohl noch niemand etwas
   // zugewiesen hat. Ohne Geraete-Config verteilen wir also selbst (Paul 23.10.2026).
+  // Eigene Designs zuerst: davon haengen Namen und Vorschau der Stile ab.
+  customrowLesen((roh.geraet && roh.geraet.customrow) || roh.customrow || '');
   const g = roh.geraet || null;
   const bauZeilen = (g && (g.masterrow || g.timerow))
     ? (g.masterrow || '') + ';' + (g.timerow || '')
@@ -3590,6 +3720,24 @@ function displaysAusEintraegen(eintraege) {
   });
   if (misslungen || !neu.length) return false;
   displays = neu;
+  return true;
+}
+
+// Rueckfall, wenn die Bretter nicht eins zu eins zurueckkommen (Alle Abfahrten): dann
+// gilt wenigstens das AUSSEHEN der gespeicherten Config, also Stil und Design. Sonst
+// stuende nach jedem Oeffnen wieder die Vorgabe da, obwohl der Nutzer sein Display
+// laengst eingefaerbt hat (Paul 23.10.2026). Nur wenn ALLE Eintraege denselben Stil
+// tragen, sonst wuerde eine gemischte Config auf einen Stil eingeebnet.
+function aussehenUebernehmen(eintraege) {
+  const mit = (eintraege || []).filter(x => x.c);
+  if (!mit.length) return false;
+  const c = mit[0].c;
+  if (!mit.every(x => x.c === c)) return false;
+  displays.forEach(d => {
+    if (d.vomNutzer) return;
+    d.stil = c;
+    d.einst = Object.assign({}, mit[0].e);
+  });
   return true;
 }
 
@@ -3701,6 +3849,8 @@ function tokenTreffer(linien, m, richtungen) {
   // Gab es schon eine Config, zaehlt sie: Bretter, Stil, Uhr und Design kommen zurueck.
   if (displaysAusEintraegen(ueber && ueber.eintraege)) { allesZeichnen(); return; }
   allesZeichnen();
+  // Die Aufteilung kam nicht zurueck, das Aussehen schon.
+  if (ueber && aussehenUebernehmen(ueber.eintraege)) allesZeichnen();
   // Gruppen aus der Uebergabe anlegen. Die Verteilung hat die Zeilen einzeln gezaehlt
   // und kann Mitglieder derselben Gruppe auf zwei Displays gelegt haben, darum holen
   // wir sie auf das Display des ersten Mitglieds zurueck. Als Gruppe zaehlen sie dann
