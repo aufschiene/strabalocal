@@ -1803,11 +1803,14 @@ function stationenZeichnen() {
   let offen = '', schonWo = '', leer = '';
   let uebrig = 0;
   stationen.forEach((st, si) => {
-    const gesehen = new Set();
-    st.abfahrten.forEach(d => {
+    // NUR die gewaehlten Richtungen, dieselbe Liste wie auf den Displays. Vorher lief
+    // das ueber alle Abfahrten der Station, und dann stand im Pool die halbe
+    // Haltestelle: in Linz lagen unter den vier gewaehlten Linien noch 600, 618, 411
+    // und der Rest (Paul 23.10.2026). Wer eine weitere Linie will, holt sie sich in
+    // der Linienauswahl.
+    const zeilen = zeilenEintraege(st);
+    zeilen.forEach(d => {
       const k = d.line + '|' + d.dest;
-      if (gesehen.has(k)) return;
-      gesehen.add(k);
       if (vergeben.has(k)) return;
       uebrig++;
       const f = badgeFarben(d);
@@ -1827,7 +1830,7 @@ function stationenZeichnen() {
          + '</div>';
       if (wo.length) schonWo += zeile; else offen += zeile;
     });
-    if (!gesehen.size) {
+    if (!zeilen.length) {
       leer += '<div class="linie aus"><div class="rumpf"><div class="ziel">' + escapeHtmlFt(st.name)
          + '</div><div class="halt">'
          + (st.fehler ? 'nicht geladen, ' + escapeHtmlFt(st.fehler) : 'keine Abfahrten geladen')
