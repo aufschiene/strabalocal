@@ -51,9 +51,9 @@
      sofort in der Vorschau (Paul 23.10.2026). "body >" schlaegt die Regel fuer alle Kinder
      von body (position: relative). Grund und Schatten erst, wenn sie wirklich klebt
      (Klasse .klebt, siehe leisteKlebt), sonst laege oben ein Balken ueber dem Stadtplan. */
-  body > #streifen.streifen { position: sticky; top: 0; z-index: 5; transition: background-color .2s, box-shadow .2s; }
+  body > #streifen.streifen { position: sticky; top: 0; z-index: 5; }
   body > #streifen.streifen.klebt {
-    background-color: rgba(242, 234, 217, .96);
+    background-color: var(--papier);
     box-shadow: 0 10px 18px -14px rgba(27, 27, 27, .5);
   }
   /* Was wir per scrollIntoView ansteuern, landet unter der Leiste statt dahinter. --leiste
@@ -500,9 +500,39 @@ function standardEinst() {
   return { t: 1, b: 0, u: 0, v: 4, h: 1, n: 0, k: 0, o: 0,
            f: 0, d: 0, x: 0, y: 0, i: STANDZEIT_VORGABE };
 }
+// Oesterreich faehrt echte LED-Matrizen, und die haben je Bundesland ihre Farbe:
+// Oberoesterreich gruen, die uebrigen orange (Paul 23.10.2026). Wien hat seinen eigenen
+// Stil, und die OEBB ihre blaue Bahnhofsanzeige, darum stehen beide hier nicht.
+// Werte wie in SCHRIFT_WAHL.matrix: 1 Weiss, 2 Gruen, 3 Orange.
+const NETZ_MATRIX_TON = {
+  OOEVV: 2, OEBB_REG_OOE: 2,
+  STVG: 3, SALZBURG: 3, KAERNTEN: 3, VOR: 3, VVT: 3, VVV: 3
+};
+// Die Netze der Linien, die auf diesem Display liegen.
+function netzeVon(d) {
+  const raus = new Set();
+  ((d && d.richtungen) || []).forEach(k => {
+    const r = richtungFinden(k);
+    if (r) raus.add(r.station.netz || 'WL');
+  });
+  return raus;
+}
+function matrixTon(d) {
+  let ton = 0;
+  netzeVon(d).forEach(n => { if (!ton && NETZ_MATRIX_TON[n]) ton = NETZ_MATRIX_TON[n]; });
+  return ton;
+}
 function einstFuer(d) {
   if (!d) return standardEinst();
-  if (!d.einst) d.einst = standardEinst();
+  if (!d.einst) {
+    const e = standardEinst();
+    const ton = matrixTon(d);
+    if (ton) e.t = ton;
+    // Solange keine Linie drauf liegt, kennen wir das Netz nicht. Dann noch nichts
+    // merken, sonst bliebe der Farbton auf Weiss stehen, wenn die Linien kommen.
+    if (!(d.richtungen && d.richtungen.length)) return e;
+    d.einst = e;
+  }
   return d.einst;
 }
 // Nur noch fuer die displaysettings und die Vorschau, die beide eine colour bekommen.
@@ -685,7 +715,15 @@ const NETZ_STILE = {
   WL:      [1, 10, 24, 23],         // Wiener Linien, Straba, Paper White, Matrix
   OEBB:    [12, 14, 23, 24],        // OEBB, Westbahn, Matrix, Paper White
   BWEGT:   [7, 23, 12, 24],         // bodo, Matrix, OEBB, Paper White
-  WESTBAHN:[12, 14, 23, 24]
+  WESTBAHN:[12, 14, 23, 24],
+  // Oesterreichische Landesverbuende: Matrix zuerst, dann die Bahn-Tafeln.
+  OOEVV:   [23, 12, 24, 21],
+  STVG:    [23, 12, 24, 21],
+  SALZBURG:[23, 12, 24, 21],
+  KAERNTEN:[23, 12, 24, 21],
+  VOR:     [23, 12, 24, 21],
+  VVT:     [23, 12, 24, 21],
+  VVV:     [23, 12, 24, 21]
 };
 // Stile, die ueberall gehen und darum immer angeboten werden.
 const STILE_UNIVERSELL = [23, 21, 24, 10];
@@ -712,10 +750,13 @@ function stilOptionen(d) {
 }
 
 // Passender Stil fuer ein frisches Display: richtet sich nach den Netzen seiner Linien.
+// Die oesterreichischen Landesverbuende haengen echte LED-Matrizen auf, darum ist Matrix
+// dort die Vorgabe und nicht die OEBB-Tafel (Paul 23.10.2026). Den Farbton dazu setzt
+// einstFuer ueber NETZ_MATRIX_TON.
 function stilVorschlag(d) {
-  const netze = new Set();
-  (d.richtungen || []).forEach(k => { const r = richtungFinden(k); if (r) netze.add(r.station.netz || 'WL'); });
+  const netze = netzeVon(d);
   if (netze.size === 1 && netze.has('WL')) return 1;    // Wiener Linien
+  if (matrixTon(d)) return 23;                          // Matrix, gruen oder orange
   if (netze.size && !netze.has('WL')) return 12;        // OEBB-Bahnhofsanzeige
   return stil;
 }
@@ -3065,6 +3106,14 @@ setInterval(function () {
                  && [2, 15, 18, 21, 23].indexOf(parseInt(stilVon(d), 10)) >= 0);
   if (ledUhr) streifenZeichnen();
 }, 1000);
+// Klebt die Leiste oben? Dann Grund und Schatten (Paul 23.10.2026). Dazu ihre Hoehe als
+// --leiste, damit scrollIntoView-Ziele unter ihr landen statt dahinter.
+function leisteKlebt() {
+  const streifen = document.getElementById('streifen');
+  if (!streifen) return;
+  streifen.classList.toggle('klebt', window.scrollY > 0 && streifen.getBoundingClientRect().top <= 0.5);
+  document.documentElement.style.setProperty('--leiste', streifen.offsetHeight + 'px');
+}
 (function wischBeobachten() {
   const streifen = document.getElementById('streifen');
   let laeuft = false;
@@ -3073,7 +3122,49 @@ setInterval(function () {
     if (!laeuft) { laeuft = true; requestAnimationFrame(takt); }
   }, { passive: true });
   window.addEventListener('resize', function () { raumWirkung(true); });
+  let klebLaeuft = false;
+  window.addEventListener('scroll', () => {
+    if (!klebLaeuft) { klebLaeuft = true; requestAnimationFrame(() => { klebLaeuft = false; leisteKlebt(); }); }
+  }, { passive: true });
+  if (window.ResizeObserver) new ResizeObserver(leisteKlebt).observe(streifen);
+  leisteKlebt();
 })();
+// Welche Linien gewaehlt sind, lesen wir aus dem Linien-Feld von masterrow und timerow.
+// Das ist fuer ALLE Netze dieselbe Form und genau das, was auch das Geraet sieht. Der
+// Konfigurator kennt dafuer sechs Mechanismen (directions, filter, allDepartures,
+// Suffixe in der Stop-Id, lineGroups, eigene Netznamen) - die muenden alle hier hinein,
+// also muessen wir sie nicht einzeln nachbauen (Paul 23.10.2026).
+//   Feld '*' oder leer = alle Abfahrten, kein Filter
+//   sonst Tokens mit Komma, '+' verbindet Richtungen zu EINER Zeile (Gruppe),
+//   '>' trennt Linie und Richtung (Richtungs-Id oder Zieltext)
+function wahlAusZeilen(zeilen) {
+  const raus = new Map();
+  String(zeilen || '').split(';').forEach(seg => {
+    seg = seg.trim();
+    if (!seg) return;
+    const teile = seg.split('|');
+    if (teile.length < 2) return;
+    const feld = teile[1].trim();
+    const alle = !feld || feld === '*';
+    const gruppen = alle ? [] : feld.split(',').map(tok =>
+      tok.split('+').map(m => {
+        const st = m.split('>');
+        return { linie: (st[0] || '').trim(), richtung: (st[1] || '').trim() };
+      }).filter(x => x.linie)
+    ).filter(g => g.length);
+    // Ein Segment kann mehrere rbls tragen (Wien). Die Linien gelten dann fuer alle,
+    // und was an einem Bahnsteig nicht faehrt, findet beim Abgleich ohnehin nichts.
+    teile[0].split(',').forEach(rbl => {
+      rbl = rbl.trim();
+      if (!rbl) return;
+      const e = raus.get(rbl) || { alle: false, gruppen: [] };
+      if (alle) e.alle = true; else e.gruppen = e.gruppen.concat(gruppen);
+      raus.set(rbl, e);
+    });
+  });
+  return raus;
+}
+
 // Stationen, die der Konfigurator uebergibt. catchit-cities legt sie beim Klick auf
 // "Feintuning" in den sessionStorage und wechselt hierher (Paul 23.10.2026). Eine
 // Wien-Station kann mehrere Bahnsteige tragen, die werden hier zu je einer Station.
@@ -3081,31 +3172,60 @@ function uebergabeHolen() {
   let roh = null;
   try { roh = JSON.parse(sessionStorage.getItem('catchit_feintuning') || 'null'); } catch (e) {}
   if (!roh || !roh.stationen || !roh.stationen.length) return null;
+  const wahl = wahlAusZeilen((roh.masterrow || '') + ';' + (roh.timerow || ''));
   const raus = [];
   roh.stationen.forEach(st => {
+    // Rueckfall, falls keine Config berechnet wurde: die Liniennamen aus filter.
+    const ausFilter = String(st.filter || '').split(',').map(x => x.trim()).filter(Boolean)
+                        .map(x => [{ linie: x, richtung: '' }]);
     String(st.rbl || '').split(',').forEach(rbl => {
       rbl = rbl.trim();
       if (!rbl) return;
+      const w = wahl.get(rbl) || null;
       raus.push({ rbl: rbl, name: st.name || rbl, netz: st.netz || 'WL',
-                  alle: !!st.alle, richtungen: st.richtungen || [] });
+                  alle: !!st.alle || !!(w && w.alle),
+                  wahl: (w && w.gruppen.length) ? w.gruppen : ausFilter,
+                  richtungen: st.richtungen || [] });
     });
   });
   return { stationen: raus, helligkeit: roh.helligkeit, masterrow: roh.masterrow || '' };
 }
 
-// Welche Richtung der Uebergabe passt zu welcher Abfahrt? Zuerst Linie und Ziel genau,
-// sonst Linie und ein Ziel, das ineinander steckt (der Konfigurator kuerzt Ziele anders
-// als die Abfahrts-API), sonst nur die Linie.
-function richtungTreffer(linien, wunsch) {
-  const l = String(wunsch.line || '').trim().toUpperCase();
-  const z = String(wunsch.ziel || '').trim().toLowerCase();
-  let treffer = linien.find(x => x.name.toUpperCase() === l && x.ziel.toLowerCase() === z);
-  if (!treffer && z) {
-    treffer = linien.find(x => x.name.toUpperCase() === l
-      && (x.ziel.toLowerCase().indexOf(z) >= 0 || z.indexOf(x.ziel.toLowerCase()) >= 0));
+// Welches Ziel der Station ist gemeint? Zuerst genau, sonst eines, das ineinander
+// steckt: der Konfigurator kuerzt Ziele anders als die Abfahrts-API.
+function zielTreffer(linien, ziel) {
+  const z = String(ziel || '').trim().toLowerCase();
+  if (!z) return null;
+  return linien.find(x => x.ziel.toLowerCase() === z)
+      || linien.find(x => x.ziel.toLowerCase().indexOf(z) >= 0
+                       || z.indexOf(x.ziel.toLowerCase()) >= 0)
+      || null;
+}
+
+// Ein Linien-Token der Config auf die echten Abfahrten abbilden. Drei Faelle:
+//   "U1>Leopoldau"  Zieltext, direkt abgleichbar
+//   "U1>301"        Richtungs-Id, in den Abfahrten gibt es die nicht: dann hilft der
+//                   Zieltext aus der Uebergabe (richtungen)
+//   "105"           keine Richtung, z.B. Linz und andere HAFAS-Netze: die Linie gilt
+//                   in alle Richtungen
+function tokenTreffer(linien, m, richtungen) {
+  const l = String(m.linie || '').trim().toUpperCase();
+  const gleich = linien.filter(x => x.name.trim().toUpperCase() === l);
+  if (!gleich.length) return [];
+  const r = String(m.richtung || '').trim();
+  if (r && !/^\d+$/.test(r)) {
+    const t = zielTreffer(gleich, r);
+    return t ? [t] : gleich;
   }
-  if (!treffer) treffer = linien.find(x => x.name.toUpperCase() === l);
-  return treffer || null;
+  const ziele = (richtungen || [])
+    .filter(x => String(x.line || '').trim().toUpperCase() === l)
+    .map(x => String(x.ziel || '').trim()).filter(Boolean);
+  if (ziele.length) {
+    const raus = [];
+    ziele.forEach(z => { const t = zielTreffer(gleich, z); if (t && raus.indexOf(t) < 0) raus.push(t); });
+    if (raus.length) return raus;
+  }
+  return gleich;
 }
 
 (async function start() {
@@ -3124,6 +3244,7 @@ function richtungTreffer(linien, wunsch) {
   const liste = ueber ? ueber.stationen
                       : TEST.map(e => ({ rbl: e.rbl, name: e.name, netz: 'WL', alle: false,
                                          lat: e.lat, lon: e.lon,
+                                         wahl: [[{ linie: e.linie, richtung: e.ziel }]],
                                          richtungen: [{ line: e.linie, ziel: e.ziel }] }));
   for (const e of liste) {
     const st = { rbl: e.rbl, name: e.name, netz: e.netz || 'WL', abfahrten: [],
@@ -3142,15 +3263,45 @@ function richtungTreffer(linien, wunsch) {
     }
     // Angehakt wird, was der Konfigurator gewaehlt hat. "Alle Abfahrten" laesst die
     // Auswahl leer, das heisst in dieser Oberflaeche ohnehin "alles".
-    if (!e.alle) {
+    if (!e.alle && e.wahl && e.wahl.length) {
       const linien = linienAus(st.abfahrten);
-      (e.richtungen || []).forEach(wunsch => {
-        const treffer = richtungTreffer(linien, wunsch);
-        if (treffer) st.gewaehlt.add(treffer.name + '|' + treffer.ziel);
+      const paare = [];
+      e.wahl.forEach(gruppe => {
+        const keys = [];
+        gruppe.forEach(m => {
+          tokenTreffer(linien, m, e.richtungen).forEach(treffer => {
+            const k = treffer.name + '|' + treffer.ziel;
+            st.gewaehlt.add(k);
+            if (keys.indexOf(k) < 0) keys.push(k);
+          });
+        });
+        // Nur ein Token mit '+' ist eine Gruppe. Dass eine Linie in zwei Richtungen
+        // faehrt, macht noch keine gemeinsame Zeile.
+        if (gruppe.length > 1 && keys.length > 1) paare.push(keys);
       });
+      if (paare.length) st.paare = paare;
     }
   }
   allesZeichnen();
+  // Gruppen aus der Uebergabe anlegen. Die Verteilung hat die Zeilen einzeln gezaehlt
+  // und kann Mitglieder derselben Gruppe auf zwei Displays gelegt haben, darum holen
+  // wir sie auf das Display des ersten Mitglieds zurueck. Als Gruppe zaehlen sie dann
+  // ohnehin nur eine Zeile. gruppenPruefen raeumt auf, was nicht mehr passt.
+  let gruppiert = false;
+  stationen.forEach(st => (st.paare || []).forEach(keys => {
+    const d = displays.find(x => x.richtungen.indexOf(keys[0]) >= 0);
+    if (!d || gruppeVon(d, keys[0])) return;
+    keys.slice(1).forEach(k => {
+      displays.forEach(x => {
+        if (x !== d) x.richtungen = x.richtungen.filter(y => y !== k);
+      });
+      if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k);
+    });
+    if (!d.gruppen) d.gruppen = [];
+    d.gruppen.push(keys.slice());
+    gruppiert = true;
+  }));
+  if (gruppiert) { displays.forEach(gruppenPruefen); allesZeichnen(); }
 
 })();
 </script>

@@ -7587,6 +7587,14 @@ function wizardOpenFinetuning() {
 // Stationen und Config wandern per sessionStorage mit: gleiche Herkunft, keine
 // Laengengrenze wie in der Adresszeile (Paul 23.10.2026). Von hier fuehren zwei Wege
 // hinueber: der Knopf "Feintuning" im Wizard und "Einstellungen aendern" im Menue.
+//
+// WELCHE LINIEN GEWAEHLT SIND, steht genau an EINER Stelle: im Linien-Feld von
+// masterrow und timerow ("NETZ:stop|U1>301,U4|c1|g0"). Diese Seite kennt dafuer sechs
+// Mechanismen, je nach Netz: directions, filter, allDepartures/allDepCat, Suffixe in
+// der Stop-Id (~S~REX, >Ziel), lineGroups/regionalLinks und eigene Netznamen
+// (OEBBREG/OEBBFERN/OEBBALL). Alle sechs muenden ohnehin in dieses eine Feld, denn nur
+// das sieht das Geraet. Darum uebernimmt die neue Oberflaeche es direkt und muss von
+// den sechs Mechanismen nichts wissen (Paul 23.10.2026, Linz uebernahm alle Linien).
 function zurNeuenOberflaeche(cfg) {
   cfg = cfg || (typeof recommendedConfig !== 'undefined' ? recommendedConfig : null) || {};
   try {
@@ -7598,10 +7606,11 @@ function zurNeuenOberflaeche(cfg) {
           name: st.stopName,
           netz: st.network,
           alle: !!st.allDepartures,
-          // Netze ohne Richtungsauswahl (HAFAS, z.B. Linz) fuehren die gewaehlten
-          // Linien NUR in filter. Ohne das uebernimmt die neue Oberflaeche alles,
-          // was an der Station faehrt (Paul 23.10.2026).
+          // Nur noch der Rueckfall, falls keine Config berechnet wurde: die Auswahl
+          // steht kanonisch in masterrow/timerow (siehe unten).
           filter: st.filter || '',
+          // Zieltexte zu den gewaehlten Richtungen. Die masterrow fuehrt dort, wo es sie
+          // gibt, eine Richtungs-Id, und die kommt in den Abfahrtsdaten nicht vor.
           richtungen: (st.directions || []).map(function (d) {
             return { line: d.line || '', ziel: d.towards || d.ziel || '' };
           })
