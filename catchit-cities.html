@@ -7580,6 +7580,38 @@ function wizardFinish() {
 function wizardOpenFinetuning() {
   var cfg = wizardBuildConfig();
   if (!cfg) return;
+  // Das Feintuning liegt jetzt in der neuen Oberflaeche (anzeigen/anzeigen.html).
+  // Stationen und Config wandern per sessionStorage mit: gleiche Herkunft, keine
+  // Laengengrenze wie in der Adresszeile (Paul 23.10.2026).
+  try {
+    sessionStorage.setItem('catchit_feintuning', JSON.stringify({
+      stand: Date.now(),
+      stationen: (stations || []).map(function (st) {
+        return {
+          rbl: st.fullId || st.stopId,
+          name: st.stopName,
+          netz: st.network,
+          alle: !!st.allDepartures,
+          richtungen: (st.directions || []).map(function (d) {
+            return { line: d.line || '', ziel: d.towards || d.ziel || '' };
+          })
+        };
+      }),
+      masterrow: cfg.masterrow || '',
+      timerow: cfg.timerow || '',
+      displaysettings: cfg.displaysettings || '',
+      helligkeit: parseInt(cfg.displaylight || 3, 10)
+    }));
+  } catch (e) {}
+  window.location.href = 'anzeigen/anzeigen.html';
+  return;
+}
+
+// Das alte Feintuning-Overlay bleibt als Funktion erhalten, es haengt an anderen
+// Stellen (Zurueck aus dem Overlay, alter Flow).
+function wizardOpenFinetuningAlt() {
+  var cfg = wizardBuildConfig();
+  if (!cfg) return;
   ftCameFromWizard = true;  // Zurueck-Button fuehrt dann zum neuen Wizard, nicht zum alten Screen
   document.querySelectorAll('.container > .card').forEach(function(c) {
     if (c.id !== 'stationsCard') c.classList.add('hidden');
