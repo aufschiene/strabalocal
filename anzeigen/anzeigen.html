@@ -1999,8 +1999,24 @@ function geraeteDaten() {
   const c = configBauen();
   const erste = displays[0];
   const e = erste ? einstFuer(erste) : standardEinst();
+  // rbl und filter MUESSEN mit: die Seite des Geraets schickt ihr Formular nur ab,
+  // wenn data.rbl gesetzt ist (fillAndSubmit: "if (data.rbl) { ... form.submit(); }").
+  // Ohne das fuellt sie brav alle Felder und tut dann nichts (Paul 23.10.2026).
+  // Inhaltlich gewinnt ohnehin die masterrow, die positionalen Felder baut das Geraet
+  // daraus neu.
+  const rbls = [], filter = [];
+  (c.masterrow + ';' + c.timerow).split(';').forEach(function (seg) {
+    seg = seg.trim();
+    if (!seg) return;
+    const teile = seg.split('|');
+    if (teile.length < 2) return;
+    rbls.push(teile[0]);
+    filter.push(teile[1]);
+  });
   return {
     type: 'setRBL',
+    rbl: rbls.join(','),
+    filter: filter.join('|'),
     masterrow: c.masterrow,
     timerow: c.timerow,
     displaysettings: c.displaysettings,
