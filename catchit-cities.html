@@ -12464,7 +12464,9 @@ var _ladeGesamt = 0, _ladeFertig = 0;
 // bei warmen Daten sofort "100 %", und das sieht aus, als waere der Balken nur Deko
 // (Paul 23.10.2026). _ladeAnzeige ist der gezeigte Wert, _ladeZiel der echte.
 var _ladeAnzeige = 0, _ladeZiel = 0, _ladeVon = 0, _ladeSeit = 0, _ladeTicker = null;
-var _LADE_GLEITZEIT = 2000;
+// 2600 statt 2000: das weiche Auslaufen frisst das Ende der Strecke, mit 2000 war die
+// Fahrt von null auf 96 nach 1,7 s durch. So liegt sie sicher ueber zwei Sekunden.
+var _LADE_GLEITZEIT = 2600;
 // Vor der ersten Station kroch der Balken gar nicht, bei kalten Daten stand er sechs
 // Sekunden auf null und sah eingefroren aus (Paul 23.10.2026). Jetzt laeuft er immer ein
 // halbes Feld VOR dem Erreichten her: vor der ersten Station kriecht er langsam dorthin,
@@ -12477,6 +12479,11 @@ var _ladeGleitzeit = 2000;
 // dem Augenblick, in dem es wirklich fertig ist.
 var _LADE_DECKEL = 96;
 var _ladeFertigGemeldet = false;
+// Der Balken laeuft erst, wenn er auch zu sehen ist. Vorher animierte er schon waehrend
+// des Ladens im verborgenen Ladescreen, und wer danach auf eine Karte klickte, sah ihn
+// sofort auf 96 stehen (Paul 23.10.2026). Solange er unsichtbar ist, wird nur das Ziel
+// mitgefuehrt, gezeichnet wird nichts.
+var _ladeSichtbar = false;
 
 function ladeFortschrittStarten(gesamt) {
   _ladeGesamt = gesamt > 0 ? gesamt : 0;
@@ -12533,6 +12540,8 @@ function ladeFortschrittZeichnen() {
   // sonst staende er die ganze Zeit auf null.
   if (_ladeGesamt <= 0) { kasten.style.display = 'none'; return; }
   var ziel = _ladeZielProzent();
+  // Unsichtbar: nur merken, wohin es gehen soll. Die Fahrt beginnt beim Einblenden.
+  if (!_ladeSichtbar) { _ladeZiel = ziel; return; }
   if (ziel === _ladeZiel && _ladeTicker) return;   // laeuft schon dorthin
   _ladeZiel = ziel;
   _ladeVon = _ladeAnzeige;
@@ -12541,6 +12550,29 @@ function ladeFortschrittZeichnen() {
   _ladeGleitzeit = (_ladeFertig === 0 && !_ladeFertigGemeldet) ? _LADE_KRIECHZEIT : _LADE_GLEITZEIT;
   if (_ladeZiel <= _ladeVon) { _ladeAnzeige = _ladeZiel; _ladeMalen(); return; }
   if (!_ladeTicker) _ladeTicker = setInterval(_ladeTick, 40);
+}
+
+// Einblenden: IMMER bei null anfangen und mindestens zwei Sekunden bis zum aktuellen Ziel
+// brauchen, damit man den Balken wirklich laufen sieht statt ihn fertig vorzufinden.
+function ladeFortschrittEinblenden() {
+  var kasten = document.getElementById('startupProgress');
+  if (!kasten || _ladeGesamt <= 0) return;
+  _ladeSichtbar = true;
+  kasten.style.display = '';
+  if (_ladeTicker) { clearInterval(_ladeTicker); _ladeTicker = null; }
+  _ladeAnzeige = 0; _ladeVon = 0;
+  _ladeZiel = _ladeZielProzent();
+  _ladeSeit = Date.now();
+  _ladeGleitzeit = (_ladeFertig === 0 && !_ladeFertigGemeldet) ? _LADE_KRIECHZEIT : _LADE_GLEITZEIT;
+  _ladeMalen();
+  if (_ladeZiel > 0) _ladeTicker = setInterval(_ladeTick, 40);
+}
+
+function ladeFortschrittAusblenden() {
+  _ladeSichtbar = false;
+  if (_ladeTicker) { clearInterval(_ladeTicker); _ladeTicker = null; }
+  var kasten = document.getElementById('startupProgress');
+  if (kasten) kasten.style.display = 'none';
 }
 
 // Der Einstieg steht jetzt, bevor der Aufbau der Stationen fertig ist
@@ -12555,10 +12587,9 @@ async function aufAufbauWarten(btn) {
   var auswahl = document.getElementById('configChoiceOverlay');
   var ladescreen = document.getElementById('startupLoading');
   var caption = document.getElementById('startupLoadingText');
-  var balken = document.getElementById('startupProgress');
   if (auswahl) auswahl.style.display = 'none';
   if (caption) caption.textContent = 'Stationen werden geladen …';
-  if (balken && _ladeGesamt > 0) { balken.style.display = ''; ladeFortschrittZeichnen(); }
+  ladeFortschrittEinblenden();
   // WICHTIG 'flex', nicht '': das Overlay traegt display:flex im style-Attribut, und ein
   // leerer Wert loescht die Eigenschaft, statt sie wiederherzustellen. Der Block fiel dann
   // auf display:block zurueck und Text, Zug und Balken standen verstreut statt mittig
@@ -12572,7 +12603,7 @@ async function aufAufbauWarten(btn) {
   }
   try { ladeFortschrittAbschliessen(); } catch (e) {}
   if (ladescreen) ladescreen.style.display = 'none';
-  if (balken) balken.style.display = 'none';
+  try { ladeFortschrittAusblenden(); } catch (e) {}
   if (caption) caption.textContent = 'Lade Konfiguration …';
   try { auswahlHinweisAktualisieren(); } catch (e) {}
 }

@@ -873,10 +873,20 @@ function stilOptionen(d) {
 // einstFuer ueber NETZ_MATRIX_TON.
 function stilVorschlag(d) {
   const netze = netzeVon(d);
+  // Ein frisch angelegtes Brett hat noch keine Linie, also auch kein Netz. Dann erbt es
+  // den Stil des Bretts davor: wer gerade ein Matrix-Display gebaut hat, will mit dem
+  // naechsten selten bei Wiener Linien anfangen (Paul 23.10.2026).
+  if (!netze.size) {
+    const i = displays.indexOf(d);
+    for (let j = (i < 0 ? displays.length : i) - 1; j >= 0; j--) {
+      if (displays[j] && displays[j].stil != null) return displays[j].stil;
+    }
+    return stil;
+  }
   if (netze.size === 1 && netze.has('WL')) return 1;    // Wiener Linien
   const v = netzVorgabe(d);
   if (v) return v[0];
-  if (netze.size && !netze.has('WL')) return 12;        // unbekanntes Netz: Bahnhofstafel
+  if (!netze.has('WL')) return 12;                      // unbekanntes Netz: Bahnhofstafel
   return stil;
 }
 let zeiger = 0;                // welcher Bildschirm ist ausgewaehlt
@@ -1099,9 +1109,10 @@ function gehwegRichtung(st, ziel) {
   return (v != null) ? v : null;
 }
 function gehwegFuer(st, key) {
-  const eigen = st && st.gehwegLinien && st.gehwegLinien[key];
+  const lokal = keyLokal(key);
+  const eigen = st && st.gehwegLinien && st.gehwegLinien[lokal];
   if (eigen != null) return eigen;
-  const ziel = String(key).split('|')[1] || '';
+  const ziel = lokal.split('|')[1] || '';
   const r = gehwegRichtung(st, ziel);
   return (r != null) ? r : gehwegStation(st);
 }
@@ -1136,10 +1147,22 @@ function gwGenauer(rbl) {
 function nachtSchalten() { nacht.an = !nacht.an; allesZeichnen(); }
 function nachtZeitSetzen(feld, wert) { nacht[feld] = parseInt(wert, 10) || 0; allesZeichnen(); }
 
+// Schluessel einer ZEILE. Die Station gehoert mit hinein: zwei Stationen koennen
+// dieselbe Linie mit demselben Ziel fuehren (Paul 23.10.2026: M76 nach Lichtenrade an
+// Walther-Schreiber-Platz UND am Knausplatz). Ohne die Station galten beide als eine
+// Zeile, die zweite verschwand aus der Liste und in der Config bekam sie die Abfahrten
+// der ersten. Innerhalb einer Station bleibt es bei "Linie|Ziel", davon leben
+// gewaehlt und gehwegLinien.
+function zeilenKey(si, dep) { return si + '\u00a7' + dep.line + '|' + dep.dest; }
+function keyLokal(k) {
+  const m = /^(\d+)\u00a7([\s\S]*)$/.exec(String(k));
+  return m ? m[2] : String(k);
+}
+
 function alleRichtungen() {
   const raus = [];
-  stationen.forEach(st => zeilenEintraege(st).forEach(d => {
-    raus.push({ key: d.line + '|' + d.dest, dep: d, station: st });
+  stationen.forEach((st, si) => zeilenEintraege(st).forEach(d => {
+    raus.push({ key: zeilenKey(si, d), dep: d, station: st, si: si });
   }));
   return raus;
 }
@@ -1823,7 +1846,7 @@ function editorZeichnen() {
       return '<b style="background:' + f.bg + ';color:' + f.fg + '">'
            + escapeHtmlFt(t ? t.dep.line : '?') + '</b>';
     }).join('');
-    const ziele = teil.map((k, n) => escapeHtmlFt(treffer[n] ? treffer[n].dep.dest : k))
+    const ziele = teil.map((k, n) => escapeHtmlFt(treffer[n] ? treffer[n].dep.dest : keyLokal(k)))
                       .join(' &middot; ');
     const halte = [];
     treffer.forEach(t => { if (t && halte.indexOf(t.station.name) < 0) halte.push(t.station.name); });
@@ -2021,7 +2044,7 @@ function stationenZeichnen() {
     // der Linienauswahl.
     const zeilen = zeilenEintraege(st);
     zeilen.forEach(d => {
-      const k = d.line + '|' + d.dest;
+      const k = zeilenKey(si, d);
       if (vergeben.has(k)) return;
       uebrig++;
       const f = badgeFarben(d);
@@ -3697,9 +3720,11 @@ function displaysAusEintraegen(eintraege) {
       ein.gruppen.forEach(teil => {
         const keys = [];
         teil.forEach(m => stats.forEach(st => {
+          const si = stationen.indexOf(st);
           tokenTreffer(linienAus(st.abfahrten), m, []).forEach(tr => {
-            const k = tr.name + '|' + tr.ziel;
-            if (st.gewaehlt && st.gewaehlt.size && !st.gewaehlt.has(k)) return;
+            const lokal = tr.name + '|' + tr.ziel;
+            if (st.gewaehlt && st.gewaehlt.size && !st.gewaehlt.has(lokal)) return;
+            const k = zeilenKey(si, { line: tr.name, dest: tr.ziel });
             if (keys.indexOf(k) < 0) keys.push(k);
           });
         }));
@@ -3834,8 +3859,9 @@ function tokenTreffer(linien, m, richtungen) {
         const keys = [];
         gruppe.forEach(m => {
           tokenTreffer(linien, m, e.richtungen).forEach(treffer => {
-            const k = treffer.name + '|' + treffer.ziel;
-            st.gewaehlt.add(k);
+            const lokal = treffer.name + '|' + treffer.ziel;
+            st.gewaehlt.add(lokal);
+            const k = zeilenKey(stationen.indexOf(st), { line: treffer.name, dest: treffer.ziel });
             if (keys.indexOf(k) < 0) keys.push(k);
           });
         });
