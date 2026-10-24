@@ -7796,6 +7796,27 @@ function zurNeuenOberflaeche(cfg) {
       // heisst spielerisch, alles auf einem heisst kompakt. Der Nutzer sieht die beiden
       // Woerter drueben nicht mehr, sie steuern nur die automatische Verteilung.
       modus: cfg.multiDisplay ? 'spielerisch' : 'kompakt',
+      // Marke des Geraets (BODO, OEBB, leer bei ungebrandet).
+      brand: (typeof deviceBrand === 'function') ? deviceBrand() : '',
+      // Die erlaubten Display-Stile dieser Marke, damit die neue Oberflaeche sie nicht
+      // abschreiben muss: die Liste darf nur EINMAL existieren, sonst laufen die beiden
+      // Fassungen auseinander, sobald jemand nur eine aendert (24.10.2026). Reihenfolge =
+      // Reihenfolge der Karten hier und des Aufklappmenues drueben. Ohne Marke null.
+      // Die Namen kommen ueber brandDisplayName, nicht aus der Tabelle: so gibt es auch
+      // hier nur einen Weg zur Wahrheit.
+      brandStile: (typeof brandDisplayTypes === 'function') ? brandDisplayTypes() : null,
+      brandStilNamen: (function() {
+        try {
+          var liste = (typeof brandDisplayTypes === 'function') ? brandDisplayTypes() : null;
+          if (!liste || !liste.length) return null;
+          var m = {};
+          liste.forEach(function(cid) {
+            var n = (typeof brandDisplayName === 'function') ? brandDisplayName(cid) : null;
+            if (n) m[cid] = n;
+          });
+          return Object.keys(m).length ? m : null;
+        } catch (e) { return null; }
+      })(),
       // Die hier gebauten Zeilen sagen, WAS gewaehlt ist: sie geben den Stand dieser
       // Seite wieder, also auch gerade abgehakte Linien.
       // ACHTUNG Schreibweise: die Config fuehrt die Felder als masterRow/timeRow/
@@ -9380,7 +9401,9 @@ function brandBusFirstRank(line) {
 // Reihenfolge Tram, Bus, Zug. Innerhalb jeder Gruppe nach Liniennummer.
 // (Nachtbus = "N" + Ziffer, z.B. N1.)
 function lineTypeRank(line) {
-  if (typeof brandDisplayTypes === 'function' && brandDisplayTypes()) return brandBusFirstRank(line);
+  // Bewusst brandBusFirstActive und NICHT brandDisplayTypes: eine Marke darf eine kurze
+  // Stil-Liste haben, ohne deshalb Busse vor Zuege zu sortieren.
+  if (typeof brandBusFirstActive === 'function' && brandBusFirstActive()) return brandBusFirstRank(line);
   const t = String(line.type || '').toLowerCase();
   const n = String(line.name || '').trim();
   if (t.includes('metro') || /^U\d/i.test(n)) return 0;                      // U-Bahn
@@ -15826,8 +15849,22 @@ function setFtCompactSeparate(mode) {
 // Marken-Geräte bekommen eine feste, kurze Display-Auswahl statt der ganzen Liste.
 // bodo (Paul 01.10.2026): Blau/Gelb, Orange Matrix und die ÖBB-Anzeige, letztere unter
 // dem neutralen Namen „Bahnhofsanzeige". Reihenfolge = Reihenfolge der Karten.
-var BRAND_DISPLAY_TYPES = { BODO: [7, 23, 12] };
-var BRAND_DISPLAY_NAMES = { BODO: { 7: 'bodo-Ansicht', 12: 'Bahnhofsanzeige', 23: 'Orange Matrix' } };
+// OEBB (Paul 24.10.2026): "Bahnhofanzeige, Wiener Linien, Matrix und Paperwhite und
+// eigenes display". Reihenfolge ist seine. Nur die 12 braucht einen eigenen Namen, die
+// anderen heissen wie im Katalog.
+var BRAND_DISPLAY_TYPES = { BODO: [7, 23, 12], OEBB: [12, 1, 23, 24] };
+var BRAND_DISPLAY_NAMES = {
+  BODO: { 7: 'bodo-Ansicht', 12: 'Bahnhofsanzeige', 23: 'Orange Matrix' },
+  OEBB: { 12: 'Bahnhofsanzeige' }
+};
+// Nur bodo sortiert Busse vor Zuege. Das haengt NICHT an der Stil-Liste: sonst haette
+// OEBB mit seiner neuen Liste still die Bus-Sortierung bekommen, und das waere bei einer
+// Bahn genau verkehrt (24.10.2026).
+var BRAND_BUS_FIRST = { BODO: 1 };
+function brandBusFirstActive() {
+  var b = (typeof deviceBrand === 'function') ? deviceBrand() : '';
+  return !!BRAND_BUS_FIRST[b];
+}
 function brandDisplayTypes() {
   var b = (typeof deviceBrand === 'function') ? deviceBrand() : '';
   var l = BRAND_DISPLAY_TYPES[b];
@@ -15929,7 +15966,11 @@ function brandBaseCid() {
   for (var i = 0; i < cands.length; i++) {
     if (!isNaN(cands[i]) && cands[i] !== 12) return cands[i];
   }
-  return (brandDisplayTypes() || [7])[0];
+  // Die 12 ist eine AUFTEILUNG, kein Grund-Stil (siehe die Schleife oben, die sie
+  // ueberspringt). Bei OEBB steht sie an erster Stelle der Liste, darum hier die erste
+  // Art nehmen, die NICHT 12 ist.
+  var _liste = (brandDisplayTypes() || [7]).filter(function(c) { return c !== 12; });
+  return _liste.length ? _liste[0] : 7;
 }
 
 // „Bahnhofsanzeige" ist keine Wahl fürs ganze Brett, sondern eine Aufteilung: die Züge

@@ -767,6 +767,34 @@ function matrixSeiteGross(c, zeilen) { return istMatrix(c) && zeilen <= 3; }
 //   B Hintergrund, T Schrift, H Badge-Grund, V Badge-Schrift, U Badge-Rand,
 //   G 1 glatt / 2 Punktraster, F 1 Modern / 2 Classic / 3 Matrix,
 //   A 1 Badges / 0 Linienname gross, W 1 Ziel fett, M 1 Ziel mittig, N Name.
+// Marken-Geraete bekommen eine kurze, feste Stil-Auswahl statt der ganzen Liste.
+// Liste und Namen eins zu eins aus dem Konfigurator (BRAND_DISPLAY_TYPES und
+// BRAND_DISPLAY_NAMES), damit beide Seiten dasselbe sagen. Die OEBB-Geraete haben dort
+// keine Liste, bei ihnen ist nur die Netzauswahl gesperrt, nicht die Display-Wahl.
+// "Eigenes Display" bleibt ueberall erlaubt (Paul 24.10.2026).
+// Die Liste kommt mit der Uebergabe, damit sie nur EINMAL existiert und nicht
+// auseinanderlaeuft. Die Kopie hier ist nur der Rueckfall, falls eine aeltere Fassung
+// des Konfigurators sie noch nicht mitschickt.
+const MARKEN_STILE = { BODO: [7, 23, 12], OEBB: [12, 1, 23, 24] };
+const MARKEN_NAMEN = {
+  BODO: { 7: 'bodo-Ansicht', 12: 'Bahnhofsanzeige', 23: 'Orange Matrix' },
+  OEBB: { 12: 'Bahnhofsanzeige' }
+};
+let marke = '';
+let markeStileAus = null;   // aus der Uebergabe
+let markeNamenAus = null;
+function markenStile() {
+  if (markeStileAus && markeStileAus.length) return markeStileAus;
+  const l = MARKEN_STILE[marke];
+  return (l && l.length) ? l : null;
+}
+function markenName(c) {
+  c = parseInt(c, 10);
+  if (markeNamenAus && markeNamenAus[c]) return markeNamenAus[c];
+  const m = MARKEN_NAMEN[marke];
+  return (m && m[c]) || null;
+}
+
 const EIGEN_MIN = 101, EIGEN_MAX = 103;
 function istEigen(c) { c = parseInt(c, 10); return c >= EIGEN_MIN && c <= EIGEN_MAX; }
 let eigene = {};   // colour -> Design
@@ -787,6 +815,8 @@ function eigenFrei() {
 function stilTitel(c) {
   c = parseInt(c, 10);
   if (istEigen(c)) return (eigene[c] && eigene[c].N) || ('Mein Display ' + (c - 100));
+  const mn = markenName(c);
+  if (mn) return mn;
   return (STILE.find(x => x.id === c) || {}).name || ('Stil ' + c);
 }
 // Was der Baukasten anbietet. [Wert, Beschriftung]
@@ -853,11 +883,19 @@ function stilOptionen(d) {
   const jetzt = stilVon(d);
   const eintrag = id => {
     const x = STILE.find(y => y.id === id);
-    return x ? '<option value="' + x.id + '"' + (x.id === jetzt ? ' selected' : '') + '>' + escapeHtmlFt(x.name) + '</option>' : '';
+    // Name: auf Marken-Geraeten der Marken-Name, sonst der aus dem Katalog.
+    return x ? '<option value="' + x.id + '"' + (x.id === jetzt ? ' selected' : '') + '>' + escapeHtmlFt(stilTitel(x.id)) + '</option>' : '';
   };
-  let h = '<optgroup label="Passend zu deinen Linien">' + passend.map(eintrag).join('') + '</optgroup>';
-  const rest = STILE.filter(x => passend.indexOf(x.id) < 0);
-  if (rest.length) h += '<optgroup label="Alle weiteren">' + rest.map(x => eintrag(x.id)).join('') + '</optgroup>';
+  let h = '';
+  const nurMarke = markenStile();
+  if (nurMarke) {
+    // Marken-Geraet: genau diese Stile, in dieser Reihenfolge, mit den Marken-Namen.
+    h += '<optgroup label="F\u00fcr dein Ger\u00e4t">' + nurMarke.map(eintrag).join('') + '</optgroup>';
+  } else {
+    h += '<optgroup label="Passend zu deinen Linien">' + passend.map(eintrag).join('') + '</optgroup>';
+    const rest = STILE.filter(x => passend.indexOf(x.id) < 0);
+    if (rest.length) h += '<optgroup label="Alle weiteren">' + rest.map(x => eintrag(x.id)).join('') + '</optgroup>';
+  }
   // Schon angelegte eigene Designs stehen hier mit ihrem Namen, danach erst das Anlegen.
   let eig = '';
   Object.keys(eigene).map(Number).sort().forEach(c => {
@@ -874,6 +912,15 @@ function stilOptionen(d) {
 // dort die Vorgabe und nicht die OEBB-Tafel (Paul 23.10.2026). Den Farbton dazu setzt
 // einstFuer ueber NETZ_MATRIX_TON.
 function stilVorschlag(d) {
+  const nurMarke = markenStile();
+  if (nurMarke) {
+    // Innerhalb der Marke so nah wie moeglich am sonstigen Vorschlag bleiben.
+    const frei = stilVorschlagFrei(d);
+    return nurMarke.indexOf(frei) >= 0 ? frei : nurMarke[0];
+  }
+  return stilVorschlagFrei(d);
+}
+function stilVorschlagFrei(d) {
   const netze = netzeVon(d);
   // Ein frisch angelegtes Brett hat noch keine Linie, also auch kein Netz. Dann erbt es
   // den Stil des Bretts davor: wer gerade ein Matrix-Display gebaut hat, will mit dem
@@ -3773,6 +3820,9 @@ function uebergabeHolen() {
     : '';
   return { stationen: raus, helligkeit: roh.helligkeit, masterrow: roh.masterrow || '',
            modus: (roh.modus === 'spielerisch' || roh.modus === 'kompakt') ? roh.modus : null,
+           marke: roh.brand || '',
+           markeStile: roh.brandStile || null,
+           markeNamen: roh.brandStilNamen || null,
            eintraege: eintraegeAusZeilen(bauZeilen) };
 }
 
@@ -3953,6 +4003,15 @@ function tokenTreffer(linien, m, richtungen) {
   if (ueber && ueber.helligkeit) helligkeit = ueber.helligkeit;
   // Der Wizard sagt, wie automatisch verteilt werden soll.
   if (ueber && ueber.modus) modus = ueber.modus;
+  // Marke des Geraets: aus der Uebergabe, sonst aus der Adresszeile wie im Konfigurator.
+  try {
+    const ausUrl = new URLSearchParams(location.search).get('brand');
+    marke = String(ausUrl || (ueber && ueber.marke) || '').trim().toUpperCase();
+  } catch (e) { marke = String((ueber && ueber.marke) || '').trim().toUpperCase(); }
+  if (ueber && Array.isArray(ueber.markeStile) && ueber.markeStile.length) {
+    markeStileAus = ueber.markeStile.map(x => parseInt(x, 10)).filter(x => !isNaN(x));
+  }
+  if (ueber && ueber.markeNamen && typeof ueber.markeNamen === 'object') markeNamenAus = ueber.markeNamen;
 
   const liste = ueber ? ueber.stationen
                       : TEST.map(e => ({ rbl: e.rbl, name: e.name, netz: 'WL', alle: false,
