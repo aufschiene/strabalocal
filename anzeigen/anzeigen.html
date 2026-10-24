@@ -3857,7 +3857,18 @@ function displaysAusEintraegen(eintraege) {
     // nie neu verteilen, und eine neue Linie faende kein Brett mit Platz.
     const d = { richtungen: [], vomNutzer: false };
     const gruppen = [];
+    // Wien fuehrt eine Gruppe NICHT als '+'-Token, sondern als m-Feld ueber mehrere
+    // Eintraege: Token <idx> dieses Eintrags gehoert zu Gruppe <gid>, gleiche gid heisst
+    // dieselbe Zeile. Ohne das Lesen war die Gruppe beim naechsten Oeffnen weg, obwohl
+    // sie richtig gespeichert war (Paul 24.10.2026).
+    const nachGid = new Map();
     buendel.forEach(ein => {
+      const mKarte = new Map();
+      String(ein.m || '').split(',').forEach(x => {
+        const st2 = x.split(':');
+        const idx = parseInt(st2[0], 10), gid = parseInt(st2[1], 10);
+        if (!isNaN(idx) && !isNaN(gid)) mKarte.set(idx, gid);
+      });
       // Nur die Stationen dieses Eintrags, sonst zieht ein gleicher Linienname von einer
       // anderen Station mit herein.
       const stats = stationen.filter(st => ein.rbls.indexOf(st.rbl) >= 0);
@@ -3870,7 +3881,7 @@ function displaysAusEintraegen(eintraege) {
         const gw = ein.g.length ? (ein.g.length > i ? ein.g[i] : ein.g[0]) : 0;
         if (gw) st.gehweg = gw;
       });
-      ein.gruppen.forEach(teil => {
+      ein.gruppen.forEach((teil, ti) => {
         const keys = [];
         teil.forEach(m => stats.forEach(st => {
           const si = stationen.indexOf(st);
@@ -3904,8 +3915,16 @@ function displaysAusEintraegen(eintraege) {
         }));
         keys.forEach(k => { if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k); });
         if (teil.length > 1 && keys.length > 1) gruppen.push(keys);
+        // Was das m-Feld derselben Gruppe zuordnet, ueber alle Eintraege sammeln.
+        const gid = mKarte.get(ti);
+        if (gid) {
+          if (!nachGid.has(gid)) nachGid.set(gid, []);
+          const topf = nachGid.get(gid);
+          keys.forEach(k => { if (topf.indexOf(k) < 0) topf.push(k); });
+        }
       });
     });
+    nachGid.forEach(keys => { if (keys.length > 1) gruppen.push(keys); });
     // z1 = das ganze Brett ist eine Uhr, sonst z<Zeile+1>, also z2 fuer die erste Zeile.
     if (erste.z === 1) d.richtungen = [UHR_KEY];
     else if (erste.z > 1) d.richtungen.splice(erste.z - 2, 0, UHR_KEY);
