@@ -2236,9 +2236,9 @@ function configBauen() {
     d.richtungen.forEach(k => {
       const r = richtungFinden(k);
       if (!r) return;
-      if (!proStation.has(r.station.rbl)) proStation.set(r.station.rbl, { station: r.station, linien: [] });
+      if (!proStation.has(r.station.rbl)) proStation.set(r.station.rbl, { station: r.station, linien: [], keys: [] });
       const eintrag = proStation.get(r.station.rbl);
-      if (eintrag.linien.indexOf(r.dep.line) < 0) eintrag.linien.push(r.dep.line);
+      if (eintrag.linien.indexOf(r.dep.line) < 0) { eintrag.linien.push(r.dep.line); eintrag.keys.push(k); }
     });
     if (!proStation.size && !zeigtUhr(d)) return;   // leeres Display kommt nicht ans Geraet
 
@@ -2289,9 +2289,24 @@ function configBauen() {
       // gleichfarbige Wien-Eintraege zu einem Brett zusammen, und genau das wollen wir
       // hier. Dass dadurch auch ein zweites Wien-Display mit gleichem Stil mithineinfaellt,
       // steht als Hinweis in der Oberflaeche.
+      // Gruppen ueber MEHRERE Wien-Eintraege kann nur das m-Feld tragen: Token <idx>
+      // dieses Eintrags gehoert zu Gruppe <gid>, und gleiche gid fuehrt die Firmware
+      // ueber Eintragsgrenzen hinweg zu einer Zeile zusammen. Ohne das standen zwei
+      // zusammengefasste Linien von zwei Bahnsteigen am Geraet wieder untereinander
+      // (Paul 24.10.2026, Linie 5 mit Linie 46).
+      const gidVon = new Map();
+      zeilenEinheiten(d).forEach((teil, gi) => {
+        if (teil.length > 1) teil.forEach(k => gidVon.set(k, gi + 1));
+      });
       proStation.forEach((e, rbl) => {
+        const marken = [];
+        (e.keys || []).forEach((k, i) => {
+          const gid = gidVon.get(k);
+          if (gid) marken.push(i + ':' + gid);
+        });
         stuecke.push(rbl + '|' + (e.linien.length ? e.linien.join(',') : '*')
                    + '|c' + c + '|g' + gehwegStation(e.station) + '|r' + zeilenVon(d)
+                   + (marken.length ? '|m' + marken.join(',') : '')
                    + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
       });
     } else {
