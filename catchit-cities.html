@@ -8941,19 +8941,36 @@ function entdoppelOrt(name) {
   return rest;
 }
 
+// Stand der letzten Proxy-Suche: true, wenn der Server leer UND sofort geantwortet hat.
+var _sucheGedrosselt = false;
+
 async function searchViaProxy(network, query) {
   const params = new URLSearchParams({ network: mapNetworkForApi(network), q: query });
   // Leere Antwort EINMAL wiederholen: direkt nach einem Server-Neustart bzw. unter der
   // Trainboard-Drossel kommt der erste Abruf leer zurueck, der naechste stimmt
   // (Hinweis des Server-Teams, 03.10.2026). Kostet nur im Nichtstreffer-Fall Zeit.
+  // Eine echte Suche braucht am Server rund sechs Sekunden. Kommt die Antwort LEER und
+  // dabei auffaellig schnell zurueck (unter anderthalb Sekunden), hat nicht die Suche
+  // nichts gefunden, sondern die Drossel hat abgewiesen: gemessen 24.10.2026, "Stuttgart"
+  // auf BWEGT einmal 0,08 s mit null Treffern, gleich darauf 6,4 s mit vierzehn. Darum
+  // mehrmals nachfassen, mit wachsendem Abstand, und am Ende merken, ob es eine Drossel
+  // war — sonst stand beim Kunden "Keine Stationen gefunden", obwohl es die Station gibt
+  // (Kunde Thomas, Stuttgart: "erst wenn ich die Oberflaeche mehrmals neu starte").
+  const WARTEN = [0, 700, 1500, 2500];
   let data = { stops: [] };
-  for (let versuch = 0; versuch < 2; versuch++) {
-    if (versuch) await new Promise(function(r) { setTimeout(r, 800); });
+  let gedrosselt = false;
+  for (let versuch = 0; versuch < WARTEN.length; versuch++) {
+    if (WARTEN[versuch]) await new Promise(function(r) { setTimeout(r, WARTEN[versuch]); });
+    const t0 = Date.now();
     try {
       data = await (await fetch(`${SEARCH_API}?${params}`)).json();
     } catch (e) { data = { stops: [] }; }
-    if ((data.stops || []).length) break;
+    const leer = !(data.stops || []).length;
+    if (!leer) { gedrosselt = false; break; }
+    gedrosselt = (Date.now() - t0) < 1500;   // leer UND schnell = abgewiesen
+    if (!gedrosselt) break;                  // leer UND langsam = es gibt wirklich nichts
   }
+  _sucheGedrosselt = gedrosselt;
   return (data.stops || []).map(s => ({
     id: s.id, name: entdoppelOrt(s.name), info: s.info || '',
     // Seit 03.10.2026 sagt der Server pro Treffer, ob es ein Bahnhof ist: true/false/null
@@ -9000,7 +9017,9 @@ function displaySearchResults(results) {
   }
 
   if (filtered.length === 0) {
-    searchResults.innerHTML = '<div class="no-results">Keine Stationen gefunden</div>';
+    searchResults.innerHTML = _sucheGedrosselt
+      ? '<div class="no-results">Die Suche ist gerade überlastet. Bitte gleich nochmal versuchen.</div>'
+      : '<div class="no-results">Keine Stationen gefunden</div>';
   } else {
     searchResults.innerHTML = filtered.map(r => `
       <div class="search-result-item" onclick="selectStop('${r.id}', '${r.name.replace(/'/g, "\\'")}')">
@@ -24890,6 +24909,8 @@ window.addEventListener('DOMContentLoaded', () => {
     '+ Weitere Station hinzufügen': '+ Add another station', 'Weitere Station hinzufügen': 'Add another station',
     'Noch keine Stationen hinzugefügt': 'No stations added yet', 'Keine Stationen': 'No stations',
     'Keine Station gefunden': 'No station found', 'Keine Stationen gefunden': 'No stations found',
+    'Die Suche ist gerade überlastet. Bitte gleich nochmal versuchen.':
+      'The search is busy right now. Please try again in a moment.',
     'Diese Station ist bereits hinzugefügt!': 'This station has already been added!',
     'Diese Auswahl ist bereits hinzugefügt!': 'This selection has already been added!',
     'Diese Verbindung ist bereits hinzugefügt!': 'This connection has already been added!',

@@ -3772,7 +3772,15 @@ function displaysAusEintraegen(eintraege) {
   const nach = new Map();
   let ohne = 0;
   eintraege.forEach(ein => {
-    const nr = ein.dnr || ('x' + (++ohne));
+    let nr = ein.dnr;
+    if (!nr) {
+      // Ohne d<n> entscheidet die Firmware selbst, und sie legt gleichfarbige WIEN-
+      // Eintraege zu EINEM Brett zusammen (colourToMergedIdx, nur fuer isWien). Genau
+      // das muss hier auch passieren, sonst zeigt die Oberflaeche drei Bretter, wo das
+      // Geraet eines hat (Kunde Valentin, 24.10.2026: 12, 5A und U6 an drei Stationen).
+      const wien = ein.rbls.some(r => /^WLB?:/i.test(r) || /^\d/.test(r));
+      nr = (wien && ein.c) ? ('w' + ein.c) : ('x' + (++ohne));
+    }
     if (!nach.has(nr)) nach.set(nr, []);
     nach.get(nr).push(ein);
   });
@@ -3801,12 +3809,33 @@ function displaysAusEintraegen(eintraege) {
         const keys = [];
         teil.forEach(m => stats.forEach(st => {
           const si = stationen.indexOf(st);
-          tokenTreffer(linienAus(st.abfahrten), m, []).forEach(tr => {
+          const nimm = (linie, ziel) => {
+            const k = zeilenKey(si, { line: linie, dest: ziel });
+            if (keys.indexOf(k) < 0) keys.push(k);
+          };
+          const treffer = tokenTreffer(linienAus(st.abfahrten), m, []);
+          let fand = false;
+          treffer.forEach(tr => {
             const lokal = tr.name + '|' + tr.ziel;
             if (st.gewaehlt && st.gewaehlt.size && !st.gewaehlt.has(lokal)) return;
-            const k = zeilenKey(si, { line: tr.name, dest: tr.ziel });
-            if (keys.indexOf(k) < 0) keys.push(k);
+            fand = true;
+            nimm(tr.name, tr.ziel);
           });
+          if (fand) return;
+          // Faehrt die Linie gerade nicht, gibt es keine Abfahrt zum Abgleichen. Die
+          // Auswahl kennt sie trotzdem als ruhende Zeile, und ohne diesen Rueckfall
+          // bliebe das Brett LEER und fiele weg. Seine Zeilen landeten dann auf fremden
+          // Brettern (Kunde Valentin: die Zuege standen zwischen den Wiener Linien).
+          const name = String(m.linie || '').trim().toUpperCase();
+          let traf = false;
+          (st.gewaehlt ? Array.from(st.gewaehlt) : []).forEach(lokal => {
+            const i = String(lokal).indexOf('|');
+            const linie = i < 0 ? lokal : lokal.slice(0, i);
+            if (String(linie).trim().toUpperCase() !== name) return;
+            traf = true;
+            nimm(linie, i < 0 ? '' : lokal.slice(i + 1));
+          });
+          if (!traf && m.linie) nimm(m.linie, '');
         }));
         keys.forEach(k => { if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k); });
         if (teil.length > 1 && keys.length > 1) gruppen.push(keys);
