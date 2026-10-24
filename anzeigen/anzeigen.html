@@ -959,9 +959,16 @@ function linienMerken(st) {
     const k = d.line + '|' + d.dest;
     if (gesehen.has(k)) return;
     gesehen.add(k);
-    paare.push({ line: d.line, dest: d.dest, vt: d.vt, lineColor: d.lineColor, lineTextColor: d.lineTextColor });
+    paare.push({ line: d.line, dest: d.dest, vt: d.vt, rid: d.rid || '',
+                 lineColor: d.lineColor, lineTextColor: d.lineTextColor });
   });
-  if (paare.length) st.letzteLinien = paare;
+  if (!paare.length) return;
+  // Was frueher einmal hier fuhr, bleibt gemerkt. Sonst verloere eine Linie, die abends
+  // nicht mehr faehrt, auch ihre Farbe und ihre Richtungs-Id (Paul 24.10.2026).
+  (st.letzteLinien || []).forEach(alt => {
+    if (!gesehen.has(alt.line + '|' + alt.dest)) paare.push(alt);
+  });
+  st.letzteLinien = paare;
 }
 // Kurzfuehrungen gehoeren zu ihrer Richtung, nicht daneben. Regel wie im Konfigurator
 // (Paul 20.09.2026): die Richtungs-Id ist die physische Richtung, mehrere Zieltexte
@@ -1385,7 +1392,11 @@ function schirmeBauen() {
           if (teil.length === 1 && istUhrKey(teil[0])) return { uhr: true, line: '', dest: '', time: '' };
           const deps = teil.map(k => { const r = richtungFinden(k); return r && r.dep; }).filter(Boolean);
           if (!deps.length) return null;
-          const vorn = deps.reduce((a, b) => (b.time < a.time ? b : a));
+          // Eine ruhende Linie hat keine Zeit. Sie bleibt als Zeile stehen, die Spalte
+          // rechts aber leer, so wie es auch das Geraet zeichnet (24.10.2026).
+          const faehrt = deps.filter(x => x.time != null);
+          if (!faehrt.length) return Object.assign({}, deps[0], { time: '' });
+          const vorn = faehrt.reduce((a, b) => (b.time < a.time ? b : a));
           return teil.length > 1 ? Object.assign({}, vorn, { zusammen: teil.length }) : vorn;
         }).filter(Boolean);
         seiten = [];
@@ -1550,6 +1561,22 @@ function zeilenEintraege(st) {
   // Richtungen, bei denen ALLES zu knapp ist, bleiben trotzdem in der Liste: sonst
   // wuerfe ein zu hoher Gehweg die Zuweisung des Nutzers weg (Paul 22.10.2026).
   knapp.forEach((d, k) => { if (!gesehen.has(k)) { gesehen.add(k); raus.push(d); } });
+  // Und was GEWAEHLT ist, aber gerade gar nicht faehrt, bleibt ebenfalls stehen. Vorher
+  // entstanden Zeilen nur aus aktuellen Abfahrten: eine abends ruhende Linie verschwand
+  // damit aus der Oberflaeche UND aus der Config, das Geraet verlor sie stillschweigend
+  // (zwei Kundenmeldungen, 24.10.2026: "wo ist die Linie 41 geblieben").
+  if (st.gewaehlt && st.gewaehlt.size) {
+    st.gewaehlt.forEach(k => {
+      if (gesehen.has(k)) return;
+      gesehen.add(k);
+      const i = String(k).indexOf('|');
+      const linie = i < 0 ? k : k.slice(0, i), ziel = i < 0 ? '' : k.slice(i + 1);
+      const alt = (st.letzteLinien || []).find(x => x.line === linie && x.dest === ziel) || {};
+      raus.push({ line: linie, dest: ziel, time: null, ruht: true,
+                  rid: alt.rid || '', vt: alt.vt || '',
+                  lineColor: alt.lineColor || null, lineTextColor: alt.lineTextColor || null });
+    });
+  }
   return raus;
 }
 
@@ -1864,7 +1891,8 @@ function editorZeichnen() {
        + '<div class="rumpf"><div class="ziel">' + ziele + '</div>'
        + '<div class="halt">Zeile ' + (i + 1)
        + (halte.length ? ' &middot; ' + escapeHtmlFt(halte.join(', ')) : '')
-       + (zeit ? ' &middot; in ' + zeit.time + ' min' : ' &middot; gerade keine Abfahrt') + '</div>'
+       + (zeit && (zeit.time || zeit.time === 0) ? ' &middot; in ' + zeit.time + ' min'
+                                                     : ' &middot; f\u00e4hrt gerade nicht') + '</div>'
        + (zusammen
           ? '<div class="zusatz">' + teil.length + ' Richtungen in einer Zeile &middot; '
             + '<button class="link" onclick="gruppeLoesen(' + di + ',' + i + ')">trennen</button></div>'
@@ -3874,6 +3902,14 @@ function tokenTreffer(linien, m, richtungen) {
                  gewaehlt: new Set(), lat: e.lat, lon: e.lon,
                  vorgabe: e.richtungen && e.richtungen[0]
                           ? { line: e.richtungen[0].line, dest: e.richtungen[0].ziel } : null };
+    // Die gewaehlten Richtungen aus der Uebergabe gelten als bekannt, auch bevor je eine
+    // Abfahrt kam. Daran haengen Richtungs-Id und Beschriftung einer ruhenden Zeile.
+    if (e.richtungen && e.richtungen.length) {
+      st.letzteLinien = e.richtungen.filter(r => r.line && r.ziel).map(r => ({
+        line: r.line, dest: r.ziel, rid: r.rid || '', vt: '',
+        lineColor: null, lineTextColor: null
+      }));
+    }
     stationen.push(st);
     // Mehrere Anfragen direkt hintereinander laufen schnell in die Ratengrenze der API.
     // Ein leeres catch wuerde den Fehler verschlucken und die Seite bliebe stumm leer.
@@ -3892,12 +3928,22 @@ function tokenTreffer(linien, m, richtungen) {
       e.wahl.forEach(gruppe => {
         const keys = [];
         gruppe.forEach(m => {
-          tokenTreffer(linien, m, e.richtungen).forEach(treffer => {
-            const lokal = treffer.name + '|' + treffer.ziel;
-            st.gewaehlt.add(lokal);
-            const k = zeilenKey(stationen.indexOf(st), { line: treffer.name, dest: treffer.ziel });
+          const nimm = (linie, ziel) => {
+            st.gewaehlt.add(linie + '|' + ziel);
+            const k = zeilenKey(stationen.indexOf(st), { line: linie, dest: ziel });
             if (keys.indexOf(k) < 0) keys.push(k);
-          });
+          };
+          const treffer = tokenTreffer(linien, m, e.richtungen);
+          if (treffer.length) { treffer.forEach(x => nimm(x.name, x.ziel)); return; }
+          // Kein Treffer heisst: diese Linie faehrt GERADE nicht, abends oder am
+          // Wochenende. Frueher fiel sie damit aus der Auswahl und aus der Config, das
+          // Geraet verlor sie stillschweigend (Kundenmeldungen 24.10.2026, "wo ist die
+          // Linie 41 geblieben"). Sie bleibt jetzt stehen, mit dem Ziel aus der
+          // Uebergabe, sonst mit dem aus dem Token.
+          const wunsch = (e.richtungen || [])
+            .filter(x => String(x.line || '').trim().toUpperCase() === String(m.linie).trim().toUpperCase());
+          if (wunsch.length) { wunsch.forEach(w => nimm(m.linie, w.ziel || '')); return; }
+          nimm(m.linie, /^\d+$/.test(m.richtung) ? '' : (m.richtung || ''));
         });
         // Nur ein Token mit '+' ist eine Gruppe. Dass eine Linie in zwei Richtungen
         // faehrt, macht noch keine gemeinsame Zeile.
