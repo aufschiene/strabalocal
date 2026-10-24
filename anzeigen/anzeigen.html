@@ -313,6 +313,8 @@
   }
   .farbfeld input[type=color]::-webkit-color-swatch-wrapper { padding: 2px; }
   .farbfeld input[type=color]::-webkit-color-swatch { border: none; border-radius: 7px; }
+  .wahltrenner { font-size: 11px; font-weight: 700; letter-spacing: .04em;
+                 text-transform: uppercase; color: var(--grau); margin: 14px 0 6px; }
   .schiene.an { background: var(--akzent); }
   .schiene.an .kugel { transform: translateX(24px); background: #fff; }
 
@@ -1797,7 +1799,7 @@ function editorZeichnen() {
   h += '<div class="zeilenkopf"><h2>'
      + (zeitbasiert(dHier) ? 'Linien auf diesem Display' : 'Zeilen dieses Displays') + '</h2>'
      + (!zeitbasiert(dHier) && (dHier.richtungen || []).length > 1
-        ? '<button class="link" onclick="gruppeFragen(' + s.index + ')">Zeilen zusammenfassen</button>'
+        ? '<button class="link" onclick="gruppeFragen(' + s.index + ')">Gruppieren</button>'
         : '')
      + '</div>';
   if (zeitbasiert(dHier)) {
@@ -2900,10 +2902,18 @@ function gruppeDialogZeichnen(di) {
   const d = displays[di];
   if (!d) return;
   const frei = zeilenEinheiten(d).length - 1;   // so viele Zeilen hat das Display danach
+  const drauf = new Set(d.richtungen || []);
+  // Auch Linien anbieten, die noch NICHT auf diesem Display liegen. Wer S4, S5 und S6
+  // zusammenfassen will, soll sie hier ankreuzen koennen, statt sie vorher einzeln
+  // herueberzutippen. Beim Gruppieren kommen sie automatisch mit (Paul 24.10.2026).
+  const reihenfolge = (d.richtungen || []).concat(
+    alleRichtungen().map(r => r.key).filter(k => !drauf.has(k)));
   let liste = '';
-  (d.richtungen || []).forEach(k => {
+  reihenfolge.forEach((k, nr) => {
     const r = richtungFinden(k);
     if (!r) return;
+    const dazu = !drauf.has(k);
+    if (dazu && nr === drauf.size) liste += '<div class="wahltrenner">Noch nicht auf diesem Display</div>';
     const schon = gruppeVon(d, k);
     const an = gruppeWahl.has(k);
     const f = badgeFarben(r.dep);
@@ -2914,25 +2924,33 @@ function gruppeDialogZeichnen(di) {
            + '<b style="background:' + f.bg + ';color:' + f.fg + '">' + escapeHtmlFt(r.dep.line) + '</b>'
            + '<div class="rumpf"><div class="ziel">' + escapeHtmlFt(r.dep.dest) + '</div>'
            + '<div class="halt">' + escapeHtmlFt(r.station.name)
-           + (schon ? ' &middot; steht schon in einer Zeile zusammen' : '') + '</div></div>'
+           + (schon ? ' &middot; steht schon in einer Zeile zusammen'
+                    : (dazu ? ' &middot; kommt dann auf dieses Display' : '')) + '</div></div>'
            + '</div>';
   });
   const reicht = gruppeWahl.size > 1;
-  dialogZeigen('Zeilen zusammenfassen',
+  dialogZeigen('Gruppieren',
     'Richtungen, die dieselbe Strecke fahren, brauchen keine eigene Zeile. Kreuze an, '
     + 'welche sich eine teilen sollen. Das Display zeigt dann die n\u00e4chste Abfahrt davon '
     + 'und hat eine Zeile mehr frei.',
     [{ text: 'Abbrechen', still: true },
-     { text: reicht ? 'Zusammenfassen' : 'Mindestens zwei w\u00e4hlen', aus: !reicht, offen: !reicht,
+     { text: reicht ? 'Gruppieren' : 'Mindestens zwei w\u00e4hlen', aus: !reicht, offen: !reicht,
        tun: function () { gruppeAnlegen(di); } }],
     'doppelt',
-    '<div class="wahlliste">' + (liste || '<div class="leer">Keine Richtung auf diesem Display.</div>')
+    '<div class="wahlliste">' + (liste || '<div class="leer">Keine Richtung da.</div>')
       + '</div>');
 }
 
 function gruppeAnlegen(di) {
   const d = displays[di];
   if (!d) return;
+  // Angekreuztes, das noch woanders liegt, kommt zuerst auf dieses Display.
+  gruppeWahl.forEach(k => {
+    if (d.richtungen.indexOf(k) < 0 && richtungFinden(k)) {
+      d.richtungen.push(k);
+      abgelegt.delete(k);
+    }
+  });
   const teil = (d.richtungen || []).filter(k => gruppeWahl.has(k) && !gruppeVon(d, k));
   if (teil.length < 2) return;
   if (!d.gruppen) d.gruppen = [];

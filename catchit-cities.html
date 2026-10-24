@@ -23060,7 +23060,12 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // Richtungen duerfen aus der globalen Liste kommen. Hat die Station gar kein
     // filter-Feld, bleibt es beim bisherigen Verhalten.
     let stationDests = _pickBySeg(masterDirsByRbl, part, _occ);
+    // Woher kommen die Richtungen? Aus der masterrow sind sie stationsgenau, aus der
+    // globalen Liste gelten sie fuer ALLE Stationen zusammen. Das macht weiter unten den
+    // Unterschied, ob man sie dieser Station blind zuschreiben darf.
+    let destsAusGlobalerListe = false;
     if (!stationDests) {
+      destsAusGlobalerListe = true;
       stationDests = filterLines.length
         ? lineDestinations.filter(function(ld) {
             return filterLines.indexOf(_stripModePrefix(ld.line)) >= 0;
@@ -23383,6 +23388,26 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       // einschränken; nur wenn auch der nichts weiß (offline), bleibt die volle Union der
       // letzte Rettungsanker (Moritz-Fall, tokenCount 1, bleibt ohnehin unangetastet).
       let _destPool = stationDests;
+      // GLOBALE LISTE + MEHRERE STATIONEN: nur Linien uebernehmen, die laut Linien-Index
+      // hier wirklich verkehren. Ohne das erbte eine Station, deren Abfahrten gerade leer
+      // sind (Nacht, Drosselung, Betriebspause), die Linien ALLER anderen Stationen
+      // (Kunde Thomas, Stuttgart 24.10.2026: nach dem Zurueckgehen standen 41 und 43 von
+      // Marienplatz ploetzlich auch bei Feuersee). Kennt der Index die Haltestelle nicht,
+      // wird lieber NICHTS uebernommen als etwas Fremdes — die masterrow-Faelle unten
+      // bleiben davon unberuehrt, die sind stationsgenau.
+      if (destsAusGlobalerListe && rblParts.length > 1) {
+        const _idxGlobal = await fetchStopLinesCached(network, bareStopId);
+        if (_idxGlobal && _idxGlobal.length) {
+          const _hierGlobal = new Set(_idxGlobal);
+          _destPool = stationDests.filter(function(sd) {
+            return sd.line && _hierGlobal.has(String(sd.line).trim().toLowerCase());
+          });
+        } else {
+          _destPool = [];
+          console.warn('[loadExistingConfig] ' + (station.fullId || station.stopId) +
+            ': keine Abfahrten und kein Linien-Index — globale Richtungsliste NICHT uebernommen');
+        }
+      }
       if (_segInfo !== undefined && _segInfo.tokenCount > 1) {
         let allowedLines = null;
         const _takenBySiblings = new Set();
@@ -23398,7 +23423,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
               (sb.directions || []).forEach(d => { if (d.line) _takenBySiblings.add(String(d.line).trim().toLowerCase()); });
           });
         }
-        const _filtered = stationDests.filter(sd => {
+        const _filtered = _destPool.filter(sd => {
           if (!sd.line) return false;
           const _ln = String(sd.line).trim().toLowerCase();
           if (allowedLines && !allowedLines.has(_ln)) return false;
