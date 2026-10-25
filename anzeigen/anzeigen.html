@@ -2976,7 +2976,18 @@ function gruppeFragen(di, vorgabe) {
 
 function gruppeHaken(di, key) {
   if (gruppeWahl.has(key)) gruppeWahl.delete(key); else gruppeWahl.add(key);
+  // Der Dialog wird komplett neu gezeichnet. Ohne gemerkte Scroll-Position springt die
+  // Liste bei jedem Haken an den Anfang, und bei zehn Linien hakt man blind
+  // (Paul 25.10.2026).
+  const merker = [];
+  document.querySelectorAll('#schleier *').forEach(el => {
+    if (el.scrollTop > 0) merker.push([el.className, el.scrollTop]);
+  });
   gruppeDialogZeichnen(di);
+  merker.forEach(([klasse, oben]) => {
+    const el = klasse ? document.querySelector('#schleier .' + String(klasse).split(' ')[0]) : null;
+    if (el) el.scrollTop = oben;
+  });
 }
 
 function gruppeDialogZeichnen(di) {
