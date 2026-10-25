@@ -570,6 +570,12 @@ const BADGE_FAHRZEUGE = [[1, 'Tram'], [2, 'Bus'], [4, 'U-Bahn'], [8, 'Zug/S-Bahn
 // 0 heisst: vom Geraet kam nichts, dann gilt die Vorgabe. Nicht direkt mit
 // STANDZEIT_VORGABE belegen, die Konstante steht weiter unten.
 let standzeitStart = 0;
+// Eine ALTE Zeile mit mehreren Stationen in EINEM Segment und ohne '!'-Token und ohne q
+// sagt nicht, welche Linie zu welcher Station gehoert. Wir ordnen sie dann dort ein, wo
+// sie tatsaechlich haelt, und das ist eine Vermutung: haelt eine Linie an beiden, steht
+// sie an beiden. Beim naechsten Speichern wird aus der Vermutung eine Festlegung, darum
+// sagen wir es dem Nutzer, bevor er speichert (Konfigurator-Sitzung 25.10.2026).
+let wahlGeraten = false;
 function standardEinst() {
   return { t: 1, b: 0, u: 0, v: 4, h: 1, n: 0, k: 0, o: 0,
            f: 0, d: 0, x: 0, y: 0, i: standzeitStart || STANDZEIT_VORGABE };
@@ -2024,6 +2030,13 @@ function editorZeichnen() {
      + ' Dieser Stil kann h\u00f6chstens ' + maxHier + ' Zeilen.'
      + ' Insgesamt <b>' + displays.length + (displays.length === 1 ? ' Display' : ' Displays')
      + '</b>.'
+     + (wahlGeraten
+        ? '<div class="hinweis">Diese Einstellung kommt aus einem \u00e4lteren Format, in dem '
+          + 'nicht steht, welche Linie zu welcher Station geh\u00f6rt. Wir haben jede Linie '
+          + 'dort eingeordnet, wo sie wirklich h\u00e4lt. H\u00e4lt eine an beiden Stationen, '
+          + 'steht sie jetzt an beiden. Schau die Zeilen einmal durch, bevor du speicherst: '
+          + 'danach steht die Zuordnung fest.</div>'
+        : '')
      + (zerfaelltImKonfigurator(dHier)
         ? '<div class="hinweis">Dieses Display besteht aus ' + eintraegeVon(dHier)
           + ' Eintr\u00e4gen, weil "Alle Abfahrten" einer Station nicht mit einzelnen Linien '
@@ -2473,8 +2486,10 @@ function tokenListeFlach(d) {
       const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
       // Nur eine Zeile mit mehreren Linien ist eine Gruppe. Dass eine Linie in zwei
       // Richtungen faehrt, macht noch keine.
-      if (echte.length > 1) merges.push(liste.length + ':' + (gi + 1));
-      liste.push({ tok: ref ? r.dep.line + '>' + ref : r.dep.line, rbl: r.station.rbl });
+      const gid = echte.length > 1 ? (gi + 1) : 0;
+      if (gid) merges.push(liste.length + ':' + gid);
+      liste.push({ tok: ref ? r.dep.line + '>' + ref : r.dep.line,
+                   rbl: r.station.rbl, gid: gid });
     });
   });
   return { liste: liste, merges: merges };
@@ -2537,6 +2552,12 @@ function customrowLesen(zeile) {
 // das Speichern, damit beides nie auseinanderlaeuft.
 function configBauen() {
   const teile = [], zeitTeile = [];
+  // Die timerow traegt die zeitbasierten Display-TYPEN (OEBB, Westbahn, SBB), NICHT
+  // die Sortierung. Die steht als 's' in den displaysettings.
+  const teileEinsammeln = (stuecke, c) => {
+    const topf = istZeitTyp(c) ? zeitTeile : teile;
+    stuecke.forEach(x => topf.push(x));
+  };
   displays.forEach((d, di) => {
     // WIEN: die Firmware bindet jede Linie an einen Stop (stopId:Linie). Steht in EINEM
     // Eintrag eine Liste aus mehreren rbls, landen am Ende alle Linien am LETZTEN Stop
@@ -2636,6 +2657,31 @@ function configBauen() {
       // schon je einzeln da und zaehlen hier nicht mit.
       let gemeinsam = 0;
       proStation.forEach(e => { if (!e.alle) gemeinsam++; });
+
+      // AB FIRMWARE 2.6: ein Eintrag JE STATION, zusammengehalten vom d-Feld, so wie es
+      // der Konfigurator seit 25.10.2026 auch schreibt. Damit traegt jede Station ihre
+      // eigenen Linien, ihre eigene Gehzeit und ihren eigenen Filter, und die beiden
+      // Kruecken des Komma-Formats fallen weg: das '!'-Token und das q-Feld.
+      // Nur mit gemeldeter Version: ein aelteres Geraet kennt das d nicht und zeigte
+      // sonst ploetzlich zwei Bretter statt einem (abgestimmt mit der Konfigurator-
+      // Sitzung, 25.10.2026).
+      if (gemeinsam > 1 && fwNeu()) {
+        const flachN = tokenListeFlach(d);
+        proStation.forEach((e, rbl) => {
+          if (e.alle) return;
+          const kahl = rblTeile(rbl).kahl;
+          const meine = flachN.liste.filter(x => x.rbl === rbl);
+          const marken = [];
+          meine.forEach((x, i) => { if (x.gid) marken.push(i + ':' + x.gid); });
+          stuecke.push(kahl + '|' + (meine.length ? meine.map(x => x.tok).join(',') : '*')
+                     + '|c' + c + '|g' + gehwegStation(e.station) + '|r' + zeilenVon(d)
+                     + (marken.length ? '|m' + marken.join(',') : '')
+                     + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
+        });
+        teileEinsammeln(stuecke, c);
+        return;
+      }
+
       const rbls = [], gw = [], reihen = [];
       proStation.forEach((e, rbl) => {
         if (e.alle) return;
@@ -2680,10 +2726,7 @@ function configBauen() {
                  + qTeil
                  + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
     }
-    // Die timerow traegt die zeitbasierten Display-TYPEN (OEBB, Westbahn, SBB), NICHT
-    // die Sortierung. Die steht als 's' in den displaysettings.
-    const topf = istZeitTyp(c) ? zeitTeile : teile;
-    stuecke.forEach(x => topf.push(x));
+    teileEinsammeln(stuecke, c);
   });
   // colour-Liste parallel zu den Segmenten: Firmware vor 2.5.3 erkennt eine
   // Multi-Display-Config nur am Komma in dieser Liste (catchit-cities, Kunde Johann).
@@ -4184,6 +4227,15 @@ function wahlAusZeilen(zeilen) {
       } else if (teil.nur) {
         meine = ein.gruppen.map(g => g.filter(m => gehoertDazu(teil.nur, m.linie))).filter(g => g.length);
         genau = true;
+      } else if (ein.rbls.length === 1) {
+        // Steht in dem Eintrag nur EINE Station, gehoeren seine Linien zwangslaeufig
+        // ihr. Das ist seit 25.10.2026 der Normalfall: beide Oberflaechen schreiben ein
+        // Segment je Station und halten sie ueber das d-Feld zusammen, '!' und q
+        // braucht es dafuer nicht mehr. Ohne dieses "genau" verloere eine Linie, die
+        // gerade nicht in ihre Richtung faehrt, hier wieder ihre Zeile, also genau der
+        // Fehler, den '!' und q einmal geloest haben (Kunde Thomas, Linie 41).
+        meine = ein.gruppen;
+        genau = true;
       } else {
         meine = ein.gruppen;
       }
@@ -4276,6 +4328,10 @@ function uebergabeHolen() {
     standzeitStart = Math.max(STANDZEIT_MIN_UHR, Math.min(STANDZEIT_MAX, sz));
   }
   const g = roh.geraet || null;
+  wahlGeraten = eintraegeAusZeilen((roh.masterrow || '') + ';' + (roh.timerow || ''))
+    .some(ein => ein.rbls.length > 1 && !ein.alle
+              && !(ein.q && ein.q.length)
+              && !ein.rbls.some(r => rblTeile(r).nur));
   const bauZeilen = (g && (g.masterrow || g.timerow))
     ? (g.masterrow || '') + ';' + (g.timerow || '')
     : '';

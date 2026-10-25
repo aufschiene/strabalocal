@@ -3380,6 +3380,49 @@
   </div>
 
   <!-- Wizard-Schritt: Display-Stil (kompakt vs. spielerisch) -->
+  <!-- Wizard-Schritt: Abfahrten oder Linien. Nur bei EINER Station sinnvoll, bei mehreren
+       waere ein Brett voller "alle Abfahrten" unbrauchbar, darum fragen wir dort nicht und
+       bleiben bei der Vorgabe des Pickers, naemlich nach Linie (Paul 25.10.2026). -->
+  <div class="card hidden" id="stepWizardAbfahrten">
+    <h2>Was soll auf deinem catch-it stehen?</h2>
+    <p style="color:#666;font-size:13px;margin-bottom:16px;">Du kannst es später jederzeit ändern.</p>
+
+    <div class="display-style-grid">
+      <button class="display-style-btn" data-value="lines" onclick="selectAbfahrtenArt('lines')">
+        <div class="style-preview compact">
+          <div class="preview-frame wien">
+            <div class="line"><span class="num">U6</span><span class="dest">Floridsdorf</span><span class="min">2'</span></div>
+            <div class="line"><span class="num">13A</span><span class="dest">Hauptbhf</span><span class="min">5'</span></div>
+            <div class="line"><span class="num">71</span><span class="dest">Schottenring</span><span class="min">8'</span></div>
+          </div>
+        </div>
+        <div class="label-box">
+          <div class="name">Nach Linie</div>
+          <div class="desc">Du wählst die Linien und Richtungen, jede bekommt ihre feste Zeile.</div>
+        </div>
+      </button>
+
+      <button class="display-style-btn" data-value="all" onclick="selectAbfahrtenArt('all')">
+        <div class="style-preview compact">
+          <div class="preview-frame wien">
+            <div class="line"><span class="num">71</span><span class="dest">Schottenring</span><span class="min">1'</span></div>
+            <div class="line"><span class="num">U6</span><span class="dest">Floridsdorf</span><span class="min">3'</span></div>
+            <div class="line"><span class="num">13A</span><span class="dest">Hauptbhf</span><span class="min">4'</span></div>
+          </div>
+        </div>
+        <div class="label-box">
+          <div class="name">Alle Abfahrten</div>
+          <div class="desc">Alles, was als Nächstes fährt, nach Uhrzeit sortiert.</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="wizard-step-actions">
+      <button class="btn btn-secondary" onclick="wizardBack()">Zurück</button>
+      <button class="btn btn-primary" id="wizardAbfahrtenNextBtn" onclick="wizardNext()" disabled>Weiter</button>
+    </div>
+  </div>
+
   <div class="card hidden" id="stepWizardStyle">
     <h2>Wie soll dein catch-it aussehen?</h2>
     <p style="color:#666;font-size:13px;margin-bottom:16px;">Du kannst es später jederzeit ändern.</p>
@@ -3874,7 +3917,7 @@
 <!-- Bottom Bar -->
 <div class="bottom-bar">
   <div class="container">
-    <button class="btn btn-save" id="saveBtn" onclick="goToDisplayConfig()" disabled>
+    <button class="btn btn-save" id="saveBtn" onclick="handleStationsNextStep()" disabled>
       Weiter
     </button>
   </div>
@@ -5332,6 +5375,111 @@ function geraetZusatzfelder(zeile) {
     schluessel.push(k); proSegment.push(extra);
   });
   return { schluessel: schluessel, felder: proSegment };
+}
+
+// Display-Nummern (Feld d) des Geraets, aufgeschluesselt je EINZELNER Station. Ein
+// komma-gejointes Alt-Segment ("A,B|...|d1") gibt seine Nummer an beide Stationen weiter.
+// Damit bleibt eine im Feintuning gesetzte Bretter-Aufteilung erhalten, auch wenn diese
+// Oberflaeche die Zeile voellig neu baut.
+function geraetDProStop(zeile) {
+  var proStop = {}, max = 0;
+  String(zeile || '').split(';').forEach(function(seg) {
+    seg = String(seg || '').trim(); if (!seg) return;
+    var f = seg.split('|');
+    var d = 0;
+    for (var i = 2; i < f.length; i++) {
+      var t = String(f[i] || '').trim();
+      if (t.charAt(0) === 'd' || t.charAt(0) === 'D') { d = parseInt(t.substring(1), 10) || 0; break; }
+    }
+    if (!d) return;
+    if (d > max) max = d;
+    segStopSchluessel(f[0]).split(',').forEach(function(st) { if (st && !proStop[st]) proStop[st] = d; });
+  });
+  return { proStop: proStop, max: max };
+}
+
+// Token-Reihenfolge je Station aus einer Geraete-Zeile. Bei fester Sortierung (s1) ist die
+// Reihenfolge der Tokens in Feld 1 genau die ZEILENFOLGE am Geraet: main.cpp baut rowOrder
+// aus der Parse-Reihenfolge (roB, Zeile 2075), und display_logic.h nimmt sie bei
+// _sortMode == 1 direkt. Beim Neubau standen die Tokens in der Reihenfolge unserer internen
+// Liste, die Zeilen wanderten also bei JEDEM Speichern, auch wenn der Nutzer nur eine
+// Kleinigkeit an der Linienauswahl geaendert hat (Hinweis der Anzeigen-Sitzung, nachgemessen
+// 25.10.2026: "U1>R,U14>R,41>R,43>H" kam als "U14>R,U1>R,43>H,41>R" heraus).
+function tokenOrdnungProStop(zeile) {
+  var map = {};
+  String(zeile || '').split(';').forEach(function(seg) {
+    var f = String(seg || '').split('|');
+    var stops = segStopSchluessel(f[0]);
+    var toks = String(f[1] || '').split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+    if (!stops || toks.length < 2) return;
+    stops.split(',').forEach(function(st) {
+      if (!st) return;
+      if (!map[st]) map[st] = toks;
+      var ci = st.indexOf(':');            // zusaetzlich unter der nackten Id, siehe OEBBALL
+      if (ci > 0 && !map['#' + st.substring(ci + 1)]) map['#' + st.substring(ci + 1)] = toks;
+    });
+  });
+  return map;
+}
+// Gemerkte Reihenfolge dieses Eintrags: voller Schluessel, dann die einzelnen Stationen,
+// dann deren nackte Id. Ein Komma-Segment findet so die Liste seines ersten Stops.
+function tokenOrdnungFuer(map, rbl) {
+  if (!map) return null;
+  var k = segStopSchluessel(rbl);
+  if (map[k]) return map[k];
+  var teile = String(k).split(',');
+  for (var i = 0; i < teile.length; i++) {
+    var t = teile[i]; if (!t) continue;
+    if (map[t]) return map[t];
+    var ci = t.indexOf(':');
+    if (ci > 0 && map['#' + t.substring(ci + 1)]) return map['#' + t.substring(ci + 1)];
+  }
+  return null;
+}
+// Tokens eines Eintrags in die gemerkte Reihenfolge bringen, unbekannte hinten anhaengen.
+// gids und qIdx laufen index-parallel mit, sonst zeigten die m- und q-Felder danach auf die
+// falschen Tokens.
+function tokenOrdnungAnwenden(e, ordnung) {
+  if (!ordnung || ordnung.length < 2 || !e.lineParts || e.lineParts.length < 2) return;
+  var rang = {};
+  ordnung.forEach(function(t, i) { if (rang[t] === undefined) rang[t] = i; });
+  var hinten = ordnung.length + 1000;
+  var idx = e.lineParts.map(function(_, i) { return i; });
+  idx.sort(function(a, b) {
+    var ra = (rang[e.lineParts[a]] !== undefined) ? rang[e.lineParts[a]] : hinten + a;
+    var rb = (rang[e.lineParts[b]] !== undefined) ? rang[e.lineParts[b]] : hinten + b;
+    return ra - rb;
+  });
+  if (idx.every(function(v, i) { return v === i; })) return;
+  var lp = e.lineParts.slice(), gi = (e.gids || []).slice(), qi = e.qIdx ? e.qIdx.slice() : null;
+  e.lineParts = idx.map(function(i) { return lp[i]; });
+  if (gi.length) e.gids = idx.map(function(i) { return gi[i] || 0; });
+  if (qi) e.qIdx = idx.map(function(i) { return qi[i]; });
+}
+
+// War der Kunde schon mal im Feintuning? Dann traegt seine masterrow Felder, die diese
+// Seite gar nicht bauen kann (Zeilen, Sortierung, Brett-Nummer, Design ...). In dem Fall
+// hat der Wizard nichts mehr zu fragen und "Weiter" geht direkt ins Feintuning
+// (Paul 25.10.2026). Ergaenzt hasExistingConfig, greift also auch dann, wenn die Config
+// ueber einen Weg hereinkam, der das Flag nicht gesetzt hat.
+function geraetHatFremdeFelder() {
+  try {
+    if (typeof _geraetRows === 'undefined' || !_geraetRows) return false;
+    var z = geraetZusatzfelder(_geraetRows.masterrow);
+    return z.felder.some(function(f) { return f && f.length; });
+  } catch (e) { return false; }
+}
+// Token, das WIR dem Geraet hinschreiben. Im Pro-Station-Format (Firmware ab 2.6) ist das
+// leer, denn dort baut die Firmware es bei jedem Abruf selbst aus dem Filter des eigenen
+// Eintrags (rblWithLineSelection in main.cpp, Liniennamen vor '>' abgeschnitten). Ein
+// GESPEICHERTES Token schaltet diesen Eigenbau sogar ab (erste Zeile dort) und kostet auf
+// den Geraeten, die gerade draussen laufen, die Gehzeit: getGehwegForStop schneidet bei '!'
+// erst seit 24.10.2026 ab, also im Quellstand, nicht in 2.6.1. Im alten Komma-Format bleibt
+// das Token, dort ist es die EINZIGE Information, welche Linie zu welcher Station gehoert
+// (Entscheidung mit der Anzeigen-Sitzung, 25.10.2026).
+function lineSelTokenGespeichert(s) {
+  if (typeof dFeldSupported === 'function' && dFeldSupported()) return '';
+  return lineSelToken(s);
 }
 // Alle Stations-Felder einer rbl-Liste bzw. masterrow/timerow von Tokens befreien (Edit-Restore).
 function lineSelStripRows(str) {
@@ -7165,6 +7313,18 @@ function detectCountryExplicit() {
 // Test-Trigger: ?wizard=style öffnet den Wizard ab Schritt 1.
 
 var WIZARD_STEPS = [
+  { id: 'stepWizardAbfahrten', name: 'Abfahrten',
+    // NUR bei genau einer Station. Bei mehreren ergibt "Alle Abfahrten" kein brauchbares
+    // Brett, dort bleibt es bei der Picker-Vorgabe "nach Linie"; umstellen kann man es
+    // weiterhin je Station im Picker (Paul 25.10.2026). Zug-Anzeigen (von→nach) haben
+    // keine Linienauswahl, dort stellt sich die Frage auch nicht.
+    isAvailable: function() {
+      if (!Array.isArray(stations) || stations.length !== 1) return false;
+      if (stations[0] && stations[0].isJourney) return false;
+      return true;
+    },
+    validate: function() { return true; }
+  },
   { id: 'stepWizardStyle', name: 'Display-Stil',
     // Nur sinnvoll wenn 2+ verschiedene Netzwerke kombiniert sind — sonst hat
     // "Kompakt vs. Spielerisch" keinen Effekt (single-Netz-Display ist immer
@@ -7351,6 +7511,20 @@ function selectBvgRowsStyle(value) {
   if (nextBtn) nextBtn.disabled = false;
 }
 
+// Abfahrten-Art des Wizards: setzt allDepartures der einzigen Station. Die Richtungen
+// bleiben erhalten, ein Wechsel ist also verlustfrei in beide Richtungen.
+function selectAbfahrtenArt(value) {
+  document.querySelectorAll('#stepWizardAbfahrten .display-style-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.value === value);
+  });
+  var next = document.getElementById('wizardAbfahrtenNextBtn');
+  if (next) next.disabled = false;
+  if (Array.isArray(stations) && stations.length === 1 && stations[0]) {
+    stations[0].allDepartures = (value === 'all');
+    try { if (typeof updateStationsList === 'function') updateStationsList(); } catch (e) {}
+  }
+}
+
 function selectDisplayStyle(value) {
   // Alle Style-Karten synchron halten (Wizard-Schritt UND Feintuning-Karte)
   document.querySelectorAll('.display-style-btn').forEach(function(btn) {
@@ -7392,10 +7566,15 @@ function wizardShowStep(idx) {
   if (idx >= active.length) idx = active.length - 1;
   wizardCurrentIdx = idx;
 
-  // Alle Top-Level-Cards verstecken (außer stationsCard)
+  // Alle Top-Level-Cards verstecken. Die Stationsliste AUCH: der Wizard kommt NACH der
+  // Linien-Auswahl, er soll nicht darunter haengen (Paul 25.10.2026). Sie steht sonst mit
+  // ihrer eigenen Weiter-Schaltflaeche ueber dem Schritt und sieht aus, als waere man noch
+  // dort. Beim Verlassen nach hinten holt exitWizardToStations sie wieder hervor.
   document.querySelectorAll('.container > .card').forEach(function(c) {
     if (c.id !== 'stationsCard') c.classList.add('hidden');
   });
+  var _statCard = document.getElementById('stationsCard');
+  if (_statCard) _statCard.classList.add('hidden');
   // Aktive Wizard-Card zeigen
   var step = active[idx];
   var card = document.getElementById(step.id);
@@ -7411,6 +7590,12 @@ function wizardShowStep(idx) {
   if (name) name.textContent = step.name;
   if (fill) fill.style.width = (((idx + 1) / active.length) * 100) + '%';
 
+  // Abfahrten-Schritt: zeigen, was die Station HEUTE hat, damit die Karten nicht
+  // etwas anderes behaupten als der Picker.
+  if (step.id === 'stepWizardAbfahrten') {
+    var _st = (Array.isArray(stations) && stations.length === 1) ? stations[0] : null;
+    selectAbfahrtenArt(_st && _st.allDepartures ? 'all' : 'lines');
+  }
   // Stil-Schritt: gespeicherte Auswahl wiederherstellen, sonst "Kompakt" als
   // vordefinierter Standard vorauswaehlen (Weiter ist damit sofort aktiv).
   if (step.id === 'stepWizardStyle') {
@@ -8047,9 +8232,18 @@ function wizardNightToggle() {
 // Override handleStationsNextStep: "Weiter" nach Stations-Auswahl startet jetzt
 // direkt den neuen Wizard (Stil → Gehweg → Nachtmodus → Erweitert), statt den
 // alten stepDisplayConfig/Feintuning-Flow zu öffnen.
+// Ausnahme seit 25.10.2026: war der Kunde schon mal im Feintuning, hat der Wizard nichts
+// mehr zu fragen und "Weiter" geht direkt hinüber (Paul: "wenn der Kunde Einstellungen hat,
+// die der Wizard gar nicht einstellen kann, war er schon mal im Menü"). Vorher landete man
+// dort auf einer LEEREN Seite: der Wizard fand keinen Schritt, der noch etwas zu fragen hat,
+// und blendete alles aus.
 (function() {
   if (typeof handleStationsNextStep !== 'function') return;
+  var ohneWizard = handleStationsNextStep;   // die Fassung von weiter unten
   window.handleStationsNextStep = function() {
+    var fremd = false;
+    try { fremd = (typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder(); } catch (e) {}
+    if (hasExistingConfig || fremd) { ohneWizard(); return; }
     startSetupWizard();
   };
 })();
@@ -12400,7 +12594,13 @@ function updateStationsList() {
         openFinetuningBtn.classList.add('hidden');
       }
     }
-    if (stationsCardEl) stationsCardEl.classList.remove('hidden');
+    // Laeuft der Wizard (seine Fortschrittsleiste steht), bleibt die Stationsliste weg:
+    // der Schritt kommt NACH der Linien-Auswahl und soll nicht darunter haengen
+    // (Paul 25.10.2026). Diese Zeile holte sie bisher bedingungslos wieder hervor und hat
+    // damit das Verstecken in wizardShowStep jedes Mal zurueckgenommen.
+    var _wizProg = document.getElementById('wizardProgress');
+    var _wizLaeuft = !!(_wizProg && !_wizProg.classList.contains('hidden'));
+    if (stationsCardEl && !_wizLaeuft) stationsCardEl.classList.remove('hidden');
   }
 
   // Helper: Direction-Towards-Text kompakt machen ("Richtung Wien (Flughafen / Wien)" → "Wien")
@@ -12959,10 +13159,15 @@ function handleStationsNextStep() {
   var weiter  = document.getElementById('openFinetuningBtn');
   if (addMore) addMore.classList.add('hidden');
   if (weiter)  weiter.classList.add('hidden');
-  if (hasExistingConfig) {
-    // Bestehende Config vom Gerät: Direkt zum Feintuning
-    goToDisplayConfig();  // Erst Config berechnen
-    goToFinetuning();     // Dann direkt zum Feintuning
+  if (hasExistingConfig || geraetHatFremdeFelder()) {
+    // Bestehende Config vom Geraet: direkt ins Feintuning, der Wizard hat dann nichts
+    // mehr zu fragen (Paul 25.10.2026: "wenn der Kunde Einstellungen hat, die der Wizard
+    // gar nicht einstellen kann, war er schon mal im Menue").
+    // WICHTIG die NEUE Oberflaeche: goToFinetuning() zeigt stepFinetuning, und das ist
+    // seit dem Umzug tot. Es blieb deshalb eine komplett LEERE Seite stehen, gemessen
+    // 25.10.2026 mit einer Geraete-Config und einem Klick auf Weiter.
+    goToDisplayConfig();        // erst die Config berechnen
+    zurNeuenOberflaeche(null);  // dann hinueber, wie bei "Einstellungen aendern"
   } else {
     // Neue Config: Zur Display-Config Seite
     goToDisplayConfig();
@@ -13625,7 +13830,7 @@ function calculateRecommendedConfig() {
 
   return {
     // Station-Daten
-    rbl: stations.map(s => s.fullId + lineSelToken(s)).join(','),   // mit Linienauswahl-Token
+    rbl: stations.map(s => s.fullId + lineSelTokenGespeichert(s)).join(','),   // mit Linienauswahl-Token (im Pro-Station-Format leer)
     filter: stations.map(s => s.filter || '').join('|'),
     stationDetails: uniqueStationDetails,
 
@@ -14943,6 +15148,14 @@ function mergedSegmentsSupported() {
   // (?fw= schickt das Gerät weiter mit; fwAtLeast/fwVersionParam bleiben für
   // künftige Gates erhalten, werden hier aber nicht mehr ausgewertet.)
   return true;
+}
+
+// Feld d<n> (Eintraege mit gleichem d sind EIN Brett) kennt die Firmware seit 2.6, siehe
+// dToMergedIdx in main.cpp. Davor war das komma-gejointe Multi-rbl-Segment der einzige Weg,
+// eine Zusammenlegung auszudruecken. Ohne gemeldete Version (kein ?fw=) bleibt es dabei:
+// ein unbekanntes d wuerde ignoriert und aus EINEM Brett wuerden mehrere.
+function dFeldSupported() {
+  return fwAtLeast('2.6.0');
 }
 
 // Stadt-Gruppenschlüssel einer Station: gleiche Stadt/gleiches Netz + gleicher Display-Typ
@@ -21518,7 +21731,7 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     }
     // Linienauswahl-Token ('!M4~U2' oder ''): haengt an der rbl des Geraets, die bareId
     // (Gehweg-Schluessel) bleibt die reine Stop-Id.
-    var _lsTok = lineSelToken(s);
+    var _lsTok = lineSelTokenGespeichert(s);
 
     if (dirs.length > 0) {
       dirs.forEach(function(d) {
@@ -21684,6 +21897,40 @@ function buildMasterAndTimeRows(gehwegByStopId) {
   // ("BAYERN:a,BAYERN:b|<lines beider>|c24|g0", wie Wien "4131,4136"). Position = erstes
   // Mitglied; Linien-Tokens dedupliziert (wie Firmware seenTok); Gehweg = Max der Stops.
   (function mergeInstanceSegments() {
+    // Firmware ab 2.6: NICHT mehr komma-joinen, sondern ein Segment JE STATION mit
+    // derselben Display-Nummer d. Die Firmware verschmilzt sie zu EINEM Brett und behaelt
+    // dabei Filter und Gehweg je Station (rblFilters/rblGehweg bleiben getrennt). Damit
+    // verschwindet der Fall, den '!'-Token und q nicht entscheiden koennen: dieselbe Linie
+    // an BEIDEN Stationen ausgewaehlt, mit verschiedenen Richtungs-Ids (Kunde Thomas).
+    if (dFeldSupported()) {
+      var _gd = (typeof _geraetRows !== 'undefined' && _geraetRows)
+                ? geraetDProStop(_geraetRows.masterrow) : { proStop: {}, max: 0 };
+      var gruppen = {};
+      entries.forEach(function(e) {
+        if (!e.instKey) return;
+        (gruppen[e.instKey] = gruppen[e.instKey] || []).push(e);
+      });
+      var belegt = {}, frei = _gd.max;
+      Object.keys(gruppen).forEach(function(k) {
+        var grp = gruppen[k];
+        // Allein braucht keine Nummer: ein Segment ist schon ein Brett. Ohne d bleibt
+        // alles beim bisherigen Verhalten (Wien nach Stil verschmelzen, sonst getrennt).
+        if (grp.length < 2) return;
+        // Nummer des Geraets bevorzugen, damit eine im Feintuning gesetzte Aufteilung
+        // dieselbe Nummer behaelt; neue Bretter bekommen Nummern OBERHALB aller Geraete-
+        // Nummern, damit sie keinem bestehenden Brett in die Quere kommen.
+        var kandidat = 0;
+        grp.forEach(function(e) {
+          var d = _gd.proStop[segStopSchluessel(e.rbl)];
+          if (d && !belegt[d] && (!kandidat || d < kandidat)) kandidat = d;
+        });
+        var nr = kandidat || (++frei);
+        while (belegt[nr]) nr = ++frei;
+        belegt[nr] = true;
+        grp.forEach(function(e) { e.dNr = nr; });
+      });
+      return;
+    }
     var byKey = {};
     for (var i = 0; i < entries.length; i++) {
       var e = entries[i];
@@ -21723,7 +21970,36 @@ function buildMasterAndTimeRows(gehwegByStopId) {
   // Stationen. Hat der Nutzer hier Bretter umgebaut, passte ein mitgeschlepptes d<n>
   // nicht mehr, und ein falsches Brett waere schlimmer als ein fehlendes. Dann bleibt es
   // beim bisherigen Verhalten.
-  var _zusatz = null;
+  var _zusatz = null;         // exakte Struktur: Felder in Segment-Reihenfolge
+  var _zusatzProStop = null;  // Rueckfall: Felder je Station, ohne d
+  // Aus {schluessel, felder} eine Karte "Station → Felder (ohne d)" machen. Board-Felder
+  // wie Zeilen, Sortierung und Design sind je Brett gleich, und die Firmware nimmt beim
+  // Verschmelzen ohnehin den ersten gesetzten Wert.
+  function _zusatzKarte(z) {
+    var karte = {};
+    (z.schluessel || []).forEach(function(k, i) {
+      var felder = z.felder[i] || [];
+      if (!felder.length) return;
+      String(k).split(',').forEach(function(st) {
+        if (!st) return;
+        if (!karte[st]) karte[st] = felder;
+        // Zusaetzlich unter der nackten Id: bei "alle Abfahrten" benennt diese Seite das
+        // Netz um (OEBBREG:1131826 wird OEBBALL:1131826), und ueber den vollen Schluessel
+        // waere das Segment nicht wiederzufinden.
+        var ci = st.indexOf(':');
+        if (ci > 0) { var bare = st.substring(ci + 1); if (bare && !karte['#' + bare]) karte['#' + bare] = felder; }
+      });
+    });
+    return karte;
+  }
+  // Felder dieser Station aus der Rueckfall-Karte: erst der volle Schluessel, dann die
+  // nackte Id.
+  function _zusatzFuer(karte, rbl) {
+    var k = segStopSchluessel(rbl);
+    if (karte[k]) return karte[k];
+    var ci = String(k).indexOf(':');
+    return (ci > 0) ? karte['#' + String(k).substring(ci + 1)] : null;
+  }
   try {
     if (typeof _geraetRows !== 'undefined' && _geraetRows) {
       var _alt = {
@@ -21738,13 +22014,34 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       if (passt(_alt[false].schluessel, _neu[false]) && passt(_alt[true].schluessel, _neu[true])) {
         _zusatz = _alt;
       } else {
-        console.log('[masterrow] Struktur geaendert — Geraete-Zusatzfelder nicht uebernommen');
+        // Struktur anders: die Felder in Segment-Reihenfolge passen nicht mehr. Seit dem
+        // Umbau auf "ein Segment je Station plus d" ist das der NORMALFALL, sobald eine
+        // Bestands-Config noch komma-gejointe Segmente hat. Rueckfall je Station: die
+        // Felder des alten Segments gelten fuer jede seiner Stationen weiter. Aufteilung
+        // (d) bleibt dabei bewusst aussen vor, die bauen wir selbst; ein mitgeschlepptes
+        // d aus einer anderen Struktur waere schlimmer als keines.
+        _zusatzProStop = { false: _zusatzKarte(_alt[false]), true: _zusatzKarte(_alt[true]) };
+        console.log('[masterrow] Struktur geaendert — Zusatzfelder je Station uebernommen, ohne d');
       }
     }
   } catch (e) { _zusatz = null; }
   var _zusatzLauf = { false: 0, true: 0 };
+  // Zeilenfolge des Geraets je Station, damit sie das Speichern uebersteht.
+  var _tokOrd = null;
+  try {
+    if (typeof _geraetRows !== 'undefined' && _geraetRows) {
+      _tokOrd = { false: tokenOrdnungProStop(_geraetRows.masterrow),
+                  true:  tokenOrdnungProStop(_geraetRows.timerow) };
+    }
+  } catch (e) { _tokOrd = null; }
 
   entries.forEach(function(e) {
+    // Reihenfolge zuerst: lines, m und q entstehen gleich darunter aus den Indizes.
+    if (_tokOrd) {
+      var _kOrd = !!e.isTime;
+      tokenOrdnungAnwenden(e, tokenOrdnungFuer(_tokOrd[_kOrd], e.rbl)
+                           || tokenOrdnungFuer(_tokOrd[!_kOrd], e.rbl));
+    }
     var lines = e.lineParts.length ? e.lineParts.join(',') : '*';
     // Gruppen-Marker m<tokenIdx>:<gid> für alle gruppierten Linien-Tokens dieser
     // Station. Ältere Firmware ignoriert das unbekannte Feld (Tokens bleiben sauber).
@@ -21768,14 +22065,32 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     if (e.qIdx && e.qIdx.length === e.lineParts.length && String(e.rbl).indexOf(',') >= 0) {
       qPart = '|q' + e.qIdx.join(',');
     }
+    // d<n>: Eintraege mit gleichem d sind EIN Brett (Firmware ab 2.6, dToMergedIdx).
+    // Steht nur dort, wo DIESE Oberflaeche eine Zusammenlegung meint. Ohne das Feld gilt
+    // wie bisher: Wien nach Stil verschmelzen, Fremdnetze getrennt.
+    var dPart = e.dNr ? '|d' + e.dNr : '';
     var _extra = '';
-    if (_zusatz) {
-      var _k = !!e.isTime;
-      var _liste = _zusatz[_k].felder[_zusatzLauf[_k]++];
-      if (_liste && _liste.length) _extra = '|' + _liste.join('|');
+    var _k = !!e.isTime;
+    var _liste = null;
+    if (_zusatz) _liste = _zusatz[_k].felder[_zusatzLauf[_k]++];
+    else if (_zusatzProStop) _liste = _zusatzFuer(_zusatzProStop[_k], e.rbl);
+    if (_liste && _liste.length) {
+      // Eigenes d gewinnt: sonst stuenden zwei d-Felder im Segment und die Firmware nimmt
+      // das erste, also womoeglich das alte. Wo diese Oberflaeche KEINE Zusammenlegung
+      // meint (Wien, "alle Abfahrten", von→nach), bleibt die Nummer des Geraets stehen,
+      // sonst zerfiele ein dort gebautes Brett, etwa eines ueber Master- und Timerow
+      // hinweg. Eine Verwechslung ist dabei nicht moeglich: neue Nummern beginnen
+      // OBERHALB aller Geraete-Nummern, und wiederverwendet wird nur die Nummer, die eine
+      // Station der Gruppe schon vom Geraet hatte.
+      _liste = _liste.filter(function(t) {
+        var c = String(t).charAt(0);
+        if (c !== 'd' && c !== 'D') return true;
+        return !e.dNr;
+      });
+      if (_liste.length) _extra = '|' + _liste.join('|');
     }
     e.str = e.rbl + '|' + lines + '|c' + e.colour + '|g' + gPart
-          + (mParts.length ? '|m' + mParts.join(',') : '') + qPart + _extra;
+          + (mParts.length ? '|m' + mParts.join(',') : '') + qPart + dPart + _extra;
   });
 
   // Kompakt (ein Display für alle): ZEILEN global nach dt-Rang sortieren — so kann eine
@@ -22274,7 +22589,7 @@ function saveFromFinetuning() {
         return id.indexOf(':') < 0 ? ('WL:' + id) : id;
       }).filter(Boolean).join(',');
     }
-    return fid + lineSelToken(s);   // Linienauswahl-Token wie in der masterrow
+    return fid + lineSelTokenGespeichert(s);   // Linienauswahl-Token wie in der masterrow
   }).join(',');
   recommendedConfig.filter = stations.map(s => s.filter || '').join('|');
 
@@ -23127,16 +23442,29 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // Beim Laden erkennen, ob eine Config schon "alles auf einem Display" nutzt: dann traegt
   // mindestens ein Segment rbls aus MEHREREN Netzen. Sonst verloere der Schalter beim
   // Wiedereinstieg seinen Zustand und das Speichern wuerde die Anzeige wieder aufteilen.
+  // Netze PRO BRETT zaehlen, nicht pro Segment: ein Brett ist entweder ein Segment (alt,
+  // Komma-Liste) oder alle Segmente mit derselben Nummer d (neu). Traegt ein Brett rbls aus
+  // mehreren Netzen, lief die Config auf "alles auf einem Display".
   try {
-    ftAllOneDisplay = String(masterRowStr || '').split(';').some(function(seg) {
-      var feld = String(seg || '').split('|')[0] || '';
-      var netze = {};
-      feld.split(',').forEach(function(t) {
+    var netzeProBrett = {};
+    String(masterRowStr || '').split(';').forEach(function(seg, segIdx) {
+      seg = String(seg || '').trim(); if (!seg) return;
+      var f = seg.split('|');
+      var dNr = 0;
+      for (var i = 2; i < f.length; i++) {
+        var t = String(f[i] || '').trim();
+        if (t.charAt(0) === 'd' || t.charAt(0) === 'D') { dNr = parseInt(t.substring(1), 10) || 0; break; }
+      }
+      var brett = dNr ? ('d' + dNr) : ('seg' + segIdx);
+      var netze = netzeProBrett[brett] = netzeProBrett[brett] || {};
+      String(f[0] || '').split(',').forEach(function(t) {
         t = t.trim(); if (!t) return;
         var ci = t.indexOf(':');
         netze[ci > 0 ? cityGroupNetwork(t.substring(0, ci)) : 'WL'] = 1;
       });
-      return Object.keys(netze).length > 1;
+    });
+    ftAllOneDisplay = Object.keys(netzeProBrett).some(function(b) {
+      return Object.keys(netzeProBrett[b]).length > 1;
     });
   } catch (e) { ftAllOneDisplay = false; }
   // Gemischtes Segment heisst Kompakt: die Karten oben muessen das gleich anzeigen,
@@ -23271,16 +23599,29 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     if (masterRowStr) {
       String(masterRowStr).split(';').forEach(seg => {
         seg = seg.trim(); if (!seg) return;
-        const segRbl = (seg.split('|')[0] || '').trim();
+        const felder = seg.split('|');
+        const segRbl = (felder[0] || '').trim();
         if (!segRbl) return;
+        // Feld d<n>: Segmente mit gleichem d sind EIN Brett. Seit dem Umbau auf ein Segment
+        // je Station ist das der Weg, auf dem eine Zusammenlegung zurueckkommt.
+        let dNr = 0;
+        for (let i = 2; i < felder.length; i++) {
+          const t = String(felder[i] || '').trim();
+          if (t.charAt(0) === 'd' || t.charAt(0) === 'D') { dNr = parseInt(t.substring(1), 10) || 0; break; }
+        }
         const toks = segRbl.split(',').map(t => t.trim()).filter(Boolean);
         const segIdx = _segCount++;
         toks.forEach(tok => {
-          (segInfoByToken[tok] = segInfoByToken[tok] || []).push({ segIdx: segIdx, tokenCount: toks.length });
+          (segInfoByToken[tok] = segInfoByToken[tok] || []).push({ segIdx: segIdx, tokenCount: toks.length, dNr: dNr });
         });
       });
     }
   }
+  // Display-Instanz einer Station: MIT Feld d gehoert sie zu Brett d (Segmente mit gleichem
+  // d sind eines), ohne d weiterhin zu ihrem Segment. Der Versatz 1000 haelt die beiden
+  // Nummernkreise auseinander; die Zahl selbst ist nur ein Schluessel fuers Gruppieren.
+  const _instVon = (si) => (si === undefined || si === null) ? null
+                         : (si.dNr ? 1000 + si.dNr : si.segIdx + 1);
   // Vorkommens-Zähler des Lesers: das n-te Auftreten eines rbl-Tokens in rbl_id liest
   // aus allen drei Segment-Maps den n-ten Eintrag (Überhang: letzter Eintrag gewinnt).
   const _rblOcc = {};
@@ -23371,7 +23712,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // zählt auch Übersprungene mit, sonst verrutschen die Folge-Vorkommen.
     const _occ = (_rblOcc[part] = (_rblOcc[part] || 0) + 1) - 1;
     const _segInfo = _pickBySeg(segInfoByToken, part, _occ);
-    const _instId = (_segInfo !== undefined) ? _segInfo.segIdx + 1 : null;
+    const _instId = _instVon(_segInfo);
     if (stations.some(s => s.fullId === fullId
         && (s.displayInstance == null ? null : s.displayInstance) === _instId)) continue;
 
@@ -23496,7 +23837,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     { const _cOv = _pickBySeg(colourByRbl, part, _occ); if (_cOv != null) station.colourOverride = _cOv; }
     // Display-Instanz = masterrow-Segment: Stationen desselben (merged) Segments teilen
     // sich eine Instanz — Grundlage für den Zuordnungs-Wizard und die Toggle-Ableitung.
-    if (_segInfo !== undefined) station.displayInstance = _segInfo.segIdx + 1;
+    if (_segInfo !== undefined) station.displayInstance = _instVon(_segInfo);
 
     // DBALL/DBSTEIG: der rbl kodiert die Auswahl (Gattung/Steig/Linie nach '!', alt ':').
     // Beim Reload steht in der masterrow "…|*|" → ohne dieses Handling läse der Konfigurator
@@ -23669,12 +24010,28 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // richtungsIds beim Re-Save zu verlieren; der Merge dedupliziert die Tokens wieder.)
     if (!isAllDep && !isJourney && Array.isArray(stationDests) && stationDests.length
         && (_segInfo === undefined || _segInfo.tokenCount === 1 || station.directions.length === 0)) {
+      // Seit dem Umbau auf ein Segment je Station gilt das NICHT mehr nur fuer Steig-rids:
+      // traegt ein Segment genau EINE Station, sind seine Tokens ohnehin stationsgenau, da
+      // kann nichts Fremdes hereinrutschen. Lag die Linie gerade nicht im Feed (Abend,
+      // Betriebspause, Drosselung), fiel sie vorher still aus der Auswahl. Gemessen
+      // 25.10.2026: "41>R" an Stuttgart Marienplatz war nach dem Laden weg, sobald eine
+      // zweite Station im Spiel war; die Anzeigen-Sitzung hat denselben Fall gemeldet.
+      // Formate, die eine Server-Umstellung ungueltig gemacht haben kann, bleiben dem
+      // Reparatur-Pfad weiter unten vorbehalten.
+      const _eineStation = (_segInfo === undefined || _segInfo.tokenCount === 1);
+      const _altesRidFormat = rid => /^p\d+$/.test(rid) || /^di\d+l/.test(rid)
+                                  || /^p[A-Za-zÄÖÜäöüß.\s]+\d+$/.test(rid);
+      const _ridTexte = (window._dirTextByStop || {})[network + ':' + bareStopId] || {};
       stationDests.forEach(sd => {
         if (!sd.line || !sd.towards) return;
         const rid = String(sd.towards);
-        if (!/^st/.test(rid)) return;   // nur Steig-rids (Global-/DELFI-Netze)
+        if (!/^st/.test(rid) && !(_eineStation && !_altesRidFormat(rid))) return;
         const has = station.directions.some(d => d.line === sd.line && String(d.richtungsId || '') === rid);
-        if (!has) station.directions.push({ line: sd.line, towards: '', type: '', richtungsId: rid });
+        if (has) return;
+        // Zieltext aus dem Linien-Index, damit die Richtung benannt ist statt nur "R"
+        const _tw = _ridTexte[String(sd.line) + '|' + rid];
+        station.directions.push({ line: sd.line, towards: (Array.isArray(_tw) ? _tw[0] : _tw) || '',
+                                  type: '', richtungsId: rid });
       });
     }
 
@@ -25343,6 +25700,13 @@ window.addEventListener('DOMContentLoaded', () => {
     // Start / Grundgerüst
     'Lade Konfiguration …': 'Loading configuration …', 'Lade…': 'Loading…', 'Lade Abfahrten...': 'Loading departures...',
     'Stationen werden geladen …': 'Loading stops …',
+    // Wizard-Schritt "Abfahrten" (25.10.2026)
+    'Was soll auf deinem catch-it stehen?': 'What should your catch-it show?',
+    'Nach Linie': 'By line',
+    'Du wählst die Linien und Richtungen, jede bekommt ihre feste Zeile.':
+      'You pick the lines and directions, each gets its own fixed row.',
+    'Alles, was als Nächstes fährt, nach Uhrzeit sortiert.':
+      'Everything leaving next, sorted by time.',
     'Erneut versuchen': 'Try again',
     'Was möchtest du ändern?': 'What would you like to change?',
     'Dein catch-it ist schon eingerichtet. Wähle, was du anpassen willst.': 'Your catch-it is already set up. Choose what you want to adjust.',
