@@ -5263,6 +5263,31 @@ function lineSelStrip(tok) {
   var bang = t.indexOf('!');
   return bang > 0 ? t.substring(0, bang) : t;
 }
+// Gegenstueck zu lineSelStrip: die Liniennamen AUS dem Token lesen
+// ("BWEGT:de:08111:6221!S4~S5~S6" -> ["S4","S5","S6"]), leer wenn kein Token da ist.
+function lineSelNames(tok) {
+  var t = String(tok || '').trim();
+  var ci = t.indexOf(':');
+  if (ci <= 0) return [];
+  if (!lineSelNetOk(t.substring(0, ci))) return [];
+  var bang = t.indexOf('!');
+  if (bang <= 0) return [];
+  return t.substring(bang + 1).split('~').map(function(n) { return n.trim(); }).filter(Boolean);
+}
+// Karte "reine Stop-Id" -> Liniennamen aus dem '!'-Token, aus noch UNGEKUERZTEN Zeilen.
+// Muss vor lineSelStripRows laufen, danach ist die Auskunft weg.
+function lineSelMapFromRows(str) {
+  var map = {};
+  String(str || '').split(';').forEach(function(seg) {
+    var feld = String(seg || '').split('|')[0] || '';
+    feld.split(',').forEach(function(tok) {
+      tok = tok.trim(); if (!tok) return;
+      var namen = lineSelNames(tok);
+      if (namen.length) map[lineSelStrip(tok)] = namen;
+    });
+  });
+  return map;
+}
 // Alle Stations-Felder einer rbl-Liste bzw. masterrow/timerow von Tokens befreien (Edit-Restore).
 function lineSelStripRows(str) {
   return String(str || '').split(';').map(function(seg) {
@@ -7754,6 +7779,24 @@ function wizardOpenFinetuning() {
 // (OEBBREG/OEBBFERN/OEBBALL). Alle sechs muenden ohnehin in dieses eine Feld, denn nur
 // das sieht das Geraet. Darum uebernimmt die neue Oberflaeche es direkt und muss von
 // den sechs Mechanismen nichts wissen (Paul 23.10.2026, Linz uebernahm alle Linien).
+// Erste brauchbare Zahl aus zwei Schreibweisen, sonst die Vorgabe. 0 ist ein gueltiger
+// Wert (Nachtmodus ab 0 Uhr), darum ausdruecklich auf null/undefined pruefen und nicht
+// auf Wahrheitswert.
+function _zahlOderVorgabe(a, b, vorgabe) {
+  var v = (a !== undefined && a !== null && a !== '') ? a
+        : ((b !== undefined && b !== null && b !== '') ? b : null);
+  if (v === null) return vorgabe;
+  var n = parseInt(v, 10);
+  return isNaN(n) ? vorgabe : n;
+}
+// Nachtmodus: das Geraet schickt ihn als Wahrheitswert oder als 1/0/"1"/"true".
+// Unbekannt heisst AN, so haelt es der Wizard dieser Seite auch.
+function _nachtAn(cfg) {
+  var v = (cfg.nightMode !== undefined) ? cfg.nightMode : cfg.nightmode;
+  if (v === undefined || v === null || v === '') return true;
+  return (v === true || v === 1 || v === '1' || v === 'true');
+}
+
 // masterrow/timerow fuer die Uebergabe: erst aus der Config (beide Schreibweisen),
 // sonst frisch aus den Stationen bauen. Nie mit leeren Zeilen uebergeben, die neue
 // Oberflaeche liest daraus, WAS gewaehlt ist.
@@ -7835,7 +7878,20 @@ function zurNeuenOberflaeche(cfg) {
         timerow: _geraetRows.timerow,
         displaysettings: _geraetRows.displaysettings
       } : null,
-      helligkeit: parseInt(cfg.displaylight || 3, 10)
+      // ACHTUNG Schreibweise, dieselbe Falle wie bei masterRow: die Config fuehrt diese
+      // Felder in camelCase (displayLight, nightMode, …), hier stand bisher nur das
+      // kleingeschriebene displaylight. Das war immer undefined, also ging an die neue
+      // Oberflaeche IMMER Helligkeit 3, egal was am Geraet stand (25.10.2026).
+      helligkeit: _zahlOderVorgabe(cfg.displayLight, cfg.displaylight, 3),
+      // Nachtmodus und Standzeit kamen bisher gar nicht mit. Die neue Oberflaeche startete
+      // deshalb mit IHREN Vorgaben (Nachtmodus aus, Standzeit 10) und schrieb die beim
+      // Speichern aufs Geraet: der Nachtmodus des Kunden war nach jedem Besuch geloescht,
+      // ohne dass er etwas angefasst hat (Kunde aus Vellmar). Die Vorgaben hier sind die
+      // DIESER Seite (Nachtmodus an, 22 bis 6, Standzeit 12), nicht die der anderen.
+      nightmode: _nachtAn(cfg) ? '1' : '0',
+      nightstart: String(_zahlOderVorgabe(cfg.nightStart, cfg.nightstart, 22)),
+      nightend: String(_zahlOderVorgabe(cfg.nightEnd, cfg.nightend, 6)),
+      stopinterval: String(_zahlOderVorgabe(cfg.stopInterval, cfg.stopinterval, 12))
     }));
   } catch (e) {}
   // Mit Zeitstempel: GitHub Pages schickt cache-control max-age=600, ohne das sieht man
@@ -13802,6 +13858,11 @@ function goToDisplayConfig() {
     nightMode: recommendedConfig.nightMode,
     nightStart: recommendedConfig.nightStart,
     nightEnd: recommendedConfig.nightEnd,
+    // Standzeit und Anzeige-Modus fehlten hier. calculateRecommendedConfig baut sie neu
+    // (Standzeit 12, Modus 1), die Werte des Geraets waren damit beim Weiterklicken weg,
+    // ohne dass jemand etwas angefasst hat (gemessen 25.10.2026: Geraet 8, danach 12).
+    stopInterval: recommendedConfig.stopInterval,
+    displayMode: recommendedConfig.displayMode,
     showFunMessages: recommendedConfig.showFunMessages
   } : null;
 
@@ -13840,6 +13901,14 @@ function goToDisplayConfig() {
     if (previousSettings.nightMode !== undefined) recommendedConfig.nightMode = previousSettings.nightMode;
     if (previousSettings.nightStart !== undefined) recommendedConfig.nightStart = previousSettings.nightStart;
     if (previousSettings.nightEnd !== undefined) recommendedConfig.nightEnd = previousSettings.nightEnd;
+    if (previousSettings.stopInterval !== undefined) {
+      recommendedConfig.stopInterval = previousSettings.stopInterval;
+      ftStopInterval = previousSettings.stopInterval;   // sonst ueberschreibt der naechste Bau wieder
+    }
+    if (previousSettings.displayMode !== undefined) {
+      recommendedConfig.displayMode = previousSettings.displayMode;
+      ftDisplayMode = previousSettings.displayMode;
+    }
     if (previousSettings.showFunMessages !== undefined) recommendedConfig.showFunMessages = previousSettings.showFunMessages;
   }
 
@@ -22674,11 +22743,17 @@ function saveConfig() {
 // linefilterdestination: Linz-Format "1:Auwiesen,2:solarCity,27:Chemiepark" mit Line:Destination
 // roworderdestination: Wien-Format "4A:Karlsplatz U,4A:Wittelsbachstraße,59A:Bhf. Meidling S U" mit Line:Destination
 let _loadExistingConfigPromise = null;
+// Stop-Id -> Liniennamen aus dem '!'-Token der zuletzt geladenen Config.
+var _linienProStop = {};
 async function loadExistingConfig(rbl, filter, linefilterdestination, roworderdestination, linegroups, masterRowStr, clearFirst) {
   if (!rbl || rbl.trim() === '') return;
   // Linienauswahl-Token (BERLIN:900100003!M4~U2) gehoert nur dem Geraet: hier abtrennen, damit
   // Stationssuche, Picker (/stops/lines) und Anzeige die reine Id sehen. Beim Speichern baut
   // lineSelToken() es aus den gewaehlten Richtungen wieder auf.
+  // VOR dem Kuerzen festhalten, welche Linien laut Token zu welchem Stop gehoeren. Bei
+  // einem merged Segment (beide Stationen auf EINEM Display) ist das die einzige Quelle
+  // dafuer — das Linienfeld des Segments gilt fuer alle Stops gemeinsam.
+  _linienProStop = Object.assign(lineSelMapFromRows(rbl), lineSelMapFromRows(masterRowStr || ''));
   rbl = lineSelStripRows(rbl);
   masterRowStr = lineSelStripRows(masterRowStr || '');
 
@@ -22921,11 +22996,28 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         if (!dirs.length) dirs = null;
       }
       pushDirs(segRbl, dirs);
-      // Merged Segment (komma-gejointe rbls, fw>=2.3.18): dieselben Richtungen für
-      // jeden Stop-Token hinterlegen — die API-Abfrage pro Station behält unten nur
-      // die Richtungen, die an diesem Stop tatsächlich vorkommen.
+      // Merged Segment (komma-gejointe rbls, fw>=2.3.18): die Richtungen des Segments auf
+      // die einzelnen Stop-Tokens verteilen. Dabei sagt das '!'-Feld des Tokens, welche
+      // Linien zu DIESEM Stop gehören ("…:6221!S4~S5~S6") — nur die dürfen hierher.
+      // Vorher bekam jeder Stop ALLE Richtungen des Segments, und es sollte die
+      // Abfahrts-Abfrage richten. Das geht nur gut, solange eine Linie nicht an beiden
+      // Stationen fährt: Kunde Thomas (Stuttgart, 25.10.2026) hatte Marienplatz mit
+      // U1/U14/41/43 und Feuersee mit S4/S5/S6 auf EINEM Display; 41 und 43 halten aber
+      // auch an Feuersee (43 endet dort sogar), also nahm die Abfahrts-Prüfung sie dort
+      // zu Recht an und sie standen bei jedem Öffnen zusätzlich bei Feuersee.
       if (segRbl.indexOf(',') >= 0) {
-        segRbl.split(',').forEach(tok => { tok = tok.trim(); if (tok) pushDirs(tok, dirs); });
+        segRbl.split(',').forEach(tok => {
+          tok = tok.trim(); if (!tok) return;
+          var eigene = (_linienProStop && _linienProStop[tok]) || [];
+          if (!dirs || !eigene.length) { pushDirs(tok, dirs); return; }
+          var nurHier = dirs.filter(function(d) {
+            var ln = _stripModePrefix(d.line);
+            return eigene.some(function(e) { return _stripModePrefix(e) === ln; });
+          });
+          // Greift der Filter gar nicht (unbekannte Schreibweise), lieber alles behalten
+          // als die Station zu leeren.
+          pushDirs(tok, nurHier.length ? nurHier : dirs);
+        });
       }
     });
   }
@@ -24352,11 +24444,19 @@ async function handleConfigMessage(data) {
     // seedDtGroupFromConfig greift dann auf diese masterrow-Saat zurück.
     if (rowOrderDest) window._mrGroupSeed = rowOrderDest;
     // Anzeige-Modus (Gemischt/Slideshow)
+    // Die Werte des Geraets MUESSEN auch in die Feintuning-Variablen, nicht nur in
+    // recommendedConfig: der Config-Bau setzt weiter unten
+    // recommendedConfig.stopInterval = ftStopInterval und displayMode = ftDisplayMode.
+    // Bleiben die auf ihren Vorgaben (12 bzw. 1), ueberschreiben sie den Geraetewert
+    // wieder, bevor ihn jemand sieht — die Standzeit des Kunden war damit bei jedem
+    // Besuch auf 12 zurueckgesetzt (25.10.2026, gemessen: Geraet 8, uebergeben 12).
     if (data.config.display_mode !== undefined) {
       recommendedConfig.displayMode = parseInt(data.config.display_mode) || 1;
+      ftDisplayMode = recommendedConfig.displayMode;
     }
     if (data.config.stop_interval !== undefined) {
       recommendedConfig.stopInterval = parseInt(data.config.stop_interval) || 12;
+      ftStopInterval = recommendedConfig.stopInterval;
     }
     // Weitere Feintuning-Einstellungen
     if (data.config.colour !== undefined) {

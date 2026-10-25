@@ -315,6 +315,9 @@
   .farbfeld input[type=color]::-webkit-color-swatch { border: none; border-radius: 7px; }
   .wahltrenner { font-size: 11px; font-weight: 700; letter-spacing: .04em;
                  text-transform: uppercase; color: var(--grau); margin: 14px 0 6px; }
+  .ruht-tag { margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+              font-weight: 600; background: var(--rand); color: var(--grau);
+              vertical-align: middle; white-space: nowrap; }
   .schiene.an { background: var(--akzent); }
   .schiene.an .kugel { transform: translateX(24px); background: #fff; }
 
@@ -534,9 +537,14 @@ const BADGE_FAHRZEUGE = [[1, 'Tram'], [2, 'Bus'], [4, 'U-Bahn'], [8, 'Zug/S-Bahn
 //   t Schriftfarbe, b Hintergrund Wien, u Badges, v Fahrzeugarten,
 //   h Hochflurer, n Niederflur-Blinken, k Klima, o Blinken bei 0,
 //   f Matrix-Schriftart, d Verspaetung, x/y Wechselzeiten, i Standzeit.
+// Standzeit, mit der ein frisches Display startet. Kommt vom Geraet, sonst die Vorgabe.
+// Ohne das stellte jeder Besuch die Standzeit stillschweigend auf 10 Sekunden zurueck.
+// 0 heisst: vom Geraet kam nichts, dann gilt die Vorgabe. Nicht direkt mit
+// STANDZEIT_VORGABE belegen, die Konstante steht weiter unten.
+let standzeitStart = 0;
 function standardEinst() {
   return { t: 1, b: 0, u: 0, v: 4, h: 1, n: 0, k: 0, o: 0,
-           f: 0, d: 0, x: 0, y: 0, i: STANDZEIT_VORGABE };
+           f: 0, d: 0, x: 0, y: 0, i: standzeitStart || STANDZEIT_VORGABE };
 }
 // Welcher Anzeige-Stil passt zu welchem Netz, und in welchem Farbton. Dieselbe Zuordnung
 // wie im Konfigurator (CITY_CAPABILITIES: defaultColour und defaultColorVariant), damit
@@ -1268,7 +1276,12 @@ function displaysAuffuellen() {
     if (x.st !== y.st) return x.st - y.st;
     return String(x.linie).localeCompare(String(y.linie), 'de', { numeric: true });
   });
-  const platz = d => !d.vomNutzer && zeilenEinheiten(d).length < maxZeilen(stilVon(d));
+  // Ein chronologisches Brett ("Naechste Abfahrten") traegt BELIEBIG viele Linien und
+  // zeigt davon die naechsten N. Der Zeilen-Deckel gilt nur fuer feste Zeilen. Vorher
+  // zerlegte die Verteilung eine Haltestelle mit zehn Linien in vier Bretter, obwohl
+  // eines gereicht haette (Kundenmeldung Bernd, 25.10.2026).
+  const platz = d => !d.vomNutzer
+    && (zeitbasiert(d) || zeilenEinheiten(d).length < maxZeilen(stilVon(d)));
   offen.forEach(k => {
     const meine = wissen.get(k);
     let ziel = null;
@@ -1932,16 +1945,22 @@ function editorZeichnen() {
                       .join(' &middot; ');
     const halte = [];
     treffer.forEach(t => { if (t && halte.indexOf(t.station.name) < 0) halte.push(t.station.name); });
+    // Ruht die Zeile? Nur wenn KEIN Mitglied gerade faehrt.
+    const ruht = treffer.length > 0 && treffer.every(t => !t || !t.dep || t.dep.time == null);
     h += '<div class="linie ziehbar' + (zusammen ? ' zusammen' : '') + '" data-idx="' + i + '"'
        + ' onpointerdown="zeileGreifen(event,' + di + ',this)"'
        + ' onpointermove="zeileZiehen(event)" onpointerup="zeileLoslassen()"'
        + ' onpointercancel="zeileLoslassen()">'
        + (zusammen ? '<span class="marken">' + marken + '</span>' : marken)
-       + '<div class="rumpf"><div class="ziel">' + ziele + '</div>'
+       + '<div class="rumpf"><div class="ziel">' + ziele
+       // Eine ruhende Linie wird grau gezeichnet, und Grau liest sich wie ein Fehler.
+       // Darum steht direkt beim Ziel, was los ist, nicht nur klein darunter
+       // (Kunde Thomas, 25.10.2026: "was sind die grauen Linien S4, S5, S6?").
+       + (ruht ? '<span class="ruht-tag">f\u00e4hrt gerade nicht</span>' : '') + '</div>'
        + '<div class="halt">Zeile ' + (i + 1)
        + (halte.length ? ' &middot; ' + escapeHtmlFt(halte.join(', ')) : '')
        + (zeit && (zeit.time || zeit.time === 0) ? ' &middot; in ' + zeit.time + ' min'
-                                                     : ' &middot; f\u00e4hrt gerade nicht') + '</div>'
+                                                     : ' &middot; kommt wieder, sobald sie f\u00e4hrt') + '</div>'
        + (zusammen
           ? '<div class="zusatz">' + teil.length + ' Richtungen in einer Zeile &middot; '
             + '<button class="link" onclick="gruppeLoesen(' + di + ',' + i + ')">trennen</button></div>'
@@ -3478,6 +3497,39 @@ function sortierungSetzen(di, wert) {
   if (!d) return;
   d.sortierung = wert;
   allesZeichnen();
+  // Auf "Naechste Abfahrten" passt alles auf EIN Brett. Wer umschaltet, will meist
+  // genau das: eine Liste nach Uhrzeit statt mehrerer Bretter (Kundenmeldung Bernd,
+  // 25.10.2026). Darum einmal fragen, statt ihn jede Linie einzeln holen zu lassen.
+  if (wert !== 'zeit') return;
+  const andere = displays.filter((x, xi) => xi !== di && x.richtungen.some(k => !istUhrKey(k)));
+  if (!andere.length) return;
+  let zahl = 0;
+  andere.forEach(x => x.richtungen.forEach(k => { if (!istUhrKey(k)) zahl++; }));
+  dialogZeigen('Alle Linien hierher holen?',
+    'Dieses Display zeigt jetzt die n\u00e4chsten Abfahrten nach Uhrzeit. Dabei darf es '
+    + 'beliebig viele Linien tragen. Sollen die ' + zahl + ' Linien von den anderen '
+    + (andere.length === 1 ? 'Display' : 'Displays') + ' mit hierher?',
+    [{ text: 'Nein, so lassen', still: true },
+     { text: 'Alle hierher', tun: function () { alleHierher(di); } }],
+    'doppelt');
+}
+
+// Alle Linien der uebrigen Bretter auf dieses holen. Bretter, die der Nutzer selbst
+// angelegt hat, bleiben unberuehrt; leere fallen beim Zeichnen ohnehin weg.
+function alleHierher(di) {
+  const d = displays[di];
+  if (!d) return;
+  displays.forEach((x, xi) => {
+    if (xi === di) return;
+    x.richtungen.filter(k => !istUhrKey(k)).forEach(k => {
+      if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k);
+    });
+    x.richtungen = x.richtungen.filter(k => istUhrKey(k));
+    gruppenPruefen(x);
+  });
+  d.vomNutzer = true;
+  zeiger = 0;
+  allesZeichnen();
 }
 function zeitZeilenSetzen(di, wert) {
   const d = displays[di];
@@ -3821,6 +3873,15 @@ function uebergabeHolen() {
   return { stationen: raus, helligkeit: roh.helligkeit, masterrow: roh.masterrow || '',
            modus: (roh.modus === 'spielerisch' || roh.modus === 'kompakt') ? roh.modus : null,
            marke: roh.brand || '',
+           // Geraete-Einstellungen, die nicht in der masterrow stehen. Ohne sie startet
+           // die Oberflaeche mit ihren Vorgaben und SPEICHERT die dann auch: Bernds
+           // Nachtmodus war nach jedem Besuch weg (Kundenmeldung 25.10.2026).
+           nacht: (roh.nightmode != null || roh.nightstart != null) ? {
+             an: String(roh.nightmode) === '1' || roh.nightmode === true,
+             von: parseInt(roh.nightstart, 10),
+             bis: parseInt(roh.nightend, 10)
+           } : null,
+           standzeit: parseInt(roh.stopinterval, 10),
            markeStile: roh.brandStile || null,
            markeNamen: roh.brandStilNamen || null,
            eintraege: eintraegeAusZeilen(bauZeilen) };
@@ -4022,6 +4083,15 @@ function tokenTreffer(linien, m, richtungen) {
   if (ueber && ueber.helligkeit) helligkeit = ueber.helligkeit;
   // Der Wizard sagt, wie automatisch verteilt werden soll.
   if (ueber && ueber.modus) modus = ueber.modus;
+  // Nachtmodus und Standzeit so uebernehmen, wie sie am Geraet stehen.
+  if (ueber && ueber.nacht) {
+    nacht.an = !!ueber.nacht.an;
+    if (!isNaN(ueber.nacht.von)) nacht.von = ueber.nacht.von;
+    if (!isNaN(ueber.nacht.bis)) nacht.bis = ueber.nacht.bis;
+  }
+  if (ueber && !isNaN(ueber.standzeit) && ueber.standzeit > 0) {
+    standzeitStart = Math.max(STANDZEIT_MIN_UHR, Math.min(STANDZEIT_MAX, ueber.standzeit));
+  }
   // Marke des Geraets: aus der Uebergabe, sonst aus der Adresszeile wie im Konfigurator.
   try {
     const ausUrl = new URLSearchParams(location.search).get('brand');
