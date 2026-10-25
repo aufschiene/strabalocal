@@ -163,6 +163,7 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .linie .ziel::before { content: '\2192\00a0'; color: var(--grau); }
+  .linie .ziel.alles::before { content: none; }
   .linie .halt { font-size: 12px; color: var(--grau); margin-top: 1px; }
   .linie.gewaehlt { border-color: var(--akzent); border-width: 2px; }
   .neu-badge {
@@ -586,6 +587,15 @@ function netzeVon(d) {
 }
 // Vorgabe des ersten bekannten Netzes auf diesem Display.
 function netzVorgabe(d) {
+  // Zuerst, was der Konfigurator fuer die Stationen dieses Bretts sagt: dort steckt mehr
+  // als der Netz-Standard drin, etwa eine Zuweisung des Kunden oder Westbahn statt OEBB.
+  let aus = null;
+  ((d && d.richtungen) || []).forEach(k => {
+    if (aus) return;
+    const r = richtungFinden(k);
+    if (r && r.station && r.station.stil) aus = [r.station.stil, r.station.stilTon || 0];
+  });
+  if (aus) return aus;
   let v = null;
   netzeVon(d).forEach(n => { if (!v && NETZ_VORGABE[n]) v = NETZ_VORGABE[n]; });
   return v;
@@ -734,8 +744,42 @@ function zeilenDesStils(c) {
   displays.forEach(d => { if (stilVon(d) === c) gross = Math.max(gross, zeilenSelbst(d)); });
   return gross;
 }
+// Liegen auf diesem Brett NUR Stations-Bloecke? Dann verhaelt es sich wie ein
+// chronologisches: alles was dort faehrt, nach Uhrzeit.
+// Wie viele Eintraege ergibt dieses Brett in der Config? Jede "Alle Abfahrten"-Station
+// braucht einen eigenen, denn '*' vertraegt keine Linienliste neben sich; alle uebrigen
+// Linien teilen sich einen.
+function eintraegeVon(d) {
+  const bloecke = new Set();
+  let andere = false;
+  ((d && d.richtungen) || []).forEach(k => {
+    if (istUhrKey(k)) return;
+    const r = richtungFinden(k);
+    if (!r) return;
+    if (r.dep.alleStation) bloecke.add(r.station.rbl); else andere = true;
+  });
+  return bloecke.size + (andere ? 1 : 0);
+}
+
+// Zusammengehalten werden mehrere Eintraege ueber das d-Feld. Die Firmware versteht das,
+// der Konfigurator liest es aber nicht: er macht aus jedem Segment eine eigene Anzeige
+// und schreibt beim naechsten Speichern kein d mehr. Danach zerfaellt so ein Brett dort
+// in zwei. Wien ist ausgenommen, dort fuehrt die Firmware gleichfarbige Eintraege
+// ohnehin zusammen (Konfigurator-Sitzung 25.10.2026).
+function zerfaelltImKonfigurator(d) {
+  return !stopIdFormat(d) && eintraegeVon(d) > 1;
+}
+
+function nurBloeckeAuf(d) {
+  const ks = ((d && d.richtungen) || []).filter(k => !istUhrKey(k));
+  return ks.length > 0 && ks.every(istAlleKey);
+}
 function zeilenSelbst(d) {
   if (zeitbasiert(d)) return zeitZeilen(d);
+  // Ein Stations-Block ist EINE Zeile in der Liste, am Geraet aber so viele Abfahrten,
+  // wie das Brett hergibt. Darum zaehlt er nicht als eine Zeile, sondern holt das
+  // Maximum des Stils (Paul 25.10.2026).
+  if ((d.richtungen || []).some(istAlleKey)) return maxZeilen(stilVon(d));
   // Zusammengefasste Richtungen teilen sich eine Zeile, darum die Einheiten zaehlen.
   const n = zeilenEinheiten(d).length;
   const max = maxZeilen(stilVon(d));
@@ -1217,7 +1261,22 @@ function nachtZeitSetzen(feld, wert) { nacht[feld] = parseInt(wert, 10) || 0; al
 // Zeile, die zweite verschwand aus der Liste und in der Config bekam sie die Abfahrten
 // der ersten. Innerhalb einer Station bleibt es bei "Linie|Ziel", davon leben
 // gewaehlt und gehwegLinien.
+// "Alle Abfahrten" ist KEINE Linie, sondern die ganze Station. Im Geraeteformat steht
+// dafuer ein '*' im Linienfeld, und genau so fuehren wir es auch hier: EIN Block je
+// Station statt einer Zeile je Linie. Vorher zerfiel die Wahl "alle Abfahrten" in so
+// viele Zeilen, wie gerade zufaellig etwas fuhr, und der Nutzer sah etwas anderes als
+// das, was er im Picker ausgewaehlt hatte (Paul 25.10.2026: "pro Station ein Block").
+const ALLE_LINIE = '*';
+const ALLE_TEXT = 'Alle Abfahrten';
+// Zeichen fuer den Block: ein Stern waere im Badge kaum zu erkennen.
+const ALLE_MARKE = '\u2630';
+function depText(dep) { return (dep && dep.alleStation) ? ALLE_TEXT : ((dep && dep.dest) || ''); }
+function depMarke(dep) { return (dep && dep.alleStation) ? ALLE_MARKE : ((dep && dep.line) || '?'); }
 function zeilenKey(si, dep) { return si + '\u00a7' + dep.line + '|' + dep.dest; }
+function istAlleKey(k) {
+  const i = String(k).indexOf('\u00a7');
+  return i >= 0 && String(k).slice(i + 1) === ALLE_LINIE + '|';
+}
 function keyLokal(k) {
   const m = /^(\d+)\u00a7([\s\S]*)$/.exec(String(k));
   return m ? m[2] : String(k);
@@ -1311,6 +1370,8 @@ function abfahrtenDerRichtung(key) {
   const r = richtungFinden(key);
   if (!r) return [];
   const gw = gehwegFuer(r.station, key);
+  // Der Stations-Block steht fuer alles, was hier abfaehrt, nach Uhrzeit.
+  if (r.dep.alleStation) return r.station.abfahrten.filter(x => x.time >= gw);
   return r.station.abfahrten.filter(x => x.line === r.dep.line && x.dest === r.dep.dest && x.time >= gw);
 }
 
@@ -1426,7 +1487,11 @@ function schirmeBauen() {
     const erste = displays[quellen[0]];
     // Zeilen: das Geraet kennt sie je Stil, bei mehreren Quellen gewinnt die groesste.
     const proSeite = Math.max(1, Math.max.apply(null, quellen.map(i => zeilenVon(displays[i]))));
-    const zeitlich = quellen.some(i => zeitbasiert(displays[i]));
+    // Ein Brett, auf dem nur Stations-Bloecke liegen, zeigt am Geraet die naechsten
+    // Abfahrten dieser Stationen nach Uhrzeit. In der Vorschau genauso, sonst staende da
+    // eine Zeile je Block statt der Abfahrten (Paul 25.10.2026).
+    const nurBloecke = quellen.every(i => nurBloeckeAuf(displays[i]));
+    const zeitlich = nurBloecke || quellen.some(i => zeitbasiert(displays[i]));
     let seiten;
     if (zeigtUhr(erste)) {
       seiten = [[]];
@@ -1452,7 +1517,13 @@ function schirmeBauen() {
           // Die Uhr-Zeile bleibt als leere Zeile stehen, darueber legt die Vorschau
           // spaeter die Uhrzeit.
           if (teil.length === 1 && istUhrKey(teil[0])) return { uhr: true, line: '', dest: '', time: '' };
-          const deps = teil.map(k => { const r = richtungFinden(k); return r && r.dep; }).filter(Boolean);
+          const deps = teil.map(k => {
+            const r = richtungFinden(k);
+            if (!r) return null;
+            // Der Block hat keine eigene Abfahrt: hier steht die naechste der Station.
+            if (r.dep.alleStation) return abfahrtenDerRichtung(k)[0] || null;
+            return r.dep;
+          }).filter(Boolean);
           if (!deps.length) return null;
           // Eine ruhende Linie hat keine Zeit. Sie bleibt als Zeile stehen, die Spalte
           // rechts aber leer, so wie es auch das Geraet zeichnet (24.10.2026).
@@ -1608,6 +1679,13 @@ function seitenTeilen(daten, proSeite) {
 // jede einzelne Abfahrt geblaettert, dadurch wurden aus drei Richtungen fuenfzehn Displays
 // statt zwei (Paul 22.10.2026: "das waere dann ein Display und die 2 waere dann ein Plus").
 function zeilenEintraege(st) {
+  // Ganze Station: ein einziger Block. Die Zeit der naechsten Abfahrt kommt mit, damit
+  // die Zeile unten "in x min" zeigen kann.
+  if (st.alle) {
+    const erste = (st.abfahrten || []).find(x => x.time >= gehwegStation(st)) || st.abfahrten[0] || {};
+    return [{ line: ALLE_LINIE, dest: '', alleStation: true, rid: '',
+              time: (erste.time != null ? erste.time : null), vt: erste.vt || '' }];
+  }
   const raus = [];
   const gesehen = new Set();
   const knapp = new Map();
@@ -1635,7 +1713,7 @@ function zeilenEintraege(st) {
       const linie = i < 0 ? k : k.slice(0, i), ziel = i < 0 ? '' : k.slice(i + 1);
       const alt = (st.letzteLinien || []).find(x => x.line === linie && x.dest === ziel) || {};
       raus.push({ line: linie, dest: ziel, time: null, ruht: true,
-                  rid: alt.rid || '', vt: alt.vt || '',
+                  rid: alt.rid || (st.ruhtRid && st.ruhtRid[k]) || '', vt: alt.vt || '',
                   lineColor: alt.lineColor || null, lineTextColor: alt.lineTextColor || null });
     });
   }
@@ -1843,6 +1921,10 @@ function editorZeichnen() {
         : zeitbasiert(dHier)
         ? nHier + (nHier === 1 ? ' Linie' : ' Linien') + ' im Display, davon stehen die '
           + zeitZeilen(dHier) + ' n\u00e4chsten Abfahrten darauf, nach Uhrzeit sortiert.'
+        : nurBloeckeAuf(dHier)
+        ? (nHier === 1 ? 'Eine ganze Station' : nHier + ' ganze Stationen')
+          + ', davon stehen die ' + zeilenVon(dHier)
+          + ' n\u00e4chsten Abfahrten darauf, nach Uhrzeit sortiert.'
         : einzelLinie(dHier)
         ? (gruppenVon(dHier).length ? 'Eine zusammengefasste Zeile, darum ' : 'Eine Linie, darum ')
           + zeilenVon(dHier) + ' Zeilen mit ihren n\u00e4chsten Abfahrten.'
@@ -1851,7 +1933,15 @@ function editorZeichnen() {
           + (seitenHier > 1 ? ', also ' + seitenHier + ' Seiten zum Durchwechseln' : '') + '.')
      + ' Dieser Stil kann h\u00f6chstens ' + maxHier + ' Zeilen.'
      + ' Insgesamt <b>' + displays.length + (displays.length === 1 ? ' Display' : ' Displays')
-     + '</b>.</div>';
+     + '</b>.'
+     + (zerfaelltImKonfigurator(dHier)
+        ? '<div class="hinweis">Dieses Display besteht aus ' + eintraegeVon(dHier)
+          + ' Eintr\u00e4gen, weil "Alle Abfahrten" einer Station nicht mit einzelnen Linien '
+          + 'in einem Eintrag stehen kann. Am Ger\u00e4t ist es trotzdem ein Display. '
+          + 'Wenn du sp\u00e4ter in der Linienauswahl noch einmal speicherst, kann es dort '
+          + 'in zwei Displays zerfallen.</div>'
+        : '')
+     + '</div>';
 
   // Je Zeile zeigen, was darauf steht, mit Pfeilen zum Umsortieren innerhalb des Displays.
   // Kopf mit Link: Zusammenfassen ist die eine Sache, die man hier noch tun kann, und
@@ -1877,8 +1967,9 @@ function editorZeichnen() {
       if (!r) return;
       const fz = badgeFarben(r.dep);
       h += '<div class="linie">'
-         + '<b style="background:' + fz.bg + ';color:' + fz.fg + '">' + escapeHtmlFt(r.dep.line) + '</b>'
-         + '<div class="rumpf"><div class="ziel">' + escapeHtmlFt(r.dep.dest) + '</div>'
+         + '<b style="background:' + fz.bg + ';color:' + fz.fg + '">' + escapeHtmlFt(depMarke(r.dep)) + '</b>'
+         + '<div class="rumpf"><div class="ziel' + (r.dep.alleStation ? ' alles' : '') + '">'
+         + escapeHtmlFt(depText(r.dep)) + '</div>'
          + '<div class="halt">' + escapeHtmlFt(r.station.name) + '</div></div>'
          + '<button class="pfeil weg-x" title="von diesem Display nehmen"'
          + ' onclick="richtungSchalten(' + dz + ',\'' + k.replace(/'/g, "\\'") + '\',false)">' + SYM_X + '</button>'
@@ -1939,9 +2030,9 @@ function editorZeichnen() {
       const t = treffer[n];
       const f = t ? badgeFarben(t.dep) : { bg: '#4a4a4a', fg: '#fff' };
       return '<b style="background:' + f.bg + ';color:' + f.fg + '">'
-           + escapeHtmlFt(t ? t.dep.line : '?') + '</b>';
+           + escapeHtmlFt(t ? depMarke(t.dep) : '?') + '</b>';
     }).join('');
-    const ziele = teil.map((k, n) => escapeHtmlFt(treffer[n] ? treffer[n].dep.dest : keyLokal(k)))
+    const ziele = teil.map((k, n) => escapeHtmlFt(treffer[n] ? depText(treffer[n].dep) : keyLokal(k)))
                       .join(' &middot; ');
     const halte = [];
     treffer.forEach(t => { if (t && halte.indexOf(t.station.name) < 0) halte.push(t.station.name); });
@@ -1952,15 +2043,20 @@ function editorZeichnen() {
        + ' onpointermove="zeileZiehen(event)" onpointerup="zeileLoslassen()"'
        + ' onpointercancel="zeileLoslassen()">'
        + (zusammen ? '<span class="marken">' + marken + '</span>' : marken)
-       + '<div class="rumpf"><div class="ziel">' + ziele
+       + '<div class="rumpf"><div class="ziel'
+       + (treffer.every(x => x && x.dep && x.dep.alleStation) ? ' alles' : '') + '">' + ziele
        // Eine ruhende Linie wird grau gezeichnet, und Grau liest sich wie ein Fehler.
        // Darum steht direkt beim Ziel, was los ist, nicht nur klein darunter
        // (Kunde Thomas, 25.10.2026: "was sind die grauen Linien S4, S5, S6?").
        + (ruht ? '<span class="ruht-tag">f\u00e4hrt gerade nicht</span>' : '') + '</div>'
-       + '<div class="halt">Zeile ' + (i + 1)
-       + (halte.length ? ' &middot; ' + escapeHtmlFt(halte.join(', ')) : '')
-       + (zeit && (zeit.time || zeit.time === 0) ? ' &middot; in ' + zeit.time + ' min'
-                                                     : ' &middot; kommt wieder, sobald sie f\u00e4hrt') + '</div>'
+       + '<div class="halt">'
+       + (treffer.every(x => x && x.dep && x.dep.alleStation)
+          ? escapeHtmlFt(halte.join(', ')) + ' &middot; alles, was hier f\u00e4hrt, nach Uhrzeit'
+          : 'Zeile ' + (i + 1)
+            + (halte.length ? ' &middot; ' + escapeHtmlFt(halte.join(', ')) : '')
+            + (zeit && (zeit.time || zeit.time === 0) ? ' &middot; in ' + zeit.time + ' min'
+                                                      : ' &middot; kommt wieder, sobald sie f\u00e4hrt'))
+       + '</div>'
        + (zusammen
           ? '<div class="zusatz">' + teil.length + ' Richtungen in einer Zeile &middot; '
             + '<button class="link" onclick="gruppeLoesen(' + di + ',' + i + ')">trennen</button></div>'
@@ -2219,18 +2315,46 @@ function tokenListe(d) {
   const raus = [];
   zeilenEinheiten(d).forEach(teil => {
     const stueck = [];
+    // Ein '+'-Token gehoert als GANZES zu einem Stop, also zaehlt der erste.
+    let vonRbl = '';
     teil.forEach(k => {
       if (istUhrKey(k)) return;
       const r = richtungFinden(k);
       if (!r) return;
+      if (!vonRbl) vonRbl = r.station.rbl;
       // Immer zuerst die Richtungs-Id, nur ohne sie den bereinigten Zieltext. Genau
       // so macht es der alte Konfigurator, und die Firmware vergleicht die Id exakt.
       const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
       stueck.push(ref ? r.dep.line + '>' + ref : r.dep.line);
     });
-    if (stueck.length) raus.push(stueck.join('+'));
+    if (stueck.length) raus.push({ tok: stueck.join('+'), rbl: vonRbl });
   });
   return raus;
+}
+
+// Dasselbe, aber FLACH: ein Token je Linie, die Gruppen stehen daneben im m-Feld
+// (m<tokenIndex>:<gruppe>). Der Konfigurator schreibt Gruppen seit jeher so, und er
+// liest beides. Schrieben wir '+', waere dieselbe Gruppe nach dem naechsten Speichern
+// drueben wieder ein m, und die Zeile saehe jedes Mal anders aus. Eine Form fuer beide
+// Oberflaechen, damit ein Brett den Weg hin und zurueck unveraendert uebersteht
+// (abgestimmt mit der Konfigurator-Sitzung, 25.10.2026).
+function tokenListeFlach(d) {
+  const liste = [], merges = [];
+  zeilenEinheiten(d).forEach((teil, gi) => {
+    const echte = teil.filter(k => {
+      const r = richtungFinden(k);
+      return !istUhrKey(k) && r && !r.dep.alleStation;
+    });
+    echte.forEach(k => {
+      const r = richtungFinden(k);
+      const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
+      // Nur eine Zeile mit mehreren Linien ist eine Gruppe. Dass eine Linie in zwei
+      // Richtungen faehrt, macht noch keine.
+      if (echte.length > 1) merges.push(liste.length + ':' + (gi + 1));
+      liste.push({ tok: ref ? r.dep.line + '>' + ref : r.dep.line, rbl: r.station.rbl });
+    });
+  });
+  return { liste: liste, merges: merges };
 }
 
 // Die eigenen Designs als customrow: ein Segment je Slot, "c<slot>|B…|T…|N…".
@@ -2302,8 +2426,10 @@ function configBauen() {
     d.richtungen.forEach(k => {
       const r = richtungFinden(k);
       if (!r) return;
-      if (!proStation.has(r.station.rbl)) proStation.set(r.station.rbl, { station: r.station, linien: [], keys: [] });
+      if (!proStation.has(r.station.rbl)) proStation.set(r.station.rbl, { station: r.station, linien: [], keys: [], alle: false });
       const eintrag = proStation.get(r.station.rbl);
+      // Der Stations-Block ist keine Linie: er fuellt das Linienfeld allein mit '*'.
+      if (r.dep.alleStation) { eintrag.alle = true; return; }
       if (eintrag.linien.indexOf(r.dep.line) < 0) { eintrag.linien.push(r.dep.line); eintrag.keys.push(k); }
     });
     if (!proStation.size && !zeigtUhr(d)) return;   // leeres Display kommt nicht ans Geraet
@@ -2376,8 +2502,20 @@ function configBauen() {
                    + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
       });
     } else {
-      const rbls = [], gw = [];
+      // Stationen mit "Alle Abfahrten" bekommen je einen eigenen Eintrag: ihr Linienfeld
+      // ist '*', und das vertraegt sich nicht mit einer Liste konkreter Linien daneben.
       proStation.forEach((e, rbl) => {
+        if (!e.alle) return;
+        stuecke.push(rblTeile(rbl).kahl + '|*|c' + c + '|g' + gehwegStation(e.station)
+                   + '|r' + zeilenVon(d) + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
+      });
+      // Wie viele Stationen teilen sich das gemeinsame Segment? Die Bloecke stehen
+      // schon je einzeln da und zaehlen hier nicht mit.
+      let gemeinsam = 0;
+      proStation.forEach(e => { if (!e.alle) gemeinsam++; });
+      const rbls = [], gw = [], reihen = [];
+      proStation.forEach((e, rbl) => {
+        if (e.alle) return;
         // Welche Linie zu WELCHEM Stop gehoert, steht ausschliesslich im '!'-Teil der
         // rbl. Stehen zwei Stationen in EINEM Segment, ist das Linienfeld dahinter
         // gemeinsam, und ohne den Teil kann es beim naechsten Oeffnen niemand mehr
@@ -2385,19 +2523,38 @@ function configBauen() {
         // beiden (Kunde Thomas, 41 und 43 an Feuersee, 25.10.2026).
         // Nicht bei Wien, dort hat ohnehin jede Station ihren eigenen Eintrag, und nicht
         // bei den Zug-Brettern, die kennen das Token nicht.
+        // Nur bei MEHREREN Stationen: bei einer ist die Zuordnung ohnehin eindeutig,
+        // und 2.6.1 findet den Stop fuer die GEHZEIT nicht mehr, sobald ein '!' dran
+        // haengt (Firmware-Sitzung 25.10.2026, dort behoben, aber erst im naechsten
+        // Release). So trifft es nur die Configs, die das Token wirklich brauchen.
         const kahl = rblTeile(rbl).kahl;
-        const marke = (!wien && !istZeitTyp(c) && e.linien.length)
+        const marke = (gemeinsam > 1 && linienTokenErlaubt(e.station, c, e.linien))
           ? '!' + e.linien.join('~') : '';
         rbls.push(kahl + marke);
+        reihen.push(rbl);
         gw.push(gehwegStation(e.station));
       });
       const gTeil = gw.every(x => x === gw[0]) ? String(gw[0]) : gw.join(',');
       // Wien: Liniennamen, die Richtung steckt im Bahnsteig, und Gruppen ueber Eintraege
       // hinweg braucht das m-Feld. Sonst ein Token je Zeile mit Ziel, Gruppen per '+'.
-      const tok = wien ? alleLinien : tokenListe(d);
+      const flach = wien ? { liste: alleLinien.map(x => ({ tok: x, rbl: '' })), merges: merges }
+                         : tokenListeFlach(d);
+      const liste = flach.liste;
+      const tok = liste.map(x => x.tok);
+      // q: je Linien-Token der Index seiner Station in der rbl-Liste, 0-basiert, gezaehlt
+      // wie die Komma-Liste in Feld 1 dasteht. Loest den einzigen Fall, den sonst nichts
+      // loest: dieselbe Linie mit DERSELBEN Richtungs-Id an zwei Stationen eines
+      // Segments (Stuttgart, 41 nach Berliner Platz an beiden Haltestellen).
+      // Buchstabe und Regeln mit der Firmware-Sitzung festgelegt (25.10.2026).
+      let qTeil = '';
+      if (!wien && reihen.length > 1 && liste.length) {
+        qTeil = '|q' + liste.map(x => Math.max(0, reihen.indexOf(x.rbl))).join(',');
+      }
+      if (rbls.length)
       stuecke.push(rbls.join(',') + '|' + (tok.length ? tok.join(',') : '*')
                  + '|c' + c + '|g' + gTeil + '|r' + zeilenVon(d)
-                 + (wien && merges.length ? '|m' + merges.join(',') : '')
+                 + (flach.merges.length ? '|m' + flach.merges.join(',') : '')
+                 + qTeil
                  + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
     }
     // Die timerow traegt die zeitbasierten Display-TYPEN (OEBB, Westbahn, SBB), NICHT
@@ -3799,6 +3956,8 @@ function eintraegeAusZeilen(zeilen) {
         case 's': e.s = zahl(wert); break;
         case 'd': e.dnr = zahl(wert); break;
         case 'm': e.m = wert; break;
+        // q: je Linien-Token der Index seiner Station in der rbl-Liste.
+        case 'q': e.q = wert.split(',').map(x => parseInt(x, 10)); break;
         case 'g': e.g = wert.split(',').map(x => zahl(x) || 0); break;
         case 'w': {
           const st = wert.split('-');
@@ -3838,23 +3997,59 @@ function gehoertDazu(nur, linie) {
   return !nur || nur.indexOf(String(linie || '').trim().toUpperCase()) >= 0;
 }
 
+// Netze, die im rbl ein EIGENES '!'-Schema fuehren oder keines vertragen. Bei DB und
+// Daenemark stehen dort Gattung, Steig oder Linie: ein zweites Token zerlegt ihre
+// Auswahl. Wien und Linz brauchen keines, dort hat jede Station ihren eigenen Eintrag.
+// Liste aus dem Konfigurator (lineSelToken), geprueft gegen den Netznamen im rbl.
+const OHNE_LINIENTOKEN = ['WL', 'WLB', 'TEST', 'DB', 'DBALL', 'DBSTEIG', 'DBIRIS',
+                          'DKTRAIN', 'DKALL', 'DKSTEIG', 'WESTBAHN', 'LINZ',
+                          'LIEMOBIL', 'RET', 'OVAPI', 'BODO'];
+function netzKuerzel(st) {
+  const rbl = String((st && st.rbl) || '');
+  const i = rbl.indexOf(':');
+  return (i > 0 ? rbl.slice(0, i) : String((st && st.netz) || '')).trim().toUpperCase();
+}
+// Darf diese Station ein Linien-Token tragen? Ein Liniename mit einem Trennzeichen des
+// Formats macht die masterrow unlesbar: dann lieber gar kein Token.
+function linienTokenErlaubt(st, colour, linien) {
+  // Zug-Bretter nehmen wir immer selbst aus, das haengt am gewaehlten Stil und nicht am
+  // Netz, das weiss nur diese Seite.
+  if (istZeitTyp(colour)) return false;
+  if (!(linien.length > 0 && linien.every(l => !/[~!,|;]/.test(String(l))))) return false;
+  // Sagt der Konfigurator es, gilt er. Die Liste unten ist nur noch der Rueckfall fuer
+  // eine aeltere Fassung, die das Feld noch nicht mitschickt.
+  if (st && typeof st.linienToken === 'boolean') return st.linienToken;
+  const n = netzKuerzel(st);
+  if (!n || n.indexOf('OEBB') === 0) return false;
+  return OHNE_LINIENTOKEN.indexOf(n) < 0;
+}
+
 // Nur die Auswahl je rbl, abgeleitet aus denselben Eintraegen.
 function wahlAusZeilen(zeilen) {
   const raus = new Map();
   eintraegeAusZeilen(zeilen).forEach(ein => {
     // Ein Segment kann mehrere rbls tragen (Wien). Die Linien gelten dann fuer alle,
     // und was an einem Bahnsteig nicht faehrt, findet beim Abgleich ohnehin nichts.
-    ein.rbls.forEach(rbl => {
+    ein.rbls.forEach((rbl, ri) => {
       const teil = rblTeile(rbl);
-      // Nur die Linien dieser Station, falls die rbl sie mitbringt.
-      const meine = teil.nur
-        ? ein.gruppen.map(g => g.filter(m => gehoertDazu(teil.nur, m.linie))).filter(g => g.length)
-        : ein.gruppen;
+      // q ist die genaueste Angabe: es nennt je Token die Station. Sonst das '!'-Token,
+      // das nur Liniennamen kennt.
+      let meine, genau = false;
+      if (ein.q && ein.q.length >= ein.gruppen.length) {
+        meine = ein.gruppen.filter((g, gi) => ein.q[gi] === ri);
+        genau = true;
+      } else if (teil.nur) {
+        meine = ein.gruppen.map(g => g.filter(m => gehoertDazu(teil.nur, m.linie))).filter(g => g.length);
+        genau = true;
+      } else {
+        meine = ein.gruppen;
+      }
       // Unter beiden Schreibweisen ablegen, mit und ohne '!'-Teil: welche davon die
       // Station traegt, wissen wir hier nicht.
       [rbl, teil.kahl].forEach(k => {
-        const e = raus.get(k) || { alle: false, gruppen: [] };
+        const e = raus.get(k) || { alle: false, gruppen: [], genau: false };
         if (ein.alle) e.alle = true; else e.gruppen = e.gruppen.concat(meine);
+        if (genau) e.genau = true;
         raus.set(k, e);
       });
     });
@@ -3902,6 +4097,16 @@ function uebergabeHolen() {
       raus.push({ rbl: rbl, name: st.name || rbl, netz: st.netz || 'WL',
                   alle: !!st.alle || !!(w && w.alle),
                   wahl: (w && w.gruppen.length) ? w.gruppen : ausFilter,
+                  // Der Konfigurator weiss, was zu dieser Station gehoert, und sagt es
+                  // uns. Damit braucht diese Seite keine eigene Netz-Tabelle mehr
+                  // (Paul 25.10.2026: "aber der Konfigurator weiss das ja alles").
+                  // Stand die Zuordnung ausdruecklich in der Config ('!' oder q)? Dann
+                  // gehoert die Linie sicher zu dieser Station, auch wenn sie gerade
+                  // nicht in dieser Richtung faehrt.
+                  genau: !!(w && w.genau),
+                  linienToken: (typeof st.linienToken === 'boolean') ? st.linienToken : null,
+                  stil: parseInt(st.stil, 10),
+                  stilTon: parseInt(st.stilTon, 10),
                   richtungen: wunsch.slice() });
     });
   });
@@ -3915,6 +4120,13 @@ function uebergabeHolen() {
   // zugewiesen hat. Ohne Geraete-Config verteilen wir also selbst (Paul 23.10.2026).
   // Eigene Designs zuerst: davon haengen Namen und Vorschau der Stile ab.
   customrowLesen((roh.geraet && roh.geraet.customrow) || roh.customrow || '');
+  // Die Standzeit des Geraets ist die Vorgabe fuer jedes Display, das keine eigene
+  // mitbringt. Sie muss VOR dem Parsen stehen, denn standardEinst() liest sie, und die
+  // Eintraege unten entstehen in derselben Anweisung (Paul 25.10.2026).
+  const sz = parseInt(roh.stopinterval, 10);
+  if (!isNaN(sz) && sz > 0) {
+    standzeitStart = Math.max(STANDZEIT_MIN_UHR, Math.min(STANDZEIT_MAX, sz));
+  }
   const g = roh.geraet || null;
   const bauZeilen = (g && (g.masterrow || g.timerow))
     ? (g.masterrow || '') + ';' + (g.timerow || '')
@@ -3986,19 +4198,27 @@ function displaysAusEintraegen(eintraege) {
       const nurVon = new Map();
       ein.rbls.forEach(r => { const x = rblTeile(r); nurVon.set(x.kahl, x.nur); });
       const stats = stationen.filter(st => nurVon.has(rblTeile(st.rbl).kahl));
-      // "Alle Abfahrten" steht als '*' in der Config: ein Eintrag, am Geraet aber
-      // mehrere Seiten. Unser Modell kennt ein Display je Seite, das laesst sich nicht
-      // eins zu eins zurueckholen. Dann verteilen wir wie beim ersten Mal.
-      // (Ein Uhr-Brett traegt auch '*', hat aber keine Station, das ist hier egal.)
-      if (ein.alle && stats.length) { misslungen = true; return; }
-      stats.forEach((st, i) => {
-        const gw = ein.g.length ? (ein.g.length > i ? ein.g[i] : ein.g[0]) : 0;
-        if (gw) st.gehweg = gw;
-      });
+      // "Alle Abfahrten" steht als '*' in der Config. Das ist jetzt ein Stations-Block,
+      // also genau EINE Zeile, und damit laesst es sich zurueckholen. Vorher gab die
+      // Wiederherstellung hier auf, und jeder Kunde mit "alle Abfahrten" verlor bei
+      // jedem Besuch seine Aufteilung, seine Uhr und sein Design (Paul 25.10.2026).
+      // (Ein Uhr-Brett traegt auch '*', hat aber keine Station: dann passiert hier nichts.)
+      if (ein.alle) {
+        stats.forEach(st => {
+          st.alle = true;
+          const k = zeilenKey(stationen.indexOf(st), { line: ALLE_LINIE, dest: '' });
+          if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k);
+        });
+        return;
+      }
       ein.gruppen.forEach((teil, ti) => {
         const keys = [];
+        // Sagt q, zu welcher Station dieses Token gehoert, gilt nur sie.
+        const nurRbl = (ein.q && ein.q.length > ti && ein.rbls[ein.q[ti]] != null)
+          ? rblTeile(ein.rbls[ein.q[ti]]).kahl : null;
         teil.forEach(m => stats.forEach(st => {
-          if (!gehoertDazu(nurVon.get(rblTeile(st.rbl).kahl), m.linie)) return;
+          if (nurRbl && rblTeile(st.rbl).kahl !== nurRbl) return;
+          if (!nurRbl && !gehoertDazu(nurVon.get(rblTeile(st.rbl).kahl), m.linie)) return;
           const si = stationen.indexOf(st);
           const nimm = (linie, ziel) => {
             const k = zeilenKey(si, { line: linie, dest: ziel });
@@ -4061,6 +4281,21 @@ function displaysAusEintraegen(eintraege) {
 // stuende nach jedem Oeffnen wieder die Vorgabe da, obwohl der Nutzer sein Display
 // laengst eingefaerbt hat (Paul 23.10.2026). Nur wenn ALLE Eintraege denselben Stil
 // tragen, sonst wuerde eine gemischte Config auf einen Stil eingeebnet.
+// Gehzeit je Station aus den Eintraegen. Das g-Feld zaehlt parallel zur rbl-Liste des
+// Eintrags, also gilt g[i] fuer rbls[i]; eine einzelne Zahl gilt fuer alle.
+function gehwegUebernehmen(eintraege) {
+  (eintraege || []).forEach(ein => {
+    if (!ein.g || !ein.g.length) return;
+    (ein.rbls || []).forEach((rbl, i) => {
+      const gw = ein.g.length > i ? ein.g[i] : ein.g[0];
+      if (!gw) return;
+      const kahl = rblTeile(rbl).kahl;
+      const st = stationen.find(x => rblTeile(x.rbl).kahl === kahl);
+      if (st && !st.gehweg) st.gehweg = gw;
+    });
+  });
+}
+
 function aussehenUebernehmen(eintraege) {
   const mit = (eintraege || []).filter(x => x.c);
   if (!mit.length) return false;
@@ -4079,8 +4314,14 @@ function aussehenUebernehmen(eintraege) {
 function zielTreffer(linien, ziel) {
   const z = String(ziel || '').trim().toLowerCase();
   if (!z) return null;
-  return linien.find(x => x.ziel.toLowerCase() === z)
-      || linien.find(x => x.ziel.toLowerCase().indexOf(z) >= 0
+  const genau = linien.find(x => x.ziel.toLowerCase() === z);
+  if (genau) return genau;
+  // Ein bis zwei Zeichen sind eine Richtungs-Id (H, R), kein Zieltext. Teilweise suchen
+  // waere hier fatal: das "H" von bodo und BWEGT steckt in fast jedem Ortsnamen und
+  // traf dann die erstbeste Zeile. So wurde aus "S4>H" die S4 nach Schwabstrasse
+  // (Paul 25.10.2026). Dieselbe Grenze zieht die Firmware in matchesLineDest.
+  if (z.length <= 2) return null;
+  return linien.find(x => x.ziel.toLowerCase().indexOf(z) >= 0
                        || z.indexOf(x.ziel.toLowerCase()) >= 0)
       || null;
 }
@@ -4106,6 +4347,12 @@ function tokenTreffer(linien, m, richtungen) {
       const tr = zielTreffer(gleich, r);
       if (tr) return [tr];
     }
+    // 3) Weder eine passende Richtungs-Id noch ein passendes Ziel. Fuehrt die Station
+    //    ueberhaupt Richtungs-Ids, dann faehrt diese Linie hier nicht in DIESER
+    //    Richtung, und der Rueckfall auf "alle Richtungen dieser Linie" waere falsch.
+    //    Genau so landete Stuttgart "43>H" auch an Feuersee, wo die 43 nur nach
+    //    Pragsattel faehrt (Paul 25.10.2026).
+    if (gleich.some(x => x.rid)) return [];
   }
   // 3) Was die Uebergabe zu dieser Linie weiss. Auch hier zuerst die Richtungs-Id: das
   //    ist derselbe Wert, den die Linienauswahl im Konfigurator schon benutzt.
@@ -4143,9 +4390,6 @@ function tokenTreffer(linien, m, richtungen) {
     if (!isNaN(ueber.nacht.von)) nacht.von = ueber.nacht.von;
     if (!isNaN(ueber.nacht.bis)) nacht.bis = ueber.nacht.bis;
   }
-  if (ueber && !isNaN(ueber.standzeit) && ueber.standzeit > 0) {
-    standzeitStart = Math.max(STANDZEIT_MIN_UHR, Math.min(STANDZEIT_MAX, ueber.standzeit));
-  }
   // Marke des Geraets: aus der Uebergabe, sonst aus der Adresszeile wie im Konfigurator.
   try {
     const ausUrl = new URLSearchParams(location.search).get('brand');
@@ -4163,6 +4407,10 @@ function tokenTreffer(linien, m, richtungen) {
                                          richtungen: [{ line: e.linie, ziel: e.ziel }] }));
   for (const e of liste) {
     const st = { rbl: e.rbl, name: e.name, netz: e.netz || 'WL', abfahrten: [],
+                 alle: !!e.alle,
+                 linienToken: (e.linienToken == null) ? null : e.linienToken,
+                 stil: isNaN(e.stil) ? null : e.stil,
+                 stilTon: isNaN(e.stilTon) ? null : e.stilTon,
                  gewaehlt: new Set(), lat: e.lat, lon: e.lon,
                  vorgabe: e.richtungen && e.richtungen[0]
                           ? { line: e.richtungen[0].line, dest: e.richtungen[0].ziel } : null };
@@ -4192,8 +4440,15 @@ function tokenTreffer(linien, m, richtungen) {
       e.wahl.forEach(gruppe => {
         const keys = [];
         gruppe.forEach(m => {
-          const nimm = (linie, ziel) => {
+          const nimm = (linie, ziel, ruhtMit) => {
             st.gewaehlt.add(linie + '|' + ziel);
+            // Richtung des Tokens behalten, auch wenn gerade keine Abfahrt dazu da ist.
+            // Sonst schriebe das naechste Speichern nur noch "S4" und die Linie gaelte
+            // ab dann in ALLE Richtungen (Paul 25.10.2026).
+            if (ruhtMit) {
+              if (!st.ruhtRid) st.ruhtRid = {};
+              st.ruhtRid[linie + '|' + ziel] = ruhtMit;
+            }
             const k = zeilenKey(stationen.indexOf(st), { line: linie, dest: ziel });
             if (keys.indexOf(k) < 0) keys.push(k);
           };
@@ -4207,7 +4462,26 @@ function tokenTreffer(linien, m, richtungen) {
           const wunsch = (e.richtungen || [])
             .filter(x => String(x.line || '').trim().toUpperCase() === String(m.linie).trim().toUpperCase());
           if (wunsch.length) { wunsch.forEach(w => nimm(m.linie, w.ziel || '')); return; }
-          nimm(m.linie, /^\d+$/.test(m.richtung) ? '' : (m.richtung || ''));
+          // Kein Treffer, und die Uebergabe kennt die Linie an DIESER Station auch
+          // nicht. Dann gehoert sie zu einer anderen Station desselben Eintrags, denn
+          // das Linienfeld gilt fuer das ganze Segment. Keine Geisterzeile anlegen
+          // (Paul 25.10.2026: "U1 R" an Feuersee, "S4 H" am Marienplatz).
+          // Faehrt die Linie hier, nur nicht in DIESER Richtung, dann gehoert das Token
+          // nicht zu dieser Station. Keine ruhende Zeile: die ist fuer Linien gedacht,
+          // die gerade gar nicht fahren, nicht fuer die falsche Richtung.
+          const faehrtHier = linien.some(x =>
+            String(x.name || '').trim().toUpperCase() === String(m.linie).trim().toUpperCase());
+          // Ohne ausdrueckliche Zuordnung waere es wohl die falsche Station. MIT
+          // Zuordnung ist es eine echte Linie dieser Station, die gerade nur in einer
+          // anderen Richtung faehrt, und sie bleibt als ruhende Zeile stehen.
+          if (faehrtHier && !e.genau) return;
+          const ruhtMit = String(m.richtung || '').trim();
+          const kennt = (st.letzteLinien || [])
+            .some(x => String(x.line || '').trim().toUpperCase() === String(m.linie).trim().toUpperCase());
+          if (!kennt && !e.genau) return;
+          // Die Richtung aus dem Token ist eine ID (H, R, p1…, st…), kein Zieltext.
+          // Als Beschriftung taugt sie nicht, darum ohne Ziel: gilt in alle Richtungen.
+          nimm(m.linie, '', ruhtMit);
         });
         // Nur ein Token mit '+' ist eine Gruppe. Dass eine Linie in zwei Richtungen
         // faehrt, macht noch keine gemeinsame Zeile.
@@ -4216,6 +4490,11 @@ function tokenTreffer(linien, m, richtungen) {
       if (paare.length) st.paare = paare;
     }
   }
+  // Die Gehzeit steht JE STATION im g-Feld und gehoert nicht zur Aufteilung. Sie wurde
+  // bisher nur mitgenommen, wenn die Bretter zurueckkamen. Bei "Alle Abfahrten" gibt die
+  // Wiederherstellung aber auf, und dann schrieben wir g0 zurueck: die Gehzeit des Kunden
+  // war nach einem Besuch weg, dieselbe Falle wie beim Nachtmodus (Paul 25.10.2026).
+  gehwegUebernehmen(ueber && ueber.eintraege);
   // Gab es schon eine Config, zaehlt sie: Bretter, Stil, Uhr und Design kommen zurueck.
   if (displaysAusEintraegen(ueber && ueber.eintraege)) { allesZeichnen(); return; }
   allesZeichnen();

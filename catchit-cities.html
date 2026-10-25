@@ -5153,9 +5153,14 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
     }
   };
   hideRailInPicker();
+  // Die Liste, fuer die dieser Aufruf gestartet wurde. Hat eine neuere Haltestellenwahl
+  // availableLines inzwischen ersetzt (extractLines legt ein neues Array an), darf diese
+  // verspaetete Antwort nichts mehr hineinschreiben (siehe _pickerGen).
+  const _meineListe = availableLines;
   try {
     const r = await fetch(STATION_LINES_API + '?network=' + encodeURIComponent(network) + '&stopId=' + encodeURIComponent(stopId) + '&_=' + Date.now(), { cache: 'no-store' });
     const data = await r.json();
+    if (availableLines !== _meineListe) return;
     const lines = (data && data.lines) || [];
     if (!lines.length) return;
     const norm = s => String(s || '').trim().toLowerCase();
@@ -5248,6 +5253,8 @@ function lineSelToken(s) {
   function add(n) { n = String(n || '').trim(); if (n && !seen[n]) { seen[n] = 1; names.push(n); } }
   (s.directions || []).forEach(function(d) { add(d && d.line); });
   if (!names.length && s.filter) String(s.filter).split(',').forEach(add);
+  // Gleicher Rueckfall wie der masterrow-Bau: die Linien, die das Geraet fuer die Station hatte.
+  if (!names.length && Array.isArray(s.geraetLinien)) s.geraetLinien.forEach(function(g) { add(g && g.line); });
   if (!names.length) return '';
   // Trenner im Liniennamen: dann lieber kein Token als ein kaputtes.
   if (names.some(function(n) { return /[~!,|;]/.test(n); })) return '';
@@ -5276,17 +5283,55 @@ function lineSelNames(tok) {
 }
 // Karte "reine Stop-Id" -> Liniennamen aus dem '!'-Token, aus noch UNGEKUERZTEN Zeilen.
 // Muss vor lineSelStripRows laufen, danach ist die Auskunft weg.
+// Schluessel ist die POSITION des Segments plus der Stop, nicht der Stop allein und auch
+// nicht das Stop-Feld. Dieselbe Station steht in mehreren Segmenten, wenn ihre Linien auf
+// mehrere Bretter verteilt sind, und mehrere Bretter koennen DASSELBE Stop-Feld haben:
+//   …6019!43,…6221!S6   |   …6019!41,…6221!S5   |   …6019!U1~U14,…6221!S4
+// Alle drei lauten ohne Tokens gleich. Nur die Position unterscheidet sie sicher, und sie
+// ist die Reihenfolge der Bretter (25.10.2026, Fall aus der Anzeigen-Oberflaeche).
+// Der Index ist der ROHE aus split(';'), also unabhaengig davon, welche Segmente der
+// Leser spaeter ueberspringt: beide Seiten laufen ueber dieselbe Zeichenkette.
+function lineSelSegKey(segIdx, stopGekuerzt) {
+  return String(segIdx) + '||' + String(stopGekuerzt);
+}
 function lineSelMapFromRows(str) {
   var map = {};
-  String(str || '').split(';').forEach(function(seg) {
+  String(str || '').split(';').forEach(function(seg, segIdx) {
     var feld = String(seg || '').split('|')[0] || '';
     feld.split(',').forEach(function(tok) {
       tok = tok.trim(); if (!tok) return;
       var namen = lineSelNames(tok);
-      if (namen.length) map[lineSelStrip(tok)] = namen;
+      if (namen.length) map[lineSelSegKey(segIdx, lineSelStrip(tok))] = namen;
     });
   });
   return map;
+}
+// Vergleichsschluessel eines Segments: Feld 0 ohne '!'-Tokens.
+function segStopSchluessel(rblFeld) {
+  return String(rblFeld || '').split(',').map(function(t) { return lineSelStrip(t.trim()); })
+    .filter(Boolean).join(',');
+}
+// Die Felder EINER Geraete-Zeile, die wir beim Neubau nicht selbst schreiben. rbl und
+// Linien sind Feld 0 und 1; c, g, m und q bauen wir neu. Alles andere gehoert dem Geraet
+// bzw. der Anzeigen-Oberflaeche (Aufteilung d, Zeilen r, Sortierung s, Standzeit i,
+// Wechselzeiten j, Design t/o/f/p/b/u/v/h/n/k …) und ging beim Speichern aus DIESER
+// Oberflaeche bisher verloren (bestaetigt 25.10.2026).
+function geraetZusatzfelder(zeile) {
+  var schluessel = [], proSegment = [];
+  String(zeile || '').split(';').forEach(function(seg) {
+    seg = String(seg || '').trim(); if (!seg) return;
+    var f = seg.split('|');
+    var k = segStopSchluessel(f[0]); if (!k) return;
+    var extra = [];
+    for (var i = 2; i < f.length; i++) {
+      var t = String(f[i] || '').trim(); if (!t) continue;
+      var c = t.charAt(0);
+      if (c === 'c' || c === 'g' || c === 'm' || c === 'q') continue;   // bauen wir selbst
+      extra.push(t);
+    }
+    schluessel.push(k); proSegment.push(extra);
+  });
+  return { schluessel: schluessel, felder: proSegment };
 }
 // Alle Stations-Felder einer rbl-Liste bzw. masterrow/timerow von Tokens befreien (Edit-Restore).
 function lineSelStripRows(str) {
@@ -5303,6 +5348,15 @@ let selectedRegion = null;
 let selectedNetwork = null;
 let selectedStop = null;
 let availableLines = [];
+// Generation der Linienliste: selectStop/selectStopForEdit setzen selectedStop sofort, die
+// Abfahrten-Antwort kommt aber Sekunden spaeter (Drosselung, Zeitueberschreitung). Klickt der
+// Kunde in der Zeit eine zweite Haltestelle an, schrieb die verspaetete Antwort der ERSTEN in
+// die geteilte availableLines, waehrend selectedStop schon die zweite war. selectedLines sind
+// Indizes und zeigten dann auf fremde Linien: Stuttgart 24.10.2026, Marienplatz (6019) wurde
+// mit S4/S5/S6 von Feuersee gespeichert, Feuersee mit U1/U14. Jede Antwort prueft deshalb,
+// ob sie noch die aktuelle ist, und addStation prueft, wem die Linienliste gehoert.
+let _pickerGen = 0;
+let _availableLinesStop = '';   // "NETZ:stopId", fuer das availableLines zuletzt gebaut wurde
 let selectedLines = new Set();
 // Datengrundlage-Popup: Richtungs-Verknüpfungen (nur Regional-Modus, NUR innerhalb
 // einer Linie). lineName -> Array von Gruppen; jede Gruppe = Array von dirKeys
@@ -7832,7 +7886,30 @@ function zurNeuenOberflaeche(cfg) {
           richtungen: (st.directions || []).map(function (d) {
             return { line: d.line || '', ziel: d.towards || d.ziel || '',
                      rid: String(d.richtungsId || '').trim() };
-          })
+          }),
+          // Netz-Kenntnis JE STATION, damit die neue Oberflaeche keine eigenen
+          // Netz-Tabellen fuehren muss. Zwei Kopien davon lagen dort schon herum, und
+          // eine Kopie laeuft frueher oder spaeter auseinander (Paul 25.10.2026,
+          // "aber der Konfigurator weiss das ja alles"). Gleiches Vorgehen wie bei den
+          // Marken-Stilen: die Angabe gibt es nur einmal, naemlich hier.
+          // darf die rbl dieser Station ein '!'-Linien-Token tragen? Genau die Bedingungen
+          // von lineSelToken: erlaubtes Netz UND konkrete Linien. Bei "Alle Abfahrten"
+          // und bei Zug-Anzeigen gibt es nichts aufzuzaehlen, dort ist die Antwort nein.
+          // Vorher sagte das Feld bei einer '*'-Station faelschlich ja (25.10.2026).
+          linienToken: (typeof lineSelNetOk === 'function')
+            && !!lineSelNetOk(st.network) && !st.allDepartures && !st.isJourney,
+          // welcher Anzeige-Stil passt zu dieser Station (mit Zuweisung, bodo und
+          // Westbahn beruecksichtigt, sonst der Netz-Default)
+          stil: (function () {
+            try { return parseInt(stationDisplayColour(st), 10) || 1; } catch (e) { return 1; }
+          })(),
+          // zugehoeriger Farbton des Netzes, 0 wenn es keinen gibt
+          stilTon: (function () {
+            try {
+              var cap = (typeof CITY_CAPABILITIES !== 'undefined') ? CITY_CAPABILITIES[st.network] : null;
+              return (cap && cap.defaultColorVariant) ? parseInt(cap.defaultColorVariant, 10) : 0;
+            } catch (e) { return 0; }
+          })()
         };
       }),
       // Wie automatisch aufgeteilt werden soll, kommt aus dem Wizard: getrennte Displays
@@ -9322,6 +9399,8 @@ async function selectStop(id, name) {
   }
 
   selectedStop = { id, name };
+  const _gen = ++_pickerGen;   // siehe _pickerGen: verspaetete Antworten verwerfen
+  _availableLinesStop = '';
   selectedLines = new Set();
   availableLines = [];
   _lineColorMap = {};  // Linienfarben pro Station neu ("1" kollidiert zwischen Netzen)
@@ -9348,6 +9427,7 @@ async function selectStop(id, name) {
     // Lade Abfahrten um erreichbare Ziele zu sammeln (via unified-Fetch)
     try {
       const data = await fetchDeparturesUnified(`${selectedNetwork}:${id}`);
+      if (_gen !== _pickerGen) return;   // inzwischen andere Haltestelle gewaehlt
       const dests = new Map();  // id → name
       if (data?.data?.monitors) {
         for (const monitor of data.data.monitors) {
@@ -9380,6 +9460,7 @@ async function selectStop(id, name) {
       p2pDestinations = [];
     }
 
+    if (_gen !== _pickerGen) return;   // inzwischen andere Haltestelle gewaehlt
     linesLoading.classList.add('hidden');
     linesContainer.classList.remove('hidden');
     renderPointToPointConfig();
@@ -9418,8 +9499,11 @@ async function selectStop(id, name) {
       }
     }
 
+    if (_gen !== _pickerGen) return;   // verspaetete Antwort: nicht in die Liste der neuen Haltestelle schreiben
     extractLines(mergedData || {});
     await augmentLinesFromLinesEndpoint(selectedNetwork, selectedStop.id);
+    if (_gen !== _pickerGen) return;
+    _availableLinesStop = `${selectedNetwork}:${selectedStop.id}`;
     try { renderLines(); } catch (e) { console.error('renderLines:', e); }
 
     linesLoading.classList.add('hidden');
@@ -12101,6 +12185,16 @@ function addStation() {
     filter = [...new Set(selectedLineNames)].join(',');
   }
 
+  // Sicherheitsnetz (siehe _pickerGen): die Linienliste muss fuer DIESE Haltestelle gebaut
+  // worden sein, sonst wuerde die Station mit den Linien einer anderen gespeichert.
+  if (selectedNetwork !== 'WESTBAHN' && _availableLinesStop
+      && _availableLinesStop !== `${selectedNetwork}:${selectedStop.id}`) {
+    console.warn('[addStation] Linienliste gehoert zu ' + _availableLinesStop + ', gewaehlt ist '
+      + selectedNetwork + ':' + selectedStop.id + ', Speichern abgebrochen');
+    alert('Die Linienliste gehört zu einer anderen Haltestelle. Bitte die Station noch einmal auswählen.');
+    return;
+  }
+
   // Netzwerk-Mapping: OEBB_SBAHN → OEBBREG, OEBB_FERN → OEBBFERN etc.
   // Server filtert automatisch nach Produkt basierend auf dem Netzwerk-Prefix
   const apiNetwork = mapNetworkForApi(selectedNetwork);
@@ -13056,6 +13150,8 @@ function erneutLinienLaden() {
 
 async function selectStopForEdit(id, name, existingDirections, existingFilter) {
   selectedStop = { id, name };
+  const _gen = ++_pickerGen;   // siehe _pickerGen: verspaetete Antworten verwerfen
+  _availableLinesStop = '';
   selectedLines = new Set();
   availableLines = [];
   _lineColorMap = {};  // Linienfarben pro Station neu
@@ -13091,9 +13187,12 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
 
   try {
     const data = await fetchDeparturesUnified(`${selectedNetwork}:${id}`);
+    if (_gen !== _pickerGen) return;   // verspaetete Antwort: inzwischen andere Haltestelle gewaehlt
 
     extractLines(data);
     await augmentLinesFromLinesEndpoint(selectedNetwork, id);
+    if (_gen !== _pickerGen) return;
+    _availableLinesStop = `${selectedNetwork}:${id}`;
 
     // Vorauswahl: Markiere Linien die bereits ausgewählt waren
 
@@ -21311,6 +21410,14 @@ function buildMasterAndTimeRows(gehwegByStopId) {
   var groupIdByFwToken = {};
   if (!_ftSeen) {
     var _lgStr = (typeof recommendedConfig !== 'undefined' && recommendedConfig && recommendedConfig.lineGroups) || '';
+    // Ohne gespeicherte lineGroups (oder ohne Gruppe darin) die Saat aus der masterrow
+    // nehmen: extractDestTokensFromRows liest seit 25.10.2026 auch ein '+' im Linienfeld
+    // als Gruppe, ohne m-Feld. Schickt das Geraet keine linegroups mit, war die Gruppe
+    // sonst nach dem Speichern weg, obwohl sie in der masterrow stand.
+    if (String(_lgStr).indexOf('+') < 0) {
+      var _seed = (typeof window !== 'undefined' && window._mrGroupSeed) || '';
+      if (String(_seed).indexOf('+') >= 0) _lgStr = _seed;
+    }
     String(_lgStr).split(',').forEach(function(grp) {
       grp = grp.trim();
       if (grp.indexOf('+') < 0) return;
@@ -21480,8 +21587,27 @@ function buildMasterAndTimeRows(gehwegByStopId) {
         }
         var lines = (!s.allDepartures && s.filter) ? s.filter.split(',').map(function(x){return x.trim();}).filter(Boolean).join('+') : '*';
         var _rd2 = ensure(rbl + _lsTok, bareOf(rbl));
-        _rd2.lineParts.push(lines || '*');
-        _rd2.gids.push(0);
+        // Bestandsstation ohne Richtungen UND ohne Filter, die nicht "Alle Abfahrten" ist:
+        // hier stuende sonst '*', und das Geraet zeigte ab dann das ganze Brett, ohne Token
+        // und ohne lines_filter. Die Linien, die das Geraet fuer die Station hatte, bleiben
+        // stattdessen stehen (geraetLinien aus loadExistingConfig).
+        var _geraetTokens = [];
+        if (lines === '*' && !s.allDepartures && Array.isArray(s.geraetLinien) && s.geraetLinien.length) {
+          s.geraetLinien.forEach(function(gl) {
+            if (!gl || !gl.line) return;
+            var ref = String(gl.towards || '');
+            var istRid = ref && typeof _siehtNachRichtungsIdAus === 'function' && _siehtNachRichtungsIdAus(ref);
+            var tok = _mrLinePart({ line: gl.line, towards: istRid ? '' : ref, richtungsId: istRid ? ref : '' });
+            if (tok && _geraetTokens.indexOf(tok) < 0) _geraetTokens.push(tok);
+          });
+          if (_geraetTokens.length) console.warn('[MASTERROW] ' + rbl + ': keine Richtungen rekonstruiert, Geraete-Linien bleiben erhalten: ' + _geraetTokens.join(','));
+        }
+        if (_geraetTokens.length) {
+          _geraetTokens.forEach(function(tok) { _rd2.lineParts.push(tok); _rd2.gids.push(0); });
+        } else {
+          _rd2.lineParts.push(lines || '*');
+          _rd2.gids.push(0);
+        }
         // Rang aus den Filter-Linien (Station ohne directions, z.B. eingemischte S-Bahn).
         if (!s.allDepartures && s.filter) {
           s.filter.split(',').forEach(function(ln) {
@@ -21567,10 +21693,19 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       // 2026-08: S-Bahn 15 min zog Bus-Stops 6/7 mit hoch und filterte deren Abfahrten weg).
       if (!tgt.gehwegs) tgt.gehwegs = [tgt.gehweg];
       tgt.gehwegs.push(e.gehweg);
+      // Stop-Index dieses Beitrags = Position seines ersten rbl-Tokens in Feld 0.
+      // tgt.rbl ist oben schon erweitert, die Laenge VOR e ergibt sich aus der Differenz.
+      var _stopIdx = tgt.rbl.split(',').length - String(e.rbl).split(',').length;
+      if (!tgt.qIdx) tgt.qIdx = tgt.lineParts.map(function() { return 0; });
       e.lineParts.forEach(function(lp, li) {
-        if (tgt.lineParts.indexOf(lp) >= 0) return;  // Dedup über die Stops des Segments
+        // KEIN Dedup mehr ueber die Stops des Segments. Faehrt dieselbe Linie mit
+        // derselben Richtung an beiden Stationen, sind das ZWEI Zeilen auf dem Brett,
+        // und der Dedup warf still eine davon weg (gemessen 25.10.2026: "41>R,41>R"
+        // ging als "41>R" heraus). Welches Token zu welcher Station gehoert, sagt jetzt
+        // das q-Feld unten.
         tgt.lineParts.push(lp);
         tgt.gids.push(e.gids[li] || 0);
+        tgt.qIdx.push(_stopIdx);
       });
       if (e.gehweg > tgt.gehweg) tgt.gehweg = e.gehweg;
       if (e.rank < tgt.rank) tgt.rank = e.rank;
@@ -21579,6 +21714,32 @@ function buildMasterAndTimeRows(gehwegByStopId) {
   })();
 
   // Serialisieren (m-Token-Indizes jetzt final, auch nach Merge).
+  // Unbekannte Felder des Geraets durchreichen — aber NUR, wenn sich die Struktur nicht
+  // geaendert hat: gleiche Anzahl Segmente in derselben Reihenfolge mit denselben
+  // Stationen. Hat der Nutzer hier Bretter umgebaut, passte ein mitgeschlepptes d<n>
+  // nicht mehr, und ein falsches Brett waere schlimmer als ein fehlendes. Dann bleibt es
+  // beim bisherigen Verhalten.
+  var _zusatz = null;
+  try {
+    if (typeof _geraetRows !== 'undefined' && _geraetRows) {
+      var _alt = {
+        false: geraetZusatzfelder(_geraetRows.masterrow),
+        true: geraetZusatzfelder(_geraetRows.timerow)
+      };
+      var _neu = { false: [], true: [] };
+      entries.forEach(function(e) { _neu[!!e.isTime].push(segStopSchluessel(e.rbl)); });
+      var passt = function(a, b) {
+        return a.length === b.length && a.every(function(x, i) { return x === b[i]; });
+      };
+      if (passt(_alt[false].schluessel, _neu[false]) && passt(_alt[true].schluessel, _neu[true])) {
+        _zusatz = _alt;
+      } else {
+        console.log('[masterrow] Struktur geaendert — Geraete-Zusatzfelder nicht uebernommen');
+      }
+    }
+  } catch (e) { _zusatz = null; }
+  var _zusatzLauf = { false: 0, true: 0 };
+
   entries.forEach(function(e) {
     var lines = e.lineParts.length ? e.lineParts.join(',') : '*';
     // Gruppen-Marker m<tokenIdx>:<gid> für alle gruppierten Linien-Tokens dieser
@@ -21593,7 +21754,24 @@ function buildMasterAndTimeRows(gehwegByStopId) {
         e.gehwegs.some(function(g) { return g !== e.gehwegs[0]; })) {
       gPart = e.gehwegs.join(',');
     }
-    e.str = e.rbl + '|' + lines + '|c' + e.colour + '|g' + gPart + (mParts.length ? '|m' + mParts.join(',') : '');
+    // q<Stop-Index je Linien-Token>, 0-basiert, in der Reihenfolge der rbl-Liste in Feld 0
+    // und index-parallel zur Komma-Liste in Feld 1 (ein '+'-Token zaehlt als EINES).
+    // NUR bei Segmenten mit mehr als einer Station: sonst ist die Zuordnung ohnehin
+    // eindeutig. Buchstabe mit Firmware und Anzeigen-Oberflaeche abgestimmt (x ist am
+    // Geraet belegt, q war frei); aeltere Firmware ignoriert das unbekannte Feld, alte
+    // Configs ohne q verhalten sich unveraendert.
+    var qPart = '';
+    if (e.qIdx && e.qIdx.length === e.lineParts.length && String(e.rbl).indexOf(',') >= 0) {
+      qPart = '|q' + e.qIdx.join(',');
+    }
+    var _extra = '';
+    if (_zusatz) {
+      var _k = !!e.isTime;
+      var _liste = _zusatz[_k].felder[_zusatzLauf[_k]++];
+      if (_liste && _liste.length) _extra = '|' + _liste.join('|');
+    }
+    e.str = e.rbl + '|' + lines + '|c' + e.colour + '|g' + gPart
+          + (mParts.length ? '|m' + mParts.join(',') : '') + qPart + _extra;
   });
 
   // Kompakt (ein Display für alle): ZEILEN global nach dt-Rang sortieren — so kann eine
@@ -22753,7 +22931,10 @@ async function loadExistingConfig(rbl, filter, linefilterdestination, roworderde
   // VOR dem Kuerzen festhalten, welche Linien laut Token zu welchem Stop gehoeren. Bei
   // einem merged Segment (beide Stationen auf EINEM Display) ist das die einzige Quelle
   // dafuer — das Linienfeld des Segments gilt fuer alle Stops gemeinsam.
-  _linienProStop = Object.assign(lineSelMapFromRows(rbl), lineSelMapFromRows(masterRowStr || ''));
+  // NUR aus der masterrow: die rbl-Liste kennt keine Segmente, ihr Index 0 wuerde mit dem
+  // ersten masterrow-Segment kollidieren. Ohne masterrow gibt es ohnehin keine Richtungen
+  // zu verteilen.
+  _linienProStop = lineSelMapFromRows(masterRowStr || '');
   rbl = lineSelStripRows(rbl);
   masterRowStr = lineSelStripRows(masterRowStr || '');
 
@@ -22969,16 +23150,23 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   const masterDirsByRbl = {};
   if (masterRowStr) {
     const pushDirs = (tok, dirs) => { (masterDirsByRbl[tok] = masterDirsByRbl[tok] || []).push(dirs); };
-    String(masterRowStr).split(';').forEach(seg => {
+    String(masterRowStr).split(';').forEach((seg, _segIdx) => {
       seg = seg.trim(); if (!seg) return;
       const fields = seg.split('|');
       const segRbl = (fields[0] || '').trim();
       const linesField = (fields[1] || '').trim();
       if (!segRbl) return;
       let dirs = null;
+      // Zusaetzlich je KOMMA-Token eine eigene Liste: das q-Feld unten nummeriert genau
+      // diese Tokens durch, ein '+'-Token zaehlt dabei als EINES. Die flache Liste dirs
+      // entdoppelt (und muss das auch), fuer q brauchen wir die Tokens aber einzeln,
+      // denn "41>R,41>R" sind zwei Zeilen an zwei Stationen.
+      let tokenDirs = null;
       if (linesField && linesField !== '*') {  // '*' = Alle Abfahrten → kein Richtungs-Filter
         dirs = [];
+        tokenDirs = [];
         linesField.split(',').forEach(tok => {
+          const diesesToken = [];
           (tok || '').split('+').forEach(t => {   // '+' = Merge-Gruppe → einzeln
             t = t.trim(); if (!t) return;
             const gt = t.indexOf('>');   // richtungsId (Vorrang)
@@ -22990,11 +23178,20 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
             // Gattungswort aus alten Konfigurationen abstreifen ("Stb 6" → "6"), sonst
             // trifft das Token die heutige Abfahrt nicht mehr. Richtung bleibt unberührt.
             line = _stripModePrefix(line); towards = towards.trim();
-            if (line && !dirs.some(d => d.line === line && d.towards === towards)) dirs.push({ line, towards });
+            if (!line) return;
+            diesesToken.push({ line, towards });
+            if (!dirs.some(d => d.line === line && d.towards === towards)) dirs.push({ line, towards });
           });
+          tokenDirs.push(diesesToken);
         });
-        if (!dirs.length) dirs = null;
+        if (!dirs.length) { dirs = null; tokenDirs = null; }
       }
+      // q<Stop-Index je Komma-Token>, 0-basiert, in der Reihenfolge der rbl-Liste in
+      // Feld 0. Sagt eindeutig, welches Linien-Token zu welcher Station gehoert, auch
+      // wenn dieselbe Linie mit derselben Richtung an beiden faehrt. Buchstabe von der
+      // Firmware festgelegt, sie liest ihn ab dem Release nach 2.6.1.
+      const qMatch = seg.match(/\|q(\d+(?:,\d+)*)/);
+      const qStops = qMatch ? qMatch[1].split(',').map(n => parseInt(n, 10)) : null;
       pushDirs(segRbl, dirs);
       // Merged Segment (komma-gejointe rbls, fw>=2.3.18): die Richtungen des Segments auf
       // die einzelnen Stop-Tokens verteilen. Dabei sagt das '!'-Feld des Tokens, welche
@@ -23006,9 +23203,24 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       // auch an Feuersee (43 endet dort sogar), also nahm die Abfahrts-Prüfung sie dort
       // zu Recht an und sie standen bei jedem Öffnen zusätzlich bei Feuersee.
       if (segRbl.indexOf(',') >= 0) {
-        segRbl.split(',').forEach(tok => {
-          tok = tok.trim(); if (!tok) return;
-          var eigene = (_linienProStop && _linienProStop[tok]) || [];
+        const stopToks = segRbl.split(',').map(t => t.trim()).filter(Boolean);
+        // Das q-Feld ist genauer als das '!'-Token und gewinnt, wenn es passt: es
+        // unterscheidet auch zwei Tokens, die gleich AUSSEHEN ("41>R" an beiden
+        // Stationen). Das '!'-Token kann das nicht, es nennt ja nur Liniennamen.
+        let ausQ = null;
+        if (qStops && tokenDirs && qStops.length === tokenDirs.length) {
+          ausQ = stopToks.map(() => []);
+          tokenDirs.forEach((liste, i) => {
+            const si = qStops[i];
+            if (!(si >= 0 && si < ausQ.length)) return;
+            liste.forEach(d => {
+              if (!ausQ[si].some(x => x.line === d.line && x.towards === d.towards)) ausQ[si].push(d);
+            });
+          });
+        }
+        stopToks.forEach((tok, i) => {
+          if (ausQ && ausQ[i].length) { pushDirs(tok, ausQ[i]); return; }
+          var eigene = (_linienProStop && _linienProStop[lineSelSegKey(_segIdx, tok)]) || [];
           if (!dirs || !eigene.length) { pushDirs(tok, dirs); return; }
           var nurHier = dirs.filter(function(d) {
             var ln = _stripModePrefix(d.line);
@@ -23201,7 +23413,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // _occ/_segInfo wurden oben vor dem Dubletten-Check gelesen — alle Segment-Maps
     // (Filter, Richtungen, colour) synchron über dasselbe Vorkommen ablesen.
     const stationFilter = (_segInfo !== undefined) ? (filterParts[_segInfo.segIdx] || '') : (filterParts[idx] || '');
-    const filterLines = stationFilter ? stationFilter.split(',').map(f => _stripModePrefix(f)).filter(Boolean) : [];
+    let filterLines = stationFilter ? stationFilter.split(',').map(f => _stripModePrefix(f)).filter(Boolean) : [];
     // Richtungs-Filter dieser Station: PRIMÄR aus der masterrow (richtungsId-genau), sonst der
     // global geparste linefilterdestination/linegroups-Fallback.
     // WICHTIG: Der Fallback ist eine GLOBALE Liste ueber ALLE Stationen. Ungefiltert
@@ -23224,6 +23436,23 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
           })
         : lineDestinations;
     }
+    // MERGED SEGMENT: das filter-Feld des Geraets gilt fuer das ganze Segment, also die
+    // Union aller Stops. Als station.filter uebernommen wurde daraus bei leeren Richtungen
+    // (Abfahrten leer, Linienindex gedrosselt) ueber lineSelToken die Token-Union
+    // "6221!U1~U14~41~43~S4~S5~S6" (Server-Log 25.10.2026). Die masterrow-Richtungen sind
+    // nach dem '!'-Token schon stationsgenau: nur deren Linien sind der Filter DIESER Station.
+    if (_segInfo !== undefined && _segInfo.tokenCount > 1 && !destsAusGlobalerListe
+        && Array.isArray(stationDests) && stationDests.length) {
+      const _eigeneLinien = [];
+      stationDests.forEach(sd => {
+        const ln = _stripModePrefix(sd.line);
+        if (ln && _eigeneLinien.indexOf(ln) < 0) _eigeneLinien.push(ln);
+      });
+      if (_eigeneLinien.length) filterLines = _eigeneLinien;
+    }
+    // Hatte das Geraet fuer diesen Stop ein '!'-Token? Dann sind die Segment-Richtungen oben
+    // schon auf ihn zugeschnitten und duerfen als sein letzter Halt dienen (geraetLinien).
+    const _tokenBekannt = Object.keys(_linienProStop || {}).some(k => k.split('||')[1] === part);
     const bareStopId = isJourney ? stopId.split('>')[0] : stopId;
     // "Alle Abfahrten"-Station? Primär am "*"-Marker der masterrow erkennen; Fallback:
     // gar kein Filter UND keine Richtungs-Filter irgendwo (reine alle-Abfahrten-Config).
@@ -23247,6 +23476,12 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       isExisting: true,
       allDepartures: isAllDep,
       allDepCat: reloadAllCat,   // ÖBB "Alle Abfahrten"-Gattung (all/reg/fern), aus dem Prefix
+      // Linien-Tokens, die das Geraet fuer DIESE Station gespeichert hatte (stationsgenau,
+      // bei merged Segmenten nur mit '!'-Token). Letzter Halt fuer den Save, falls keine
+      // Richtung rekonstruierbar war: statt '*' (ganzes Brett) bleiben sie stehen.
+      geraetLinien: (!destsAusGlobalerListe && Array.isArray(stationDests)
+                     && (_segInfo === undefined || _segInfo.tokenCount === 1 || _tokenBekannt))
+        ? stationDests.map(sd => ({ line: sd.line, towards: sd.towards || '' })) : [],
       directions: []  // Wird unten befüllt (außer bei "Alle Abfahrten" → bleibt leer)
     };
     // Gespeicherten Display-Typ (|cNN aus der masterrow) als Zuordnung wiederherstellen —
@@ -24245,16 +24480,35 @@ function extractDestTokensFromRows(masterrow, timerow) {
           if (!isNaN(idx) && gid) gidByIdx[idx] = gid;
         });
       }
-      // Tokens dieses Segments in Reihenfolge einsammeln
+      // Tokens dieses Segments in Reihenfolge einsammeln. Ein '+' IM Komma-Token ist
+      // selbst schon eine Gruppe: die Firmware liest es nativ so (GetSplittedStrings mit
+      // '+'), und die Anzeigen-Oberflaeche schreibt Gruppen ueberall ausser in Wien NUR
+      // als '+', ohne m-Feld. Vorher wurde das '+' wie ein Komma zerlegt und die Gruppe
+      // war beim Laden weg (25.10.2026). Das m-Feld bleibt fuer den Fall, den '+' nicht
+      // ausdruecken kann: eine Gruppe ueber MEHRERE Eintraege, wie in Wien je Bahnsteig.
       const segToks = [];
-      parts[1].split(/[,+]/).forEach(function(lt) {
-        lt = lt.trim();
-        const gt = lt.indexOf('>');
-        if (gt <= 0) return;
-        const line = lt.substring(0, gt).trim();
-        const rid = lt.substring(gt + 1).trim();
-        if (!line || !rid) return;
-        segToks.push(line + ':' + rid);
+      const implizit = {};
+      let _kommaIdx = 0;
+      parts[1].split(',').forEach(function(kommaTok) {
+        const start = segToks.length;
+        String(kommaTok || '').split('+').forEach(function(lt) {
+          lt = lt.trim();
+          const gt = lt.indexOf('>');
+          if (gt <= 0) return;
+          const line = lt.substring(0, gt).trim();
+          const rid = lt.substring(gt + 1).trim();
+          if (!line || !rid) return;
+          segToks.push(line + ':' + rid);
+        });
+        if (segToks.length - start > 1) {
+          const gid = 'plus' + _kommaIdx;
+          for (let k = start; k < segToks.length; k++) implizit[k] = gid;
+        }
+        _kommaIdx++;
+      });
+      // Ein ausdrueckliches m-Feld gewinnt, es kann ja mehr als '+'.
+      Object.keys(implizit).forEach(function(k) {
+        if (gidByIdx[k] === undefined) gidByIdx[k] = implizit[k];
       });
       // Gruppen zusammenfassen: an der Position des ersten Mitglieds, Rest überspringen
       const consumed = new Set();
