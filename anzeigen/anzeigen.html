@@ -779,32 +779,6 @@ function zeilenDesStils(c) {
 }
 // Liegen auf diesem Brett NUR Stations-Bloecke? Dann verhaelt es sich wie ein
 // chronologisches: alles was dort faehrt, nach Uhrzeit.
-// Wie viele Eintraege ergibt dieses Brett in der Config? Jede "Alle Abfahrten"-Station
-// braucht einen eigenen, denn '*' vertraegt keine Linienliste neben sich; alle uebrigen
-// Linien teilen sich einen.
-function eintraegeVon(d) {
-  const bloecke = new Set();
-  let andere = false;
-  ((d && d.richtungen) || []).forEach(k => {
-    if (istUhrKey(k)) return;
-    const r = richtungFinden(k);
-    if (!r) return;
-    if (r.dep.alleStation) bloecke.add(r.station.rbl); else andere = true;
-  });
-  return bloecke.size + (andere ? 1 : 0);
-}
-
-// Zusammengehalten werden mehrere Eintraege ueber das d-Feld. Die Firmware versteht das.
-// Die Linienauswahl kennt das Feld nicht, reicht es aber unveraendert durch, solange die
-// STATIONEN dieselben bleiben: blosses Umhaken von Linien ist also harmlos. Kommt dort
-// eine Station dazu oder faellt eine weg, reicht sie bewusst nichts mehr durch, denn ein
-// mitgeschlepptes d passt dann auf eine andere Stationsmenge nicht mehr. Erst dann
-// zerfaellt so ein Brett. Wien ist ausgenommen, dort fuehrt die Firmware gleichfarbige
-// Eintraege ohnehin zusammen (nachgemessen von der Konfigurator-Sitzung, 25.10.2026).
-function zerfaelltImKonfigurator(d) {
-  return !stopIdFormat(d) && eintraegeVon(d) > 1;
-}
-
 function nurBloeckeAuf(d) {
   const ks = ((d && d.richtungen) || []).filter(k => !istUhrKey(k));
   return ks.length > 0 && ks.every(istAlleKey);
@@ -2036,13 +2010,6 @@ function editorZeichnen() {
           + 'dort eingeordnet, wo sie wirklich h\u00e4lt. H\u00e4lt eine an beiden Stationen, '
           + 'steht sie jetzt an beiden. Schau die Zeilen einmal durch, bevor du speicherst: '
           + 'danach steht die Zuordnung fest.</div>'
-        : '')
-     + (zerfaelltImKonfigurator(dHier)
-        ? '<div class="hinweis">Dieses Display besteht aus ' + eintraegeVon(dHier)
-          + ' Eintr\u00e4gen, weil "Alle Abfahrten" einer Station nicht mit einzelnen Linien '
-          + 'in einem Eintrag stehen kann. Am Ger\u00e4t ist es trotzdem ein Display, und '
-          + 'Linien umh\u00e4ngen \u00e4ndert daran nichts. Nur wenn du in der Linienauswahl '
-          + 'eine Station hinzuf\u00fcgst oder entfernst, zerf\u00e4llt es dort in zwei.</div>'
         : '')
      + '</div>';
 
