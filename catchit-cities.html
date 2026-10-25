@@ -7892,6 +7892,10 @@ function zurNeuenOberflaeche(cfg) {
           // eine Kopie laeuft frueher oder spaeter auseinander (Paul 25.10.2026,
           // "aber der Konfigurator weiss das ja alles"). Gleiches Vorgehen wie bei den
           // Marken-Stilen: die Angabe gibt es nur einmal, naemlich hier.
+          // Linien, die an dieser Station halten. Bei "Alle Abfahrten" ist richtungen
+          // leer, die neue Oberflaeche braucht fuer ihren Stations-Block aber die
+          // Linien-Symbole. Bei Wien leer, dort kommen die Daten aus wienData.
+          linienAmHalt: (st.linienAmHalt || []).slice(),
           // darf die rbl dieser Station ein '!'-Linien-Token tragen? Genau die Bedingungen
           // von lineSelToken: erlaubtes Netz UND konkrete Linien. Bei "Alle Abfahrten"
           // und bei Zug-Anzeigen gibt es nichts aufzuzaehlen, dort ist die Antwort nein.
@@ -23091,6 +23095,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
         _vorlauf.push(fetchDeparturesUnified(netz + ':' + one)
           .then(function(j) {
             try { ladeFortschrittSchritt(); } catch (e) {}
+            try { linienAmHaltMerken(netz, one, j); } catch (e) {}
             if (nameVorlaeufigMerken(netz, one, j)) {
               // Jeden Namen einzeln anzeigen, sobald er da ist: eine zaehe Station soll die
               // schnellen nicht aufhalten (gemessen: eine von zwei brauchte 11,8 s).
@@ -23470,6 +23475,8 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       // Solange die Fahne steht, darf der Name NICHT in den Namens-Cache (sonst merkt sich
       // der Browser den abweichenden Titel und die Station benennt sich beim naechsten Mal um).
       _nameVorlaeufig: nameVorlaeufig,
+      // Linien, die hier halten (aus den Abfahrten). Fuer den Block bei "Alle Abfahrten".
+      linienAmHalt: _linienAmHalt[network + ':' + bareStopId] || [],
       filter: filterLines.length ? filterLines.join(',') : stationFilter,   // Namen bereits überführt
       fullId,
       isJourney,
@@ -24212,6 +24219,25 @@ var _nameMemo = new Map();
 // (nameNachtragen). Gemerkt wird nur der kanonische, nie der vorlaeufige — sonst
 // wanderte der abweichende Titel in den Cache und die Station benannte sich um.
 var _nameVorlaeufig = new Map();
+
+// Welche Linien halten an dieser Station? Faellt bei den Abfahrten ohnehin ab, die der
+// Lade-Pfad holt, kostet also keine eigene Abfrage. Gebraucht wird es fuer "Alle
+// Abfahrten": dort gibt es keine gewaehlten Richtungen, und die neue Oberflaeche soll
+// trotzdem EINEN Block je Station zeigen, mit Haltestellen-Symbol und den Linien klein
+// darunter (Paul 25.10.2026).
+var _linienAmHalt = {};
+function linienAmHaltMerken(network, stopId, dep) {
+  try {
+    var namen = [], gesehen = {};
+    ((dep && dep.data && dep.data.monitors) || []).forEach(function(m) {
+      ((m && m.lines) || []).forEach(function(l) {
+        var n = String((l && l.name) || '').trim();
+        if (n && !gesehen[n]) { gesehen[n] = 1; namen.push(n); }
+      });
+    });
+    if (namen.length) _linienAmHalt[String(network) + ':' + String(stopId)] = namen;
+  } catch (e) { /* nie den Aufbau stoeren */ }
+}
 
 function nameAusAbfahrten(dep) {
   var ms = dep && dep.data && dep.data.monitors;

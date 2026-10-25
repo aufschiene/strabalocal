@@ -679,12 +679,62 @@ function dvStrabaHTML(colour, data, rows, previewEl) {
 // ---------- Bodo / German City (display_bodo.cpp, display_german_city.cpp) ----------
 // Beide sind exakt das Layout des Eigenen Displays (display_free_color ist eine Kopie
 // von Bodo) → derselbe Renderer mit festen Farben. German City: dunkelgrünes Badge.
+// ---------- BODO (display_bodo.cpp: dunkelgrau, blaues Badge, zweizeiliges Ziel) ----------
+// Bis 25.10.2026 lief bodo ueber den allgemeinen Freifarben-Renderer. Der trifft die
+// FARBEN, nicht aber das Layout: am Geraet haben alle Zeilen ein GLEICH BREITES Badge
+// fester Hoehe, der Zieltext darf zweizeilig umbrechen, und der Countdown steht in
+// Poppins Bold 24pt rechts. Jetzt 1:1 aus der Firmware nachgebaut.
+// Badge-Breite je Linienname (calculateBadgeWidth), das Maximum gilt fuer ALLE Zeilen.
+function dvBodoBadgeW(name) {
+  var len = String(name == null ? '' : name).length;
+  if (len <= 1) return 38;
+  if (len === 2) return 54;
+  if (len === 3) return 70;
+  return 84;
+}
+
 function dvBodoHTML(colour, data, rows, previewEl) {
-  var cfg = { B: '1e2328', T: 'ffffff', U: '0089cf', H: '0089cf', V: 'ffffff',
-              G: '1', F: '1', A: '1', W: '0', M: '0', rows: rows, P: {} };
-  if (colour === 19 || colour === 20) { cfg.H = '1b5e20'; cfg.U = '1b5e20'; }
-  fcApplyPreviewBg(previewEl, cfg);
-  return fcDevicePreviewHTML(cfg, data);
+  var BG = '#1e2328', FG = '#ffffff';
+  // 19/20 erben das Layout, tragen aber ein gruenes Badge (display_bodo.cpp initColors).
+  var BADGE = (colour === 19 || colour === 20) ? '#1b5e20' : '#0089cf';
+  previewEl.style.background = BG;
+  previewEl.style.backgroundImage = 'none';
+
+  var margin = 8;
+  var rowH = Math.floor(170 / rows);
+  // Badge: feste Hoehe 38, Breite = groesste Namensbreite + 4, senkrecht zentriert.
+  var badgeH = Math.min(38, rowH - 2);
+  var maxW = 38;
+  data.forEach(function(d) {
+    var w = dvBodoBadgeW(d.line);
+    if (w > maxW) maxW = w;
+  });
+  var badgeW = maxW + 4;
+  // Der Zieltext beginnt NICHT hinter dem Badge, sondern hinter maxLineNameWidth + 12.
+  var destX = margin + maxW + 12;
+  var destW = 320 - destX - 55;
+
+  var html = data.map(function(dep, i) {
+    var top = i * rowH;
+    // Leere Zeile: Paging-Platzhalter, keine Echtzeit oder keine Linie.
+    if (!dep.line && dep.time === '') {
+      return '<div style="position:absolute;left:0;top:' + top + 'px;width:320px;height:' + rowH + 'px;"></div>';
+    }
+    var badgeY = Math.round((rowH - badgeH) / 2);
+    // Poppins SemiBold 16pt ~ 19px, Medium 12pt ~ 15px, Bold 24pt ~ 34px.
+    var d2 = dvDest2(destX, rowH, destW, 19, 4, 15, FG, 500);
+    return '<div style="position:absolute;left:0;top:' + top + 'px;width:320px;height:' + rowH + 'px;">'
+      + '<div style="position:absolute;left:' + margin + 'px;top:' + badgeY + 'px;'
+        + 'width:' + badgeW + 'px;height:' + badgeH + 'px;border-radius:6px;background:' + BADGE + ';'
+        + 'color:#fff;display:flex;align-items:center;justify-content:center;'
+        + 'font-weight:600;font-size:19px;">' + escapeHtmlFt(dep.line) + '</div>'
+      + d2.open + escapeHtmlFt(dep.dest) + d2.close
+      + '<div style="position:absolute;right:' + margin + 'px;top:0;height:' + rowH + 'px;'
+        + 'display:flex;align-items:center;color:' + FG + ';font-weight:700;font-size:34px;">'
+      + dep.time + '</div>'
+      + '</div>';
+  }).join('');
+  return dvWrap(html, DV_POPPINS);
 }
 
 // Dispatcher: colour → Nachbildung. null = kein Renderer (generisches Brett).

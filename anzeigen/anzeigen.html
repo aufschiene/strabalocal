@@ -131,6 +131,24 @@
   button.klein { font-size: 12px; padding: 6px 10px; box-shadow: 2px 2px 0 var(--tinte); }
   .reihe { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 
+  /* Reiter ueber der Karte, wie Browser-Tabs: der aktive haengt an der Karte und hat
+     unten keine Kante, der andere sitzt daneben und ist gedaempft. Die Wahl aendert
+     alles darunter, darum steht sie ueber der Karte und nicht darin (Paul 25.10.2026). */
+  .reiter { display: flex; gap: 6px; padding-left: 12px; position: relative; z-index: 2;
+            margin-bottom: -2px; }
+  .reiter button {
+    font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    border: 2px solid var(--tinte); border-bottom: none; border-radius: 12px 12px 0 0;
+    padding: 8px 15px 8px; background: #e2d7c2; color: var(--grau);
+    box-shadow: none; margin-top: 4px;
+  }
+  .reiter button.an {
+    background: var(--karte); color: var(--tinte);
+    padding-bottom: 10px; margin-top: 0; margin-bottom: -2px;
+  }
+  .reiter button:disabled { cursor: default; opacity: .55; }
+  @media (max-width: 460px) { .reiter button { padding: 8px 11px; font-size: 12px; } }
+
   .schalter { display: flex; background: #ece3d2; border-radius: 10px; padding: 4px; gap: 4px; }
   .schalter button { flex: 1; box-shadow: none; border: none; background: transparent; color: var(--grau); }
   .schalter button.an { background: #fff; color: var(--tinte); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
@@ -316,6 +334,14 @@
   .farbfeld input[type=color]::-webkit-color-swatch { border: none; border-radius: 7px; }
   .wahltrenner { font-size: 11px; font-weight: 700; letter-spacing: .04em;
                  text-transform: uppercase; color: var(--grau); margin: 14px 0 6px; }
+  /* Ueberschrift je Station in der Liste "nach Abfahrt". */
+  .haltkopf { display: flex; align-items: center; gap: 7px; margin: 14px 0 2px;
+              font-size: 11px; font-weight: 800; letter-spacing: .5px;
+              text-transform: uppercase; color: var(--grau); }
+  .haltkopf svg { width: 14px; height: 14px; }
+  .minilinien { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .minilinien i { font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .2px;
+                  padding: 2px 6px; border-radius: 5px; line-height: 1.4; }
   .ruht-tag { margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 11px;
               font-weight: 600; background: var(--rand); color: var(--grau);
               vertical-align: middle; white-space: nowrap; }
@@ -393,6 +419,7 @@
 <div class="streifen" id="streifen"></div>
 
 <div class="bahn">
+  <div class="reiter" id="reiter"></div>
   <div class="karte klapp offen" id="klappLinien">
     <button class="klapp-kopf" onclick="klappSchalten('klappLinien')"><span>Linien &amp; Reihenfolge<span class="neu-platz"></span></span>
       <span class="klapp-pfeil"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
@@ -444,7 +471,7 @@
 <script src="renderer-host.js"></script>
 <!-- Die Versionsnummer bei jeder Aenderung am Renderer hochzaehlen: GitHub Pages
      liefert die Datei sonst bis zu zehn Minuten aus dem Cache weiter. -->
-<script src="display-renderer.js?v=2"></script>
+<script src="display-renderer.js?v=3"></script>
 <script>
 const DEP_API  = 'https://api.straba.at/api/v1/wl/departures';
 const SUCH_API = 'https://api.straba.at/api/v1/stops/search';
@@ -1056,6 +1083,45 @@ function beispielAbfahrten(st) {
   return raus;
 }
 // Was hier faehrt, fuer spaeter merken: daraus entstehen nachts die Beispielzeiten.
+// Die Linien einer Haltestelle, fuer den Stations-Block. ALLE Quellen zusammen: was die
+// Linienauswahl mitschickt, was wir uns gemerkt haben und was gerade faehrt. Jede
+// einzelne Quelle zeigt nur, was zu IHREM Zeitpunkt unterwegs war, und nachts waere das
+// eine Linie statt sechs. Nur Namen, sortiert wie im Picker.
+function halteLinien(st) {
+  const raus = [];
+  const nimm = n => {
+    const x = String(n || '').trim();
+    if (x && raus.indexOf(x) < 0) raus.push(x);
+  };
+  (st.linienAmHalt || []).forEach(nimm);
+  (st.letzteLinien || []).forEach(d => nimm(d.line));
+  (st.abfahrten || []).forEach(d => nimm(d.line));
+  return raus.sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
+}
+
+// Die kleinen Linien-Marken unter dem Namen der Station.
+function miniMarken(deps) {
+  if (!deps || !deps.length) return '';
+  const gesehen = [];
+  const stueck = [];
+  deps.forEach(d => {
+    if (gesehen.indexOf(d.line) >= 0) return;
+    gesehen.push(d.line);
+    const fz = badgeFarben(d);
+    stueck.push('<i style="background:' + fz.bg + ';color:' + fz.fg + '">'
+              + escapeHtmlFt(d.line) + '</i>');
+  });
+  return '<div class="minilinien">' + stueck.join('') + '</div>';
+}
+
+// Alle Linien, die an dieser Station halten. Fuer den "Alle Abfahrten"-Block.
+function miniLinien(st) {
+  return miniMarken(halteLinien(st).map(name =>
+    (st.letzteLinien || []).find(x => x.line === name)
+    || (st.abfahrten || []).find(x => x.line === name)
+    || { line: name }));
+}
+
 function linienMerken(st) {
   const gesehen = new Set(), paare = [];
   st.abfahrten.forEach(d => {
@@ -1729,6 +1795,7 @@ function gewaehlteAbfahrten(st) { return zeilenEintraege(st); }
 function allesZeichnen() {
   schirmeBauen();
   streifenZeichnen();
+  reiterZeichnen();
   editorZeichnen();
   stationenZeichnen();
   neuMarkieren();
@@ -1822,6 +1889,28 @@ function streifenZeichnen() {
   if (s && s.station) karteAufStation(s.station);
 }
 
+// Die beiden Reiter ueber der Karte. Sie entscheiden, wie das Display sortiert, und
+// damit, was in der Karte darunter ueberhaupt einzustellen ist. Darum sitzen sie wie
+// Browser-Tabs oben drauf und nicht als Schalter mitten im Formular.
+function reiterZeichnen() {
+  const el = document.getElementById('reiter');
+  if (!el) return;
+  const s = schirme[zeiger];
+  const offen = !!document.querySelector('#klappLinien.offen');
+  if (!s || !offen) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  const d = s.display;
+  const zeit = zeitbasiert(d);
+  // Stile ohne Wahl zeigen nur den einen Reiter, der zutrifft, und zwar unantastbar.
+  const geht = kannSortieren(stilVon(d));
+  const knopf = (an, text, wert) =>
+    '<button class="' + (an ? 'an' : '') + '"'
+    + (geht ? ' onclick="sortierungSetzen(' + s.index + ',\'' + wert + '\')"' : ' disabled')
+    + '>' + text + '</button>';
+  el.innerHTML = (geht || !zeit ? knopf(!zeit, 'Nach Linie', 'statisch') : '')
+               + (geht || zeit ? knopf(zeit, 'Nach Abfahrt', 'zeit') : '');
+}
+
 function editorZeichnen() {
   const el = document.getElementById('editor');
   const s = schirme[zeiger];
@@ -1873,19 +1962,15 @@ function editorZeichnen() {
   }
 
   const dHier = s.display;
-  h += '<label class="feld" for="stilWahl">Anzeige-Stil dieses Displays</label>'
-     + '<select id="stilWahl" onchange="stilSetzen(this.value)">' + stilOptionen(dHier) + '</select>';
-
-  h += '<label class="feld">Was zeigt dieses Display?</label>';
+  // Die Sortierung steht GANZ OBEN, noch vor dem Stil: sie entscheidet, was darunter
+  // ueberhaupt einzustellen ist (Zeilen und Reihenfolge, oder nur die Anzahl der
+  // Abfahrten). Und sie heisst nicht mehr "was zeigt das Display", denn gezeigt werden
+  // in beiden Faellen Abfahrten; der Unterschied ist die Sortierung
+  // (Paul 25.10.2026: "Sortiert nach, nach Linie oder nach Abfahrt").
   if (!kannSortieren(stilVon(dHier))) {
-    h += '<div class="hinweis">Dieser Anzeige-Stil zeigt immer die n\u00e4chsten Abfahrten '
-       + 'nach Uhrzeit, eine feste Zeilenfolge gibt es dort nicht.</div>';
+    h += '<div class="hinweis">Dieser Anzeige-Stil sortiert immer nach Abfahrt, also nach '
+       + 'Uhrzeit. Feste Zeilen je Linie gibt es dort nicht.</div>';
   } else {
-    h += '<div class="schalter">'
-       + '<button class="' + (zeitbasiert(dHier) ? '' : 'an') + '" onclick="sortierungSetzen(' + s.index + ',\'statisch\')">'
-       + 'Feste Zeilen</button>'
-       + '<button class="' + (zeitbasiert(dHier) ? 'an' : '') + '" onclick="sortierungSetzen(' + s.index + ',\'zeit\')">'
-       + 'N\u00e4chste Abfahrten</button></div>';
     // Seit Firmware 2.6 steht 's' im EINTRAG, die Wahl gilt also je Display. Nur
     // aeltere Geraete lesen es aus den displaysettings, und dort kennt das Format nur
     // die colour. Der Hinweis gilt darum nur noch, wenn sich das Geraet aelter meldet
@@ -1898,6 +1983,9 @@ function editorZeichnen() {
          + escapeHtmlFt((STILE.find(y => y.id === stilVon(dHier)) || {}).name || '') + '.</div>';
     }
   }
+  h += '<label class="feld" for="stilWahl">Anzeige-Stil dieses Displays</label>'
+     + '<select id="stilWahl" onchange="stilSetzen(this.value)">' + stilOptionen(dHier) + '</select>';
+
   if (zeitbasiert(dHier)) {
     h += '<label class="feld" for="zeilenWahl">Wie viele Abfahrten</label>'
        + '<select id="zeilenWahl" onchange="zeitZeilenSetzen(' + s.index + ',this.value)">';
@@ -1964,17 +2052,33 @@ function editorZeichnen() {
       h += '<div class="zeile"><div class="jetzt">Noch nichts zugewiesen. '
          + 'W\u00e4hle unten eine Linie aus.</div></div>';
     }
+    // Nach Abfahrt sortiert gibt es keine Zeilenfolge, nach der man hier ordnen
+    // koennte. Also nach STATION gruppieren: das ist die Einheit, die hier noch zaehlt
+    // (Paul 25.10.2026).
+    const proHalt = new Map();
     keysZ.forEach(k => {
       const r = richtungFinden(k);
       if (!r) return;
-      const fz = badgeFarben(r.dep);
+      if (!proHalt.has(r.station)) proHalt.set(r.station, []);
+      proHalt.get(r.station).push({ k: k, r: r });
+    });
+    // EINE Karte je Station, darunter die gewaehlten Linien als kleine Marken. Eine
+    // Karte je Linie waere hier irrefuehrend: in welcher Reihenfolge sie stehen, macht
+    // der Fahrplan, nicht diese Liste (Paul 25.10.2026).
+    proHalt.forEach((liste, st) => {
+      const si = stationen.indexOf(st);
+      const block = liste.some(x => x.r.dep.alleStation);
+      const deps = liste.map(x => x.r.dep).filter(x => !x.alleStation);
       h += '<div class="linie">'
-         + '<b style="background:' + fz.bg + ';color:' + fz.fg + '">' + escapeHtmlFt(depMarke(r.dep)) + '</b>'
-         + '<div class="rumpf"><div class="ziel' + (r.dep.alleStation ? ' alles' : '') + '">'
-         + escapeHtmlFt(depText(r.dep)) + '</div>'
-         + '<div class="halt">' + escapeHtmlFt(r.station.name) + '</div></div>'
-         + '<button class="pfeil weg-x" title="von diesem Display nehmen"'
-         + ' onclick="richtungSchalten(' + dz + ',\'' + k.replace(/'/g, "\\'") + '\',false)">' + SYM_X + '</button>'
+         + '<b style="background:#1b1b1b;color:#fff">' + SYM_HALT + '</b>'
+         + '<div class="rumpf"><div class="ziel alles">' + escapeHtmlFt(st.name) + '</div>'
+         + '<div class="halt">'
+         + (block ? ALLE_TEXT
+                  : deps.length + (deps.length === 1 ? ' Linie' : ' Linien') + ', nach Uhrzeit gemischt')
+         + '</div>'
+         + (block ? miniLinien(st) : miniMarken(deps)) + '</div>'
+         + '<button class="pfeil weg-x" title="diese Station von diesem Display nehmen"'
+         + ' onclick="stationWeg(' + dz + ',' + si + ')">' + SYM_X + '</button>'
          + '</div>';
     });
   }
@@ -2031,11 +2135,16 @@ function editorZeichnen() {
     const marken = teil.map((k, n) => {
       const t = treffer[n];
       const f = t ? badgeFarben(t.dep) : { bg: '#4a4a4a', fg: '#fff' };
+      if (t && t.dep.alleStation) return '<b style="background:#1b1b1b;color:#fff">' + SYM_HALT + '</b>';
       return '<b style="background:' + f.bg + ';color:' + f.fg + '">'
            + escapeHtmlFt(t ? depMarke(t.dep) : '?') + '</b>';
     }).join('');
-    const ziele = teil.map((k, n) => escapeHtmlFt(treffer[n] ? depText(treffer[n].dep) : keyLokal(k)))
-                      .join(' &middot; ');
+    const ziele = teil.map((k, n) => {
+      const tr = treffer[n];
+      if (!tr) return escapeHtmlFt(keyLokal(k));
+      // Beim Block steht der Name der Station oben, "Alle Abfahrten" darunter.
+      return escapeHtmlFt(tr.dep.alleStation ? tr.station.name : depText(tr.dep));
+    }).join(' &middot; ');
     const halte = [];
     treffer.forEach(t => { if (t && halte.indexOf(t.station.name) < 0) halte.push(t.station.name); });
     // Ruht die Zeile? Nur wenn KEIN Mitglied gerade faehrt.
@@ -2053,12 +2162,14 @@ function editorZeichnen() {
        + (ruht ? '<span class="ruht-tag">f\u00e4hrt gerade nicht</span>' : '') + '</div>'
        + '<div class="halt">'
        + (treffer.every(x => x && x.dep && x.dep.alleStation)
-          ? escapeHtmlFt(halte.join(', ')) + ' &middot; alles, was hier f\u00e4hrt, nach Uhrzeit'
+          ? ALLE_TEXT + ' &middot; alles, was hier f\u00e4hrt, nach Uhrzeit'
           : 'Zeile ' + (i + 1)
             + (halte.length ? ' &middot; ' + escapeHtmlFt(halte.join(', ')) : '')
             + (zeit && (zeit.time || zeit.time === 0) ? ' &middot; in ' + zeit.time + ' min'
                                                       : ' &middot; kommt wieder, sobald sie f\u00e4hrt'))
        + '</div>'
+       + (treffer.length === 1 && treffer[0] && treffer[0].dep.alleStation
+          ? miniLinien(treffer[0].station) : '')
        + (zusammen
           ? '<div class="zusatz">' + teil.length + ' Richtungen in einer Zeile &middot; '
             + '<button class="link" onclick="gruppeLoesen(' + di + ',' + i + ')">trennen</button></div>'
@@ -2251,14 +2362,24 @@ function stationenZeichnen() {
       const wo = anderswo.get(k) || [];
       // Schon woanders? Trotzdem voll sichtbar und waehlbar, nur mit einem Zeichen
       // daneben. Entfernen gibt es hier nicht: aus dem Pool verschwindet nichts.
+      // Ein Stations-Block ist keine Linie: Haltestellen-Zeichen, Name der Station, und
+      // die Linien klein darunter, genau wie die Stationskarte in der Linienauswahl
+      // (Paul 25.10.2026: "da steht dann einfach Station X, das Icon ist eine
+      // Haltestelle und darunter die Linien-Icons kleiner").
+      const block = !!d.alleStation;
       const zeile = '<div class="linie' + (wo.length ? '' : ' neu-dran') + '"'
          + ' title="auf das gew\u00e4hlte Display legen"'
          + ' onclick="richtungSchalten(' + diHier + ',\'' + k.replace(/'/g, "\\'") + '\',true)">'
-         + '<b style="background:' + f.bg + ';color:' + f.fg + '">' + escapeHtmlFt(d.line) + '</b>'
-         + '<div class="rumpf"><div class="ziel">' + escapeHtmlFt(d.dest) + '</div>'
-         + '<div class="halt">' + escapeHtmlFt(st.name)
+         + (block
+            ? '<b style="background:#1b1b1b;color:#fff">' + SYM_HALT + '</b>'
+            : '<b style="background:' + f.bg + ';color:' + f.fg + '">' + escapeHtmlFt(d.line) + '</b>')
+         + '<div class="rumpf"><div class="ziel' + (block ? ' alles' : '') + '">'
+         + escapeHtmlFt(block ? st.name : d.dest) + '</div>'
+         + '<div class="halt">'
+         + (block ? ALLE_TEXT : escapeHtmlFt(st.name))
          + (d.beispiel ? ' &middot; Beispielzeiten' : '')
-         + (wo.length ? ' &middot; schon auf Display ' + wo.join(' und ') : '') + '</div></div>'
+         + (wo.length ? ' &middot; schon auf Display ' + wo.join(' und ') : '') + '</div>'
+         + (block ? miniLinien(st) : '') + '</div>'
          + (wo.length ? '<span class="doppel" title="liegt schon auf Display '
                         + wo.join(' und ') + '">' + DOPPEL_ICON + '</span>' : '')
          + '</div>';
@@ -3281,6 +3402,12 @@ const SYM_UHR =
   + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
   + '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></svg>';
 
+// Haltestelle: Mast mit Schild, so wie das Zeichen an der Strasse.
+const SYM_HALT =
+  '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"'
+  + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+  + '<rect x="6" y="2.6" width="12" height="11.4" rx="2.4"/>'
+  + '<path d="M12 14v6.4"/><path d="M8.8 20.4h6.4"/></svg>';
 const DOPPEL_ICON =
   '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"'
   + ' stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
@@ -3617,8 +3744,9 @@ function klappSchalten(id) {
   if (!el) return;
   const wirdOffen = !el.classList.contains('offen');
   document.querySelectorAll('.klapp.offen').forEach(x => x.classList.remove('offen'));
-  if (!wirdOffen) return;
+  if (!wirdOffen) { reiterZeichnen(); return; }
   el.classList.add('offen');
+  reiterZeichnen();
   // Beim Zuklappen des vorherigen rutscht die Seite, darum den neuen Kopf herholen.
   const kopf = el.querySelector('.klapp-kopf');
   if (kopf) kopf.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -3675,6 +3803,19 @@ function dialogZeigen(titel, text, knoepfe, art, inhalt) {
 function sagen(titel, text) { dialogZeigen(titel, text, [{ text: 'Alles klar' }]); }
 
 // ---- Bedienung -----------------------------------------------------------------------
+// Alles, was von dieser Station auf dem Display liegt, dort herunternehmen. In der
+// Ansicht nach Abfahrt steht die Station als EINE Karte da, also nimmt das x auch die
+// ganze Station. Einzelne Linien holt man sich danach wieder aus dem Topf darunter.
+function stationWeg(di, si) {
+  const d = displays[di];
+  const st = stationen[si];
+  if (!d || !st) return;
+  d.richtungen.filter(k => {
+    const r = richtungFinden(k);
+    return r && r.station === st;
+  }).forEach(k => richtungSchalten(di, k, false));
+}
+
 function sortierungSetzen(di, wert) {
   const d = displays[di];
   if (!d) return;
@@ -3689,7 +3830,7 @@ function sortierungSetzen(di, wert) {
   let zahl = 0;
   andere.forEach(x => x.richtungen.forEach(k => { if (!istUhrKey(k)) zahl++; }));
   dialogZeigen('Alle Linien hierher holen?',
-    'Dieses Display zeigt jetzt die n\u00e4chsten Abfahrten nach Uhrzeit. Dabei darf es '
+    'Dieses Display sortiert jetzt nach Abfahrt, also nach Uhrzeit. Dabei darf es '
     + 'beliebig viele Linien tragen. Sollen die ' + zahl + ' Linien von den anderen '
     + (andere.length === 1 ? 'Display' : 'Displays') + ' mit hierher?',
     [{ text: 'Nein, so lassen', still: true },
@@ -4106,6 +4247,11 @@ function uebergabeHolen() {
                   // gehoert die Linie sicher zu dieser Station, auch wenn sie gerade
                   // nicht in dieser Richtung faehrt.
                   genau: !!(w && w.genau),
+                  // Welche Linien hier halten. Nur der Rueckfall: normalerweise stehen
+                  // sie in den Abfahrten, die diese Seite ohnehin holt. Nachts ist die
+                  // Liste dort aber kurz, und bei einer Station mit "Alle Abfahrten"
+                  // gibt es sonst gar nichts anzuzeigen (Paul 25.10.2026).
+                  linienAmHalt: Array.isArray(st.linienAmHalt) ? st.linienAmHalt.slice() : null,
                   linienToken: (typeof st.linienToken === 'boolean') ? st.linienToken : null,
                   stil: parseInt(st.stil, 10),
                   stilTon: parseInt(st.stilTon, 10),
@@ -4409,7 +4555,7 @@ function tokenTreffer(linien, m, richtungen) {
                                          richtungen: [{ line: e.linie, ziel: e.ziel }] }));
   for (const e of liste) {
     const st = { rbl: e.rbl, name: e.name, netz: e.netz || 'WL', abfahrten: [],
-                 alle: !!e.alle,
+                 alle: !!e.alle, linienAmHalt: e.linienAmHalt || null,
                  linienToken: (e.linienToken == null) ? null : e.linienToken,
                  stil: isNaN(e.stil) ? null : e.stil,
                  stilTon: isNaN(e.stilTon) ? null : e.stilTon,
