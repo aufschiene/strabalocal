@@ -2377,7 +2377,20 @@ function configBauen() {
       });
     } else {
       const rbls = [], gw = [];
-      proStation.forEach((e, rbl) => { rbls.push(rbl); gw.push(gehwegStation(e.station)); });
+      proStation.forEach((e, rbl) => {
+        // Welche Linie zu WELCHEM Stop gehoert, steht ausschliesslich im '!'-Teil der
+        // rbl. Stehen zwei Stationen in EINEM Segment, ist das Linienfeld dahinter
+        // gemeinsam, und ohne den Teil kann es beim naechsten Oeffnen niemand mehr
+        // auseinanderhalten: eine Linie, die zufaellig an beiden haelt, landet dann an
+        // beiden (Kunde Thomas, 41 und 43 an Feuersee, 25.10.2026).
+        // Nicht bei Wien, dort hat ohnehin jede Station ihren eigenen Eintrag, und nicht
+        // bei den Zug-Brettern, die kennen das Token nicht.
+        const kahl = rblTeile(rbl).kahl;
+        const marke = (!wien && !istZeitTyp(c) && e.linien.length)
+          ? '!' + e.linien.join('~') : '';
+        rbls.push(kahl + marke);
+        gw.push(gehwegStation(e.station));
+      });
       const gTeil = gw.every(x => x === gw[0]) ? String(gw[0]) : gw.join(',');
       // Wien: Liniennamen, die Richtung steckt im Bahnsteig, und Gruppen ueber Eintraege
       // hinweg braucht das m-Feld. Sonst ein Token je Zeile mit Ziel, Gruppen per '+'.

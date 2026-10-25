@@ -24330,6 +24330,36 @@ function _geraetRowsMerken(mr, tr, ds) {
   _geraetRows = { masterrow: mr, timerow: tr, displaysettings: ds };
 }
 
+// ZURUECK AUS DEM FEINTUNING, OHNE ZU SPEICHERN.
+// Beim Zurueckgehen im Browser laedt diese Seite neu und fragt das Geraet. Alles, was der
+// Nutzer gerade ausgewaehlt und noch nicht gespeichert hat, war damit weg: nachgestellt
+// 25.10.2026, eine entfernte Station stand nach dem Zurueckgehen wieder da. Der Kunde
+// (Thomas, Stuttgart) wiederholte die Auswahl darum immer wieder.
+// Die Uebergabe ans Feintuning liegt noch im sessionStorage und traegt BEIDES: die eben
+// gebaute masterrow und, als geraet.masterrow, den Stand des Geraets beim Verlassen.
+// Stimmt der noch mit dem ueberein, was das Geraet JETZT meldet, hat zwischendurch
+// niemand gespeichert — dann ist die Auswahl von eben die juengere Wahrheit.
+// Hat das Geraet seither eine andere masterrow, gewinnt IMMER das Geraet.
+var _FEINTUNING_RUECKKEHR_FENSTER = 30 * 60 * 1000;
+function auswahlAusFeintuningZurueck(geraeteMasterrow) {
+  try {
+    var o = JSON.parse(sessionStorage.getItem('catchit_feintuning') || 'null');
+    if (!o || !o.masterrow || !o.stand) return null;
+    if (Date.now() - o.stand > _FEINTUNING_RUECKKEHR_FENSTER) return null;
+    var beimVerlassen = (o.geraet && o.geraet.masterrow != null) ? String(o.geraet.masterrow).trim() : null;
+    if (beimVerlassen === null) return null;              // kein Vergleichsmass → Finger weg
+    var jetzt = String(geraeteMasterrow == null ? '' : geraeteMasterrow).trim();
+    if (beimVerlassen !== jetzt) return null;             // Geraet hat sich geaendert → Geraet gewinnt
+    var eigene = String(o.masterrow).trim();
+    if (!eigene || eigene === beimVerlassen) return null;  // nichts geaendert → nichts zu retten
+    var rbl = eigene.split(';').map(function(seg) { return (seg.split('|')[0] || '').trim(); })
+                    .filter(Boolean).join(',');
+    if (!rbl) return null;
+    console.log('[config] Rueckkehr aus dem Feintuning: ungespeicherte Auswahl wiederhergestellt');
+    return { rbl: rbl, masterrow: eigene, timerow: String(o.timerow || '') };
+  } catch (e) { return null; }
+}
+
 async function handleConfigMessage(data) {
   _configMsgSeen = true;   // sofort, nicht erst wenn der Wiederaufbau fertig ist
   if (data.type === 'loadExistingConfig') _geraetRowsMerken(data.masterrow, data.timerow, data.displaysettings);
@@ -24358,7 +24388,12 @@ async function handleConfigMessage(data) {
     if (data.rbl && data.rbl.split(',').some(function(p){ p=(p||'').trim(); return p.indexOf('WL:')===0 || /^\d/.test(p); })) {
       await loadWienData();
     }
-    await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '', data.linegroups || '', (data.masterrow || '') + ';' + (data.timerow || ''));
+    var _zurueck1 = auswahlAusFeintuningZurueck(data.masterrow);
+    if (_zurueck1) {
+      await loadExistingConfig(_zurueck1.rbl, '', '', '', '', _zurueck1.masterrow + ';' + _zurueck1.timerow, true);
+    } else {
+      await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '', data.linegroups || '', (data.masterrow || '') + ';' + (data.timerow || ''));
+    }
     if (Array.isArray(stations) && stations.length > 0) resolveStartup();
     return;
   }
@@ -24404,7 +24439,12 @@ async function handleConfigMessage(data) {
     const lineGroupsStr = data.config.linegroups || '';
     // clearFirst=true: loadFullConfig ist autoritativ und verwirft ein evtl. parallel gelaufenes
     // (unvollständiges) loadExistingConfig-Ergebnis erst NACH der Serialisierung (Race-Fix).
-    await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest, lineGroupsStr, (data.config.masterrow || '') + ';' + (data.config.timerow || ''), true);
+    var _zurueck2 = auswahlAusFeintuningZurueck(data.config.masterrow);
+    if (_zurueck2) {
+      await loadExistingConfig(_zurueck2.rbl, '', '', '', '', _zurueck2.masterrow + ';' + _zurueck2.timerow, true);
+    } else {
+      await loadExistingConfig(rblId, linesFilter, lineFilterDest, rowOrderDest, lineGroupsStr, (data.config.masterrow || '') + ';' + (data.config.timerow || ''), true);
+    }
 
     // Initialisiere recommendedConfig falls noch nicht vorhanden
     if (!recommendedConfig) {
