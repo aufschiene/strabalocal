@@ -3798,6 +3798,22 @@ function eintraegeAusZeilen(zeilen) {
   return raus;
 }
 
+// Eine rbl kann ihre Linien mitbringen: "NETZ:stop!U1~U14~41~43". Das braucht es, wenn
+// MEHRERE Stationen in EINEM Segment stehen, denn das Linienfeld dahinter gilt dann
+// fuers ganze Segment und sagt nicht, welche Linie zu welcher Station gehoert. Ohne das
+// bekam jede Station alle Linien des Segments, und weil die 41 und die 43 wirklich an
+// beiden Haltestellen halten, blieben sie dort haengen (Kunde Thomas, 25.10.2026).
+function rblTeile(rbl) {
+  const r = String(rbl || '');
+  const i = r.indexOf('!');
+  if (i < 0) return { kahl: r, nur: null };
+  const nur = r.slice(i + 1).split('~').map(x => x.trim().toUpperCase()).filter(Boolean);
+  return { kahl: r.slice(0, i), nur: nur.length ? nur : null };
+}
+function gehoertDazu(nur, linie) {
+  return !nur || nur.indexOf(String(linie || '').trim().toUpperCase()) >= 0;
+}
+
 // Nur die Auswahl je rbl, abgeleitet aus denselben Eintraegen.
 function wahlAusZeilen(zeilen) {
   const raus = new Map();
@@ -3805,9 +3821,18 @@ function wahlAusZeilen(zeilen) {
     // Ein Segment kann mehrere rbls tragen (Wien). Die Linien gelten dann fuer alle,
     // und was an einem Bahnsteig nicht faehrt, findet beim Abgleich ohnehin nichts.
     ein.rbls.forEach(rbl => {
-      const e = raus.get(rbl) || { alle: false, gruppen: [] };
-      if (ein.alle) e.alle = true; else e.gruppen = e.gruppen.concat(ein.gruppen);
-      raus.set(rbl, e);
+      const teil = rblTeile(rbl);
+      // Nur die Linien dieser Station, falls die rbl sie mitbringt.
+      const meine = teil.nur
+        ? ein.gruppen.map(g => g.filter(m => gehoertDazu(teil.nur, m.linie))).filter(g => g.length)
+        : ein.gruppen;
+      // Unter beiden Schreibweisen ablegen, mit und ohne '!'-Teil: welche davon die
+      // Station traegt, wissen wir hier nicht.
+      [rbl, teil.kahl].forEach(k => {
+        const e = raus.get(k) || { alle: false, gruppen: [] };
+        if (ein.alle) e.alle = true; else e.gruppen = e.gruppen.concat(meine);
+        raus.set(k, e);
+      });
     });
   });
   return raus;
@@ -3932,7 +3957,11 @@ function displaysAusEintraegen(eintraege) {
       });
       // Nur die Stationen dieses Eintrags, sonst zieht ein gleicher Linienname von einer
       // anderen Station mit herein.
-      const stats = stationen.filter(st => ein.rbls.indexOf(st.rbl) >= 0);
+      // Station finden, egal ob mit oder ohne '!'-Teil geschrieben, und dabei merken,
+      // welche Linien zu ihr gehoeren.
+      const nurVon = new Map();
+      ein.rbls.forEach(r => { const x = rblTeile(r); nurVon.set(x.kahl, x.nur); });
+      const stats = stationen.filter(st => nurVon.has(rblTeile(st.rbl).kahl));
       // "Alle Abfahrten" steht als '*' in der Config: ein Eintrag, am Geraet aber
       // mehrere Seiten. Unser Modell kennt ein Display je Seite, das laesst sich nicht
       // eins zu eins zurueckholen. Dann verteilen wir wie beim ersten Mal.
@@ -3945,6 +3974,7 @@ function displaysAusEintraegen(eintraege) {
       ein.gruppen.forEach((teil, ti) => {
         const keys = [];
         teil.forEach(m => stats.forEach(st => {
+          if (!gehoertDazu(nurVon.get(rblTeile(st.rbl).kahl), m.linie)) return;
           const si = stationen.indexOf(st);
           const nimm = (linie, ziel) => {
             const k = zeilenKey(si, { line: linie, dest: ziel });
