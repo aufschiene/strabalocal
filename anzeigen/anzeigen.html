@@ -4657,6 +4657,7 @@ function uebergabeHolen() {
                   gattungen: linienfeldVon(rohZeilen, rbl) || String(st.filter || '').trim(),
                   // Schon geholte Abfahrten, roh wie von der API oder fertig geparst.
                   abfahrten: st.abfahrten || st.rohAbfahrten || null,
+                  abfahrtenStand: parseInt(st.abfahrtenStand, 10) || 0,
                   linienToken: (typeof st.linienToken === 'boolean') ? st.linienToken : null,
                   stil: parseInt(st.stil, 10),
                   stilTon: parseInt(st.stilTon, 10),
@@ -5025,7 +5026,12 @@ function ladenAus() {
     // Mehrere Anfragen direkt hintereinander laufen schnell in die Ratengrenze der API.
     // Ein leeres catch wuerde den Fehler verschlucken und die Seite bliebe stumm leer.
     // Kamen die Abfahrten mit, sofort anzeigen und NICHT noch einmal holen.
-    let roh = e.abfahrten || e.rohAbfahrten || null;
+    // Die Linienauswahl gibt nur Frisches mit (hoechstens 60 s alt). Das gilt aber beim
+    // SCHREIBEN: diese Seite kann die Uebergabe spaeter laden, etwa nach einem Neuladen
+    // oder wenn der Tab lag. Darum hier noch einmal aufs Alter sehen, sonst stuenden
+    // falsche Minuten da, und das waere schlimmer als kurz zu warten (Paul 26.10.2026).
+    const standAlter = e.abfahrtenStand ? (Date.now() - e.abfahrtenStand) : 0;
+    let roh = (e.abfahrtenStand && standAlter > 90000) ? null : (e.abfahrten || e.rohAbfahrten || null);
     if (roh && !Array.isArray(roh)) roh = abfahrtenAus(roh);
     if (Array.isArray(roh) && roh.length) {
       abfahrtenSetzen(st, roh);
