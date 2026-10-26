@@ -5235,6 +5235,17 @@ function ladenAus() {
           const kennt = (st.letzteLinien || [])
             .some(x => String(x.line || '').trim().toUpperCase() === String(m.linie).trim().toUpperCase());
           if (!kennt && !e.genau) return;
+          // Und NIE etwas nachtragen, was die Linienauswahl nicht gewaehlt hat. Eine alte
+          // Geraete-Zeile kann Linien tragen, die der Nutzer laengst abgewaehlt hat (Linz:
+          // die Landbusse 309, 412, 609 aus einem frueheren Brett). Die Auswahl des
+          // Pickers gewinnt, die gespeicherte Zeile ist nur die Reihenfolge
+          // (Paul 26.10.2026).
+          if (st.gewaehlt && st.gewaehlt.size) {
+            const da = [...st.gewaehlt].some(k2 =>
+              String(k2).slice(0, String(k2).indexOf("|")).toUpperCase()
+                === String(m.linie).trim().toUpperCase());
+            if (!da) return;
+          }
           // Die Richtung aus dem Token ist eine ID (H, R, p1…, st…), kein Zieltext.
           // Als Beschriftung taugt sie nicht, darum ohne Ziel: gilt in alle Richtungen.
           nimm(m.linie, '', ruhtMit);
