@@ -1557,6 +1557,18 @@ function displaysAuffuellen() {
     const vorhanden = stilAuf(d);
     return vorhanden == null || !meine || vorhanden === meine.stil;
   };
+  // Und gehoert sie zum selben NETZ? Netze werden nicht gemischt: eine neu dazugekommene
+  // Linie kommt auf ein Brett ihres eigenen Netzes, sonst auf ein leeres oder ein neues.
+  // Vorher rutschte sie auf irgendein Brett mit Platz, sobald nur der Stil passte, und
+  // dann standen zwei Verbuende durcheinander (Paul 26.10.2026: "bitte die Netze auf
+  // Boards gebuendelt"). Ein leeres Brett nimmt weiterhin alles.
+  const netzPasst = (d, meine) => {
+    if (!meine) return true;
+    const k = (d.richtungen || []).find(x => !istUhrKey(x));
+    if (!k) return true;
+    const w = wissen.get(k);
+    return !w || w.netz === meine.netz;
+  };
   offen.forEach(k => {
     const meine = wissen.get(k);
     let ziel = null;
@@ -1567,7 +1579,7 @@ function displaysAuffuellen() {
         return w && w.netz === meine.netz;
       })) || displays.find(d => platz(d) && !d.richtungen.length);
     } else {
-      ziel = displays.find(d => platz(d) && stilPasst(d, meine));
+      ziel = displays.find(d => platz(d) && stilPasst(d, meine) && netzPasst(d, meine));
     }
     if (!ziel) { ziel = { richtungen: [], vomNutzer: false }; displays.push(ziel); }
     ziel.richtungen.push(k);
@@ -2898,13 +2910,25 @@ function configBauen() {
       zeilenEinheiten(d).forEach((teil, gi) => {
         if (teil.length > 1) teil.forEach(k => gidVon.set(k, gi + 1));
       });
+      // Die nackten Liniennamen gelten nur fuer WIEN, dort steckt die Richtung im
+      // Bahnsteig. Liegt eine fremde Station auf demselben Brett, braucht sie ihr
+      // Richtungs-Token weiter, sonst hiesse ihre Linie ab dann "in alle Richtungen".
+      // Der Zweig hier haengt aber an der ERSTEN Zeile des Bretts, und so verlor ein
+      // gemischtes Brett (Wien plus Linz) beim Speichern die Linzer Richtungen:
+      // aus 1>st444518499l1,2>st444518499l2 wurde 1,2 (Paul 26.10.2026).
+      const flachW = tokenListeFlach(d);
       proStation.forEach((e, rbl) => {
         const marken = [];
         (e.keys || []).forEach((k, i) => {
           const gid = gidVon.get(k);
           if (gid) marken.push(i + ':' + gid);
         });
-        stuecke.push(rbl + '|' + (e.linien.length ? e.linien.join(',') : '*')
+        const istWien = /^\d/.test(String(rbl)) || /^WLB?:/i.test(String(rbl));
+        const meineTok = flachW.liste.filter(x => x.rbl === rbl).map(x => x.tok);
+        const feld = istWien
+          ? (e.linien.length ? e.linien.join(',') : '*')
+          : (meineTok.length ? meineTok.join(',') : '*');
+        stuecke.push(rbl + '|' + feld
                    + '|c' + c + '|g' + gehwegStation(e.station) + '|r' + zeilenVon(d)
                    + (marken.length ? '|m' + marken.join(',') : '')
                    + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);

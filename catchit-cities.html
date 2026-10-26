@@ -3250,6 +3250,9 @@
     <button class="btn hidden" id="addMoreStationsBtn" onclick="addMoreStations()" style="margin-top: 12px; width: 100%;">
       + Weitere Station hinzufügen
     </button>
+    <button class="btn hidden" id="schnellstartBtn" onclick="startSetupWizard()" style="margin-top: 12px; width: 100%;">
+      Schnellstart
+    </button>
     <button class="btn btn-primary hidden" id="openFinetuningBtn" onclick="handleStationsNextStep()" style="margin-top: 12px; width: 100%;">
       Weiter
     </button>
@@ -12645,12 +12648,25 @@ function updateStationsList() {
     // Station auf der Zwischenseite löschen → updateStationsList versteckte den
     // Weiter-Button → gar kein Button mehr, User kam nur noch über
     // "Konfigurationen löschen" raus (Kundenreport 2026-07-14).
+    // War schon einmal etwas eingestellt, soll die Seite NICHT stillschweigend ins
+    // Feintuning springen, sondern fragen (Paul 26.10.2026): dann heisst der eine Knopf
+    // "Feintunen" und daneben steht "Schnellstart", der in den Wizard fuehrt. Beim ersten
+    // Mal gibt es nur "Weiter", und das ist der Wizard, also der Schnellstart.
+    var _schonEingerichtet = (typeof hasExistingConfig !== 'undefined' && hasExistingConfig)
+      || ((typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder());
+    var schnellstartBtn = document.getElementById('schnellstartBtn');
     if (openFinetuningBtn) {
       if (typeof currentStep !== 'undefined' && currentStep === 'added') {
         openFinetuningBtn.classList.remove('hidden');
+        openFinetuningBtn.textContent = _schonEingerichtet ? 'Feintunen' : 'Weiter';
       } else {
         openFinetuningBtn.classList.add('hidden');
       }
+    }
+    if (schnellstartBtn) {
+      var _zeigen = (typeof currentStep !== 'undefined' && currentStep === 'added')
+                    && _schonEingerichtet && stations.length > 0;
+      schnellstartBtn.classList.toggle('hidden', !_zeigen);
     }
     // Laeuft der Wizard (seine Fortschrittsleiste steht), bleibt die Stationsliste weg:
     // der Schritt kommt NACH der Linien-Auswahl und soll nicht darunter haengen
@@ -25924,6 +25940,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Linie': 'Line', 'Linien': 'Lines', 'Linie wählen': 'Choose line', 'Linien wählen': 'Choose lines',
     'Linien auswählen': 'Select lines', 'Linien auswählen:': 'Select lines:',
     'Linien für dein catch-it': 'Lines for your catch-it',
+    'Schnellstart': 'Quick start', 'Feintunen': 'Fine-tune',
     'Alle auswählen': 'Select all', 'Alle abwählen': 'Deselect all', 'Abwählen': 'Deselect',
     'Alle Abfahrten': 'All departures', 'Alle Linien': 'All lines', 'Alle Richtungen': 'All directions',
     'Einzelne Linien': 'Individual lines', 'Nach Linie filtern': 'Filter by line',
