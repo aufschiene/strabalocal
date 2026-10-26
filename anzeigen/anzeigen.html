@@ -1025,6 +1025,17 @@ function stilOptionen(d) {
 // Die oesterreichischen Landesverbuende haengen echte LED-Matrizen auf, darum ist Matrix
 // dort die Vorgabe und nicht die OEBB-Tafel (Paul 23.10.2026). Den Farbton dazu setzt
 // einstFuer ueber NETZ_MATRIX_TON.
+// Welchen Anzeige-Stil will DIESE Station? Die Linienauswahl schickt ihn mit, sonst
+// entscheidet die Netz-Vorgabe. Zwei Stationen duerfen nur zusammen auf ein Brett, wenn
+// sie denselben wollen (26.10.2026).
+function stilVorschlagStation(st) {
+  if (!st) return null;
+  if (!isNaN(st.stil) && st.stil) return parseInt(st.stil, 10);
+  const n = netzKuerzel(st);
+  const v = n ? NETZ_VORGABE[n] : null;
+  return v ? (Array.isArray(v) ? v[0] : v) : 1;
+}
+
 function stilVorschlag(d) {
   const nurMarke = markenStile();
   if (nurMarke) {
@@ -1455,6 +1466,12 @@ function displaysAuffuellen() {
   });
   const wissen = new Map();
   alle.forEach((r, i) => wissen.set(r.key, {
+    // Der Anzeige-Stil der STATION. Ein Zug-Brett (OEBB, Westbahn, SBB) kann keine
+    // Strassenbahnlinien zeigen, und es liegt am Geraet in der timerow statt in der
+    // masterrow. Darum duerfen nur Zeilen zusammen auf ein Brett, deren Stationen
+    // denselben Stil wollen. Ohne diese Regel kippte bei "kompakt" alles auf EIN
+    // Brett, und das trug dann den Stil der ersten Zeile (Paul 26.10.2026).
+    stil: stilVorschlagStation(r.station),
     typ: typRang(r.dep.vt),
     netz: netzRang.get(r.station.netz || 'WL') || 0,
     st: stationen.indexOf(r.station), linie: r.dep.line, i: i
@@ -1487,19 +1504,29 @@ function displaysAuffuellen() {
   // zeigt davon die naechsten N. Der Zeilen-Deckel gilt nur fuer feste Zeilen. Vorher
   // zerlegte die Verteilung eine Haltestelle mit zehn Linien in vier Bretter, obwohl
   // eines gereicht haette (Kundenmeldung Bernd, 25.10.2026).
+  const stilAuf = d => {
+    const k = (d.richtungen || []).find(x => !istUhrKey(x));
+    const w = k ? wissen.get(k) : null;
+    return w ? w.stil : null;
+  };
   const platz = d => !d.vomNutzer
     && (zeitbasiert(d) || zeilenEinheiten(d).length < maxZeilen(stilVon(d)));
+  // Passt diese Zeile stilistisch auf das Brett? Leere Bretter nehmen alles.
+  const stilPasst = (d, meine) => {
+    const vorhanden = stilAuf(d);
+    return vorhanden == null || !meine || vorhanden === meine.stil;
+  };
   offen.forEach(k => {
     const meine = wissen.get(k);
     let ziel = null;
     if (modus === 'spielerisch' && meine) {
       // Ein Brett, auf dem schon Linien DIESES NETZES stehen, sonst ein leeres.
-      ziel = displays.find(d => platz(d) && d.richtungen.some(k2 => {
+      ziel = displays.find(d => platz(d) && stilPasst(d, meine) && d.richtungen.some(k2 => {
         const w = wissen.get(k2);
         return w && w.netz === meine.netz;
       })) || displays.find(d => platz(d) && !d.richtungen.length);
     } else {
-      ziel = displays.find(platz);
+      ziel = displays.find(d => platz(d) && stilPasst(d, meine));
     }
     if (!ziel) { ziel = { richtungen: [], vomNutzer: false }; displays.push(ziel); }
     ziel.richtungen.push(k);
