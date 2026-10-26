@@ -1374,7 +1374,15 @@ function zugZiele(st) {
   const kahl = rblTeile((st && st.rbl) || '').kahl;
   const i = kahl.indexOf('>');
   if (i < 0) return [];
-  const namen = (st && st.zielNamen) || [];
+  // Namen der Ziele: am liebsten aus der Uebergabe. Steht dort nichts, stehen sie im
+  // Stationsnamen hinter dem Pfeil ("Linz/Donau Hbf -> Wien Hbf, Wels Hbf"), so baut ihn
+  // die Linienauswahl. Die blanke Id ist der letzte Ausweg (Paul 26.10.2026).
+  let namen = (st && st.zielNamen) || [];
+  if (!namen.length) {
+    const n = String((st && st.name) || '');
+    const pf = n.search(/[\u2192>]/);
+    if (pf > 0) namen = n.slice(pf + 1).split(',').map(x => x.trim()).filter(Boolean);
+  }
   return kahl.slice(i + 1).split('~').map(x => x.trim()).filter(Boolean)
     .map((id, n) => ({ id: id, name: String(namen[n] || '').trim() || id }));
 }
@@ -2429,22 +2437,31 @@ function stationenZeichnen() {
   // mehrerer Haltestellen liest sich sonst wie ein Haufen: man sucht die Station, nicht
   // die Linie (Paul 26.10.2026). Daneben steht der Schalter, der die ganze Station als
   // EINE Zeile aufs Brett legt statt ihrer Linien.
+  // Wien fuehrt JE BAHNSTEIG eine Station, und zwei Bahnsteige derselben Haltestelle
+  // heissen gleich. Im Topf stand "Alaudagasse" deshalb zweimal untereinander, einmal je
+  // Richtung. Hier zaehlt die Haltestelle, nicht der Steig: eine Ueberschrift, darunter
+  // alle Richtungen (Paul 26.10.2026).
+  const haltName = st => String(st.name || '').trim().toLowerCase() + '\u0001' + (st.netz || '');
   const haltKopf = (st, si) => {
-    const anZahl = zeilenEintraege(st).length;
+    const geschwister = stationen.filter(x => haltName(x) === haltName(st));
+    const alleBlock = geschwister.every(x => x.alle);
+    const istZug = geschwister.some(istZugStation);
     return '<div class="haltkopf"><span style="display:flex;align-items:center;gap:7px;">'
       + SYM_HALT + '<span>' + escapeHtmlFt(st.name) + '</span></span>'
       // Zwei Zustaende, beide sichtbar: man soll sehen, dass es die Wahl gibt, und in
       // welchem Zustand die Station gerade ist (Paul 26.10.2026).
-      + (istZugStation(st) ? ''
+      + (istZug ? ''
          : '<span class="haltwahl">'
-           + '<button class="' + (st.alle ? '' : 'an') + '"'
-           + (st.alle ? ' onclick="stationAlsBlock(' + si + ',false)"' : '')
+           + '<button class="' + (alleBlock ? '' : 'an') + '"'
+           + (alleBlock ? ' onclick="halteAlsBlock(' + si + ',false)"' : '')
            + '>Linien</button>'
-           + '<button class="' + (st.alle ? 'an' : '') + '"'
-           + (st.alle ? '' : ' onclick="stationAlsBlock(' + si + ',true)"')
+           + '<button class="' + (alleBlock ? 'an' : '') + '"'
+           + (alleBlock ? '' : ' onclick="halteAlsBlock(' + si + ',true)"')
            + '>Station</button></span>')
       + '</div>';
   };
+  const kopfGesetzt = new Set();
+  const gesehenImTopf = new Set();
   stationen.forEach((st, si) => {
     // NUR die gewaehlten Richtungen, dieselbe Liste wie auf den Displays. Vorher lief
     // das ueber alle Abfahrten der Station, und dann stand im Pool die halbe
@@ -2452,12 +2469,17 @@ function stationenZeichnen() {
     // und der Rest (Paul 23.10.2026). Wer eine weitere Linie will, holt sie sich in
     // der Linienauswahl.
     const zeilen = zeilenEintraege(st);
-    let kopfOffen = true;
+    let kopfOffen = !kopfGesetzt.has(haltName(st));
     zeilen.forEach(d => {
       const k = zeilenKey(si, d);
       if (vergeben.has(k)) return;
+      // Zwei Bahnsteige koennen dieselbe Linie mit demselben Ziel tragen. Unter EINER
+      // Ueberschrift sieht das wie ein Doppelgaenger aus, also nur einmal zeigen.
+      const sicht = haltName(st) + '\u0002' + d.line + '|' + d.dest;
+      if (gesehenImTopf.has(sicht)) return;
+      gesehenImTopf.add(sicht);
       uebrig++;
-      if (kopfOffen) { offen += haltKopf(st, si); kopfOffen = false; }
+      if (kopfOffen) { offen += haltKopf(st, si); kopfOffen = false; kopfGesetzt.add(haltName(st)); }
       const f = badgeFarben(d);
       const wo = anderswo.get(k) || [];
       // Schon woanders? Trotzdem voll sichtbar und waehlbar, nur mit einem Zeichen
@@ -3940,7 +3962,20 @@ function sagen(titel, text) { dialogZeigen(titel, text, [{ text: 'Alles klar' }]
 // Eine Station als EINE Zeile fuehren statt ihrer Linien, oder zurueck. Die Auswahl
 // der Linien bleibt dabei erhalten, sie liegt in st.gewaehlt und kommt beim Zurueck-
 // schalten wieder. "Alle Abfahrten" und Zug-Verbindungen sind ohnehin Stations-Zeilen.
-function stationAlsBlock(si, an) {
+// Der Schalter in der Ueberschrift meint die HALTESTELLE, also alle ihre Bahnsteige.
+function halteAlsBlock(si, an) {
+  const st = stationen[si];
+  if (!st) return;
+  const name = String(st.name || '').trim().toLowerCase() + '\u0001' + (st.netz || '');
+  stationen.forEach((x, xi) => {
+    if (String(x.name || '').trim().toLowerCase() + '\u0001' + (x.netz || '') === name) {
+      stationAlsBlock(xi, an, true);
+    }
+  });
+  allesZeichnen();
+}
+
+function stationAlsBlock(si, an, stillt) {
   const st = stationen[si];
   if (!st || istZugStation(st)) return;
   const meins = k => { const m = /^(\d+)\u00a7/.exec(String(k)); return m && parseInt(m[1], 10) === si; };
@@ -3963,7 +3998,7 @@ function stationAlsBlock(si, an) {
     displays[zielBrett].richtungen.splice(stelle, 0, ...neu);
     displays[zielBrett].vomNutzer = true;
   }
-  allesZeichnen();
+  if (!stillt) allesZeichnen();
 }
 
 function stationWeg(di, si) {
