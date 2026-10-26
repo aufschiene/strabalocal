@@ -11059,142 +11059,12 @@ function shortenStopName(name) {
     .trim();
 }
 
-// ==================== OEBB VON-NACH MODUS ====================
-
-function renderOebbDestSearch() {
-  const linesList = document.getElementById('linesList');
-  const stationName = selectedStop?.name || '';
-
-  // Header anpassen
-  document.querySelector('#linesContainer .lines-header h3').textContent = 'Züge nach...';
-  document.getElementById('selectAllBtn').style.display = 'none';
-  addStationBtn.style.display = 'none';  // Versteckt — alles über fixierten saveBtn
-  addStationBtn.disabled = !oebb_toStop;
-  addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
-
-  let html = '';
-
-  // Von-Station (fix)
-  html += `<div class="oebb-from-label">Von: <strong>${stationName}</strong></div>`;
-
-  // Ziel-Suchfeld
-  html += `
-    <div class="oebb-dest-section">
-      <div class="oebb-dest-label">Nach:</div>
-      <div class="oebb-dest-input-wrap">
-        <input type="text" id="oebbDestInput" class="oebb-dest-input"
-          placeholder="z.B. Linz, Salzburg, Graz..."
-          value="${oebb_toStop ? oebb_toStop.name : ''}"
-          oninput="searchOebbDest(this.value)"
-          autocomplete="off" />
-        ${oebb_toStop ? `<span class="oebb-dest-clear" onclick="clearOebbDest()">✕</span>` : ''}
-      </div>
-      <div id="oebbDestResults" class="oebb-dest-results"></div>
-    </div>
-  `;
-
-  // Gewähltes Ziel anzeigen
-  if (oebb_toStop) {
-    html += `<div class="oebb-dest-chosen">Ziel: <strong>${oebb_toStop.name}</strong></div>`;
-  }
-
-  // Gattungs-Filter
-  html += `<div class="strecke-section-title">Zuggattungen</div>`;
-  html += `<div class="strecke-gattungen-filter">`;
-  for (const g of OEBB_GATTUNGEN) {
-    const isOn = !oebb_deselectedGattungen.has(g);
-    html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleOebbGattung('${g}')">${g}</span>`;
-  }
-  html += `</div>`;
-
-  linesList.innerHTML = html;
-
-  // Focus auf Input
-  setTimeout(() => {
-    const input = document.getElementById('oebbDestInput');
-    if (input && !oebb_toStop) input.focus();
-  }, 100);
-}
-
-let oebbDestTimeout = null;
-async function searchOebbDest(query) {
-  const resultsDiv = document.getElementById('oebbDestResults');
-  if (!resultsDiv) return;
-
-  if (query.length < 2) {
-    resultsDiv.innerHTML = '';
-    return;
-  }
-
-  clearTimeout(oebbDestTimeout);
-  oebbDestTimeout = setTimeout(async () => {
-    try {
-      const params = new URLSearchParams({ network: 'OEBB', q: query });
-      const response = await fetch(`${SEARCH_API}?${params}`);
-      const data = await response.json();
-      // KEIN Fernverkehrs-Filter mehr. Erstens gilt der Zug-Wizard seit den Knoepfen
-      // Fernverkehr/Nahverkehr allgemein, zweitens kam die Suche vor der Gattungswahl,
-      // und drittens liefert der Server in `info` laengst nur noch "AT · train station" —
-      // der Filter warf damit JEDEN Treffer weg, auch Wien Hbf (gemessen 02.10.2026).
-      // Nur noch deduplizieren.
-      let fvStops = (data.stops || []);
-      const seen = new Map();
-      fvStops.forEach(s => {
-        const suffix = String(s.id).slice(-4);
-        const existing = seen.get(suffix);
-        if (!existing) {
-          seen.set(suffix, s);
-        } else if (s.name.startsWith('Wien ') && !existing.name.startsWith('Wien ')) {
-          seen.set(suffix, s);
-        }
-      });
-      const stops = Array.from(seen.values()).slice(0, 8);
-
-      if (stops.length === 0) {
-        resultsDiv.innerHTML = '<div class="oebb-dest-no-result">Keine Station gefunden</div>';
-        return;
-      }
-
-      resultsDiv.innerHTML = stops.map(s => `
-        <div class="oebb-dest-item" onclick="selectOebbDest('${s.id}', '${s.name.replace(/'/g, "\\'")}')">
-          <div class="oebb-dest-item-name">${s.name}</div>
-        </div>
-      `).join('');
-    } catch (e) {
-      resultsDiv.innerHTML = '<div class="oebb-dest-no-result">Fehler bei der Suche</div>';
-    }
-  }, 300);
-}
-
-function selectOebbDest(id, name) {
-  oebb_toStop = { id, name };
-  renderOebbDestSearch();
-}
-
-function clearOebbDest() {
-  oebb_toStop = null;
-  renderOebbDestSearch();
-}
-
-function toggleOebbGattung(gattung) {
-  if (oebb_deselectedGattungen.has(gattung)) {
-    oebb_deselectedGattungen.delete(gattung);
-  } else {
-    oebb_deselectedGattungen.add(gattung);
-  }
-  // Nur Chips updaten, nicht das ganze Form (sonst verliert Input den Focus)
-  const chips = document.querySelectorAll('.gattung-chip');
-  chips.forEach(chip => {
-    const g = chip.textContent;
-    if (oebb_deselectedGattungen.has(g)) {
-      chip.classList.remove('on');
-      chip.classList.add('off');
-    } else {
-      chip.classList.add('on');
-      chip.classList.remove('off');
-    }
-  });
-}
+// Die alte OEBB-Ziel-Oberflaeche (renderOebbDestSearch, searchOebbDest, selectOebbDest
+// und je ein eigenes clearOebbDest/toggleOebbGattung) stand hier bis zum 26.10.2026. Sie
+// war unerreichbar: renderOebbDestSearch wurde nur noch aus ihren eigenen Funktionen
+// aufgerufen. Schlimmer, ihre beiden Zwillinge trugen DIESELBEN Namen wie die lebenden
+// weiter unten, und bei zwei Top-Level-Deklarationen gewinnt die spaetere: wer hier etwas
+// aenderte, aenderte nichts. Zustaendig ist der Ziel-Picker (renderPointToPointConfig).
 
 // ==================== FERNVERKEHR VON→NACH (Ziel-Picker) ====================
 // Modus-Umschalter (Alle Abfahrten | Bestimmtes Ziel)
@@ -12224,8 +12094,8 @@ function selectP2PDestByName(name) {
       const apiNetwork = mapNetworkForApi(selectedNetwork);
       const response = await fetch(`${SEARCH_API}?q=${encodeURIComponent(name)}&network=${apiNetwork}`);
       const data = await response.json();
-      // Ohne Fernverkehrs-Filter, siehe searchOebbDest: `info` traegt die Produkte nicht
-      // mehr, der Filter lieferte nie wieder einen Treffer.
+      // Ohne Fernverkehrs-Filter: `info` traegt die Produkte nicht mehr, der Filter
+      // lieferte nie wieder einen Treffer (die alte Ziel-Suche hatte denselben Grund).
       const results = (data.stops || data);
       if (results.length > 0) {
         selectP2PDest(results[0].id, results[0].name);

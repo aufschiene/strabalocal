@@ -1639,6 +1639,25 @@ function schirmeBauen() {
       let alle = [];
       quellen.forEach(i => displays[i].richtungen.forEach(k => { alle = alle.concat(abfahrtenDerRichtung(k)); }));
       alle.sort((a, b) => a.time - b.time);
+      // Keine einzige Abfahrt: dann wenigstens zeigen, WAS auf dem Brett stehen wird.
+      // Bei einem Stations-Block sind das die Linien der Haltestelle mit ihrem Namen.
+      if (!alle.length) {
+        quellen.forEach(i => displays[i].richtungen.forEach(k => {
+          const r = richtungFinden(k);
+          if (!r) return;
+          if (r.dep.alleStation) {
+            halteLinien(r.station).slice(0, proSeite).forEach((ln, n) => {
+              const bsp = (r.station.letzteLinien || []).find(x => x.line === ln) || { line: ln };
+              alle.push(Object.assign({}, bsp, { line: ln, dest: r.station.name,
+                                                 time: BEISPIEL_ZEIT[n % BEISPIEL_ZEIT.length],
+                                                 beispiel: true }));
+            });
+          } else {
+            alle.push(Object.assign({}, r.dep, { time: BEISPIEL_ZEIT[alle.length % BEISPIEL_ZEIT.length],
+                                                 beispiel: true }));
+          }
+        }));
+      }
       seiten = [alle.slice(0, proSeite)];
     } else {
       // Die Zeilen aller Quellen hintereinander, in Display-Reihenfolge.
@@ -1650,6 +1669,18 @@ function schirmeBauen() {
         let naechste = [];
         einheiten[0].forEach(k => { naechste = naechste.concat(abfahrtenDerRichtung(k)); });
         naechste.sort((a, b) => a.time - b.time);
+        // Faehrt gerade nichts, zeigt das Brett wenigstens, WIE es aussehen wird:
+        // dieselbe Zeile mit Beispielzeiten statt einer schwarzen Flaeche (Paul 26.10.2026).
+        if (!naechste.length) {
+          einheiten[0].forEach(k => {
+            const r = richtungFinden(k);
+            if (!r) return;
+            BEISPIEL_ZEIT.slice(0, proSeite).forEach(z => {
+              naechste.push(Object.assign({}, r.dep, { time: z, beispiel: true }));
+            });
+          });
+          naechste.sort((a, b) => a.time - b.time);
+        }
         seiten = [naechste.slice(0, proSeite)];
       } else {
         const alle = einheiten.map(teil => {
@@ -1664,10 +1695,12 @@ function schirmeBauen() {
             return r.dep;
           }).filter(Boolean);
           if (!deps.length) return null;
-          // Eine ruhende Linie hat keine Zeit. Sie bleibt als Zeile stehen, die Spalte
-          // rechts aber leer, so wie es auch das Geraet zeichnet (24.10.2026).
+          // Eine ruhende Linie hat keine Zeit. Ein ganz leeres Brett sagt aber nichts
+          // darueber, wie es aussehen WIRD, und sah einfach kaputt aus. Darum eine
+          // Beispielzeit, so wie der Topf es bei einer Station ohne Abfahrten auch macht
+          // (Paul 26.10.2026).
           const faehrt = deps.filter(x => x.time != null);
-          if (!faehrt.length) return Object.assign({}, deps[0], { time: '' });
+          if (!faehrt.length) return Object.assign({}, deps[0], { time: BEISPIEL_ZEIT[i % BEISPIEL_ZEIT.length], beispiel: true });
           const vorn = faehrt.reduce((a, b) => (b.time < a.time ? b : a));
           return teil.length > 1 ? Object.assign({}, vorn, { zusammen: teil.length }) : vorn;
         }).filter(Boolean);
@@ -1806,6 +1839,10 @@ function richtungSchalten(di, key, an) {
   }
   allesZeichnen();
 }
+
+// Beispielzeiten fuer die Vorschau, wenn gerade nichts faehrt. Bewusst kleine, runde
+// Zahlen, damit niemand sie fuer echte Minuten haelt.
+const BEISPIEL_ZEIT = [2, 4, 6, 9, 12];
 
 function seitenTeilen(daten, proSeite) {
   const out = [];
@@ -2469,7 +2506,7 @@ function stationenZeichnen() {
   const haltKopf = (st, si) => {
     const geschwister = stationen.filter(x => haltName(x) === haltName(st));
     const alleBlock = geschwister.every(x => x.alle);
-    const istZug = geschwister.some(istZugStation);
+    const istZug = geschwister.some(istZugStation) || geschwister.some(x => x.alleFix);
     return '<div class="haltkopf"><span style="display:flex;align-items:center;gap:7px;">'
       + SYM_HALT + '<span>' + escapeHtmlFt(st.name) + '</span></span>'
       // Zwei Zustaende, beide sichtbar: man soll sehen, dass es die Wahl gibt, und in
@@ -4002,6 +4039,7 @@ function halteAlsBlock(si, an) {
 function stationAlsBlock(si, an, stillt) {
   const st = stationen[si];
   if (!st || istZugStation(st)) return;
+  if (st.alleFix && !an) return;   // ohne Linienauswahl gibt es nichts aufzuloesen
   const meins = k => { const m = /^(\d+)\u00a7/.exec(String(k)); return m && parseInt(m[1], 10) === si; };
   // WO lagen die Zeilen dieser Station, und an welcher Stelle? Dort steht gleich die neue
   // Zeile. Sonst verschwindet sie beim Umschalten und taucht irgendwo wieder auf
@@ -5006,7 +5044,13 @@ function ladenAus() {
   ladenAn(liste.length);
   for (const e of liste) {
     const st = { rbl: e.rbl, name: e.name, netz: e.netz || 'WL', abfahrten: [],
-                 alle: !!e.alle, linienAmHalt: e.linienAmHalt || null,
+                 alle: !!e.alle,
+                 // Kam sie schon als "Alle Abfahrten" aus der Linienauswahl, gibt es gar
+                 // keine Linienauswahl, auf die man zurueckschalten koennte. Dann ist der
+                 // Schalter sinnlos und fuehrt nur zu einer leeren, grauen Zeile
+                 // (Paul 26.10.2026).
+                 alleFix: !!e.alle,
+                 linienAmHalt: e.linienAmHalt || null,
                  zielNamen: e.zielNamen || null, gattungen: e.gattungen || '',
                  linienToken: (e.linienToken == null) ? null : e.linienToken,
                  stil: isNaN(e.stil) ? null : e.stil,
