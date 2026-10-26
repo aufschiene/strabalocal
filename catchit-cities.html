@@ -8018,6 +8018,33 @@ function wizardOpenFinetuning() {
 // (OEBBREG/OEBBFERN/OEBBALL). Alle sechs muenden ohnehin in dieses eine Feld, denn nur
 // das sieht das Geraet. Darum uebernimmt die neue Oberflaeche es direkt und muss von
 // den sechs Mechanismen nichts wissen (Paul 23.10.2026, Linz uebernahm alle Linien).
+// Ziele einer Zug-Anzeige ("von A nach B") als {id, name}, in der Reihenfolge der Ids in
+// der rbl ("OEBBFERN:8100002>8100173~1290401"). Die Anzeigen-Oberflaeche baut daraus eine
+// Zeile JE ZIEL (Gattungen sind dort nur Filter) und hat sonst nur die Ids, der Kunde saehe
+// "8100173" statt "Innsbruck Hbf" (Anfrage der Anzeigen-Sitzung 26.10.2026).
+// Namen kommen aus fvDests, wenn die Auswahl hier lief; bei einer vom Geraet geladenen
+// Station steht sie im Stationsnamen hinter dem Pfeil, genau wie der Edit-Pfad sie liest.
+function uebergabeZiele(st) {
+  if (!st) return [];
+  var fid = String(st.fullId || '');
+  var pfeil = fid.indexOf('>');
+  if (pfeil < 0) return [];
+  var ids = fid.substring(pfeil + 1).split('~').map(function (x) { return String(x || '').trim(); })
+              .filter(Boolean);
+  if (!ids.length) return [];
+  var vonAuswahl = {};
+  (st.fvDests || []).forEach(function (d) {
+    if (d && d.id != null && d.name) vonAuswahl[String(d.id)] = String(d.name);
+  });
+  var ausName = String(st.stopName || '').split('→').pop().split(',')
+                  .map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+  // Der Teil vor dem Pfeil ist der Startbahnhof, nicht ein Ziel: nur anwenden, wenn die
+  // Zahl der Namen zu den Ids passt, sonst lieber die Id zeigen als den falschen Namen.
+  var namenPassen = (ausName.length === ids.length);
+  return ids.map(function (id, i) {
+    return { id: id, name: vonAuswahl[id] || (namenPassen ? ausName[i] : '') || id };
+  });
+}
 // Erste brauchbare Zahl aus zwei Schreibweisen, sonst die Vorgabe. 0 ist ein gueltiger
 // Wert (Nachtmodus ab 0 Uhr), darum ausdruecklich auf null/undefined pruefen und nicht
 // auf Wahrheitswert.
@@ -8087,6 +8114,10 @@ function zurNeuenOberflaeche(cfg) {
           // Vorher sagte das Feld bei einer '*'-Station faelschlich ja (25.10.2026).
           linienToken: (typeof lineSelNetOk === 'function')
             && !!lineSelNetOk(st.network) && !st.allDepartures && !st.isJourney,
+          // Ziele einer Zug-Anzeige mit Namen, Reihenfolge wie in der rbl. Leer bei allen
+          // anderen Stationen. zielNamen ist dieselbe Liste ohne Ids, beide werden gelesen.
+          ziele: uebergabeZiele(st),
+          zielNamen: uebergabeZiele(st).map(function (z) { return z.name; }),
           // welcher Anzeige-Stil passt zu dieser Station (mit Zuweisung, bodo und
           // Westbahn beruecksichtigt, sonst der Netz-Default)
           stil: (function () {
@@ -21929,6 +21960,33 @@ function buildMasterAndTimeRows(gehwegByStopId) {
         belegt[nr] = true;
         grp.forEach(function(e) { e.dNr = nr; });
       });
+      // Dieselbe Station auf ZWEI Brettern braucht trotzdem Nummern, auch wenn jedes Brett
+      // nur diese eine Station hat: die Firmware entdoppelt ueber rbl-Feld PLUS d
+      // (masterEntryKey in main.cpp, seen startet mit "|", greift also schon beim zweiten
+      // Vorkommen). Ohne d ist der Schluessel beider Eintraege gleich und der zweite faellt
+      // STILL weg, die Station verschwindet vom zweiten Brett. Genau das meldet Kunde Hannes
+      // ("beim Veraendern verschwinden eingestellte Haltestellen"), gefunden von der
+      // Anzeigen-Sitzung, hier an der eigenen Seite nachgemessen (26.10.2026).
+      var proStop = {};
+      entries.forEach(function(e) {
+        var k = segStopSchluessel(e.rbl);
+        if (k) (proStop[k] = proStop[k] || []).push(e);
+      });
+      Object.keys(proStop).forEach(function(k) {
+        var liste = proStop[k];
+        if (liste.length < 2) return;
+        var hier = {};
+        liste.forEach(function(e) {
+          // Nummer aus der Gruppe behalten, solange sie bei diesem Stop einmalig ist.
+          // Zweimal dieselbe Station auf DEMSELBEN Brett ist dagegen eine echte Dublette,
+          // die die Firmware zu Recht wegwirft.
+          if (e.dNr) { hier[e.dNr] = true; return; }
+          var d = _gd.proStop[k];
+          if (!d || belegt[d] || hier[d]) { d = ++frei; while (belegt[d] || hier[d]) d = ++frei; }
+          belegt[d] = true; hier[d] = true;
+          e.dNr = d;
+        });
+      });
       return;
     }
     var byKey = {};
@@ -23727,12 +23785,28 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
     // gecachten Namen, haelt aber den Aufbau nicht mehr auf. Nur Stationen ohne Abfahrten
     // (nachts) warten noch auf die Suche. Gemerkt wird nur ein kanonischer Name.
     let resolvedName = null, nameVorlaeufig = false;
+    let journeyZiele = [];
     if (isJourney) {
-      const [fromId, toId] = stopId.split('>');
-      const fromName = await resolveStationNameSchnell(network, fromId);
-      const toName = await resolveStationNameSchnell(network, toId);
-      if (fromName && toName) resolvedName = `${fromName} → ${toName}`;
-      nameVorlaeufig = !!(resolvedName && [fromId, toId].some(function(one) {
+      // MEHRERE Ziele: "8100002>8100173~1290401" sind zwei Ziele, nicht eines. Vorher wurde
+      // alles hinter dem Pfeil als EINE Id aufgeloest, also stand im Namen nur ein Ziel und
+      // das zweite war namenlos (gemessen 26.10.2026: "Salzburg Hbf → Graz Hbf", obwohl
+      // zwei Ziele konfiguriert waren). Die Namen gehen auch an die Anzeigen-Oberflaeche,
+      // die daraus eine Zeile JE ZIEL baut und sonst nur die Id zeigen koennte.
+      const _pfeil = stopId.indexOf('>');
+      const fromId = stopId.substring(0, _pfeil);
+      const toIds = stopId.substring(_pfeil + 1).split('~')
+                      .map(function(x) { return String(x || '').trim(); }).filter(Boolean);
+      // Parallel, nicht hintereinander: sonst wartet der Aufbau bei mehreren Zielen auf
+      // eine Suche nach der anderen (die kostet kalt 5 bis 15 s je Station).
+      const _namen = await Promise.all([fromId].concat(toIds)
+                       .map(function(id) { return resolveStationNameSchnell(network, id); }));
+      const fromName = _namen[0], toNames = _namen.slice(1);
+      const _gute = toNames.filter(Boolean);
+      if (fromName && _gute.length) resolvedName = `${fromName} → ${_gute.join(', ')}`;
+      journeyZiele = toIds.map(function(id, i) {
+        return { id: id, name: toNames[i] || id, lines: [] };
+      });
+      nameVorlaeufig = !!(resolvedName && [fromId].concat(toIds).some(function(one) {
         return typeof _nameMemo.get(String(network) + '|' + String(one)) !== 'string';
       }));
     } else {
@@ -23821,6 +23895,9 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       filter: filterLines.length ? filterLines.join(',') : stationFilter,   // Namen bereits überführt
       fullId,
       isJourney,
+      // Ziele der Zug-Anzeige mit Namen, in der Reihenfolge der Ids in der rbl. Der
+      // Edit-Pfad und die Uebergabe an die Anzeigen-Oberflaeche lesen sie hier.
+      fvDests: journeyZiele,
       isExisting: true,
       allDepartures: isAllDep,
       allDepCat: reloadAllCat,   // ÖBB "Alle Abfahrten"-Gattung (all/reg/fern), aus dem Prefix

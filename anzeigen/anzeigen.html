@@ -252,6 +252,14 @@
   .linie .zusatz { font-size: 11px; color: var(--akzent); font-weight: 700; margin-top: 2px; }
 
   /* Auswahl im Dialog: je Richtung eine antippbare Zeile mit Haken. */
+  /* Formulare lesen sich linksbuendig. Mittig bleibt nur, was Ueberschrift ist. */
+  #dlgInhalt { text-align: left; margin-top: 14px; }
+  #dlgInhalt .linie { margin: 0; }
+  #dlgInhalt > input[type=text] { width: 100%; }
+  /* Waehrend der Baukasten offen ist, steht das bearbeitete Display UEBER dem Schleier:
+     man stellt ja genau daran ein (Paul 26.10.2026). */
+  body.designt .streifen { position: relative; z-index: 60; }
+  body.designt .schirm:not(.aktiv) { opacity: .25; }
   #schleier .wahlliste { margin: 14px 0 0; max-height: 46vh; overflow: auto; text-align: left; }
   #schleier .wahlliste .linie { margin: 0 0 6px; }
   #schleier .wahlliste .linie:last-child { margin-bottom: 0; }
@@ -335,10 +343,16 @@
   .wahltrenner { font-size: 11px; font-weight: 700; letter-spacing: .04em;
                  text-transform: uppercase; color: var(--grau); margin: 14px 0 6px; }
   /* Ueberschrift je Station in der Liste "nach Abfahrt". */
-  .haltkopf { display: flex; align-items: center; gap: 7px; margin: 14px 0 2px;
+  .haltkopf { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin: 14px 0 2px;
               font-size: 11px; font-weight: 800; letter-spacing: .5px;
               text-transform: uppercase; color: var(--grau); }
   .haltkopf svg { width: 14px; height: 14px; }
+  .farbfelder { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+                gap: 10px; margin: 2px 0 14px; }
+  .farbfeld { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .farbfeld span { font-size: 11px; font-weight: 700; letter-spacing: .3px; color: var(--grau); }
+  .farbfeld input[type=color] { width: 100%; height: 42px; padding: 0; border-radius: 10px;
+                                border: 2px solid var(--tinte); background: none; cursor: pointer; }
   .minilinien { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   .minilinien i { font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .2px;
                   padding: 2px 6px; border-radius: 5px; line-height: 1.4; }
@@ -1315,11 +1329,29 @@ function nachtZeitSetzen(feld, wert) { nacht[feld] = parseInt(wert, 10) || 0; al
 // viele Zeilen, wie gerade zufaellig etwas fuhr, und der Nutzer sah etwas anderes als
 // das, was er im Picker ausgewaehlt hatte (Paul 25.10.2026: "pro Station ein Block").
 const ALLE_LINIE = '*';
+// Ein Zug-Brett ist "von A nach B": die rbl traegt das Ziel ("OEBBFERN:8100002>8100173"),
+// bei mehreren Zielen mit '~' getrennt. Die GATTUNGEN (RJ, IC, REX …) stehen im
+// Linienfeld und sind ein FILTER, keine Zeilen. Vorher wurde jede Gattung eine eigene
+// Zeile, und aus einer Verbindung wurden achtzehn (Paul 26.10.2026: "öbb soll er immer
+// von a nach b machen und die ausgewaehlten Gattungen vom Picker laden"). Je gewaehltem
+// ZIEL eine Zeile, denn zwei Ziele sind zwei Verbindungen.
+function zugZiele(st) {
+  const kahl = rblTeile((st && st.rbl) || '').kahl;
+  const i = kahl.indexOf('>');
+  if (i < 0) return [];
+  const namen = (st && st.zielNamen) || [];
+  return kahl.slice(i + 1).split('~').map(x => x.trim()).filter(Boolean)
+    .map((id, n) => ({ id: id, name: String(namen[n] || '').trim() || id }));
+}
+function istZugStation(st) { return zugZiele(st).length > 0; }
 const ALLE_TEXT = 'Alle Abfahrten';
 // Zeichen fuer den Block: ein Stern waere im Badge kaum zu erkennen.
 const ALLE_MARKE = '\u2630';
 function depText(dep) { return (dep && dep.alleStation) ? ALLE_TEXT : ((dep && dep.dest) || ''); }
-function depMarke(dep) { return (dep && dep.alleStation) ? ALLE_MARKE : ((dep && dep.line) || '?'); }
+function depMarke(dep) {
+  if (dep && dep.alleStation) return ALLE_MARKE;
+  return (dep && dep.line) || '?';
+}
 function zeilenKey(si, dep) { return si + '\u00a7' + dep.line + '|' + dep.dest; }
 function istAlleKey(k) {
   const i = String(k).indexOf('\u00a7');
@@ -1729,6 +1761,18 @@ function seitenTeilen(daten, proSeite) {
 function zeilenEintraege(st) {
   // Ganze Station: ein einziger Block. Die Zeit der naechsten Abfahrt kommt mit, damit
   // die Zeile unten "in x min" zeigen kann.
+  // Zug-Brett: eine Zeile je Ziel, die Gattungen bleiben Filter.
+  const ziele = zugZiele(st);
+  if (ziele.length) {
+    const erste = (st.abfahrten || [])[0] || {};
+    // Marke des Bahnbetreibers statt einer Liniennummer: eine Verbindung hat keine
+    // Linie, und das Feld darf nicht leer bleiben (Paul 26.10.2026).
+    const oebb = /^OEBB/i.test(String(st.netz || '')) || /^OEBB/i.test(netzKuerzel(st) || '');
+    return ziele.map(z => ({ line: oebb ? '\u00d6BB' : 'DB', dest: z.name, zugZiel: z.id, rid: '',
+                             time: (erste.time != null ? erste.time : null),
+                             vt: erste.vt || 'train',
+                             lineColor: oebb ? 'e2002a' : 'ec0016', lineTextColor: 'ffffff' }));
+  }
   if (st.alle) {
     const erste = (st.abfahrten || []).find(x => x.time >= gehwegStation(st)) || st.abfahrten[0] || {};
     return [{ line: ALLE_LINIE, dest: '', alleStation: true, rid: '',
@@ -1888,7 +1932,7 @@ function reiterZeichnen() {
     + (geht ? ' onclick="sortierungSetzen(' + s.index + ',\'' + wert + '\')"' : ' disabled')
     + '>' + text + '</button>';
   el.innerHTML = (geht || !zeit ? knopf(!zeit, 'Nach Linie', 'statisch') : '')
-               + (geht || zeit ? knopf(zeit, 'Nach Abfahrt', 'zeit') : '');
+               + (geht || zeit ? knopf(zeit, 'Nach Abfahrt/Station', 'zeit') : '');
 }
 
 function editorZeichnen() {
@@ -2049,14 +2093,28 @@ function editorZeichnen() {
       const si = stationen.indexOf(st);
       const block = liste.some(x => x.r.dep.alleStation);
       const deps = liste.map(x => x.r.dep).filter(x => !x.alleStation);
+      const zug = liste.some(x => x.r.dep.zugZiel);
+      // Zug-Brett: unten stehen die GATTUNGEN, denn die sind hier die Auswahl. Nur wenn
+      // keine gewaehlt ist, also alle Abfahrten gelten, steht die Marke des Betreibers
+      // da (Paul 26.10.2026).
+      const gattungen = zug ? String(st.gattungen || '').split(',')
+                                .map(x => x.trim()).filter(x => x && x !== '*') : [];
+      const marken = zug
+        ? (gattungen.length
+           ? miniMarken(gattungen.map(x => ({ line: x, lineColor: deps[0] && deps[0].lineColor,
+                                              lineTextColor: deps[0] && deps[0].lineTextColor })))
+           : miniMarken(deps.slice(0, 1)))
+        : (block ? miniLinien(st) : miniMarken(deps));
       h += '<div class="linie">'
          + '<b style="background:#1b1b1b;color:#fff">' + SYM_HALT + '</b>'
          + '<div class="rumpf"><div class="ziel alles">' + escapeHtmlFt(st.name) + '</div>'
          + '<div class="halt">'
          + (block ? ALLE_TEXT
-                  : deps.length + (deps.length === 1 ? ' Linie' : ' Linien') + ', nach Uhrzeit gemischt')
+            : zug ? deps.length + (deps.length === 1 ? ' Ziel' : ' Ziele')
+                    + (gattungen.length ? '' : ', alle Gattungen') + ', nach Uhrzeit gemischt'
+            : deps.length + (deps.length === 1 ? ' Linie' : ' Linien') + ', nach Uhrzeit gemischt')
          + '</div>'
-         + (block ? miniLinien(st) : miniMarken(deps)) + '</div>'
+         + marken + '</div>'
          + '<button class="pfeil weg-x" title="diese Station von diesem Display nehmen"'
          + ' onclick="stationWeg(' + dz + ',' + si + ')">' + SYM_X + '</button>'
          + '</div>';
@@ -2327,6 +2385,19 @@ function stationenZeichnen() {
   // uebersieht man genau die Linie, die noch fehlt (Paul 23.10.2026).
   let offen = '', schonWo = '', leer = '';
   let uebrig = 0;
+  // Je Station eine Ueberschrift, darunter ihre Linien. Eine lange Liste aus Linien
+  // mehrerer Haltestellen liest sich sonst wie ein Haufen: man sucht die Station, nicht
+  // die Linie (Paul 26.10.2026). Daneben steht der Schalter, der die ganze Station als
+  // EINE Zeile aufs Brett legt statt ihrer Linien.
+  const haltKopf = (st, si) => {
+    const anZahl = zeilenEintraege(st).length;
+    return '<div class="haltkopf"><span style="display:flex;align-items:center;gap:7px;">'
+      + SYM_HALT + '<span>' + escapeHtmlFt(st.name) + '</span></span>'
+      + (istZugStation(st) ? ''
+         : '<button class="link" onclick="stationAlsBlock(' + si + ',' + (st.alle ? 'false' : 'true') + ')">'
+           + (st.alle ? 'Linien einzeln' : 'als Station') + '</button>')
+      + '</div>';
+  };
   stationen.forEach((st, si) => {
     // NUR die gewaehlten Richtungen, dieselbe Liste wie auf den Displays. Vorher lief
     // das ueber alle Abfahrten der Station, und dann stand im Pool die halbe
@@ -2334,10 +2405,12 @@ function stationenZeichnen() {
     // und der Rest (Paul 23.10.2026). Wer eine weitere Linie will, holt sie sich in
     // der Linienauswahl.
     const zeilen = zeilenEintraege(st);
+    let kopfOffen = true;
     zeilen.forEach(d => {
       const k = zeilenKey(si, d);
       if (vergeben.has(k)) return;
       uebrig++;
+      if (kopfOffen) { offen += haltKopf(st, si); kopfOffen = false; }
       const f = badgeFarben(d);
       const wo = anderswo.get(k) || [];
       // Schon woanders? Trotzdem voll sichtbar und waehlbar, nur mit einem Zeichen
@@ -2356,14 +2429,16 @@ function stationenZeichnen() {
          + '<div class="rumpf"><div class="ziel' + (block ? ' alles' : '') + '">'
          + escapeHtmlFt(block ? st.name : d.dest) + '</div>'
          + '<div class="halt">'
-         + (block ? ALLE_TEXT : escapeHtmlFt(st.name))
-         + (d.beispiel ? ' &middot; Beispielzeiten' : '')
-         + (wo.length ? ' &middot; schon auf Display ' + wo.join(' und ') : '') + '</div>'
+         // Der Name steht schon in der Ueberschrift darueber.
+         + (block ? ALLE_TEXT : '')
+         + (d.beispiel ? (block ? ' &middot; ' : '') + 'Beispielzeiten' : '')
+         + (wo.length ? ((block || d.beispiel) ? ' &middot; ' : '') + 'schon auf Display ' + wo.join(' und ') : '')
+         + (!block && !d.beispiel && !wo.length ? 'noch auf keinem Display' : '') + '</div>'
          + (block ? miniLinien(st) : '') + '</div>'
          + (wo.length ? '<span class="doppel" title="liegt schon auf Display '
                         + wo.join(' und ') + '">' + DOPPEL_ICON + '</span>' : '')
          + '</div>';
-      if (wo.length) schonWo += zeile; else offen += zeile;
+      offen += zeile;
     });
     if (!zeilen.length) {
       leer += '<div class="linie aus"><div class="rumpf"><div class="ziel">' + escapeHtmlFt(st.name)
@@ -2372,10 +2447,7 @@ function stationenZeichnen() {
          + '</div></div></div>';
     }
   });
-  let h = '';
-  if (offen) h += '<label class="feld" style="margin-top:2px">Noch auf keinem Display</label>' + offen;
-  if (schonWo) h += '<label class="feld">Liegen schon woanders</label>' + schonWo;
-  h += leer;
+  let h = offen + schonWo + leer;
   // Die Uhr liegt im selben Topf wie die Linien: antippen legt sie aufs Display.
   // Bei Stilen ohne Uhr-Zeile geht nur das ganze Brett als Uhr, also nur auf einem
   // Display, das sonst leer ist.
@@ -2446,7 +2518,7 @@ function tokenListeFlach(d) {
   zeilenEinheiten(d).forEach((teil, gi) => {
     const echte = teil.filter(k => {
       const r = richtungFinden(k);
-      return !istUhrKey(k) && r && !r.dep.alleStation;
+      return !istUhrKey(k) && r && !r.dep.alleStation && !r.dep.zugZiel;
     });
     echte.forEach(k => {
       const r = richtungFinden(k);
@@ -2537,10 +2609,16 @@ function configBauen() {
     d.richtungen.forEach(k => {
       const r = richtungFinden(k);
       if (!r) return;
-      if (!proStation.has(r.station.rbl)) proStation.set(r.station.rbl, { station: r.station, linien: [], keys: [], alle: false });
+      if (!proStation.has(r.station.rbl)) proStation.set(r.station.rbl, { station: r.station, linien: [], keys: [], alle: false, ziele: [] });
       const eintrag = proStation.get(r.station.rbl);
       // Der Stations-Block ist keine Linie: er fuellt das Linienfeld allein mit '*'.
       if (r.dep.alleStation) { eintrag.alle = true; return; }
+      // Zug-Zeile: sie steht fuer ein ZIEL, nicht fuer eine Linie. Das Linienfeld traegt
+      // die Gattungen, die Ziele stehen in der rbl.
+      if (r.dep.zugZiel) {
+        if (eintrag.ziele.indexOf(r.dep.zugZiel) < 0) eintrag.ziele.push(r.dep.zugZiel);
+        return;
+      }
       if (eintrag.linien.indexOf(r.dep.line) < 0) { eintrag.linien.push(r.dep.line); eintrag.keys.push(k); }
     });
     if (!proStation.size && !zeigtUhr(d)) return;   // leeres Display kommt nicht ans Geraet
@@ -2613,6 +2691,18 @@ function configBauen() {
                    + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
       });
     } else {
+      // Zug-Bretter: ein Eintrag je Station, rbl = "von>ziel1~ziel2" aus den ZEILEN, die
+      // gerade darauf liegen. Wer ein Ziel entfernt, entfernt es damit auch aus der rbl.
+      // Das Linienfeld traegt die Gattungen aus der Linienauswahl.
+      proStation.forEach((e, rbl) => {
+        if (!e.ziele || !e.ziele.length) return;
+        const kahl = rblTeile(rbl).kahl;
+        const von = kahl.indexOf('>') > 0 ? kahl.slice(0, kahl.indexOf('>')) : kahl;
+        const gattungen = String(e.station.gattungen || '').trim();
+        stuecke.push(von + '>' + e.ziele.join('~') + '|' + (gattungen || '*')
+                   + '|c' + c + '|g' + gehwegStation(e.station) + '|r' + zeilenVon(d)
+                   + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
+      });
       // Stationen mit "Alle Abfahrten" bekommen je einen eigenen Eintrag: ihr Linienfeld
       // ist '*', und das vertraegt sich nicht mit einer Liste konkreter Linien daneben.
       proStation.forEach((e, rbl) => {
@@ -2623,7 +2713,7 @@ function configBauen() {
       // Wie viele Stationen teilen sich das gemeinsame Segment? Die Bloecke stehen
       // schon je einzeln da und zaehlen hier nicht mit.
       let gemeinsam = 0;
-      proStation.forEach(e => { if (!e.alle) gemeinsam++; });
+      proStation.forEach(e => { if (!e.alle && !(e.ziele && e.ziele.length)) gemeinsam++; });
 
       // AB FIRMWARE 2.6: ein Eintrag JE STATION, zusammengehalten vom d-Feld, so wie es
       // der Konfigurator seit 25.10.2026 auch schreibt. Damit traegt jede Station ihre
@@ -2651,7 +2741,7 @@ function configBauen() {
 
       const rbls = [], gw = [], reihen = [];
       proStation.forEach((e, rbl) => {
-        if (e.alle) return;
+        if (e.alle || (e.ziele && e.ziele.length)) return;
         // Welche Linie zu WELCHEM Stop gehoert, steht ausschliesslich im '!'-Teil der
         // rbl. Stehen zwei Stationen in EINEM Segment, ist das Linienfeld dahinter
         // gemeinsam, und ohne den Teil kann es beim naechsten Oeffnen niemand mehr
@@ -3413,6 +3503,12 @@ const SYM_UHR =
   + '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></svg>';
 
 // Haltestelle: Mast mit Schild, so wie das Zeichen an der Strasse.
+// Zug: fuer die Zeile einer Verbindung "von A nach B".
+const SYM_ZUG =
+  '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"'
+  + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+  + '<rect x="5" y="3" width="14" height="13" rx="3"/><path d="M5 10h14"/>'
+  + '<path d="M8.5 19.5 6 22M15.5 19.5 18 22"/><path d="M9 13h.01M15 13h.01"/></svg>';
 const SYM_HALT =
   '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"'
   + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -3449,40 +3545,15 @@ function designZeichnen() {
   const di = displays.indexOf(d);
   let h = '';
 
-  // Eigenes Display: hier wird das Aussehen gebaut, nicht nur gefaerbt.
+  // Eigenes Display: der Baukasten steht im Pop-up und geht Schritt fuer Schritt, wie im
+  // alten Konfigurator. Alles auf einmal in der Karte war zu viel auf einmal
+  // (Paul 26.10.2026: "sonst zu confusing"). Die Karte zeigt nur, was eingestellt ist.
   if (istEigen(c)) {
     const g = eigenVon(c);
-    h += '<label class="feld" for="eigenName">Name dieses Designs</label>'
-       + '<input id="eigenName" type="text" maxlength="24" value="' + escapeHtmlFt(g.N) + '"'
-       + ' oninput="eigenNameSetzen(' + c + ', this.value)">';
-    h += '<label class="feld">Farben</label><div class="farbfelder">';
-    EIGEN_FARBEN.forEach(f => {
-      h += '<label class="farbfeld"><span>' + f[1] + '</span>'
-         + '<input type="color" value="#' + g[f[0]] + '"'
-         + ' oninput="eigenSetzen(' + c + ',\'' + f[0] + '\', this.value)"></label>';
-    });
-    h += '</div>';
-    h += '<label class="feld">Schrift</label><div class="schalter">';
-    EIGEN_SCHRIFT.forEach(b => {
-      h += '<button class="' + (g.F === b[0] ? 'an' : '') + '"'
-         + ' onclick="eigenSetzen(' + c + ',\'F\',\'' + b[0] + '\')">' + b[1] + '</button>';
-    });
-    h += '</div>';
-    h += '<label class="feld">Hintergrund</label><div class="schalter">';
-    EIGEN_GRUND.forEach(b => {
-      h += '<button class="' + (g.G === b[0] ? 'an' : '') + '"'
-         + ' onclick="eigenSetzen(' + c + ',\'G\',\'' + b[0] + '\')">' + b[1] + '</button>';
-    });
-    h += '</div>';
-    h += schalterZeile('Linien-Badges', 'Die Linie steht in einem farbigen Feld. Aus: sie steht gro\u00df daneben.',
-                       g.A === '1', 'eigenSchalten(' + c + ',\'A\',' + (g.A === '1' ? 'false' : 'true') + ')');
-    h += schalterZeile('Ziel fett', 'Kr\u00e4ftigere Schrift f\u00fcr den Zieltext.',
-                       g.W === '1', 'eigenSchalten(' + c + ',\'W\',' + (g.W === '1' ? 'false' : 'true') + ')');
-    h += schalterZeile('Ziel mittig', 'Sonst steht das Ziel oben in der Zeile, wie ab Werk.',
-                       g.M === '1', 'eigenSchalten(' + c + ',\'M\',' + (g.M === '1' ? 'false' : 'true') + ')');
-    h += '<div class="hinweis">Eigene Farben je Linie gibt es hier noch nicht, die stellst '
-       + 'du vorerst im alten Konfigurator ein. Sie bleiben erhalten.</div>';
-    el.innerHTML = h;
+    el.innerHTML = '<div class="hinweis">Eigenes Design <b>' + escapeHtmlFt(g.N || '')
+      + '</b> auf Display ' + (di + 1) + '.</div>'
+      + '<button onclick="eigenOeffnen(' + c + ')">Design bearbeiten</button>';
+    if (eigenDialogFuer === c) eigenDialogZeichnen();
     return;
   }
 
@@ -3549,12 +3620,15 @@ function designZeichnen() {
     }
   }
 
-  // Ehrlich bleiben: das Geraet kennt diese Werte nur je Stil, nicht je Display.
+  // Die Schalter stehen in JEDEM Eintrag und gelten darum je Brett: die Firmware liest
+  // sie zuerst aus dem Eintrag und erst dann aus den displaysettings nach Stil
+  // (resolveGroupLook). Nur die FARBEN eines eigenen Designs haengen am Stil-Platz,
+  // weil sie in der customrow je Slot stehen (26.10.2026).
   const gleiche = displays.filter(x => stilVon(x) === c).length;
-  if (gleiche > 1) {
-    h += '<div class="hinweis"><b>Gilt f\u00fcr alle ' + gleiche + ' Displays mit dem Stil '
-       + escapeHtmlFt(stilName) + '.</b> Das Ger\u00e4t merkt sich Farben je Anzeige-Stil, '
-       + 'nicht je Display.</div>';
+  if (gleiche > 1 && istEigen(c)) {
+    h += '<div class="hinweis"><b>Die Farben gelten fuer alle ' + gleiche
+       + ' Displays mit dem Design ' + escapeHtmlFt(stilName) + '.</b> Die Schalter '
+       + 'darunter stellst du je Display getrennt ein.</div>';
   }
   el.innerHTML = h;
 }
@@ -3816,6 +3890,24 @@ function sagen(titel, text) { dialogZeigen(titel, text, [{ text: 'Alles klar' }]
 // Alles, was von dieser Station auf dem Display liegt, dort herunternehmen. In der
 // Ansicht nach Abfahrt steht die Station als EINE Karte da, also nimmt das x auch die
 // ganze Station. Einzelne Linien holt man sich danach wieder aus dem Topf darunter.
+// Eine Station als EINE Zeile fuehren statt ihrer Linien, oder zurueck. Die Auswahl
+// der Linien bleibt dabei erhalten, sie liegt in st.gewaehlt und kommt beim Zurueck-
+// schalten wieder. "Alle Abfahrten" und Zug-Verbindungen sind ohnehin Stations-Zeilen.
+function stationAlsBlock(si, an) {
+  const st = stationen[si];
+  if (!st || istZugStation(st)) return;
+  st.alle = !!an;
+  // Die alten Schluessel dieser Station sind weg, die neuen kennt noch niemand.
+  displays.forEach(d => {
+    d.richtungen = (d.richtungen || []).filter(k => {
+      const m = /^(\d+)\u00a7/.exec(String(k));
+      return !m || parseInt(m[1], 10) !== si;
+    });
+    gruppenPruefen(d);
+  });
+  allesZeichnen();
+}
+
 function stationWeg(di, si) {
   const d = displays[di];
   const st = stationen[si];
@@ -3826,9 +3918,39 @@ function stationWeg(di, si) {
   }).forEach(k => richtungSchalten(di, k, false));
 }
 
+// Die Zeilen-Aufteilung, wie sie VOR dem Umschalten auf "Nach Abfahrt/Station" stand.
+// Nach Abfahrt gibt es keine Zeilenfolge, und wer dabei alles auf ein Brett holt, haette
+// seine Anordnung sonst endgueltig verloren. Hin und her schalten darf nichts kosten
+// (Paul 26.10.2026: "das ich durchswitchen und nicht alles geloescht ist").
+let linienAufteilung = null;
+function aufteilungSichern() {
+  if (linienAufteilung) return;        // nur die ERSTE Sicherung zaehlt
+  linienAufteilung = displays.map(d => ({
+    richtungen: (d.richtungen || []).slice(),
+    gruppen: (d.gruppen || []).map(g => g.slice()),
+    stil: d.stil, einst: Object.assign({}, d.einst || {}),
+    vomNutzer: !!d.vomNutzer, sortierung: d.sortierung
+  }));
+}
+function aufteilungZurueck() {
+  if (!linienAufteilung) return false;
+  displays = linienAufteilung.map(x => ({
+    richtungen: x.richtungen.slice(),
+    gruppen: x.gruppen.map(g => g.slice()),
+    stil: x.stil, einst: Object.assign({}, x.einst),
+    vomNutzer: x.vomNutzer, sortierung: 'statisch'
+  }));
+  linienAufteilung = null;
+  zeiger = 0;
+  return true;
+}
+
 function sortierungSetzen(di, wert) {
   const d = displays[di];
   if (!d) return;
+  // Zurueck auf "Nach Linie": die gesicherte Aufteilung wieder herstellen.
+  if (wert !== 'zeit' && aufteilungZurueck()) { allesZeichnen(); return; }
+  if (wert === 'zeit') aufteilungSichern();
   d.sortierung = wert;
   allesZeichnen();
   // Auf "Naechste Abfahrten" passt alles auf EIN Brett. Wer umschaltet, will meist
@@ -3895,6 +4017,92 @@ function stilSetzen(v) {
     return;
   }
   if (d) d.stil = parseInt(v, 10) || 1; else stil = parseInt(v, 10) || 1;
+  allesZeichnen();
+}
+
+// ---- Baukasten im Pop-up, Schritt fuer Schritt ----------------------------------
+// Vier Schritte: Name, Farben, Schrift und Hintergrund, Schalter. Nach jeder Aenderung
+// zeichnet allesZeichnen() die Karte neu und holt den Dialog gleich mit, sonst stuende
+// im Pop-up noch der alte Stand.
+let eigenDialogFuer = null;
+let eigenSchritt = 0;
+
+function eigenSchritte(c) {
+  const g = eigenVon(c);
+  const teile = [];
+  teile.push({ titel: 'Wie soll es hei\u00dfen?',
+    text: 'Der Name steht in der Auswahl, damit du dein Design wiederfindest.',
+    html: '<input id="eigenName" type="text" maxlength="24" value="' + escapeHtmlFt(g.N) + '"'
+        + ' oninput="eigenNameSetzen(' + c + ', this.value)">' });
+  // Farbfelder in handlichen Haeppchen: erst die Flaeche, dann das Badge. Fuenf
+  // Farbwaehler nebeneinander waren eine Wand (Paul 26.10.2026).
+  const farbBlock = (schluessel) => '<div class="farbfelder">' + schluessel.map(key => {
+    const x = EIGEN_FARBEN.find(y => y[0] === key) || [key, key];
+    return '<label class="farbfeld"><span>' + x[1] + '</span>'
+         + '<input type="color" value="#' + g[x[0]] + '"'
+         + ' oninput="eigenSetzen(' + c + ',\'' + x[0] + '\', this.value)"></label>';
+  }).join('') + '</div>';
+  // Pixel: Matrix-Schrift und Punktraster gehoeren zusammen, das ist EIN Aussehen und
+  // darum ein Schalter statt zweier Dreierwahlen.
+  const pixelAn = (g.F === '3' && g.G === '2');
+  teile.push({ titel: 'Fl\u00e4che und Schrift',
+    text: 'Die Vorschau oben zeigt jede \u00c4nderung sofort.',
+    html: farbBlock(['B', 'T'])
+        + schalterZeile('Pixel-Optik', 'Matrix-Schrift auf Punktraster, wie eine LED-Tafel.',
+                        pixelAn, 'eigenPixel(' + c + ',' + (pixelAn ? 'false' : 'true') + ')') });
+  // Beispiel-Badge voranstellen: man sieht sofort, woran man gerade dreht.
+  const probe = '<div style="display:flex;justify-content:center;margin:2px 0 16px;">'
+    + '<span style="display:inline-flex;align-items:center;justify-content:center;'
+    + 'min-width:58px;height:40px;padding:0 12px;border-radius:9px;font-weight:800;font-size:19px;'
+    + 'background:#' + g.H + ';color:#' + g.V + ';border:2px solid #' + g.U + ';">U1</span></div>';
+  teile.push({ titel: 'Badge',
+    text: 'Das farbige Feld, in dem die Liniennummer steht.',
+    html: probe + farbBlock(['H', 'V', 'U']) });
+  let sw = schalterZeile('Linien-Badges', 'Die Linie steht in einem farbigen Feld. Aus: sie steht gro\u00df daneben.',
+                         g.A === '1', 'eigenSchalten(' + c + ',\'A\',' + (g.A === '1' ? 'false' : 'true') + ')')
+         + schalterZeile('Ziel fett', 'Kr\u00e4ftigere Schrift f\u00fcr den Zieltext.',
+                         g.W === '1', 'eigenSchalten(' + c + ',\'W\',' + (g.W === '1' ? 'false' : 'true') + ')')
+         + schalterZeile('Ziel mittig', 'Sonst steht das Ziel oben in der Zeile, wie ab Werk.',
+                         g.M === '1', 'eigenSchalten(' + c + ',\'M\',' + (g.M === '1' ? 'false' : 'true') + ')')
+         + '<div class="hinweis">Eigene Farben je Linie gibt es hier noch nicht, die stellst '
+         + 'du vorerst im alten Konfigurator ein. Sie bleiben erhalten.</div>';
+  teile.push({ titel: 'Feinheiten', text: '', html: sw });
+  return teile;
+}
+
+function eigenOeffnen(c) {
+  eigenDialogFuer = c;
+  eigenSchritt = 0;
+  document.body.classList.add('designt');
+  eigenDialogZeichnen();
+}
+
+function eigenDialogZeichnen() {
+  const c = eigenDialogFuer;
+  if (!c || !istEigen(c)) return;
+  const teile = eigenSchritte(c);
+  const n = teile.length;
+  const i = Math.max(0, Math.min(n - 1, eigenSchritt));
+  eigenSchritt = i;
+  const knoepfe = [];
+  if (i > 0) knoepfe.push({ text: 'Zur\u00fcck', still: true, offen: true,
+                            tun: function () { eigenSchritt = i - 1; eigenDialogZeichnen(); } });
+  if (i < n - 1) knoepfe.push({ text: 'Weiter', offen: true,
+                                tun: function () { eigenSchritt = i + 1; eigenDialogZeichnen(); } });
+  else knoepfe.push({ text: 'Fertig', tun: function () {
+    eigenDialogFuer = null;
+    document.body.classList.remove('designt');
+    allesZeichnen();
+  } });
+  dialogZeigen(teile[i].titel + '  (' + (i + 1) + ' von ' + n + ')',
+               teile[i].text, knoepfe, 'doppelt', teile[i].html);
+}
+
+// Pixel-Optik: Matrix-Schrift plus Punktraster, oder beides zurueck auf schlicht.
+function eigenPixel(c, an) {
+  const e = eigenVon(c);
+  e.F = an ? '3' : '1';
+  e.G = an ? '2' : '1';
   allesZeichnen();
 }
 
@@ -4177,6 +4385,21 @@ function linienTokenErlaubt(st, colour, linien) {
   return OHNE_LINIENTOKEN.indexOf(n) < 0;
 }
 
+// Das rohe Linienfeld eines Segments zu einer rbl. Fuer Zug-Anzeigen ist das die
+// Gattungsliste, die sonst nirgends steht.
+function linienfeldVon(zeilen, rbl) {
+  const ziel = rblTeile(rbl).kahl.trim();
+  let raus = '';
+  String(zeilen || '').split(';').forEach(seg => {
+    const f = String(seg || '').trim().split('|');
+    if (f.length < 2) return;
+    if (rblTeile(f[0]).kahl.trim() !== ziel) return;
+    const feld = String(f[1] || '').trim();
+    if (feld && feld !== '*' && !raus) raus = feld;
+  });
+  return raus;
+}
+
 // Nur die Auswahl je rbl, abgeleitet aus denselben Eintraegen.
 function wahlAusZeilen(zeilen) {
   const raus = new Map();
@@ -4226,6 +4449,9 @@ function uebergabeHolen() {
   let roh = null;
   try { roh = JSON.parse(sessionStorage.getItem('catchit_feintuning') || 'null'); } catch (e) {}
   if (!roh || !roh.stationen || !roh.stationen.length) return null;
+  const rohZeilen = (roh.masterrow || '') + ';' + (roh.timerow || '')
+                  + ';' + ((roh.geraet && roh.geraet.masterrow) || '')
+                  + ';' + ((roh.geraet && roh.geraet.timerow) || '');
   const wahl = wahlAusZeilen((roh.masterrow || '') + ';' + (roh.timerow || ''));
   const raus = [];
   roh.stationen.forEach(st => {
@@ -4271,6 +4497,15 @@ function uebergabeHolen() {
                   // Liste dort aber kurz, und bei einer Station mit "Alle Abfahrten"
                   // gibt es sonst gar nichts anzuzeigen (Paul 25.10.2026).
                   linienAmHalt: Array.isArray(st.linienAmHalt) ? st.linienAmHalt.slice() : null,
+                  // Zug-Brett: die Namen der Ziele und die gewaehlten Gattungen. Beides
+                  // kennt nur die Linienauswahl, aus der rbl kaemen nur die Ids.
+                  zielNamen: Array.isArray(st.zielNamen) ? st.zielNamen.slice()
+                           : (Array.isArray(st.ziele) ? st.ziele.map(z => (z && z.name) || z) : null),
+                  // Die Gattungen stehen bei Zug-Anzeigen NICHT im filter (der ist dort
+                  // leer), sondern im Linienfeld des Segments, und das Segment liegt in
+                  // der timerow. Kanonisch ist das Linienfeld (Konfigurator-Sitzung
+                  // 26.10.2026, nachgemessen).
+                  gattungen: linienfeldVon(rohZeilen, rbl) || String(st.filter || '').trim(),
                   linienToken: (typeof st.linienToken === 'boolean') ? st.linienToken : null,
                   stil: parseInt(st.stil, 10),
                   stilTon: parseInt(st.stilTon, 10),
@@ -4374,6 +4609,22 @@ function displaysAusEintraegen(eintraege) {
       // Wiederherstellung hier auf, und jeder Kunde mit "alle Abfahrten" verlor bei
       // jedem Besuch seine Aufteilung, seine Uhr und sein Design (Paul 25.10.2026).
       // (Ein Uhr-Brett traegt auch '*', hat aber keine Station: dann passiert hier nichts.)
+      // Zug-Brett: das Linienfeld traegt Gattungen, keine Linien. Die Zeilen stehen
+      // in der rbl, naemlich je Ziel eine. Ohne diesen Zweig fand die Wiederherstellung
+      // zu den Gattungen keine Abfahrt und gab das Brett auf (Paul 26.10.2026).
+      const zugStats = stats.filter(istZugStation);
+      if (zugStats.length) {
+        zugStats.forEach(st => {
+          const si = stationen.indexOf(st);
+          // Schluessel aus DERSELBEN Quelle wie die Anzeige, nicht nachgebaut: sonst
+          // passt er nach jeder Aenderung an der Zeile nicht mehr (26.10.2026).
+          zeilenEintraege(st).forEach(dep => {
+            const k = zeilenKey(si, dep);
+            if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k);
+          });
+        });
+        if (zugStats.length === stats.length) return;
+      }
       if (ein.alle) {
         stats.forEach(st => {
           st.alle = true;
@@ -4579,6 +4830,7 @@ function tokenTreffer(linien, m, richtungen) {
   for (const e of liste) {
     const st = { rbl: e.rbl, name: e.name, netz: e.netz || 'WL', abfahrten: [],
                  alle: !!e.alle, linienAmHalt: e.linienAmHalt || null,
+                 zielNamen: e.zielNamen || null, gattungen: e.gattungen || '',
                  linienToken: (e.linienToken == null) ? null : e.linienToken,
                  stil: isNaN(e.stil) ? null : e.stil,
                  stilTon: isNaN(e.stilTon) ? null : e.stilTon,
