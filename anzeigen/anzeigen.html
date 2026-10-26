@@ -1455,6 +1455,34 @@ function richtungFinden(key) { return alleRichtungen().find(r => r.key === key) 
 // Platz, sonst entsteht eines dazu. Verschwundene fliegen raus. Welches Brett Platz
 // bekommt, entscheidet der Modus oben. Der Nutzer kann die Verteilung ueber die
 // Plus-Kachel selbst bestimmen, solche Bretter bleiben unberuehrt.
+// Ein Zeilen-Schluessel traegt den ZIELTEXT, und der ist nicht in Stein. Ueber den Tag
+// wird aus "solarCity" schon mal "solarCity \u00b7 Remise Kleinm\u00fcnchen", abends faehrt eine
+// Linie nur noch bis zur Schleife, und bei einem Ausfall der Abfahrtsdaten ist er kurz
+// ganz weg. Bisher flog die Zeile dann vom Brett, und der Kunde sah seine Stationen
+// beim Arbeiten verschwinden (Kunde Hannes, 26.10.2026: "sobald ich versuche das ganze
+// zu sortieren verschwinden einfach bereits eingestellte Stationen wieder").
+// Darum: erst heilen. Gibt es zu Station UND Linie noch eine Zeile, ist es dieselbe
+// Zeile mit neuer Beschriftung, und der Schluessel wird nachgezogen. Nur wenn die Linie
+// an dieser Station wirklich nicht mehr vorkommt, faellt sie weg.
+function schluesselHeilen(k, alle, belegt) {
+  const m = /^(\d+)\u00a7([\s\S]*)$/.exec(String(k));
+  if (!m) return null;
+  const si = parseInt(m[1], 10);
+  const rest = m[2], i = rest.indexOf('|');
+  const linie = (i < 0 ? rest : rest.slice(0, i)).trim().toUpperCase();
+  if (!linie) return null;
+  const treffer = alle.filter(r => r.si === si
+                  && String(r.dep.line || '').trim().toUpperCase() === linie);
+  if (!treffer.length) return null;
+  // Genau eine Zeile dieser Linie: eindeutig.
+  if (treffer.length === 1) return treffer[0].key;
+  // Mehrere, die Linie faehrt also in beide Richtungen. Dann gewinnt die, die noch auf
+  // keinem Brett liegt: die andere hat ihren Platz ja schon. Bleibt es mehrdeutig, wird
+  // nicht geraten, denn raten hiesse womoeglich die Gegenrichtung anzuzeigen.
+  const frei = treffer.filter(r => !belegt || !belegt.has(r.key));
+  return frei.length === 1 ? frei[0].key : null;
+}
+
 function displaysAuffuellen() {
   const alle = alleRichtungen();
   const vorhanden = alle.map(r => r.key);
@@ -1480,9 +1508,17 @@ function displaysAuffuellen() {
   // Eine Richtung darf auf MEHREREN Displays stehen (Paul 22.10.2026: "U2 ist meine
   // Prioritaetslinie und soll immer fixiert sein"). Doppelt wird nur INNERHALB eines
   // Displays verhindert. Weggefallene Richtungen fliegen ueberall raus.
+  // Was schon irgendwo liegt, zaehlt beim Heilen als vergeben.
+  const belegt = new Set();
+  displays.forEach(d => d.richtungen.forEach(k => belegt.add(k)));
   displays.forEach(d => {
     const drin = new Set();
-    d.richtungen = d.richtungen.filter(k => {
+    d.richtungen = d.richtungen.map(k => {
+      if (istUhrKey(k) || vorhanden.indexOf(k) >= 0) return k;
+      const neu = schluesselHeilen(k, alle, belegt);
+      if (neu) { belegt.add(neu); return neu; }
+      return k;
+    }).filter(k => {
       if (istUhrKey(k)) return !drin.has(k) && drin.add(k) !== null;   // Uhr bleibt immer
       if (vorhanden.indexOf(k) < 0 || drin.has(k)) return false;
       drin.add(k); return true;
@@ -1729,7 +1765,7 @@ function schirmeBauen() {
         }
         seiten = [naechste.slice(0, proSeite)];
       } else {
-        const alle = einheiten.map(teil => {
+        const alle = einheiten.map((teil, ti) => {
           // Die Uhr-Zeile bleibt als leere Zeile stehen, darueber legt die Vorschau
           // spaeter die Uhrzeit.
           if (teil.length === 1 && istUhrKey(teil[0])) return { uhr: true, line: '', dest: '', time: '' };
@@ -1746,7 +1782,10 @@ function schirmeBauen() {
           // Beispielzeit, so wie der Topf es bei einer Station ohne Abfahrten auch macht
           // (Paul 26.10.2026).
           const faehrt = deps.filter(x => x.time != null);
-          if (!faehrt.length) return Object.assign({}, deps[0], { time: BEISPIEL_ZEIT[i % BEISPIEL_ZEIT.length], beispiel: true });
+          if (!faehrt.length) {
+            return Object.assign({}, deps[0],
+                                 { time: BEISPIEL_ZEIT[ti % BEISPIEL_ZEIT.length], beispiel: true });
+          }
           const vorn = faehrt.reduce((a, b) => (b.time < a.time ? b : a));
           return teil.length > 1 ? Object.assign({}, vorn, { zusammen: teil.length }) : vorn;
         }).filter(Boolean);
@@ -4682,6 +4721,49 @@ function wahlAusZeilen(zeilen) {
   return raus;
 }
 
+// Der Picker sagt, WELCHE Linien gewaehlt sind. Welche RICHTUNG dazugehoert, steht
+// oft nur in der Zeile, die das GERAET gespeichert hat. Der zweite Einstieg
+// ("Einstellungen aendern") baut naemlich keine neue Config, dann kommen die Linien
+// nur als nackte Namen an, und ein nackter Name heisst "in alle Richtungen". Genau so
+// standen bei Linz Unionkreuzung auf einmal beide Richtungen da, obwohl das Geraet
+// sauber 1>st444518499l1,2>st444518499l2 fuehrt (Paul 26.10.2026, am Geraet
+// nachgemessen: "siehe hier du nimmst beide Richtungen").
+// Die Linien kommen also vom Picker, die Richtungen vom Geraet. Andersherum waere es
+// falsch: wer eine Linie abwaehlt, haette sie aus der alten Geraetezeile zurueck.
+function wahlVereinen(vomPicker, vomGeraet) {
+  const leer = x => !x || !x.gruppen || !x.gruppen.length;
+  if (leer(vomPicker)) return leer(vomGeraet) ? vomPicker : vomGeraet;
+  // Die Flaggen gehoeren zusammengefuehrt, auch wenn es nichts nachzutragen gibt.
+  // "genau" sagt: diese Linie gehoert sicher zu dieser Station, auch wenn sie gerade
+  // nicht faehrt. Ging es hier verloren, fiel eine ruhende Linie still aus Anzeige und
+  // Config (Kunde Hannes: Salzburg Mirabellplatz, die 151 faehrt abends nicht).
+  const mitFlaggen = (x) => ({ alle: !!(x.alle || (vomGeraet && vomGeraet.alle)),
+                               gruppen: x.gruppen,
+                               genau: !!(x.genau || (vomGeraet && vomGeraet.genau)) });
+  if (leer(vomGeraet)) return vomPicker;
+  const nachLinie = new Map();
+  vomGeraet.gruppen.forEach(g => g.forEach(m => {
+    if (!m.richtung) return;
+    const k = String(m.linie || '').trim().toUpperCase();
+    if (!nachLinie.has(k)) nachLinie.set(k, []);
+    if (!nachLinie.get(k).some(x => x.richtung === m.richtung)) nachLinie.get(k).push(m);
+  }));
+  if (!nachLinie.size) return mitFlaggen(vomPicker);
+  const gruppen = [];
+  vomPicker.gruppen.forEach(g => {
+    const neu = [];
+    g.forEach(m => {
+      const k = String(m.linie || '').trim().toUpperCase();
+      // Nur NACHTRAGEN, nie ueberschreiben: steht die Richtung schon da, gilt sie.
+      if (m.richtung || !nachLinie.has(k)) { neu.push(m); return; }
+      nachLinie.get(k).forEach(x => neu.push({ linie: m.linie, richtung: x.richtung }));
+    });
+    if (neu.length) gruppen.push(neu);
+  });
+  return { alle: !!(vomPicker.alle || vomGeraet.alle), gruppen: gruppen,
+           genau: !!(vomPicker.genau || vomGeraet.genau) };
+}
+
 // Stationen, die der Konfigurator uebergibt. catchit-cities legt sie beim Klick auf
 // "Feintuning" in den sessionStorage und wechselt hierher (Paul 23.10.2026). Eine
 // Wien-Station kann mehrere Bahnsteige tragen, die werden hier zu je einer Station.
@@ -4693,6 +4775,10 @@ function uebergabeHolen() {
                   + ';' + ((roh.geraet && roh.geraet.masterrow) || '')
                   + ';' + ((roh.geraet && roh.geraet.timerow) || '');
   const wahl = wahlAusZeilen((roh.masterrow || '') + ';' + (roh.timerow || ''));
+  // Dieselbe Auswertung fuer das, was am GERAET steht. Daraus kommen die Richtungen,
+  // wenn der Picker keine mitgibt, und die ganze Auswahl, wenn er gar nichts mitgibt.
+  const wahlGeraet = wahlAusZeilen(((roh.geraet && roh.geraet.masterrow) || '') + ';'
+                                 + ((roh.geraet && roh.geraet.timerow) || ''));
   const raus = [];
   roh.stationen.forEach(st => {
     // Rueckfall, falls keine Config berechnet wurde: die Liniennamen aus filter.
@@ -4717,10 +4803,17 @@ function uebergabeHolen() {
       // Landbusse 309, 412, 609). Vorher habe ich beide vereinigt, und dann standen auf
       // einmal elf Richtungen da, obwohl der Kunde drei gewaehlt hatte
       // (Paul 26.10.2026, in seinem Log nachgelesen).
-      const kennung = (st.alle ? '*' : '') + (st.richtungen || [])
-        .map(r => String(r.line || '') + '>' + String(r.ziel || '')).sort().join(',');
+      // Seit 26.10.2026 sagt die Linienauswahl selbst, was zusammengehoert: gleiches
+      // 'brett' heisst dieselbe Anzeige. Das ist eine Identitaet, keine Nummer, und
+      // wird nirgends angezeigt. Vorher musste ich es an der Auswahl erraten, und
+      // raten hiess: zwei Bretter mit denselben Linien fielen zu einem zusammen.
+      const kennung = st.brett ? ('b' + st.brett)
+        : ((st.alle ? '*' : '') + (st.richtungen || [])
+           .map(r => String(r.line || '') + '>' + String(r.ziel || '')).sort().join(','));
       const schon = raus.find(x => x.rbl === rbl && x.kennung === kennung);
-      const w = wahl.get(rbl) || null;
+      const vomPicker = wahl.get(rbl) || (ausFilter.length
+                        ? { alle: false, gruppen: ausFilter, genau: false } : null);
+      const w = wahlVereinen(vomPicker, wahlGeraet.get(rbl) || null);
       const wunsch = st.richtungen || [];
       if (schon) {
         if (st.alle || (w && w.alle)) schon.alle = true;
@@ -4754,6 +4847,11 @@ function uebergabeHolen() {
                   // der timerow. Kanonisch ist das Linienfeld (Konfigurator-Sitzung
                   // 26.10.2026, nachgemessen).
                   gattungen: linienfeldVon(rohZeilen, rbl) || String(st.filter || '').trim(),
+                  // Zu jeder Richtungs-Id ihr Ziel, vom Picker mitgeschickt. Damit
+                  // laesst sich eine Richtung benennen, zu der gerade keine Abfahrt
+                  // laeuft, und es muss niemand Ids vergleichen
+                  // (Paul 26.10.2026: "eine Beschreibung id-Benennung: 391=Schottentor").
+                  ridNamen: (st.ridNamen && typeof st.ridNamen === 'object') ? st.ridNamen : null,
                   // Schon geholte Abfahrten, roh wie von der API oder fertig geparst.
                   abfahrten: st.abfahrten || st.rohAbfahrten || null,
                   abfahrtenStand: parseInt(st.abfahrtenStand, 10) || 0,
@@ -4901,7 +4999,7 @@ function displaysAusEintraegen(eintraege) {
             const k = zeilenKey(si, { line: linie, dest: ziel });
             if (keys.indexOf(k) < 0) keys.push(k);
           };
-          const treffer = tokenTreffer(linienAus(st.abfahrten), m, []);
+          const treffer = tokenTreffer(linienAus(st.abfahrten), m, [], st.ridNamen);
           let fand = false;
           treffer.forEach(tr => {
             const lokal = tr.name + '|' + tr.ziel;
@@ -5009,11 +5107,26 @@ function zielTreffer(linien, ziel) {
 //                   Zieltext aus der Uebergabe (richtungen)
 //   "105"           keine Richtung, z.B. Linz und andere HAFAS-Netze: die Linie gilt
 //                   in alle Richtungen
-function tokenTreffer(linien, m, richtungen) {
+function tokenTreffer(linien, m, richtungen, ridNamen) {
   const l = String(m.linie || '').trim().toUpperCase();
   const gleich = linien.filter(x => x.name.trim().toUpperCase() === l);
-  if (!gleich.length) return [];
   const r = String(m.richtung || '').trim();
+  // Die Linienauswahl schickt zu jeder Richtungs-Id ihren Zieltext mit. Damit ist eine
+  // Richtung auch dann zu benennen, wenn gerade keine Abfahrt dazu laeuft: abends, am
+  // Wochenende, oder bei einer Linie, die nur ein paarmal am Tag faehrt. Vorher stand
+  // dann nur die nackte Linie da, ohne Ziel.
+  // Zwei Schreibweisen, weil eine Richtungs-Id nicht ueberall eindeutig ist: bei Linz
+  // steckt die Linie schon drin (st444518499l1), bei BWEGT und bodo heisst sie nur "H"
+  // oder "R" und bedeutet je Linie etwas anderes (an Marienplatz ist H bei der 43
+  // Feuersee, bei der U1 Heslach). Darum zuerst "<Linie>><Id>", dann die nackte Id.
+  const ausNamen = (!r || !ridNamen) ? ''
+                 : String(ridNamen[l + '>' + r] || ridNamen[m.linie + '>' + r]
+                          || ridNamen[r] || '').trim();
+  // "nurName" heisst: der Name stammt aus der Uebergabe, nicht aus einer Abfahrt. Die
+  // Zeile muss dann die Richtungs-Id des Tokens behalten, sonst schriebe das naechste
+  // Speichern den Zieltext dorthin, wo das Geraet eine Id erwartet (41>Vogelsang statt
+  // 41>R, 26.10.2026 beim Nachstellen von Thomas' Config gesehen).
+  if (!gleich.length) return ausNamen ? [{ name: m.linie, ziel: ausNamen, rid: r, nurName: true }] : [];
   if (r) {
     // 1) Richtungs-Id, so wie die Abfahrtsdaten sie fuehren. Bei OOEVV der Bahnsteig.
     const ueberId = gleich.filter(x => x.rid && x.rid === r);
@@ -5023,6 +5136,19 @@ function tokenTreffer(linien, m, richtungen) {
     if (!/^\d+$/.test(r)) {
       const tr = zielTreffer(gleich, r);
       if (tr) return [tr];
+    }
+    // Die Uebergabe kennt das Ziel zu dieser Id. Dann ist das die Richtung, Punkt.
+    if (ausNamen) {
+      // Eine Id kann MEHRERE Ziele tragen, wenn der Steig nicht trennt: Linz Linie 2
+      // faehrt unter derselben Id nach solarCity und nach Remise Kleinmuenchen. Der
+      // Picker verbindet die mit ' \u00b7 ', wie die Stationskarte auch
+      // (Konfigurator-Sitzung 26.10.2026). Faehrt eines davon gerade, gilt sein
+      // echter Zieltext, sonst der erste als Beschriftung.
+      const teile = ausNamen.split('\u00b7').map(x => x.trim()).filter(Boolean);
+      const echt = [];
+      teile.forEach(x => { const tr = zielTreffer(gleich, x); if (tr && echt.indexOf(tr) < 0) echt.push(tr); });
+      if (echt.length) return echt;
+      return [{ name: m.linie, ziel: teile[0] || ausNamen, rid: r, nurName: true }];
     }
     // 3) Weder eine passende Richtungs-Id noch ein passendes Ziel. Fuehrt die Station
     //    ueberhaupt Richtungs-Ids, dann faehrt diese Linie hier nicht in DIESER
@@ -5115,7 +5241,7 @@ function ladenAus() {
                  // Schalter sinnlos und fuehrt nur zu einer leeren, grauen Zeile
                  // (Paul 26.10.2026).
                  alleFix: !!e.alle,
-                 linienAmHalt: e.linienAmHalt || null,
+                 linienAmHalt: e.linienAmHalt || null, ridNamen: e.ridNamen || null,
                  zielNamen: e.zielNamen || null, gattungen: e.gattungen || '',
                  linienToken: (e.linienToken == null) ? null : e.linienToken,
                  stil: isNaN(e.stil) ? null : e.stil,
@@ -5213,8 +5339,11 @@ function ladenAus() {
             const k = zeilenKey(stationen.indexOf(st), { line: linie, dest: ziel });
             if (keys.indexOf(k) < 0) keys.push(k);
           };
-          const treffer = tokenTreffer(linien, m, e.richtungen);
-          if (treffer.length) { treffer.forEach(x => nimm(x.name, x.ziel)); return; }
+          const treffer = tokenTreffer(linien, m, e.richtungen, st.ridNamen);
+          if (treffer.length) {
+            treffer.forEach(x => nimm(x.name, x.ziel, x.nurName ? String(m.richtung || '') : ''));
+            return;
+          }
           // Kein Treffer heisst: diese Linie faehrt GERADE nicht, abends oder am
           // Wochenende. Frueher fiel sie damit aus der Auswahl und aus der Config, das
           // Geraet verlor sie stillschweigend (Kundenmeldungen 24.10.2026, "wo ist die
@@ -5240,23 +5369,13 @@ function ladenAus() {
           const kennt = (st.letzteLinien || [])
             .some(x => String(x.line || '').trim().toUpperCase() === String(m.linie).trim().toUpperCase());
           if (!kennt && !e.genau) return;
-          // Und NIE etwas nachtragen, was die Linienauswahl nicht gewaehlt hat. Eine alte
-          // Geraete-Zeile kann Linien tragen, die der Nutzer laengst abgewaehlt hat (Linz:
-          // die Landbusse 309, 412, 609 aus einem frueheren Brett). Die Auswahl des
-          // Pickers gewinnt, die gespeicherte Zeile ist nur die Reihenfolge
-          // (Paul 26.10.2026).
-          if (st.gewaehlt && st.gewaehlt.size) {
-            const ln = String(m.linie).trim().toUpperCase();
-            const rid = String(m.richtung || '').trim();
-            // Traegt das Token eine Richtungs-Id und kennt der Picker Richtungs-Ids,
-            // muss GENAU diese Richtung gewaehlt sein, nicht nur die Linie.
-            if (rid && st.gewaehltRid && st.gewaehltRid.size) {
-              if (!st.gewaehltRid.has(ln + '>' + rid)) return;
-            } else if (![...st.gewaehlt].some(k2 =>
-                String(k2).slice(0, String(k2).indexOf("|")).toUpperCase() === ln)) {
-              return;
-            }
-          }
+          // HIER DARF NICHT GEGEN st.gewaehlt GEPRUEFT WERDEN. Diese Schleife FUELLT
+          // die Menge gerade erst, ein Token wuerde also gegen seine eigenen Vorgaenger
+          // geprueft. Genau so verschwand Thomas' Linie 41: U1 und U14 waren schon
+          // drin, die 41 faehrt abends nicht, und damit flog sie raus, aus der Anzeige
+          // UND aus der gespeicherten Zeile (Kunde Thomas Stuttgart, 26.10.2026).
+          // Was der Nutzer NICHT gewaehlt hat, kommt hier ohnehin nicht mehr an: die
+          // Tokens stammen aus wahlVereinen, also aus den Linien des Pickers.
           // Die Richtung aus dem Token ist eine ID (H, R, p1…, st…), kein Zieltext.
           // Als Beschriftung taugt sie nicht, darum ohne Ziel: gilt in alle Richtungen.
           nimm(m.linie, '', ruhtMit);

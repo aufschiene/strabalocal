@@ -8082,6 +8082,46 @@ function wizardOpenFinetuning() {
 // (OEBBREG/OEBBFERN/OEBBALL). Alle sechs muenden ohnehin in dieses eine Feld, denn nur
 // das sieht das Geraet. Darum uebernimmt die neue Oberflaeche es direkt und muss von
 // den sechs Mechanismen nichts wissen (Paul 23.10.2026, Linz uebernahm alle Linien).
+// ALLE Richtungen einer Station als "richtungsId → Ziel", nicht nur die gewaehlten. Damit
+// kann die Anzeigen-Oberflaeche jedes Token der Geraetezeile benennen, statt Ids gegen Ids
+// zu halten (Paul 26.10.2026). Zwei Quellen, beide schon da, kein neuer Abruf:
+//   1. die Abfahrts-Antwort, die wir ohnehin geholt haben (alle gerade fahrenden Richtungen)
+//   2. die gewaehlten Richtungen der Station selbst (darunter welche, die gerade NICHT
+//      fahren, deren Ziel aber aus der Config oder dem Nachtrag bekannt ist)
+// Eine Id kann MEHRERE Ziele tragen, wenn der Steig nicht trennt: Linz Linie 2 faehrt unter
+// st444518499l2 nach solarCity UND nach Remise Kleinmuenchen. Die stehen dann mit " · "
+// verbunden, wie auf der Stationskarte auch.
+function uebergabeRidNamen(st) {
+  var namen = {};
+  // Schluessel "<Linie>><Id>", NICHT die nackte Id: bei den EFA-Netzen (BWEGT, bodo …)
+  // heisst die Richtungs-Id nur "H" oder "R" und bedeutet je Linie etwas anderes. An
+  // Stuttgart Marienplatz ist "R" bei der 41 Berliner Platz, bei der U14 Muehlhausen und
+  // bei der U1 Fellbach Lutherkirche (eigene Messung 26.10.2026). Eine Tabelle nach der
+  // nackten Id behielte davon nur den letzten Eintrag.
+  function dazu(linie, rid, ziel) {
+    linie = String(linie || '').trim();
+    rid = String(rid || '').trim();
+    ziel = String(ziel || '').trim();
+    if (!linie || !rid || !ziel) return;
+    var k = linie + '>' + rid;
+    if (!namen[k]) namen[k] = [];
+    if (namen[k].indexOf(ziel) < 0) namen[k].push(ziel);
+  }
+  try {
+    // Hier bewusst OHNE Frist: Zielnamen veralten nicht, anders als Abfahrtszeiten.
+    var e = _depRoh.get(st.fullId)
+         || ((typeof lineSelStrip === 'function') ? _depRoh.get(lineSelStrip(String(st.fullId || ''))) : null);
+    var mons = (e && e.wert && e.wert.data && e.wert.data.monitors) || [];
+    mons.forEach(function (m) {
+      ((m && m.lines) || []).forEach(function (l) { dazu(l && l.name, l && l.richtungsId, l && l.towards); });
+    });
+  } catch (e2) {}
+  (st.directions || []).forEach(function (d) { dazu(d && d.line, d && d.richtungsId, d && (d.towards || d.ziel)); });
+  var raus = {};
+  Object.keys(namen).forEach(function (k) { raus[k] = namen[k].join(' · '); });
+  return raus;
+}
+
 // Ziele einer Zug-Anzeige ("von A nach B") als {id, name}, in der Reihenfolge der Ids in
 // der rbl ("OEBBFERN:8100002>8100173~1290401"). Die Anzeigen-Oberflaeche baut daraus eine
 // Zeile JE ZIEL (Gattungen sind dort nur Filter) und hat sonst nur die Ids, der Kunde saehe
@@ -8215,6 +8255,14 @@ function zurNeuenOberflaeche(cfg) {
           abfahrtenStand: (function () {
             var e = _depRohEintrag(st.fullId || st.stopId); return e ? e.zeit : 0;
           })(),
+          // "<Linie>><richtungsId>" → Zielname, ALLE bekannten Richtungen dieser Station
+          ridNamen: uebergabeRidNamen(st),
+          // Welches BRETT diese Zeile meint. Dieselbe Station kann mehrfach vorkommen (Paul
+          // hat Unionkreuzung auf Brett 1 mit den Stadtlinien und auf Brett 4 mit dem 609).
+          // Der Wert ist nur eine Kennung: gleicher Wert heisst gleiches Brett. Ohne sie
+          // muesste die Gegenseite zwei gleich aussehende Zeilen an der Auswahl
+          // auseinanderhalten, und bei gleicher Auswahl ginge das nicht.
+          brett: (st.displayInstance != null) ? String(st.displayInstance) : '',
           // welcher Anzeige-Stil passt zu dieser Station (mit Zuweisung, bodo und
           // Westbahn beruecksichtigt, sonst der Netz-Default)
           stil: (function () {
