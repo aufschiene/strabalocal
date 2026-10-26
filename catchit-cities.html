@@ -5028,6 +5028,51 @@ var _depMemoTimer = null;
 // fetchDeparturesUnified(id, true).
 var _depKurzCache = new Map();
 var _DEP_KURZ_TTL = 90000;
+// Zusaetzlich die AUFGELOESTEN Antworten, gekuerzt, fuer die Uebergabe an die
+// Anzeigen-Oberflaeche. Der Cache oben haelt Promises, die Uebergabe wird aber synchron
+// gebaut. Die Anzeigen-Seite holte dieselben Abfahrten bisher gleich noch einmal und stand
+// beim Kunden solange leer (Pauls Idee, 26.10.2026).
+var _depRoh = new Map();
+var _DEP_ROH_TTL = 60000;        // Aelteres geben wir nicht mit, sonst stehen falsche Minuten da
+var _DEP_ROH_JE_LINIE = 4;       // mehr braucht kein Brett, und der sessionStorage ist endlich
+// Antwort kuerzen, ohne die Struktur anzufassen: dieselben Felder, nur die naechsten vier
+// Abfahrten je Linie. Die Blaetter werden NICHT kopiert, aber auch nicht geaendert, und das
+// Original im Promise-Cache bleibt unberuehrt (die Seite selbst arbeitet damit weiter).
+function _depRohTrimmen(d) {
+  try {
+    var mons = (d && d.data && d.data.monitors) || (d && d.monitors) || null;
+    if (!Array.isArray(mons)) return null;
+    return { data: { monitors: mons.map(function (m) {
+      var o = {};
+      Object.keys(m || {}).forEach(function (k) { if (k !== 'lines') o[k] = m[k]; });
+      o.lines = ((m && m.lines) || []).map(function (l) {
+        var nl = {};
+        Object.keys(l || {}).forEach(function (k) { if (k !== 'departures') nl[k] = l[k]; });
+        var abf = (l && l.departures && l.departures.departure) || [];
+        nl.departures = { departure: Array.isArray(abf) ? abf.slice(0, _DEP_ROH_JE_LINIE) : [] };
+        return nl;
+      });
+      return o;
+    }) } };
+  } catch (e) { return null; }
+}
+function _depRohMerken(fullId, p) {
+  try {
+    Promise.resolve(p).then(function (d) {
+      var t = _depRohTrimmen(d);
+      if (t) _depRoh.set(fullId, { zeit: Date.now(), wert: t });
+    }).catch(function () {});
+  } catch (e) {}
+}
+// Eintrag dieser Station, nur wenn frisch. Auch unter der token-freien Id nachsehen: die
+// rbl der Station kann ein '!'-Token tragen, geholt wurde sie ohne.
+function _depRohEintrag(fullId) {
+  if (!fullId) return null;
+  var e = _depRoh.get(fullId);
+  if (!e && typeof lineSelStrip === 'function') e = _depRoh.get(lineSelStrip(String(fullId)));
+  if (!e || (Date.now() - e.zeit) >= _DEP_ROH_TTL) return null;
+  return e;
+}
 function depKurzCacheLeeren() { _depKurzCache.clear(); }
 // Frische Abfahrten erzwingen: der Picker MUSS aktuelle Richtungen sehen, sonst zeigt er
 // nach einem Server-Fix noch die alten Ziele. Er raeumt den Merker darum selbst weg,
@@ -5042,6 +5087,7 @@ async function fetchDeparturesUnified(fullId, frisch) {
     _depKurzCache.delete(fullId);
     const pf = _fetchDeparturesUnifiedRaw(fullId);
     _depKurzCache.set(fullId, { zeit: Date.now(), wert: pf });
+    _depRohMerken(fullId, pf);
     return pf;
   }
   if (_depMemo) {
@@ -5049,12 +5095,14 @@ async function fetchDeparturesUnified(fullId, frisch) {
     const p = _fetchDeparturesUnifiedRaw(fullId);
     _depMemo.set(fullId, p);
     _depKurzCache.set(fullId, { zeit: Date.now(), wert: p });
+    _depRohMerken(fullId, p);
     return p;
   }
   const e = _depKurzCache.get(fullId);
   if (e && (Date.now() - e.zeit) < _DEP_KURZ_TTL) return e.wert;
   const p2 = _fetchDeparturesUnifiedRaw(fullId);
   _depKurzCache.set(fullId, { zeit: Date.now(), wert: p2 });
+  _depRohMerken(fullId, p2);
   return p2;
 }
 async function _fetchDeparturesUnifiedRaw(fullId) {
@@ -8077,10 +8125,31 @@ function _uebergabeZeilen(cfg) {
   } catch (e) { return { masterrow: '', timerow: tr }; }
 }
 
+// Die Uebergabe schreiben, mit Rueckfall. Die rohen Abfahrten machen den Eintrag um ein
+// Vielfaches groesser, und sessionStorage ist je Herkunft begrenzt (rund 5 MB, in privaten
+// Fenstern und bei blockierten Seitendaten weniger oder gar nichts). Lieber ohne Abfahrten
+// uebergeben als gar nicht: fehlt das Feld, holt die Anzeigen-Oberflaeche sie selbst, so
+// wie vor dem 26.10.2026. Vorher verschluckte der catch die GANZE Uebergabe.
+function uebergabeSchreiben(ue) {
+  function versuch(o) {
+    try { sessionStorage.setItem('catchit_feintuning', JSON.stringify(o)); return true; }
+    catch (e) { return false; }
+  }
+  if (versuch(ue)) return true;
+  var ohne = Object.assign({}, ue);
+  ohne.stationen = (ue.stationen || []).map(function (st) {
+    var s2 = Object.assign({}, st);
+    delete s2.abfahrten; delete s2.abfahrtenStand;
+    return s2;
+  });
+  console.warn('[uebergabe] zu gross fuer sessionStorage, Abfahrten weggelassen');
+  return versuch(ohne);
+}
+
 function zurNeuenOberflaeche(cfg) {
   cfg = cfg || (typeof recommendedConfig !== 'undefined' ? recommendedConfig : null) || {};
   try {
-    sessionStorage.setItem('catchit_feintuning', JSON.stringify({
+    var _ue = {
       stand: Date.now(),
       stationen: (stations || []).map(function (st) {
         return {
@@ -8118,6 +8187,18 @@ function zurNeuenOberflaeche(cfg) {
           // anderen Stationen. zielNamen ist dieselbe Liste ohne Ids, beide werden gelesen.
           ziele: uebergabeZiele(st),
           zielNamen: uebergabeZiele(st).map(function (z) { return z.name; }),
+          // Die rohen Abfahrten dieser Station, wie der Server sie geliefert hat, gekuerzt
+          // auf die naechsten vier je Linie. Die Anzeigen-Oberflaeche parst damit dasselbe
+          // JSON wie ihre eigene Antwort und zeigt sofort, statt die Abfrage ein zweites
+          // Mal zu machen. Aelter als eine Minute geben wir NICHT mit (falsche Minuten sind
+          // schlimmer als ein kurzer Ladevorgang), und Wien taucht hier nie auf: dessen
+          // Daten kommen aus wienData, nicht aus dieser Abfrage.
+          abfahrten: (function () {
+            var e = _depRohEintrag(st.fullId || st.stopId); return e ? e.wert : null;
+          })(),
+          abfahrtenStand: (function () {
+            var e = _depRohEintrag(st.fullId || st.stopId); return e ? e.zeit : 0;
+          })(),
           // welcher Anzeige-Stil passt zu dieser Station (mit Zuweisung, bodo und
           // Westbahn beruecksichtigt, sonst der Netz-Default)
           stil: (function () {
@@ -8189,7 +8270,8 @@ function zurNeuenOberflaeche(cfg) {
       nightstart: String(_zahlOderVorgabe(cfg.nightStart, cfg.nightstart, 22)),
       nightend: String(_zahlOderVorgabe(cfg.nightEnd, cfg.nightend, 6)),
       stopinterval: String(_zahlOderVorgabe(cfg.stopInterval, cfg.stopinterval, 12))
-    }));
+    };
+    uebergabeSchreiben(_ue);
   } catch (e) {}
   // Mit Zeitstempel: GitHub Pages schickt cache-control max-age=600, ohne das sieht man
   // nach einem Release bis zu zehn Minuten lang die alte Oberflaeche (Paul 23.10.2026,

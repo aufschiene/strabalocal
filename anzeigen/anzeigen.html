@@ -99,11 +99,17 @@
   .neu .glas .wort { font-size: 13px; font-weight: 600; }
 
   /* ---- Karten ---- */
-  .laden { display: none; align-items: center; gap: 12px; margin: 0 0 18px;
-           font-size: 14px; font-weight: 600; color: var(--grau); }
+  /* Waehrend geladen wird, steht EIN Ladeschirm da. Die leeren Karten daneben sahen aus,
+     als waere die Seite halb kaputt (Paul 26.10.2026). */
+  .laden { display: none; flex-direction: column; align-items: center; text-align: center;
+           gap: 14px; padding: 54px 20px 64px; }
   .laden.an { display: flex; }
-  .laden .ring { width: 20px; height: 20px; border-radius: 50%; flex: 0 0 auto;
-                 border: 3px solid var(--rand); border-top-color: var(--akzent);
+  .laden .ladenTitel { font-size: 16px; font-weight: 700; color: var(--tinte); }
+  .laden .ladenUnter { font-size: 13px; color: var(--grau); max-width: 34ch; line-height: 1.5; }
+  body.laedt .streifen, body.laedt .bahn > .karte, body.laedt .bahn > .reihe,
+  body.laedt .reiter { display: none !important; }
+  .laden .ring { width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto;
+                 border: 4px solid var(--rand); border-top-color: var(--akzent);
                  animation: dreh .8s linear infinite; }
   @keyframes dreh { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .laden .ring { animation-duration: 3s; } }
@@ -450,7 +456,11 @@
   <p class="unter">Wische seitwärts durch deine Displays. Was du hier siehst, steht genauso am Gerät.</p>
   <!-- Bis die Abfahrten da sind, stand die Seite leer da und sah kaputt aus. Eine
        Haltestelle braucht je nach Netz mehrere Sekunden (Paul 26.10.2026). -->
-  <div id="laden" class="laden"><span class="ring"></span><span id="ladenText">Lade deine Linien</span></div>
+  <div id="laden" class="laden">
+    <span class="ring"></span>
+    <span class="ladenTitel" id="ladenText">Lade deine Linien</span>
+    <span class="ladenUnter">Einen Moment, die Abfahrten kommen von mehreren Verkehrsbetrieben.</span>
+  </div>
 </div>
 
 <div class="streifen" id="streifen"></div>
@@ -1218,7 +1228,13 @@ function abfahrtenSetzen(st, liste) {
 async function abfahrten(rbl) {
   const r = await fetch(DEP_API + '?rbl=' + encodeURIComponent(rbl) + '&_=' + Date.now(), { cache: 'no-store' });
   if (!r.ok) throw new Error('HTTP ' + r.status);
-  const d = await r.json();
+  return abfahrtenAus(await r.json());
+}
+
+// Dieselbe Antwort, nur schon geholt: die Linienauswahl hat die Abfahrten beim Laden
+// ohnehin abgefragt und reicht sie mit. Zweimal dasselbe zu holen kostet nur Zeit, und
+// beim Kunden waren das die Sekunden, in denen die Seite leer stand (Paul 26.10.2026).
+function abfahrtenAus(d) {
   const raus = [];
   ((d && d.data && d.data.monitors) || []).forEach(m => {
     if (!m || !m.lines) return;
@@ -2156,7 +2172,7 @@ function editorZeichnen() {
          + '</div>'
          + marken + '</div>'
          + '<button class="pfeil weg-x" title="diese Station von diesem Display nehmen"'
-         + ' onclick="stationWeg(' + dz + ',' + si + ')">' + SYM_X + '</button>'
+         + ' onclick="stationVomBrett(' + dz + ',' + si + ')">' + SYM_X + '</button>'
          + '</div>';
     });
   }
@@ -4001,15 +4017,25 @@ function stationAlsBlock(si, an, stillt) {
     gruppenPruefen(d);
   });
   // Die neuen Zeilen an dieselbe Stelle legen.
+  const neu = zeilenEintraege(st).map(dep => zeilenKey(si, dep));
   if (zielBrett >= 0 && displays[zielBrett]) {
-    const neu = zeilenEintraege(st).map(dep => zeilenKey(si, dep));
     displays[zielBrett].richtungen.splice(stelle, 0, ...neu);
     displays[zielBrett].vomNutzer = true;
+    neu.forEach(k => abgelegt.delete(k));
+  } else {
+    // Lag die Station auf KEINEM Display, bleibt sie auch danach im Topf. Sonst legt die
+    // automatische Verteilung sie ungefragt auf ein Brett, nur weil man die Darstellung
+    // umgestellt hat (Paul 26.10.2026).
+    neu.forEach(k => abgelegt.add(k));
   }
   if (!stillt) allesZeichnen();
 }
 
-function stationWeg(di, si) {
+// ACHTUNG: NICHT stationWeg nennen, das gibt es schon und loescht die Station ganz aus
+// der Auswahl. Diese hier nimmt sie nur vom Brett. Gleicher Name hiess: die spaetere
+// Definition gewinnt, und das x an der Stations-Karte loeschte die Station samt ihrer
+// Linienauswahl (Paul 26.10.2026, Linz Unionkreuzung).
+function stationVomBrett(di, si) {
   const d = displays[di];
   const st = stationen[si];
   if (!d || !st) return;
@@ -4629,6 +4655,8 @@ function uebergabeHolen() {
                   // der timerow. Kanonisch ist das Linienfeld (Konfigurator-Sitzung
                   // 26.10.2026, nachgemessen).
                   gattungen: linienfeldVon(rohZeilen, rbl) || String(st.filter || '').trim(),
+                  // Schon geholte Abfahrten, roh wie von der API oder fertig geparst.
+                  abfahrten: st.abfahrten || st.rohAbfahrten || null,
                   linienToken: (typeof st.linienToken === 'boolean') ? st.linienToken : null,
                   stil: parseInt(st.stil, 10),
                   stilTon: parseInt(st.stilTon, 10),
@@ -4922,6 +4950,7 @@ function ladenAn(n) {
   ladenGesamt = n; ladenFertig = 0;
   const el = document.getElementById('laden');
   if (el) el.classList.add('an');
+  document.body.classList.add('laedt');
   ladenText();
 }
 function ladenText() {
@@ -4935,6 +4964,7 @@ function ladenSchritt() { ladenFertig++; ladenText(); }
 function ladenAus() {
   const el = document.getElementById('laden');
   if (el) el.classList.remove('an');
+  document.body.classList.remove('laedt');
 }
 
 (async function start() {
@@ -4994,6 +5024,14 @@ function ladenAus() {
     stationen.push(st);
     // Mehrere Anfragen direkt hintereinander laufen schnell in die Ratengrenze der API.
     // Ein leeres catch wuerde den Fehler verschlucken und die Seite bliebe stumm leer.
+    // Kamen die Abfahrten mit, sofort anzeigen und NICHT noch einmal holen.
+    let roh = e.abfahrten || e.rohAbfahrten || null;
+    if (roh && !Array.isArray(roh)) roh = abfahrtenAus(roh);
+    if (Array.isArray(roh) && roh.length) {
+      abfahrtenSetzen(st, roh);
+      ladenSchritt();
+      continue;
+    }
     try {
       abfahrtenSetzen(st, await abfahrten(e.rbl));
     } catch (err) {
