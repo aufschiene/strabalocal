@@ -3250,7 +3250,7 @@
     <button class="btn hidden" id="addMoreStationsBtn" onclick="addMoreStations()" style="margin-top: 12px; width: 100%;">
       + Weitere Station hinzufügen
     </button>
-    <button class="btn hidden" id="schnellstartBtn" onclick="startSetupWizard()" style="margin-top: 12px; width: 100%;">
+    <button class="btn hidden" id="schnellstartBtn" onclick="schnellstartNachfragen()" style="margin-top: 12px; width: 100%;">
       Schnellstart
     </button>
     <button class="btn btn-primary hidden" id="openFinetuningBtn" onclick="handleStationsNextStep()" style="margin-top: 12px; width: 100%;">
@@ -24795,6 +24795,46 @@ async function _heilungArbeiten() {
   } finally { _heilungLaeuft = false; }
 }
 
+// Vor dem Schnellstart nachfragen, wenn schon eigene Display-Einstellungen da sind
+// (Paul 26.10.2026). Gemessen am 26.10.2026: das OEFFNEN des Wizards aendert nichts, und
+// auch sein Bau laesst eine bestehende Bretter-Aufteilung stehen, solange die Stationen
+// gleich bleiben (zwei Bretter d1/d2 mit r5/t2 und r3/t3 kamen unveraendert heraus).
+// Anfassen kann er sie trotzdem: der Stil-Schritt (Kompakt gegen Spielerisch) legt bei
+// mehreren Anzeige-Typen alles neu zusammen. Geraete-Sachen wie Helligkeit, Nachtmodus und
+// Standzeit bleiben in jedem Fall, die fragt der Wizard selbst ab.
+function schnellstartNachfragen() {
+  var schonEingerichtet = (typeof hasExistingConfig !== 'undefined' && hasExistingConfig)
+    || ((typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder());
+  if (!schonEingerichtet) { startSetupWizard(); return; }
+  var alt = document.getElementById('schnellstartFrage');
+  if (alt) alt.remove();
+  var ov = document.createElement('div');
+  ov.id = 'schnellstartFrage';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10001;display:flex;align-items:center;'
+    + 'justify-content:center;padding:20px;background:rgba(27,27,27,.45);';
+  var box = document.createElement('div');
+  box.style.cssText = 'max-width:420px;width:100%;background:var(--paper);border:3px solid var(--ink);'
+    + 'border-radius:14px;box-shadow:6px 6px 0 var(--ink);padding:24px;font-family:var(--font-main);';
+  var h = document.createElement('h2');
+  h.textContent = 'Du hast schon eigene Display-Einstellungen';
+  h.style.cssText = 'margin:0 0 10px;font-size:20px;font-weight:800;color:var(--ink);';
+  var p = document.createElement('p');
+  p.textContent = 'Der Schnellstart richtet dein catch-it neu ein und kann dabei deine Aufteilung der Displays überschreiben. Helligkeit, Nachtmodus und Standzeit bleiben.';
+  p.style.cssText = 'margin:0 0 20px;font-size:14px;line-height:1.5;color:#6b6258;';
+  var ja = document.createElement('button');
+  ja.className = 'btn btn-primary'; ja.textContent = 'Ja, Schnellstart';
+  ja.style.cssText = 'width:100%;margin-bottom:10px;';
+  var nein = document.createElement('button');
+  nein.className = 'btn'; nein.textContent = 'Nein, lieber feintunen';
+  nein.style.cssText = 'width:100%;';
+  ja.onclick = function () { ov.remove(); startSetupWizard(); };
+  nein.onclick = function () { ov.remove(); handleStationsNextStep(); };
+  box.appendChild(h); box.appendChild(p); box.appendChild(ja); box.appendChild(nein);
+  ov.appendChild(box);
+  ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+
 // Zieltexte nachtragen. Eine Richtung, die gerade nicht faehrt (Abend, Wochenende,
 // seltener Bus), kommt ohne Zieltext aus den Abfahrten: die richtungsId steht, der Text
 // fehlt. Die eigene Stationskarte zeigt so einen Eintrag als "Alle Richtungen", die
@@ -25941,6 +25981,9 @@ window.addEventListener('DOMContentLoaded', () => {
     'Linien auswählen': 'Select lines', 'Linien auswählen:': 'Select lines:',
     'Linien für dein catch-it': 'Lines for your catch-it',
     'Schnellstart': 'Quick start', 'Feintunen': 'Fine-tune',
+    'Du hast schon eigene Display-Einstellungen': 'You already have your own display settings',
+    'Der Schnellstart richtet dein catch-it neu ein und kann dabei deine Aufteilung der Displays überschreiben. Helligkeit, Nachtmodus und Standzeit bleiben.': 'The quick start sets your catch-it up again and may overwrite how your displays are split. Brightness, night mode and dwell time stay.',
+    'Ja, Schnellstart': 'Yes, quick start', 'Nein, lieber feintunen': 'No, fine-tune instead',
     'Alle auswählen': 'Select all', 'Alle abwählen': 'Deselect all', 'Abwählen': 'Deselect',
     'Alle Abfahrten': 'All departures', 'Alle Linien': 'All lines', 'Alle Richtungen': 'All directions',
     'Einzelne Linien': 'Individual lines', 'Nach Linie filtern': 'Filter by line',
