@@ -5172,6 +5172,11 @@ function ladenAus() {
         if (r.rid) {
           if (!st.ruhtRid) st.ruhtRid = {};
           st.ruhtRid[linie + '|' + String(r.ziel || '').trim()] = String(r.rid).trim();
+          // Linie UND Richtung merken. Nur den Liniennamen zu pruefen reicht nicht: die
+          // Gerätezeile traegt oft beide Richtungen, der Picker aber nur eine, und dann
+          // kam die Gegenrichtung durch (Paul 26.10.2026, Linie 1 und 2 in Linz).
+          if (!st.gewaehltRid) st.gewaehltRid = new Set();
+          st.gewaehltRid.add(linie.toUpperCase() + '>' + String(r.rid).trim());
         }
       });
       // Gruppen aus der masterrow bleiben erhalten, die stehen nicht in den Richtungen.
@@ -5241,10 +5246,16 @@ function ladenAus() {
           // Pickers gewinnt, die gespeicherte Zeile ist nur die Reihenfolge
           // (Paul 26.10.2026).
           if (st.gewaehlt && st.gewaehlt.size) {
-            const da = [...st.gewaehlt].some(k2 =>
-              String(k2).slice(0, String(k2).indexOf("|")).toUpperCase()
-                === String(m.linie).trim().toUpperCase());
-            if (!da) return;
+            const ln = String(m.linie).trim().toUpperCase();
+            const rid = String(m.richtung || '').trim();
+            // Traegt das Token eine Richtungs-Id und kennt der Picker Richtungs-Ids,
+            // muss GENAU diese Richtung gewaehlt sein, nicht nur die Linie.
+            if (rid && st.gewaehltRid && st.gewaehltRid.size) {
+              if (!st.gewaehltRid.has(ln + '>' + rid)) return;
+            } else if (![...st.gewaehlt].some(k2 =>
+                String(k2).slice(0, String(k2).indexOf("|")).toUpperCase() === ln)) {
+              return;
+            }
           }
           // Die Richtung aus dem Token ist eine ID (H, R, p1…, st…), kein Zieltext.
           // Als Beschriftung taugt sie nicht, darum ohne Ziel: gilt in alle Richtungen.
