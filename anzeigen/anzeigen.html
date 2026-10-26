@@ -463,10 +463,10 @@
       <!-- Reihenfolge: WELCHES Display und wie es aussieht ganz oben, dann der Topf zum
            Auflegen, dann die Zeilen, die schon darauf liegen (Paul 26.10.2026). -->
       <div id="editorKopf"></div>
+      <div id="editor"></div>
       <div class="kopf pooltrenner"><div class="titel" id="poolTitel">Deine anderen Linien</div>
         <div class="modus">tippen legt sie auf das gewählte Display</div></div>
       <div id="stationsliste"></div>
-      <div id="editor" class="pooltrenner"></div>
     </div>
   </div>
 
@@ -2054,14 +2054,6 @@ function editorZeichnen() {
   h += '<label class="feld" for="stilWahl">Anzeige-Stil dieses Displays</label>'
      + '<select id="stilWahl" onchange="stilSetzen(this.value)">' + stilOptionen(dHier) + '</select>';
 
-  if (zeitbasiert(dHier)) {
-    h += '<label class="feld" for="zeilenWahl">Wie viele Abfahrten</label>'
-       + '<select id="zeilenWahl" onchange="zeitZeilenSetzen(' + s.index + ',this.value)">';
-    for (let z = 1; z <= maxZeilen(stilVon(dHier)); z++) {
-      h += '<option value="' + z + '"' + (z === zeitZeilen(dHier) ? ' selected' : '') + '>' + z + '</option>';
-    }
-    h += '</select>';
-  }
 
   const nHier = (dHier && dHier.richtungen.length) || 0;
   const maxHier = maxZeilen(stilVon(dHier));
@@ -2294,6 +2286,22 @@ function badgeFarben(dep) {
 // Station steht als ruhige Unterzeile darunter (Paul 22.10.2026).
 // Zeitfenster: kommt spaeter dran und steht darum in einer eigenen Karte ganz unten
 // (Paul 22.10.2026). Inhalt unveraendert, nur der Platz ist ein anderer.
+// Wie viele Abfahrten ein chronologisches Brett zeigt, ergibt sich fast immer von selbst
+// aus dem Stil. Wer es doch von Hand will, findet es unter Erweitert, nicht mitten im
+// Hauptweg (Paul 26.10.2026).
+function zeilenzahlFeld() {
+  const sHier = schirme[zeiger];
+  const d = sHier && sHier.display;
+  if (!d || !zeitbasiert(d)) return '';
+  let h = '<label class="feld" for="zeilenWahl">Wie viele Abfahrten auf Display '
+        + (displays.indexOf(d) + 1) + '</label>'
+        + '<select id="zeilenWahl" onchange="zeitZeilenSetzen(' + sHier.index + ',this.value)">';
+  for (let z = 1; z <= maxZeilen(stilVon(d)); z++) {
+    h += '<option value="' + z + '"' + (z === zeitZeilen(d) ? ' selected' : '') + '>' + z + '</option>';
+  }
+  return h + '</select>';
+}
+
 function zeitfensterZeichnen() {
   const el = document.getElementById('zeitfenster');
   if (!el) return;
@@ -2301,7 +2309,7 @@ function zeitfensterZeichnen() {
   if (!s) { el.innerHTML = ''; return; }
   const dHier = s.display;
   const di = s.index;
-  let h = '';
+  let h = zeilenzahlFeld();
 
   // Die Uhr selbst legt man unten aus dem Linien-Topf aufs Display. Hier steht nur,
   // wie sie aussieht.
@@ -4250,19 +4258,40 @@ async function stationNehmen(rbl, name, lat, lon, netz) {
 // ---- Stadtplan im Hintergrund ---------------------------------------------------------
 // Nur Schmuck: keine Klicks, entfaerbt, und er folgt der gerade gewaehlten Station,
 // sobald wir deren Koordinaten kennen (die Stationssuche liefert sie mit).
-let karte = null;
+// NICHT von tile.openstreetmap.org: deren Kacheln kommen von Spendenservern, und fuer ein
+// Produkt wie unseres ist das laut ihrer Nutzungsregel nicht gedacht. Sie haben uns dafuer
+// am 26.10.2026 mit 403 gesperrt ("App is not following the tile usage policy"). Stattdessen
+// basemap.at, das ist amtlich, ausdruecklich frei nutzbar (CC BY 4.0) und ohnehin grau.
+// ACHTUNG Reihenfolge: basemap.at erwartet {z}/{y}/{x}, nicht {z}/{x}/{y}.
+// Abgedeckt ist nur Oesterreich. Ausserhalb bleibt die Karte leer, dann traegt der
+// Papier-Hintergrund die Seite allein, und es geht keine einzige Anfrage hinaus.
+const KARTE_AT = { nord: 49.1, sued: 46.3, west: 9.4, ost: 17.2 };
+function inOesterreich(lat, lon) {
+  return lat != null && lon != null
+      && lat <= KARTE_AT.nord && lat >= KARTE_AT.sued
+      && lon >= KARTE_AT.west && lon <= KARTE_AT.ost;
+}
+let karte = null, karteLage = null;
 function karteAufbauen() {
   if (karte || typeof L === 'undefined') return;
   karte = L.map('karte', {
     zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false,
     doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false
   }).setView([48.2082, 16.3738], 14);   // Wien als Ausgangspunkt
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '&copy; OpenStreetMap'
-  }).addTo(karte);
+  karteLage = L.tileLayer(
+    'https://maps{s}.wien.gv.at/basemap/bmapgrau/normal/google3857/{z}/{y}/{x}.png',
+    { subdomains: ['', '1', '2', '3', '4'], maxZoom: 19,
+      attribution: 'Grundkarte: <a href="https://basemap.at">basemap.at</a>' });
+  karteLage.addTo(karte);
 }
 function karteAufStation(st) {
   if (!karte || !st || st.lat == null || st.lon == null) return;
+  // Ausserhalb Oesterreichs die Kacheln abschalten, statt ins Leere zu laden.
+  const drin = inOesterreich(st.lat, st.lon);
+  if (karteLage) {
+    if (drin && !karte.hasLayer(karteLage)) karteLage.addTo(karte);
+    if (!drin && karte.hasLayer(karteLage)) karte.removeLayer(karteLage);
+  }
   karte.setView([st.lat, st.lon], 15, { animate: true });
 }
 
