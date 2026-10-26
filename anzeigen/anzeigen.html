@@ -664,7 +664,11 @@ function netzeVon(d) {
   const raus = new Set();
   ((d && d.richtungen) || []).forEach(k => {
     const r = richtungFinden(k);
-    if (r) raus.add(r.station.netz || 'WL');
+    // Das Netz steht zuverlaessig im rbl-Praefix, das Feld netz kann fehlen. Fiel es
+    // hier auf 'WL' zurueck, bekam eine frisch angelegte OEBB-Station den Wiener-Linien-
+    // Stil statt der Bahnhofstafel (Paul 26.10.2026: "wenn ich von schwarz OEBB Station
+    // hinzufuege gibt er WL").
+    if (r) raus.add(netzKuerzel(r.station) || 'WL');
   });
   return raus;
 }
@@ -4823,7 +4827,13 @@ function uebergabeHolen() {
         });
         return;
       }
-      raus.push({ rbl: rbl, kennung: kennung, name: st.name || rbl, netz: st.netz || 'WL',
+      // Netz aus dem rbl-Praefix, das ist die verlaessliche Quelle. Das Feld netz kann
+      // fehlen, und ein stilles 'WL' machte aus einer OEBB-Station eine Wiener
+      // (Paul 26.10.2026). Nur ohne Praefix (alte Wiener rbls wie 4941) gilt das Feld.
+      const netzAusRbl = (rbl.indexOf(':') > 0 ? rbl.slice(0, rbl.indexOf(':')) : '')
+                           .trim().toUpperCase();
+      raus.push({ rbl: rbl, kennung: kennung, name: st.name || rbl,
+                  netz: netzAusRbl || String(st.netz || 'WL').trim().toUpperCase(),
                   alle: !!st.alle || !!(w && w.alle),
                   wahl: (w && w.gruppen.length) ? w.gruppen : ausFilter,
                   // Der Konfigurator weiss, was zu dieser Station gehoert, und sagt es
