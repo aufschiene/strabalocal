@@ -4661,6 +4661,15 @@ function rblTeile(rbl) {
   const nur = r.slice(i + 1).split('~').map(x => x.trim().toUpperCase()).filter(Boolean);
   return { kahl: r.slice(0, i), nur: nur.length ? nur : null };
 }
+// Dieselbe Station, zwei Schreibweisen. Wien steht im Geraet oft als NACKTE NUMMER
+// (4430), die Linienauswahl schickt sie mit Praefix (WL:4430). Wer das vergleicht, ohne
+// es anzugleichen, findet die Station in der gespeicherten Zeile nicht wieder und faengt
+// bei "alle Richtungen" an: so bekam Braunschweiggasse beide Richtungen der U4, obwohl
+// nur eine gewaehlt war, und stand doppelt in der Liste (Paul 26.10.2026).
+function rblKanon(rbl) {
+  return rblTeile(rbl).kahl.trim().replace(/^WLB?:/i, '').toUpperCase();
+}
+
 function gehoertDazu(nur, linie) {
   return !nur || nur.indexOf(String(linie || '').trim().toUpperCase()) >= 0;
 }
@@ -4695,12 +4704,12 @@ function linienTokenErlaubt(st, colour, linien) {
 // Das rohe Linienfeld eines Segments zu einer rbl. Fuer Zug-Anzeigen ist das die
 // Gattungsliste, die sonst nirgends steht.
 function linienfeldVon(zeilen, rbl) {
-  const ziel = rblTeile(rbl).kahl.trim();
+  const ziel = rblKanon(rbl);
   let raus = '';
   String(zeilen || '').split(';').forEach(seg => {
     const f = String(seg || '').trim().split('|');
     if (f.length < 2) return;
-    if (rblTeile(f[0]).kahl.trim() !== ziel) return;
+    if (rblKanon(f[0]) !== ziel) return;
     const feld = String(f[1] || '').trim();
     if (feld && feld !== '*' && !raus) raus = feld;
   });
@@ -4738,7 +4747,7 @@ function wahlAusZeilen(zeilen) {
       }
       // Unter beiden Schreibweisen ablegen, mit und ohne '!'-Teil: welche davon die
       // Station traegt, wissen wir hier nicht.
-      [rbl, teil.kahl].forEach(k => {
+      [rbl, teil.kahl, rblKanon(rbl)].forEach(k => {
         const e = raus.get(k) || { alle: false, gruppen: [], genau: false };
         if (ein.alle) e.alle = true; else e.gruppen = e.gruppen.concat(meine);
         if (genau) e.genau = true;
@@ -4989,8 +4998,8 @@ function displaysAusEintraegen(eintraege) {
       // Station finden, egal ob mit oder ohne '!'-Teil geschrieben, und dabei merken,
       // welche Linien zu ihr gehoeren.
       const nurVon = new Map();
-      ein.rbls.forEach(r => { const x = rblTeile(r); nurVon.set(x.kahl, x.nur); });
-      const stats = stationen.filter(st => nurVon.has(rblTeile(st.rbl).kahl));
+      ein.rbls.forEach(r => { const x = rblTeile(r); nurVon.set(rblKanon(r), x.nur); });
+      const stats = stationen.filter(st => nurVon.has(rblKanon(st.rbl)));
       // "Alle Abfahrten" steht als '*' in der Config. Das ist jetzt ein Stations-Block,
       // also genau EINE Zeile, und damit laesst es sich zurueckholen. Vorher gab die
       // Wiederherstellung hier auf, und jeder Kunde mit "alle Abfahrten" verlor bei
@@ -5024,10 +5033,10 @@ function displaysAusEintraegen(eintraege) {
         const keys = [];
         // Sagt q, zu welcher Station dieses Token gehoert, gilt nur sie.
         const nurRbl = (ein.q && ein.q.length > ti && ein.rbls[ein.q[ti]] != null)
-          ? rblTeile(ein.rbls[ein.q[ti]]).kahl : null;
+          ? rblKanon(ein.rbls[ein.q[ti]]) : null;
         teil.forEach(m => stats.forEach(st => {
-          if (nurRbl && rblTeile(st.rbl).kahl !== nurRbl) return;
-          if (!nurRbl && !gehoertDazu(nurVon.get(rblTeile(st.rbl).kahl), m.linie)) return;
+          if (nurRbl && rblKanon(st.rbl) !== nurRbl) return;
+          if (!nurRbl && !gehoertDazu(nurVon.get(rblKanon(st.rbl)), m.linie)) return;
           const si = stationen.indexOf(st);
           const nimm = (linie, ziel) => {
             const k = zeilenKey(si, { line: linie, dest: ziel });
@@ -5098,8 +5107,8 @@ function gehwegUebernehmen(eintraege) {
     (ein.rbls || []).forEach((rbl, i) => {
       const gw = ein.g.length > i ? ein.g[i] : ein.g[0];
       if (!gw) return;
-      const kahl = rblTeile(rbl).kahl;
-      const st = stationen.find(x => rblTeile(x.rbl).kahl === kahl);
+      const kahl = rblKanon(rbl);
+      const st = stationen.find(x => rblKanon(x.rbl) === kahl);
       if (st && !st.gehweg) st.gehweg = gw;
     });
   });
