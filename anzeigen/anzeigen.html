@@ -99,6 +99,15 @@
   .neu .glas .wort { font-size: 13px; font-weight: 600; }
 
   /* ---- Karten ---- */
+  .laden { display: none; align-items: center; gap: 12px; margin: 0 0 18px;
+           font-size: 14px; font-weight: 600; color: var(--grau); }
+  .laden.an { display: flex; }
+  .laden .ring { width: 20px; height: 20px; border-radius: 50%; flex: 0 0 auto;
+                 border: 3px solid var(--rand); border-top-color: var(--akzent);
+                 animation: dreh .8s linear infinite; }
+  @keyframes dreh { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .laden .ring { animation-duration: 3s; } }
+
   .karte {
     background: var(--karte); border: 2px solid var(--tinte); border-radius: 14px;
     box-shadow: 4px 4px 0 var(--tinte); padding: 14px; margin-bottom: 16px;
@@ -439,6 +448,9 @@
   <button class="zurueck" onclick="zurueckZuLinien()">&#8592; Zu deinen Linien</button>
   <h1>Meine Anzeigen</h1>
   <p class="unter">Wische seitwärts durch deine Displays. Was du hier siehst, steht genauso am Gerät.</p>
+  <!-- Bis die Abfahrten da sind, stand die Seite leer da und sah kaputt aus. Eine
+       Haltestelle braucht je nach Netz mehrere Sekunden (Paul 26.10.2026). -->
+  <div id="laden" class="laden"><span class="ring"></span><span id="ladenText">Lade deine Linien</span></div>
 </div>
 
 <div class="streifen" id="streifen"></div>
@@ -448,10 +460,10 @@
     <button class="klapp-kopf" onclick="klappSchalten('klappLinien')"><span>Linien &amp; Reihenfolge<span class="neu-platz"></span></span>
       <span class="klapp-pfeil"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
     <div class="klapp-koerper">
-      <!-- Der Topf steht OBEN: von hier legt man Linien aufs Display, das daneben in der
-           Vorschau steht. Weiter unten musste man dafuer erst an den Zeilen vorbeiscrollen
-           (Paul 26.10.2026). -->
-      <div class="kopf"><div class="titel" id="poolTitel">Deine anderen Linien</div>
+      <!-- Reihenfolge: WELCHES Display und wie es aussieht ganz oben, dann der Topf zum
+           Auflegen, dann die Zeilen, die schon darauf liegen (Paul 26.10.2026). -->
+      <div id="editorKopf"></div>
+      <div class="kopf pooltrenner"><div class="titel" id="poolTitel">Deine anderen Linien</div>
         <div class="modus">tippen legt sie auf das gewählte Display</div></div>
       <div id="stationsliste"></div>
       <div id="editor" class="pooltrenner"></div>
@@ -1961,8 +1973,10 @@ function editorZeichnen() {
   const el = document.getElementById('editor');
   const s = schirme[zeiger];
   if (!s) {
-    el.innerHTML = '<div class="kopf"><div class="titel">Noch nichts eingestellt</div></div>'
+    const kopfLeer = document.getElementById('editorKopf');
+    if (kopfLeer) kopfLeer.innerHTML = '<div class="kopf"><div class="titel">Noch nichts eingestellt</div></div>'
                  + '<div class="hinweis">Die Stationen kommen aus dem Schritt davor, dann erscheint hier dein erstes Display.</div>';
+    el.innerHTML = '';
     return;
   }
   // Rechts steht das x, nicht die Seitenzahl: wie viele Seiten es sind, sagt der Hinweis
@@ -2082,6 +2096,10 @@ function editorZeichnen() {
   // Je Zeile zeigen, was darauf steht, mit Pfeilen zum Umsortieren innerhalb des Displays.
   // Kopf mit Link: Zusammenfassen ist die eine Sache, die man hier noch tun kann, und
   // sie gehoert neben die Ueberschrift der Zeilen (Paul 22.10.2026).
+  // Ab hier beginnt die Liste der Zeilen. Alles davor ist der Kopf und steht in einem
+  // eigenen Behaelter ganz oben in der Karte.
+  const kopfEl = document.getElementById('editorKopf');
+  if (kopfEl) { kopfEl.innerHTML = h; h = ''; }
   h += '<div class="zeilenkopf"><h2>'
      + (zeitbasiert(dHier) ? 'Linien auf diesem Display' : 'Zeilen dieses Displays') + '</h2>'
      + (!zeitbasiert(dHier) && (dHier.richtungen || []).length > 1
@@ -4833,6 +4851,28 @@ function tokenTreffer(linien, m, richtungen) {
   return gleich;
 }
 
+// Ladeanzeige: sie laeuft, solange Stationen geholt werden, und sagt wie viele schon da
+// sind. Ohne sie sieht ein langsames Netz wie eine kaputte Seite aus.
+let ladenGesamt = 0, ladenFertig = 0;
+function ladenAn(n) {
+  ladenGesamt = n; ladenFertig = 0;
+  const el = document.getElementById('laden');
+  if (el) el.classList.add('an');
+  ladenText();
+}
+function ladenText() {
+  const el = document.getElementById('ladenText');
+  if (!el) return;
+  el.textContent = ladenGesamt > 1
+    ? 'Lade deine Linien, ' + ladenFertig + ' von ' + ladenGesamt + ' Haltestellen'
+    : 'Lade deine Linien';
+}
+function ladenSchritt() { ladenFertig++; ladenText(); }
+function ladenAus() {
+  const el = document.getElementById('laden');
+  if (el) el.classList.remove('an');
+}
+
 (async function start() {
   // Testaufbau, solange niemand etwas uebergibt: fuenf Wiener Stationen mit je einer
   // Linie. Damit sieht man sofort, wie aus Zeilen Seiten werden und wie die Stile wirken.
@@ -4868,6 +4908,7 @@ function tokenTreffer(linien, m, richtungen) {
                                          lat: e.lat, lon: e.lon,
                                          wahl: [[{ linie: e.linie, richtung: e.ziel }]],
                                          richtungen: [{ line: e.linie, ziel: e.ziel }] }));
+  ladenAn(liste.length);
   for (const e of liste) {
     const st = { rbl: e.rbl, name: e.name, netz: e.netz || 'WL', abfahrten: [],
                  alle: !!e.alle, linienAmHalt: e.linienAmHalt || null,
@@ -4896,6 +4937,7 @@ function tokenTreffer(linien, m, richtungen) {
       try { abfahrtenSetzen(st, await abfahrten(e.rbl)); }
       catch (err2) { st.fehler = String((err2 && err2.message) || err2); abfahrtenSetzen(st, []); }
     }
+    ladenSchritt();
     // Angehakt wird, was der Konfigurator gewaehlt hat. "Alle Abfahrten" laesst die
     // Auswahl leer, das heisst in dieser Oberflaeche ohnehin "alles".
     if (!e.alle && e.wahl && e.wahl.length) {
@@ -4960,6 +5002,7 @@ function tokenTreffer(linien, m, richtungen) {
   // war nach einem Besuch weg, dieselbe Falle wie beim Nachtmodus (Paul 25.10.2026).
   gehwegUebernehmen(ueber && ueber.eintraege);
   // Gab es schon eine Config, zaehlt sie: Bretter, Stil, Uhr und Design kommen zurueck.
+  ladenAus();
   if (displaysAusEintraegen(ueber && ueber.eintraege)) { allesZeichnen(); return; }
   allesZeichnen();
   // Die Aufteilung kam nicht zurueck, das Aussehen schon.
