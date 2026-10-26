@@ -5190,6 +5190,22 @@ async function fetchStopLinesCached(network, stopId) {
               });
             });
             window._dirTextByStop[k] = dt;
+            // Zusaetzlich die Ziele JE LINIE: viele Netze (OOEVV, Linz …) liefern im Index
+            // zwar towards, aber KEINE richtungsId, dann greift die Zuordnung oben nicht.
+            // Hat eine Linie an diesem Halt genau ein Ziel, ist sie trotzdem eindeutig.
+            if (!window._dirZieleByStop) window._dirZieleByStop = {};
+            const dz = {};
+            ((d && d.lines) || []).forEach(l => {
+              const ln = String(l.name || '').trim();
+              if (!ln) return;
+              (l.directions || []).forEach(dd => {
+                const tw = String(dd.towards || '').trim();
+                if (!tw) return;
+                if (!dz[ln]) dz[ln] = [];
+                if (dz[ln].indexOf(tw) < 0) dz[ln].push(tw);
+              });
+            });
+            window._dirZieleByStop[k] = dz;
             window._linesByStopCache[k] = ls.length ? ls : null;
             return window._linesByStopCache[k];
           }
@@ -24704,6 +24720,67 @@ async function _heilungArbeiten() {
   } finally { _heilungLaeuft = false; }
 }
 
+// Zieltexte nachtragen. Eine Richtung, die gerade nicht faehrt (Abend, Wochenende,
+// seltener Bus), kommt ohne Zieltext aus den Abfahrten: die richtungsId steht, der Text
+// fehlt. Die eigene Stationskarte zeigt so einen Eintrag als "Alle Richtungen", die
+// Anzeigen-Oberflaeche baut daraus seit 26.10.2026 aber DIREKT ihre Zeilen, und dort
+// stuende dann eine Zeile ohne Ziel. Der Linien-Index kennt die Ziele; seit dem
+// Server-Cache vom 26.10.2026 kostet er rund 60 ms je Station statt 6 s.
+// Gemessen als fehlend: Linz Unionkreuzung "609>st444518404l609" (faehrt abends nicht).
+var _zieltexteGeplant = false;
+function zieltexteNachtragenSpaeter() {
+  if (_zieltexteGeplant) return;
+  _zieltexteGeplant = true;
+  setTimeout(function() { _zieltexteGeplant = false; zieltexteNachtragen(); }, 1200);
+}
+async function zieltexteNachtragen() {
+  try {
+    // Wie bei den Namen: erst wenn der Aufbau durch ist, sonst draengt sich das Nachtragen
+    // vor die Abfragen, auf die der Aufbau wirklich wartet.
+    for (var w = 0; w < 120 && _loadExistingConfigPromise; w++) {
+      await new Promise(function(r) { setTimeout(r, 500); });
+    }
+    var offen = (stations || []).filter(function(s) {
+      if (!s || s.allDepartures || s.isJourney) return false;
+      // Wien hat keinen Linien-Index (/stops/lines liefert dort null), seine Zieltexte
+      // kommen ohnehin aus den Abfahrten derselben Quelle wie die gespeicherten rids.
+      if (s.network === 'WL' || s.network === 'WLB') return false;
+      return (s.directions || []).some(function(d) {
+        return d && d.richtungsId && !String(d.towards || '').trim();
+      });
+    });
+    var geaendert = 0;
+    for (var i = 0; i < offen.length; i++) {
+      var st = offen[i];
+      var bare = String(st.stopId || '');
+      if (typeof lineSelStrip === 'function') bare = lineSelStrip(bare);
+      bare = bare.split('>')[0];
+      if (!bare) continue;
+      try { await fetchStopLinesCached(st.network, bare); } catch (e) { continue; }
+      var k = st.network + ':' + bare;
+      var proRid = (window._dirTextByStop || {})[k] || {};
+      var proLinie = (window._dirZieleByStop || {})[k] || {};
+      (st.directions || []).forEach(function(d) {
+        if (!d || !d.richtungsId || String(d.towards || '').trim()) return;
+        var tr = proRid[String(d.line) + '|' + String(d.richtungsId)];
+        var txt = Array.isArray(tr) ? tr[0] : tr;
+        if (!txt) {
+          // Ohne rid im Index: nur bei GENAU EINEM Ziel je Linie ist es eindeutig. Bei
+          // mehreren bleibt der Text leer, raten waere schlimmer als nichts.
+          var ziele = proLinie[String(d.line)];
+          if (Array.isArray(ziele) && ziele.length === 1) txt = ziele[0];
+        }
+        if (txt) { d.towards = txt; geaendert++; }
+      });
+      await new Promise(function(r) { setTimeout(r, 120); });
+    }
+    if (geaendert) {
+      console.log('[zieltexte] ' + geaendert + ' Richtung(en) nachtraeglich benannt');
+      if (typeof updateStationsList === 'function') updateStationsList();
+    }
+  } catch (e) { /* ein fehlgeschlagener Nachtrag darf nichts aufhalten */ }
+}
+
 // Name OHNE Warten, in dieser Reihenfolge:
 //  1. in dieser Sitzung schon kanonisch aufgeloest → sofort,
 //  2. aus einem frueheren Besuch gemerkt → sofort (das ist der Normalfall beim
@@ -25007,7 +25084,7 @@ function _geraetRowsMerken(mr, tr, ds) {
 // niemand gespeichert — dann ist die Auswahl von eben die juengere Wahrheit.
 // Hat das Geraet seither eine andere masterrow, gewinnt IMMER das Geraet.
 var _FEINTUNING_RUECKKEHR_FENSTER = 30 * 60 * 1000;
-function auswahlAusFeintuningZurueck(geraeteMasterrow) {
+function auswahlAusFeintuningZurueck(geraeteMasterrow, geraeteTimerow) {
   try {
     var o = JSON.parse(sessionStorage.getItem('catchit_feintuning') || 'null');
     if (!o || !o.masterrow || !o.stand) return null;
@@ -25016,10 +25093,23 @@ function auswahlAusFeintuningZurueck(geraeteMasterrow) {
     if (beimVerlassen === null) return null;              // kein Vergleichsmass → Finger weg
     var jetzt = String(geraeteMasterrow == null ? '' : geraeteMasterrow).trim();
     if (beimVerlassen !== jetzt) return null;             // Geraet hat sich geaendert → Geraet gewinnt
+    // Die TIMEROW zaehlt genauso: Zug-Anzeigen (Stil 12 und Verwandte) liegen dort, nicht in
+    // der masterrow. Hat das Geraet dort inzwischen etwas anderes, gewinnt ebenfalls das Geraet.
+    var zeitVerlassen = (o.geraet && o.geraet.timerow != null) ? String(o.geraet.timerow).trim() : '';
+    var zeitJetzt = String(geraeteTimerow == null ? '' : geraeteTimerow).trim();
+    if (zeitVerlassen !== zeitJetzt) return null;
     var eigene = String(o.masterrow).trim();
-    if (!eigene || eigene === beimVerlassen) return null;  // nichts geaendert → nichts zu retten
-    var rbl = eigene.split(';').map(function(seg) { return (seg.split('|')[0] || '').trim(); })
-                    .filter(Boolean).join(',');
+    var eigeneZeit = String(o.timerow || '').trim();
+    if (!eigene && !eigeneZeit) return null;
+    if (eigene === beimVerlassen && eigeneZeit === zeitVerlassen) return null;  // nichts zu retten
+    // Die Stationsliste MUSS aus BEIDEN Zeilen kommen. Vorher stand hier nur die masterrow,
+    // und damit fiel beim Zurueckgehen aus dem Feintuning jede Zug-Anzeige weg: ihr Segment
+    // liegt in der timerow, also stand sie in keiner rbl und wurde gar nicht erst gebaut
+    // (Pauls Fall 26.10.2026: "Salzburg Hbf → Linz Hbf, Innsbruck Hbf" war nach dem
+    // Zurueckgehen verschwunden, die drei Stadt-Stationen blieben).
+    var rbl = [eigene, eigeneZeit].filter(Boolean).join(';')
+                .split(';').map(function(seg) { return (seg.split('|')[0] || '').trim(); })
+                .filter(Boolean).join(',');
     if (!rbl) return null;
     console.log('[config] Rueckkehr aus dem Feintuning: ungespeicherte Auswahl wiederhergestellt');
     return { rbl: rbl, masterrow: eigene, timerow: String(o.timerow || '') };
@@ -25054,13 +25144,14 @@ async function handleConfigMessage(data) {
     if (data.rbl && data.rbl.split(',').some(function(p){ p=(p||'').trim(); return p.indexOf('WL:')===0 || /^\d/.test(p); })) {
       await loadWienData();
     }
-    var _zurueck1 = auswahlAusFeintuningZurueck(data.masterrow);
+    var _zurueck1 = auswahlAusFeintuningZurueck(data.masterrow, data.timerow);
     if (_zurueck1) {
       await loadExistingConfig(_zurueck1.rbl, '', '', '', '', _zurueck1.masterrow + ';' + _zurueck1.timerow, true);
     } else {
       await loadExistingConfig(data.rbl, data.filter, data.linefilterdestination || '', data.roworderdestination || '', data.linegroups || '', (data.masterrow || '') + ';' + (data.timerow || ''));
     }
     if (Array.isArray(stations) && stations.length > 0) resolveStartup();
+    zieltexteNachtragenSpaeter();
     return;
   }
 
@@ -25105,7 +25196,7 @@ async function handleConfigMessage(data) {
     const lineGroupsStr = data.config.linegroups || '';
     // clearFirst=true: loadFullConfig ist autoritativ und verwirft ein evtl. parallel gelaufenes
     // (unvollständiges) loadExistingConfig-Ergebnis erst NACH der Serialisierung (Race-Fix).
-    var _zurueck2 = auswahlAusFeintuningZurueck(data.config.masterrow);
+    var _zurueck2 = auswahlAusFeintuningZurueck(data.config.masterrow, data.config.timerow);
     if (_zurueck2) {
       await loadExistingConfig(_zurueck2.rbl, '', '', '', '', _zurueck2.masterrow + ';' + _zurueck2.timerow, true);
     } else {
@@ -25279,6 +25370,7 @@ async function handleConfigMessage(data) {
     // Bestehende Config geladen → Auswahl-Menü (Linien ändern / Einstellungen ändern) zeigen
     maybeShowConfigChoice();
     resolveStartup();
+    zieltexteNachtragenSpaeter();
   }
 }
 

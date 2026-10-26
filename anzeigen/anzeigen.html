@@ -1406,7 +1406,16 @@ function istZugStation(st) { return zugZiele(st).length > 0; }
 const ALLE_TEXT = 'Alle Abfahrten';
 // Zeichen fuer den Block: ein Stern waere im Badge kaum zu erkennen.
 const ALLE_MARKE = '\u2630';
-function depText(dep) { return (dep && dep.alleStation) ? ALLE_TEXT : ((dep && dep.dest) || ''); }
+// Ein LEERER Zieltext heisst nicht "kein Ziel", sondern "Richtung ist per Id gewaehlt,
+// den Text kennt gerade niemand": die Linie faehrt abends nicht oder lag nicht im Feed.
+// Die Linienauswahl schreibt dafuer "Alle Richtungen", und genau so steht es hier auch,
+// sonst sieht der Kunde eine halbe Zeile (Konfigurator-Sitzung 26.10.2026).
+const RICHTUNG_UNBEKANNT = 'Alle Richtungen';
+function depText(dep) {
+  if (dep && dep.alleStation) return ALLE_TEXT;
+  const z = String((dep && dep.dest) || '').trim();
+  return z || RICHTUNG_UNBEKANNT;
+}
 function depMarke(dep) {
   if (dep && dep.alleStation) return ALLE_MARKE;
   return (dep && dep.line) || '?';
@@ -2557,7 +2566,7 @@ function stationenZeichnen() {
             ? '<b style="background:#1b1b1b;color:#fff">' + SYM_HALT + '</b>'
             : '<b style="background:' + f.bg + ';color:' + f.fg + '">' + escapeHtmlFt(d.line) + '</b>')
          + '<div class="rumpf"><div class="ziel' + (block ? ' alles' : '') + '">'
-         + escapeHtmlFt(block ? st.name : d.dest) + '</div>'
+         + escapeHtmlFt(block ? st.name : depText(d)) + '</div>'
          + '<div class="halt">'
          // Der Name steht schon in der Ueberschrift darueber.
          + (block ? ALLE_TEXT : '')
@@ -5092,7 +5101,40 @@ function ladenAus() {
     ladenSchritt();
     // Angehakt wird, was der Konfigurator gewaehlt hat. "Alle Abfahrten" laesst die
     // Auswahl leer, das heisst in dieser Oberflaeche ohnehin "alles".
-    if (!e.alle && e.wahl && e.wahl.length) {
+    // DIE AUSWAHL KOMMT AUS DEM PICKER, nicht aus einem Abgleich. Schickt die
+    // Linienauswahl ihre Richtungen mit, sind GENAU DAS die Zeilen: eine je Eintrag,
+    // mit ihrer Beschriftung und ihrer Richtungs-Id. Vorher habe ich daraus nur einen
+    // Startpunkt gemacht und dann selbst in den Abfahrten gesucht, und jedes Mal, wenn
+    // dabei etwas nicht traf, stand entweder zu wenig oder die halbe Haltestelle da
+    // (Paul 26.10.2026: "der grosse Fehler ist, dass du immer selber suchst").
+    if (!e.alle && e.richtungen && e.richtungen.length) {
+      const paare = [];
+      e.richtungen.forEach(r => {
+        const linie = String(r.line || '').trim();
+        if (!linie) return;
+        st.gewaehlt.add(linie + '|' + String(r.ziel || '').trim());
+        if (r.rid) {
+          if (!st.ruhtRid) st.ruhtRid = {};
+          st.ruhtRid[linie + '|' + String(r.ziel || '').trim()] = String(r.rid).trim();
+        }
+      });
+      // Gruppen aus der masterrow bleiben erhalten, die stehen nicht in den Richtungen.
+      (e.wahl || []).forEach(gruppe => {
+        if (!gruppe || gruppe.length < 2) return;
+        const keys = [];
+        gruppe.forEach(m => {
+          const treffer = [...st.gewaehlt].filter(k =>
+            k.slice(0, k.indexOf('|')).toUpperCase() === String(m.linie || '').trim().toUpperCase());
+          treffer.forEach(k => {
+            const i = k.indexOf('|');
+            const kk = zeilenKey(stationen.indexOf(st), { line: k.slice(0, i), dest: k.slice(i + 1) });
+            if (keys.indexOf(kk) < 0) keys.push(kk);
+          });
+        });
+        if (keys.length > 1) paare.push(keys);
+      });
+      if (paare.length) st.paare = paare;
+    } else if (!e.alle && e.wahl && e.wahl.length) {
       const linien = linienAus(st.abfahrten);
       const paare = [];
       e.wahl.forEach(gruppe => {
