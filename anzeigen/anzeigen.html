@@ -343,10 +343,21 @@
   .wahltrenner { font-size: 11px; font-weight: 700; letter-spacing: .04em;
                  text-transform: uppercase; color: var(--grau); margin: 14px 0 6px; }
   /* Ueberschrift je Station in der Liste "nach Abfahrt". */
-  .haltkopf { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin: 14px 0 2px;
-              font-size: 11px; font-weight: 800; letter-spacing: .5px;
-              text-transform: uppercase; color: var(--grau); }
-  .haltkopf svg { width: 14px; height: 14px; }
+  /* Die Station ist die Ueberschrift ihrer Linien, also sieht sie auch so aus: groesser,
+     dunkel, mit einer Linie darunter und Luft darueber (Paul 26.10.2026). */
+  .haltkopf { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+              margin: 22px 0 8px; padding-bottom: 7px; border-bottom: 2px solid var(--linie);
+              font-size: 15px; font-weight: 800; letter-spacing: .1px; color: var(--tinte); }
+  .haltkopf:first-child { margin-top: 4px; }
+  .haltkopf svg { width: 17px; height: 17px; color: var(--grau); }
+  /* Umschalter in der Stationszeile: klein, aber als Schalter erkennbar. */
+  .haltwahl { display: inline-flex; background: #ece3d2; border-radius: 9px; padding: 3px; gap: 3px;
+              flex: 0 0 auto; }
+  .haltwahl button { font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .2px;
+                     padding: 4px 10px; border: none; border-radius: 7px; background: transparent;
+                     color: var(--grau); box-shadow: none; cursor: pointer; }
+  .haltwahl button.an { background: #fff; color: var(--tinte); box-shadow: 0 1px 2px rgba(0,0,0,.15);
+                        cursor: default; }
   .farbfelder { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
                 gap: 10px; margin: 2px 0 14px; }
   .farbfeld { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
@@ -433,15 +444,17 @@
 <div class="streifen" id="streifen"></div>
 
 <div class="bahn">
-  <div class="reiter" id="reiter"></div>
   <div class="karte klapp offen" id="klappLinien">
     <button class="klapp-kopf" onclick="klappSchalten('klappLinien')"><span>Linien &amp; Reihenfolge<span class="neu-platz"></span></span>
       <span class="klapp-pfeil"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></button>
     <div class="klapp-koerper">
-      <div id="editor"></div>
-      <div class="kopf pooltrenner"><div class="titel" id="poolTitel">Deine anderen Linien</div>
+      <!-- Der Topf steht OBEN: von hier legt man Linien aufs Display, das daneben in der
+           Vorschau steht. Weiter unten musste man dafuer erst an den Zeilen vorbeiscrollen
+           (Paul 26.10.2026). -->
+      <div class="kopf"><div class="titel" id="poolTitel">Deine anderen Linien</div>
         <div class="modus">tippen legt sie auf das gewählte Display</div></div>
       <div id="stationsliste"></div>
+      <div id="editor" class="pooltrenner"></div>
     </div>
   </div>
 
@@ -912,7 +925,11 @@ function kannSortieren(c) { return STIL_OHNE_SORTIERUNG.indexOf(parseInt(c, 10))
 function zeitbasiert(d) {
   if (!d) return false;
   if (istZeitTyp(stilVon(d))) return true;   // Zugbretter sind immer chronologisch
-  return kannSortieren(stilVon(d)) && d.sortierung === 'zeit';
+  // Keine eigene Wahl mehr: ein Brett, auf dem nur ganze Stationen liegen, zeigt deren
+  // Abfahrten nach Uhrzeit, ein Brett mit Linien zeigt feste Zeilen. Die Entscheidung
+  // faellt dort, wo sie hingehoert, naemlich am Schalter "als Station" der Haltestelle
+  // (Paul 26.10.2026). Die beiden Reiter darueber waren damit doppelt gemoppelt.
+  return kannSortieren(stilVon(d)) && nurBloeckeAuf(d);
 }
 
 // Zeilen im zeitlichen Modus stellt der Nutzer selbst ein, denn sie haengen nicht mehr
@@ -1090,6 +1107,12 @@ function halteLinien(st) {
   (st.linienAmHalt || []).forEach(nimm);
   (st.letzteLinien || []).forEach(d => nimm(d.line));
   (st.abfahrten || []).forEach(d => nimm(d.line));
+  // Und was der Nutzer ausgewaehlt hat, auch wenn die Station gerade nichts liefert:
+  // sonst steht eine zusammengefasste Station ohne ihre Linien da (Paul 26.10.2026).
+  (st.gewaehlt ? [...st.gewaehlt] : []).forEach(k => {
+    const i = String(k).indexOf('|');
+    nimm(i < 0 ? k : String(k).slice(0, i));
+  });
   return raus.sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
 }
 
@@ -1819,7 +1842,6 @@ function gewaehlteAbfahrten(st) { return zeilenEintraege(st); }
 function allesZeichnen() {
   schirmeBauen();
   streifenZeichnen();
-  reiterZeichnen();
   editorZeichnen();
   stationenZeichnen();
   neuMarkieren();
@@ -2393,9 +2415,16 @@ function stationenZeichnen() {
     const anZahl = zeilenEintraege(st).length;
     return '<div class="haltkopf"><span style="display:flex;align-items:center;gap:7px;">'
       + SYM_HALT + '<span>' + escapeHtmlFt(st.name) + '</span></span>'
+      // Zwei Zustaende, beide sichtbar: man soll sehen, dass es die Wahl gibt, und in
+      // welchem Zustand die Station gerade ist (Paul 26.10.2026).
       + (istZugStation(st) ? ''
-         : '<button class="link" onclick="stationAlsBlock(' + si + ',' + (st.alle ? 'false' : 'true') + ')">'
-           + (st.alle ? 'Linien einzeln' : 'als Station') + '</button>')
+         : '<span class="haltwahl">'
+           + '<button class="' + (st.alle ? '' : 'an') + '"'
+           + (st.alle ? ' onclick="stationAlsBlock(' + si + ',false)"' : '')
+           + '>Linien</button>'
+           + '<button class="' + (st.alle ? 'an' : '') + '"'
+           + (st.alle ? '' : ' onclick="stationAlsBlock(' + si + ',true)"')
+           + '>Station</button></span>')
       + '</div>';
   };
   stationen.forEach((st, si) => {
@@ -3549,10 +3578,11 @@ function designZeichnen() {
   // alten Konfigurator. Alles auf einmal in der Karte war zu viel auf einmal
   // (Paul 26.10.2026: "sonst zu confusing"). Die Karte zeigt nur, was eingestellt ist.
   if (istEigen(c)) {
-    const g = eigenVon(c);
-    el.innerHTML = '<div class="hinweis">Eigenes Design <b>' + escapeHtmlFt(g.N || '')
-      + '</b> auf Display ' + (di + 1) + '.</div>'
-      + '<button onclick="eigenOeffnen(' + c + ')">Design bearbeiten</button>';
+    // Ein BESTEHENDES Design wird in der Karte eingestellt, mit allem untereinander:
+    // wer schon weiss, was er will, soll nicht durch vier Schritte klicken. Das Pop-up
+    // gibt es nur beim ANLEGEN, dort fuehrt es (Paul 26.10.2026).
+    el.innerHTML = eigenSchritte(c).map(x =>
+      '<label class="feld">' + escapeHtmlFt(x.kurz || x.titel) + '</label>' + x.html).join('');
     if (eigenDialogFuer === c) eigenDialogZeichnen();
     return;
   }
@@ -3828,9 +3858,8 @@ function klappSchalten(id) {
   if (!el) return;
   const wirdOffen = !el.classList.contains('offen');
   document.querySelectorAll('.klapp.offen').forEach(x => x.classList.remove('offen'));
-  if (!wirdOffen) { reiterZeichnen(); return; }
+  if (!wirdOffen) return;
   el.classList.add('offen');
-  reiterZeichnen();
   // Beim Zuklappen des vorherigen rutscht die Seite, darum den neuen Kopf herholen.
   const kopf = el.querySelector('.klapp-kopf');
   if (kopf) kopf.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -3896,15 +3925,26 @@ function sagen(titel, text) { dialogZeigen(titel, text, [{ text: 'Alles klar' }]
 function stationAlsBlock(si, an) {
   const st = stationen[si];
   if (!st || istZugStation(st)) return;
+  const meins = k => { const m = /^(\d+)\u00a7/.exec(String(k)); return m && parseInt(m[1], 10) === si; };
+  // WO lagen die Zeilen dieser Station, und an welcher Stelle? Dort steht gleich die neue
+  // Zeile. Sonst verschwindet sie beim Umschalten und taucht irgendwo wieder auf
+  // (Paul 26.10.2026: "soll die Zeile nicht wie jetzt verschwinden").
+  let zielBrett = -1, stelle = 0;
+  displays.forEach((d, di) => {
+    const i = (d.richtungen || []).findIndex(meins);
+    if (i >= 0 && zielBrett < 0) { zielBrett = di; stelle = i; }
+  });
   st.alle = !!an;
-  // Die alten Schluessel dieser Station sind weg, die neuen kennt noch niemand.
   displays.forEach(d => {
-    d.richtungen = (d.richtungen || []).filter(k => {
-      const m = /^(\d+)\u00a7/.exec(String(k));
-      return !m || parseInt(m[1], 10) !== si;
-    });
+    d.richtungen = (d.richtungen || []).filter(x => !meins(x));
     gruppenPruefen(d);
   });
+  // Die neuen Zeilen an dieselbe Stelle legen.
+  if (zielBrett >= 0 && displays[zielBrett]) {
+    const neu = zeilenEintraege(st).map(dep => zeilenKey(si, dep));
+    displays[zielBrett].richtungen.splice(stelle, 0, ...neu);
+    displays[zielBrett].vomNutzer = true;
+  }
   allesZeichnen();
 }
 
@@ -4012,8 +4052,9 @@ function stilSetzen(v) {
     eigenVon(frei);                       // legt das Design mit den Vorgaben an
     if (d) d.stil = frei; else stil = frei;
     allesZeichnen();
-    // Der Baukasten geht gleich auf, sonst sucht man ihn.
+    // Frisch angelegt: der Baukasten fuehrt Schritt fuer Schritt durch das leere Design.
     if (!document.getElementById('klappDesign').classList.contains('offen')) klappSchalten('klappDesign');
+    eigenOeffnen(frei);
     return;
   }
   if (d) d.stil = parseInt(v, 10) || 1; else stil = parseInt(v, 10) || 1;
@@ -4030,7 +4071,7 @@ let eigenSchritt = 0;
 function eigenSchritte(c) {
   const g = eigenVon(c);
   const teile = [];
-  teile.push({ titel: 'Wie soll es hei\u00dfen?',
+  teile.push({ kurz: 'Name', titel: 'Wie soll es hei\u00dfen?',
     text: 'Der Name steht in der Auswahl, damit du dein Design wiederfindest.',
     html: '<input id="eigenName" type="text" maxlength="24" value="' + escapeHtmlFt(g.N) + '"'
         + ' oninput="eigenNameSetzen(' + c + ', this.value)">' });
@@ -4045,7 +4086,7 @@ function eigenSchritte(c) {
   // Pixel: Matrix-Schrift und Punktraster gehoeren zusammen, das ist EIN Aussehen und
   // darum ein Schalter statt zweier Dreierwahlen.
   const pixelAn = (g.F === '3' && g.G === '2');
-  teile.push({ titel: 'Fl\u00e4che und Schrift',
+  teile.push({ kurz: 'Fl\u00e4che und Schrift', titel: 'Fl\u00e4che und Schrift',
     text: 'Die Vorschau oben zeigt jede \u00c4nderung sofort.',
     html: farbBlock(['B', 'T'])
         + schalterZeile('Pixel-Optik', 'Matrix-Schrift auf Punktraster, wie eine LED-Tafel.',
@@ -4055,7 +4096,7 @@ function eigenSchritte(c) {
     + '<span style="display:inline-flex;align-items:center;justify-content:center;'
     + 'min-width:58px;height:40px;padding:0 12px;border-radius:9px;font-weight:800;font-size:19px;'
     + 'background:#' + g.H + ';color:#' + g.V + ';border:2px solid #' + g.U + ';">U1</span></div>';
-  teile.push({ titel: 'Badge',
+  teile.push({ kurz: 'Badge', titel: 'Badge',
     text: 'Das farbige Feld, in dem die Liniennummer steht.',
     html: probe + farbBlock(['H', 'V', 'U']) });
   let sw = schalterZeile('Linien-Badges', 'Die Linie steht in einem farbigen Feld. Aus: sie steht gro\u00df daneben.',
@@ -4066,7 +4107,7 @@ function eigenSchritte(c) {
                          g.M === '1', 'eigenSchalten(' + c + ',\'M\',' + (g.M === '1' ? 'false' : 'true') + ')')
          + '<div class="hinweis">Eigene Farben je Linie gibt es hier noch nicht, die stellst '
          + 'du vorerst im alten Konfigurator ein. Sie bleiben erhalten.</div>';
-  teile.push({ titel: 'Feinheiten', text: '', html: sw });
+  teile.push({ kurz: 'Feinheiten', titel: 'Feinheiten', text: '', html: sw });
   return teile;
 }
 
