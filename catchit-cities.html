@@ -3250,10 +3250,10 @@
     <button class="btn hidden" id="addMoreStationsBtn" onclick="addMoreStations()" style="margin-top: 12px; width: 100%;">
       + Weitere Station hinzufügen
     </button>
-    <button class="btn hidden" id="schnellstartBtn" onclick="schnellstartNachfragen()" style="margin-top: 12px; width: 100%;">
-      Schnellstart
+    <button class="btn hidden" id="openFinetuningBtn" onclick="handleStationsNextStep()" style="margin-top: 12px; width: 100%;">
+      Feintunen
     </button>
-    <button class="btn btn-primary hidden" id="openFinetuningBtn" onclick="handleStationsNextStep()" style="margin-top: 12px; width: 100%;">
+    <button class="btn btn-primary hidden" id="schnellstartBtn" onclick="schnellstartNachfragen()" style="margin-top: 12px; width: 100%;">
       Weiter
     </button>
   </div>
@@ -5533,7 +5533,17 @@ function geraetHatFremdeFelder() {
   try {
     if (typeof _geraetRows === 'undefined' || !_geraetRows) return false;
     var z = geraetZusatzfelder(_geraetRows.masterrow);
-    return z.felder.some(function(f) { return f && f.length; });
+    return z.felder.some(function(f) {
+      if (!f || !f.length) return false;
+      // d NICHT mitzaehlen: die Bretter-Nummer schreibt diese Seite seit 26.10.2026 selbst,
+      // sobald zwei Stationen ein Brett teilen. Sie beweist also nicht, dass der Kunde im
+      // Feintuning war. Alles andere (Zeilen r, Sortierung s, Standzeit i, Wechselzeiten j,
+      // Design t/b/u/v/h/n/k/o/f/p, Fenster w, Uhr z) kann nur von dort kommen.
+      return f.some(function(t) {
+        var c = String(t).charAt(0);
+        return c !== 'd' && c !== 'D';
+      });
+    });
   } catch (e) { return false; }
 }
 // Token, das WIR dem Geraet hinschreiben. Im Pro-Station-Format (Firmware ab 2.6) ist das
@@ -12652,21 +12662,23 @@ function updateStationsList() {
     // Feintuning springen, sondern fragen (Paul 26.10.2026): dann heisst der eine Knopf
     // "Feintunen" und daneben steht "Schnellstart", der in den Wizard fuehrt. Beim ersten
     // Mal gibt es nur "Weiter", und das ist der Wizard, also der Schnellstart.
-    var _schonEingerichtet = (typeof hasExistingConfig !== 'undefined' && hasExistingConfig)
-      || ((typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder());
+    // "Feintunen" nur, wenn der Kunde eine Einstellung hat, die er NUR dort gemacht haben
+    // kann (Paul 26.10.2026): also ein Feld in der Geraete-Zeile, das diese Seite gar nicht
+    // schreibt, Aufteilung, Zeilen, Sortierung, Design. Eine Config allein reicht nicht,
+    // die entsteht auch beim ersten Speichern von hier.
+    var _warImFeintuning = (typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder();
+    var _aufZwischenseite = (typeof currentStep !== 'undefined' && currentStep === 'added');
     var schnellstartBtn = document.getElementById('schnellstartBtn');
-    if (openFinetuningBtn) {
-      if (typeof currentStep !== 'undefined' && currentStep === 'added') {
-        openFinetuningBtn.classList.remove('hidden');
-        openFinetuningBtn.textContent = _schonEingerichtet ? 'Feintunen' : 'Weiter';
-      } else {
-        openFinetuningBtn.classList.add('hidden');
-      }
-    }
+    // Der ROTE Hauptknopf ist immer der Schnellstart. War der Kunde noch nie im Feintuning,
+    // heisst er "Weiter", denn dann gibt es nichts anderes, und der Wizard IST der
+    // Schnellstart.
     if (schnellstartBtn) {
-      var _zeigen = (typeof currentStep !== 'undefined' && currentStep === 'added')
-                    && _schonEingerichtet && stations.length > 0;
-      schnellstartBtn.classList.toggle('hidden', !_zeigen);
+      schnellstartBtn.classList.toggle('hidden', !(_aufZwischenseite && stations.length > 0));
+      schnellstartBtn.textContent = _warImFeintuning ? 'Schnellstart' : 'Weiter';
+    }
+    if (openFinetuningBtn) {
+      openFinetuningBtn.classList.toggle('hidden', !(_aufZwischenseite && _warImFeintuning));
+      openFinetuningBtn.textContent = 'Feintunen';
     }
     // Laeuft der Wizard (seine Fortschrittsleiste steht), bleibt die Stationsliste weg:
     // der Schritt kommt NACH der Linien-Auswahl und soll nicht darunter haengen
@@ -13140,9 +13152,12 @@ function showAddedStationsStep() {
   // stationsCard sichtbar + die zwei Aktions-Buttons zeigen.
   var sc = document.getElementById('stationsCard'); if (sc) sc.classList.remove('hidden');
   var addMore = document.getElementById('addMoreStationsBtn');
-  var weiter  = document.getElementById('openFinetuningBtn');
   if (addMore) addMore.classList.remove('hidden');
-  if (weiter)  weiter.classList.remove('hidden');
+  // Welche der beiden Weiter-Knoepfe hier stehen, entscheidet updateStationsList: der rote
+  // Schnellstart immer, "Feintunen" nur, wenn der Kunde dort schon einmal war. Vorher stand
+  // hier ein bedingungsloses remove('hidden'), und damit erschien "Feintunen" auch beim
+  // allerersten Einrichten (gemessen 26.10.2026).
+  updateStationsList();
   if (typeof updateBreadcrumb === 'function') updateBreadcrumb();
   window.scrollTo(0, 0);
 }
@@ -24803,9 +24818,11 @@ async function _heilungArbeiten() {
 // mehreren Anzeige-Typen alles neu zusammen. Geraete-Sachen wie Helligkeit, Nachtmodus und
 // Standzeit bleiben in jedem Fall, die fragt der Wizard selbst ab.
 function schnellstartNachfragen() {
-  var schonEingerichtet = (typeof hasExistingConfig !== 'undefined' && hasExistingConfig)
-    || ((typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder());
-  if (!schonEingerichtet) { startSetupWizard(); return; }
+  // Nur fragen, wenn es etwas zu verlieren gibt: eigene Felder in der Geraete-Zeile, die
+  // nur das Feintuning schreibt. Sonst waere die Frage beim ersten Einrichten sinnlos.
+  if (!((typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder())) {
+    startSetupWizard(); return;
+  }
   var alt = document.getElementById('schnellstartFrage');
   if (alt) alt.remove();
   var ov = document.createElement('div');
