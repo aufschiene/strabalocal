@@ -5268,17 +5268,22 @@ function ladenAus() {
     const standAlter = e.abfahrtenStand ? (Date.now() - e.abfahrtenStand) : 0;
     let roh = (e.abfahrtenStand && standAlter > 90000) ? null : (e.abfahrten || e.rohAbfahrten || null);
     if (roh && !Array.isArray(roh)) roh = abfahrtenAus(roh);
+    // HIER NICHT 'continue': darunter steht die AUSWAHL. Weil die Linienauswahl die
+    // Abfahrten fast immer mitschickt, wurde der Block darunter in der Praxis nie
+    // erreicht, und dann stand jede Abfahrt der Haltestelle auf dem Brett. In jeder
+    // Nachstellung lief es richtig, weil eine nachgebaute Uebergabe keine Abfahrten
+    // mitbringt, der echte Picker aber schon. Genau das war die wochenlange Jagd nach
+    // den Geisterlinien (am Geraet nachgemessen, 26.10.2026).
     if (Array.isArray(roh) && roh.length) {
       abfahrtenSetzen(st, roh);
-      ladenSchritt();
-      continue;
-    }
-    try {
-      abfahrtenSetzen(st, await abfahrten(e.rbl));
-    } catch (err) {
-      await new Promise(r => setTimeout(r, 1500));
-      try { abfahrtenSetzen(st, await abfahrten(e.rbl)); }
-      catch (err2) { st.fehler = String((err2 && err2.message) || err2); abfahrtenSetzen(st, []); }
+    } else {
+      try {
+        abfahrtenSetzen(st, await abfahrten(e.rbl));
+      } catch (err) {
+        await new Promise(r => setTimeout(r, 1500));
+        try { abfahrtenSetzen(st, await abfahrten(e.rbl)); }
+        catch (err2) { st.fehler = String((err2 && err2.message) || err2); abfahrtenSetzen(st, []); }
+      }
     }
     ladenSchritt();
     // Angehakt wird, was der Konfigurator gewaehlt hat. "Alle Abfahrten" laesst die
