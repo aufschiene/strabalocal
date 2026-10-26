@@ -8285,7 +8285,18 @@ function zurNeuenOberflaeche(cfg) {
       nightmode: _nachtAn(cfg) ? '1' : '0',
       nightstart: String(_zahlOderVorgabe(cfg.nightStart, cfg.nightstart, 22)),
       nightend: String(_zahlOderVorgabe(cfg.nightEnd, cfg.nightend, 6)),
-      stopinterval: String(_zahlOderVorgabe(cfg.stopInterval, cfg.stopinterval, 12))
+      stopinterval: String(_zahlOderVorgabe(cfg.stopInterval, cfg.stopinterval, 12)),
+      // Firmware-Version des Geraets. Sie steht NUR in der Adresse, mit der das Geraet
+      // diese Seite oeffnet (?fw=, main.cpp baut displayQuery so); die Config-Nachricht
+      // traegt sie nicht. Die Anzeigen-Oberflaeche kann sie auch nicht selbst holen: sie
+      // laeuft ueber https im iframe, und http://catch.local/debug ist von dort aus
+      // Mixed Content und zusaetzlich durch Private Network Access gesperrt. Ohne diese
+      // Angabe hielt sie JEDES Geraet fuer alt und schrieb das alte Komma-Format, auch auf
+      // 2.6 (ihr Befund aus Pauls Konsole, 26.10.2026).
+      fw: (typeof fwVersionParam === 'function') ? (fwVersionParam() || '') : '',
+      // Und gleich die Entscheidung dazu, damit niemand die Schwelle zweimal pflegt:
+      // true heisst "ein Segment je Station plus d", false das alte Komma-Format.
+      dFeld: (typeof dFeldSupported === 'function') ? !!dFeldSupported() : false
     };
     uebergabeSchreiben(_ue);
   } catch (e) {}

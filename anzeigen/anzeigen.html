@@ -22,7 +22,8 @@
      entfaerbt, damit die Anzeigen davor lesbar bleiben. */
   #karte {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    filter: grayscale(1) contrast(.75) brightness(1.06) opacity(.35);
+    background-repeat: repeat; background-size: 768px 512px;
+    opacity: .35;
   }
   #karte::after {
     content: ''; position: absolute; inset: 0;
@@ -1610,7 +1611,16 @@ function versionMin(ist, soll) {
   return true;
 }
 // Solange wir das Geraet nicht kennen, bleiben wir vorsichtig: kein CLOCK schreiben.
-function fwNeu() { return !!geraetVersion && versionMin(geraetVersion, FW_MIT_UHR); }
+// Ob das Geraet das NEUE Format kann, entscheidet die Linienauswahl und schickt es als
+// dFeld mit. Selbst nachrechnen koennte ich nicht verlaesslich: im iframe ueber HTTPS
+// komme ich gar nicht ans Geraet (Mixed Content plus Private Network Access), meine
+// eigene Abfrage laeuft dort immer ins Leere. Und die Schwelle soll nur an EINER Stelle
+// stehen, sonst zieht beim Verschieben jemand nicht nach (26.10.2026).
+let dFeldVonAussen = null;
+function fwNeu() {
+  if (dFeldVonAussen != null) return !!dFeldVonAussen;
+  return !!geraetVersion && versionMin(geraetVersion, FW_MIT_UHR);
+}
 
 async function versionHolen() {
   for (const h of GERAETE_HOSTS) {
@@ -4358,41 +4368,48 @@ async function stationNehmen(rbl, name, lat, lon, netz) {
 // ---- Stadtplan im Hintergrund ---------------------------------------------------------
 // Nur Schmuck: keine Klicks, entfaerbt, und er folgt der gerade gewaehlten Station,
 // sobald wir deren Koordinaten kennen (die Stationssuche liefert sie mit).
-// NICHT von tile.openstreetmap.org: deren Kacheln kommen von Spendenservern, und fuer ein
-// Produkt wie unseres ist das laut ihrer Nutzungsregel nicht gedacht. Sie haben uns dafuer
-// am 26.10.2026 mit 403 gesperrt ("App is not following the tile usage policy"). Stattdessen
-// basemap.at, das ist amtlich, ausdruecklich frei nutzbar (CC BY 4.0) und ohnehin grau.
-// ACHTUNG Reihenfolge: basemap.at erwartet {z}/{y}/{x}, nicht {z}/{x}/{y}.
-// Abgedeckt ist nur Oesterreich. Ausserhalb bleibt die Karte leer, dann traegt der
-// Papier-Hintergrund die Seite allein, und es geht keine einzige Anfrage hinaus.
-const KARTE_AT = { nord: 49.1, sued: 46.3, west: 9.4, ost: 17.2 };
-function inOesterreich(lat, lon) {
-  return lat != null && lon != null
-      && lat <= KARTE_AT.nord && lat >= KARTE_AT.sued
-      && lon >= KARTE_AT.west && lon <= KARTE_AT.ost;
+// Hintergrundkarte: EIN BILD, das bei uns liegt. Keine Kachel-Anfragen im Betrieb, nicht
+// an OpenStreetMap (deren Nutzungsregel schliesst ein Produkt wie unseres aus, sie haben
+// uns am 26.10.2026 dafuer gesperrt) und auch sonst nirgendwohin. Die Bilder sind einmal
+// aus OSM-Kacheln gebaut, entsaettigt und in anzeigen/karten/ abgelegt; der Generator
+// liegt im Werkzeug-Ordner. Datenquelle bleibt OpenStreetMap, die Angabe steht unten.
+const KARTEN_ORTE = [
+  ['at-w', 48.2082, 16.3738], ['at-n', 48.2047, 15.6256], ['at-o', 48.3064, 14.2861],
+  ['at-s', 47.8095, 13.0550], ['at-t', 47.2692, 11.4041], ['at-v', 47.5031, 9.7471],
+  ['at-st', 47.0707, 15.4395], ['at-k', 46.6247, 14.3050], ['at-b', 47.8457, 16.5276],
+  ['de-bw', 48.7758, 9.1829], ['de-by', 48.1372, 11.5755], ['de-be', 52.5200, 13.4050],
+  ['de-bb', 52.3906, 13.0645], ['de-hb', 53.0793, 8.8017], ['de-hh', 53.5511, 9.9937],
+  ['de-he', 50.0826, 8.2400], ['de-mv', 53.6355, 11.4012], ['de-ni', 52.3759, 9.7320],
+  ['de-nw', 51.2277, 6.7735], ['de-rp', 49.9929, 8.2473], ['de-sl', 49.2402, 6.9969],
+  ['de-sn', 51.0504, 13.7373], ['de-st', 52.1205, 11.6276], ['de-sh', 54.3233, 10.1228],
+  ['de-th', 50.9848, 11.0299], ['ch-zh', 47.3769, 8.5417], ['ch-be', 46.9480, 7.4474],
+  ['ch-bs', 47.5596, 7.5886], ['ch-ge', 46.2044, 6.1432], ['ch-sg', 47.4245, 9.3767],
+  ['li', 47.1410, 9.5209]
+];
+// Die naechstgelegene Landeshauptstadt gewinnt. Das trifft das Bundesland fast immer und
+// bleibt auch dann sinnvoll, wenn jemand knapp ausserhalb wohnt: dann sieht er die Stadt,
+// in die er faehrt. Weiter als 400 km weg heisst "nicht abgedeckt", dann bleibt der
+// Papier-Hintergrund allein.
+function karteFuer(lat, lon) {
+  if (lat == null || lon == null) return null;
+  let best = null, bestKm = 1e9;
+  KARTEN_ORTE.forEach(o => {
+    const dy = (o[1] - lat) * 111;
+    const dx = (o[2] - lon) * 111 * Math.cos(lat * Math.PI / 180);
+    const km = Math.sqrt(dx * dx + dy * dy);
+    if (km < bestKm) { bestKm = km; best = o[0]; }
+  });
+  return bestKm <= 400 ? best : null;
 }
-let karte = null, karteLage = null;
-function karteAufbauen() {
-  if (karte || typeof L === 'undefined') return;
-  karte = L.map('karte', {
-    zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false,
-    doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false
-  }).setView([48.2082, 16.3738], 14);   // Wien als Ausgangspunkt
-  karteLage = L.tileLayer(
-    'https://maps{s}.wien.gv.at/basemap/bmapgrau/normal/google3857/{z}/{y}/{x}.png',
-    { subdomains: ['', '1', '2', '3', '4'], maxZoom: 19,
-      attribution: 'Grundkarte: <a href="https://basemap.at">basemap.at</a>' });
-  karteLage.addTo(karte);
-}
+let karteJetzt = null;
+function karteAufbauen() { /* nichts zu bauen, das Bild steht im CSS */ }
 function karteAufStation(st) {
-  if (!karte || !st || st.lat == null || st.lon == null) return;
-  // Ausserhalb Oesterreichs die Kacheln abschalten, statt ins Leere zu laden.
-  const drin = inOesterreich(st.lat, st.lon);
-  if (karteLage) {
-    if (drin && !karte.hasLayer(karteLage)) karteLage.addTo(karte);
-    if (!drin && karte.hasLayer(karteLage)) karte.removeLayer(karteLage);
-  }
-  karte.setView([st.lat, st.lon], 15, { animate: true });
+  const el = document.getElementById('karte');
+  if (!el || !st) return;
+  const name = karteFuer(st.lat, st.lon);
+  if (name === karteJetzt) return;
+  karteJetzt = name;
+  el.style.backgroundImage = name ? 'url("karten/' + name + '.jpg")' : 'none';
 }
 
 // ---- Raumwirkung der Wisch-Leiste -----------------------------------------------------
@@ -4694,7 +4711,15 @@ function uebergabeHolen() {
       // EINTRAG, also zweimal, wenn sie auf zwei Brettern liegt. Ungefiltert wurde seit
       // dem stationsgenauen Zeilen-Schluessel jede Linie doppelt angelegt
       // (Paul 23.10.2026). Was die Eintraege wollen, wird vereinigt.
-      const schon = raus.find(x => x.rbl === rbl);
+      // NUR zusammenlegen, wenn es WIRKLICH dieselbe Auswahl ist. Der Konfigurator fuehrt
+      // dieselbe Haltestelle einmal je BRETT, und das koennen zwei Bretter mit ganz
+      // verschiedenen Linien sein (Linz Unionkreuzung: einmal 1, 2, 41, 43 und einmal die
+      // Landbusse 309, 412, 609). Vorher habe ich beide vereinigt, und dann standen auf
+      // einmal elf Richtungen da, obwohl der Kunde drei gewaehlt hatte
+      // (Paul 26.10.2026, in seinem Log nachgelesen).
+      const kennung = (st.alle ? '*' : '') + (st.richtungen || [])
+        .map(r => String(r.line || '') + '>' + String(r.ziel || '')).sort().join(',');
+      const schon = raus.find(x => x.rbl === rbl && x.kennung === kennung);
       const w = wahl.get(rbl) || null;
       const wunsch = st.richtungen || [];
       if (schon) {
@@ -4705,7 +4730,7 @@ function uebergabeHolen() {
         });
         return;
       }
-      raus.push({ rbl: rbl, name: st.name || rbl, netz: st.netz || 'WL',
+      raus.push({ rbl: rbl, kennung: kennung, name: st.name || rbl, netz: st.netz || 'WL',
                   alle: !!st.alle || !!(w && w.alle),
                   wahl: (w && w.gruppen.length) ? w.gruppen : ausFilter,
                   // Der Konfigurator weiss, was zu dieser Station gehoert, und sagt es
@@ -4755,6 +4780,10 @@ function uebergabeHolen() {
   if (!isNaN(sz) && sz > 0) {
     standzeitStart = Math.max(STANDZEIT_MIN_UHR, Math.min(STANDZEIT_MAX, sz));
   }
+  // Version und Format-Entscheid kommen aus der Uebergabe, nicht aus einer eigenen
+  // Abfrage. fw ist die Rohangabe fuer die Hinweistexte, dFeld die Entscheidung.
+  if (roh.fw) geraetVersion = String(roh.fw);
+  if (typeof roh.dFeld === 'boolean') dFeldVonAussen = roh.dFeld;
   const g = roh.geraet || null;
   wahlGeraten = eintraegeAusZeilen((roh.masterrow || '') + ';' + (roh.timerow || ''))
     .some(ein => ein.rbls.length > 1 && !ein.alle
