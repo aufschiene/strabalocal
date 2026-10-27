@@ -5174,9 +5174,9 @@ function displaysAusEintraegen(eintraege) {
     nach.get(nr).push(ein);
   });
   const neu = [];
-  // Welche Zeilen schon auf einem frueheren Brett liegen. Siehe unten: ein Schluessel
-  // gehoert zu genau einem Brett.
-  const schonVergeben = new Set();
+  // Welche Zeilen schon auf einem frueheren Brett liegen, und mit welchem Aussehen.
+  // Siehe unten: Schluessel -> Menge der Kennzeichen (Stil und Zeitfenster).
+  const schonVergeben = new Map();
   let misslungen = false;
   nach.forEach(buendel => {
     const erste = buendel[0];
@@ -5302,10 +5302,21 @@ function displaysAusEintraegen(eintraege) {
     // behoben war. Das erste Brett gewinnt, das zweite faellt leer weg (Paul 27.10.2026,
     // an seinem Stand nachgestellt). Uhr-Zeilen sind ausgenommen: eine Uhr darf auf
     // mehreren Brettern stehen.
+    // Dasselbe heisst: gleicher Stil UND gleiches Zeitfenster. Zwei Bretter mit
+    // denselben Linien, aber verschiedenem Stil oder verschiedenen Stunden, sind eine
+    // gewollte Einrichtung und bleiben beide stehen. Die Zeilenzahl zaehlt ausdruecklich
+    // NICHT mit: der Wien-Fehler hat die Doppel mit r3 und r2 gespeichert, ein Vergleich
+    // darueber haette die Heilung gleich wieder ausgehebelt.
+    // fensterToken(), nicht das Objekt: String({von,bis}) waere fuer JEDES Fenster
+    // "[object Object]", und damit haette der Vergleich zwei Bretter mit
+    // VERSCHIEDENEN Stunden fuer gleich gehalten (beim Messen aufgefallen).
+    const kennzeichen = String(stilVon(d)) + '|' + fensterToken(d);
     d.richtungen = d.richtungen.filter(k => {
       if (istUhrKey(k)) return true;
-      if (schonVergeben.has(k)) return false;
-      schonVergeben.add(k);
+      let marken = schonVergeben.get(k);
+      if (!marken) { marken = new Set(); schonVergeben.set(k, marken); }
+      if (marken.has(kennzeichen)) return false;
+      marken.add(kennzeichen);
       return true;
     });
     gruppenPruefen(d);
