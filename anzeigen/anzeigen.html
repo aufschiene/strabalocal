@@ -380,6 +380,14 @@
   .farbfeld span { font-size: 11px; font-weight: 700; letter-spacing: .3px; color: var(--grau); }
   .farbfeld input[type=color] { width: 100%; height: 42px; padding: 0; border-radius: 10px;
                                 border: 2px solid var(--tinte); background: none; cursor: pointer; }
+  /* Farben je Linie im Baukasten: eine Zeile je Linie, mit dem Badge, wie es aussieht. */
+  .linienfarbe { padding: 10px 0; border-top: 1px solid var(--linie); }
+  .linienfarbe .kopf { display: flex; align-items: center; gap: 10px; }
+  .linienfarbe b { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+                   min-width: 42px; height: 30px; border-radius: 7px; padding: 0 9px;
+                   font-size: 14px; font-weight: 800; }
+  .linienfarbe .wort { flex: 1; min-width: 0; font-size: 13px; color: var(--grau); }
+  .linienfarbe .farbfelder { margin: 10px 0 2px; }
   .minilinien { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   .minilinien i { font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .2px;
                   padding: 2px 6px; border-radius: 5px; line-height: 1.4; }
@@ -2769,6 +2777,11 @@ function tokenListeFlach(d) {
 // Geschrieben wird nur, was von der Vorgabe abweicht, damit die Zeile kurz bleibt.
 // Reihenfolge und Buchstaben wie im alten Konfigurator, die Firmware liest beides gleich.
 const EIGEN_VORGABE = eigenStd();
+// Was das Geraet an eigenen Designs hatte, unveraendert. Die Firmware kann die Plaetze
+// 101 bis 109, diese Oberflaeche zeigt drei: alles darueber wird durchgereicht statt beim
+// Speichern weggeworfen.
+let customrowFremd = [];
+let customrowRoh = '';
 function customrowBauen() {
   const segs = [];
   for (let c = EIGEN_MIN; c <= EIGEN_MAX; c++) {
@@ -2788,17 +2801,24 @@ function customrowBauen() {
     if (g.N) teile.push('N' + g.N);
     if (teile.length) segs.push('c' + (c - 100) + '|' + teile.join('|'));
   }
-  return segs.join(';');
+  // Nichts gelesen und nichts gebaut, das Geraet hatte aber eine Zeile? Dann unveraendert
+  // seine eigene zurueckgeben. Eine LEERE customrow loescht am Geraet alle eigenen Designs
+  // mitsamt den Farben je Linie (lines.html setzt das Feld immer, auch leer), und genau so
+  // verlor ein Kunde seine Linienfarben beim ersten Speichern hier (27.10.2026).
+  if (!segs.length && !customrowFremd.length) return customrowRoh;
+  return segs.concat(customrowFremd).join(';');
 }
 function customrowLesen(zeile) {
+  customrowRoh = String(zeile || '').trim();
+  customrowFremd = [];
   String(zeile || '').split(';').forEach(seg => {
     seg = seg.trim();
     if (!seg) return;
     const teile = seg.split('|');
     const m = /^c(\d+)$/.exec(teile[0].trim());
-    if (!m) return;
+    if (!m) { customrowFremd.push(seg); return; }
     const c = 100 + parseInt(m[1], 10);
-    if (!istEigen(c)) return;
+    if (!istEigen(c)) { customrowFremd.push(seg); return; }
     const g = eigenVon(c);
     g.N = '';
     for (let i = 1; i < teile.length; i++) {
@@ -4319,7 +4339,8 @@ function eigenSchritte(c) {
     const x = EIGEN_FARBEN.find(y => y[0] === key) || [key, key];
     return '<label class="farbfeld"><span>' + x[1] + '</span>'
          + '<input type="color" value="#' + g[x[0]] + '"'
-         + ' oninput="eigenSetzen(' + c + ',\'' + x[0] + '\', this.value)"></label>';
+         + ' oninput="eigenZieht(' + c + ',\'' + x[0] + '\', this.value)"'
+         + ' onchange="eigenSetzen(' + c + ',\'' + x[0] + '\', this.value)"></label>';
   }).join('') + '</div>';
   // Pixel: Matrix-Schrift und Punktraster gehoeren zusammen, das ist EIN Aussehen und
   // darum ein Schalter statt zweier Dreierwahlen.
@@ -4342,11 +4363,126 @@ function eigenSchritte(c) {
          + schalterZeile('Ziel fett', 'Kr\u00e4ftigere Schrift f\u00fcr den Zieltext.',
                          g.W === '1', 'eigenSchalten(' + c + ',\'W\',' + (g.W === '1' ? 'false' : 'true') + ')')
          + schalterZeile('Ziel mittig', 'Sonst steht das Ziel oben in der Zeile, wie ab Werk.',
-                         g.M === '1', 'eigenSchalten(' + c + ',\'M\',' + (g.M === '1' ? 'false' : 'true') + ')')
-         + '<div class="hinweis">Eigene Farben je Linie gibt es hier noch nicht, die stellst '
-         + 'du vorerst im alten Konfigurator ein. Sie bleiben erhalten.</div>';
+                         g.M === '1', 'eigenSchalten(' + c + ',\'M\',' + (g.M === '1' ? 'false' : 'true') + ')');
+  // Farben je Linie: der einzige Grund, warum es den alten Konfigurator noch brauchte.
+  // Der Hinweis an dieser Stelle schickte die Kunden dorthin zurueck, und dort ist das
+  // Feintuning seit dem Umzug tot (Kunde 27.10.2026: "weiss nicht, wie ich die wieder
+  // getrennt definieren kann").
+  teile.push({ kurz: 'Farben je Linie', titel: 'Farben je Linie',
+    text: 'Jede Linie darf ihr eigenes Feld bekommen, zum Beispiel U1 rot und U2 violett.',
+    html: eigenLinienHtml(c) });
   teile.push({ kurz: 'Feinheiten', titel: 'Feinheiten', text: '', html: sw });
   return teile;
+}
+
+// Die Linien auf den Brettern mit DIESEM Design, je Linie eine Abfahrt dazu: aus ihr kommt
+// die amtliche Linienfarbe als Vorschlag. Nur die eigenen Bretter, sonst standen in den
+// Badge-Farben eines Designs die Linien einer fremden Stadt. Ein Stations-Block zaehlt mit
+// ALLEN Linien seines Halts, denn am Geraet steht dort jede Abfahrt der Station.
+function eigenLinienDeps(c) {
+  c = parseInt(c, 10);
+  const raus = new Map();
+  const nimm = dep => {
+    const ln = String((dep && dep.line) || '').trim();
+    if (!ln || ln === ALLE_LINIE || raus.has(ln)) return;
+    raus.set(ln, dep);
+  };
+  const meine = [];
+  displays.filter(d => stilVon(d) === c)
+          .forEach(d => (d.richtungen || []).forEach(k => { if (!istUhrKey(k)) meine.push(k); }));
+  const alle = alleRichtungen();
+  // Noch kein Brett mit diesem Design (frisch angelegt)? Dann alle Linien anbieten,
+  // sonst stuende hier nichts zum Einfaerben.
+  (meine.length ? alle.filter(r => meine.indexOf(r.key) >= 0) : alle).forEach(r => {
+    if (r.dep && r.dep.alleStation) (r.station.abfahrten || []).forEach(nimm);
+    else nimm(r.dep);
+  });
+  return raus;
+}
+
+// Die amtliche Farbe einer Linie, wie der Server sie liefert: dieselbe Quelle, aus der
+// auch das Geraet seine Badges faerbt. Ohne Angabe null, dann gelten die Badge-Farben
+// des Designs.
+function eigenAmtlich(dep) {
+  if (!dep) return null;
+  const bg = (typeof dvLineColorCss === 'function' ? dvLineColorCss(dep.lineColor) : null)
+          || U_BAHN_FARBEN[String(dep.line || '').toUpperCase()] || null;
+  if (!bg) return null;
+  const tx = (typeof dvLineColorCss === 'function' ? dvLineColorCss(dep.lineTextColor) : null) || '#ffffff';
+  return { bg: bg.replace('#', ''), tx: tx.replace('#', '') };
+}
+
+// Was fuer diese Linie gerade gilt: ihre eigene Farbe, sonst der Vorschlag. Hex ohne '#',
+// wie die customrow es fuehrt. Der Rand folgt der Flaeche, solange niemand ihn setzt
+// (gleiche Farbe heisst am Geraet: kein Rand).
+function eigenLinieFarben(c, ln, deps) {
+  const g = eigenVon(c);
+  const p = (g.P || {})[ln];
+  const amt = eigenAmtlich((deps || eigenLinienDeps(c)).get(ln));
+  return { bg: (p && p.bg) || (amt && amt.bg) || g.H,
+           tx: (p && p.tx) || (amt && amt.tx) || g.V,
+           ol: (p && p.ol) || (p && p.bg) || (amt && amt.bg) || g.U };
+}
+
+function eigenLinienHtml(c) {
+  const g = eigenVon(c);
+  if (g.A === '0') {
+    return '<div class="hinweis">Dieses Design schreibt die Linie als gro\u00dfen Text, '
+         + 'nicht in ein farbiges Feld. Schalte die Linien-Badges unter "Feinheiten" an, '
+         + 'dann gibt es hier Farben je Linie.</div>';
+  }
+  const deps = eigenLinienDeps(c);
+  const linien = Array.from(deps.keys());
+  if (!linien.length) {
+    return '<div class="hinweis">Auf den Displays mit diesem Design liegt noch keine Linie. '
+         + 'Sobald eine daliegt, kannst du sie hier einf\u00e4rben.</div>';
+  }
+  let h = '<div class="hinweis" style="margin-top:0">Ohne eigene Farbe nimmt eine Linie die '
+        + 'Badge-Farben von oben. Vorgeschlagen ist die offizielle Farbe des Verkehrsbetriebs.</div>';
+  linien.forEach(ln => {
+    const an = !!(g.P && g.P[ln]);
+    const f = eigenLinieFarben(c, ln, deps);
+    const ln2 = escapeHtmlFt(ln);
+    const arg = "'" + String(ln).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+    h += '<div class="linienfarbe" data-linie="' + ln2 + '"><div class="kopf">'
+       + '<b style="background:#' + f.bg + ';color:#' + f.tx
+       + ';box-shadow:inset 0 0 0 2px #' + f.ol + '">' + ln2 + '</b>'
+       + '<span class="wort">' + (an ? 'Eigene Farben' : 'Wie das Design') + '</span>'
+       + '<button class="schiene' + (an ? ' an' : '') + '" role="switch"'
+       + ' aria-checked="' + (an ? 'true' : 'false') + '"'
+       + ' onclick="eigenLinieSchalten(' + c + ',' + arg + ')"><span class="kugel"></span></button>'
+       + '</div>';
+    if (an) {
+      h += '<div class="farbfelder">'
+         + [['bg', 'Fl\u00e4che'], ['tx', 'Schrift'], ['ol', 'Rand']].map(fd =>
+             '<label class="farbfeld"><span>' + fd[1] + '</span>'
+           + '<input type="color" value="#' + f[fd[0]] + '"'
+           + ' oninput="eigenLinieFarbe(' + c + ',' + arg + ',\'' + fd[0] + '\', this.value, false)"'
+           + ' onchange="eigenLinieFarbe(' + c + ',' + arg + ',\'' + fd[0] + '\', this.value, true)"></label>'
+           ).join('')
+         + '</div>';
+    }
+    h += '</div>';
+  });
+  return h;
+}
+
+// An heisst: diese Linie bekommt einen eigenen Eintrag in der P-Liste, und zwar gleich mit
+// dem Vorschlag. Aus heisst: der Eintrag faellt weg, dann gelten wieder die Badge-Farben
+// des Designs.
+function eigenLinieSchalten(c, ln) {
+  const g = eigenVon(c);
+  if (!g.P) g.P = {};
+  if (g.P[ln]) delete g.P[ln];
+  else g.P[ln] = eigenLinieFarben(c, ln);
+  allesZeichnen();
+}
+function eigenLinieFarbe(c, ln, feld, wert, fertig) {
+  const g = eigenVon(c);
+  if (!g.P) g.P = {};
+  if (!g.P[ln]) g.P[ln] = eigenLinieFarben(c, ln);
+  g.P[ln][feld] = String(wert == null ? '' : wert).replace('#', '').toLowerCase();
+  if (fertig) allesZeichnen(); else eigenZiehtFrisch(c);
 }
 
 function eigenOeffnen(c) {
@@ -4375,6 +4511,29 @@ function eigenDialogZeichnen() {
   } });
   dialogZeigen(teile[i].titel + '  (' + (i + 1) + ' von ' + n + ')',
                teile[i].text, knoepfe, 'doppelt', teile[i].html);
+}
+
+// Waehrend am Farbwaehler gezogen wird, darf die Oberflaeche NICHT neu gebaut werden: der
+// Dialog ersetzt dabei sein Inneres, das offene Farbfeld fliegt aus dem Dokument, und jede
+// weitere Bewegung landet im Nichts. Darum beim Ziehen nur die Vorschau und die Badges hier
+// nachziehen; alles andere macht erst das Loslassen (change).
+function eigenZiehtFrisch(c) {
+  streifenZeichnen();
+  ausgabeZeichnen();
+  const deps = eigenLinienDeps(c);
+  document.querySelectorAll('.linienfarbe').forEach(el => {
+    const ln = el.dataset.linie;
+    const chip = el.querySelector('b');
+    if (!ln || !chip) return;
+    const f = eigenLinieFarben(c, ln, deps);
+    chip.style.background = '#' + f.bg;
+    chip.style.color = '#' + f.tx;
+    chip.style.boxShadow = 'inset 0 0 0 2px #' + f.ol;
+  });
+}
+function eigenZieht(c, key, wert) {
+  eigenVon(c)[key] = String(wert == null ? '' : wert).replace('#', '').toLowerCase();
+  eigenZiehtFrisch(c);
 }
 
 // Pixel-Optik: Matrix-Schrift plus Punktraster, oder beides zurueck auf schlicht.

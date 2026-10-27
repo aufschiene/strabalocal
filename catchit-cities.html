@@ -8326,12 +8326,22 @@ function zurNeuenOberflaeche(cfg) {
       masterrow: _uebergabeZeilen(cfg).masterrow,
       timerow: _uebergabeZeilen(cfg).timerow,
       displaysettings: cfg.displaysettings || cfg.displaySettings || '',
+      // Die eigenen Designs, wie DIESE Seite sie gerade fuehrt: aus dem Geraet gelesen
+      // (parseCustomRow) und durch den Wizard hier moeglicherweise geaendert. Das Original
+      // vom Geraet steht unten in geraet.customrow.
+      customrow: (typeof buildCustomRow === 'function') ? buildCustomRow() : '',
       // Das Original vom Geraet sagt, WIE es aussieht: Aufteilung, Uhr, Wechselzeiten
       // und die anderen Felder, die diese Seite nicht kennt und beim Neubau verliert.
       geraet: _geraetRows ? {
         masterrow: _geraetRows.masterrow,
         timerow: _geraetRows.timerow,
-        displaysettings: _geraetRows.displaysettings
+        displaysettings: _geraetRows.displaysettings,
+        // Die customrow MUSS mit: sie traegt die eigenen Designs (Farben, Schrift, Badges
+        // und die Farben je Linie). Die Anzeigen-Oberflaeche schreibt beim Speichern alle
+        // Felder, auch leere, und die Geraeteseite setzt customrow immer. Ohne dieses Feld
+        // kam dort eine LEERE Zeile an und das Geraet verlor seine eigenen Designs beim
+        // ersten Speichern (Kunde 27.10.2026: "hat mir die Farben meiner Linien zerschossen").
+        customrow: _geraetRows.customrow || ''
       } : null,
       // ACHTUNG Schreibweise, dieselbe Falle wie bei masterRow: die Config fuehrt diese
       // Felder in camelCase (displayLight, nightMode, …), hier stand bisher nur das
@@ -25199,10 +25209,15 @@ function _cfgSignature(data) {
 // alles stuende wieder auf Vorgabe (Paul 23.10.2026). Darum heben wir das Original hier
 // auf und reichen es durch.
 var _geraetRows = null;
-function _geraetRowsMerken(mr, tr, ds) {
+function _geraetRowsMerken(mr, tr, ds, cr) {
   mr = String(mr || '').trim(); tr = String(tr || '').trim(); ds = String(ds || '').trim();
   if (!mr && !tr) return;
-  _geraetRows = { masterrow: mr, timerow: tr, displaysettings: ds };
+  // Die customrow traegt die EIGENEN DESIGNS samt den Farben je Linie. loadExistingConfig
+  // schickt sie nicht mit, nur loadFullConfig: darum nie ueberschreiben, wenn sie gar nicht
+  // dabei ist, sonst stuende sie nach der zweiten Nachricht wieder leer da.
+  var crAlt = (_geraetRows && _geraetRows.customrow) || '';
+  _geraetRows = { masterrow: mr, timerow: tr, displaysettings: ds,
+                  customrow: (cr === undefined || cr === null) ? crAlt : String(cr).trim() };
 }
 
 // ZURUECK AUS DEM FEINTUNING, OHNE ZU SPEICHERN.
@@ -25252,7 +25267,8 @@ async function handleConfigMessage(data) {
   _configMsgSeen = true;   // sofort, nicht erst wenn der Wiederaufbau fertig ist
   if (data.type === 'loadExistingConfig') _geraetRowsMerken(data.masterrow, data.timerow, data.displaysettings);
   if (data.type === 'loadFullConfig' && data.config) {
-    _geraetRowsMerken(data.config.masterrow, data.config.timerow, data.config.displaysettings);
+    _geraetRowsMerken(data.config.masterrow, data.config.timerow, data.config.displaysettings,
+                      data.config.customrow);
   }
   // ÖBB-gebrandete Geräte erkennen: die Geräteseite schickt brand in loadExistingConfig mit.
   if (data.type === 'loadExistingConfig' && typeof noteDeviceBrand === 'function') noteDeviceBrand(data.brand);
