@@ -5174,6 +5174,9 @@ function displaysAusEintraegen(eintraege) {
     nach.get(nr).push(ein);
   });
   const neu = [];
+  // Welche Zeilen schon auf einem frueheren Brett liegen. Siehe unten: ein Schluessel
+  // gehoert zu genau einem Brett.
+  const schonVergeben = new Set();
   let misslungen = false;
   nach.forEach(buendel => {
     const erste = buendel[0];
@@ -5290,6 +5293,22 @@ function displaysAusEintraegen(eintraege) {
     // eine spaeter dazugelegte Linie bekaeme keine Zeile mehr (27.10.2026).
     if (erste.r && erste.r !== zeilenAuto(d)) d.zeilen = erste.r;
     d.einst = erste.e;
+    // Ein Zeilen-Schluessel gehoert zu GENAU EINEM Brett. Die Oberflaeche sagt das beim
+    // Auflegen selbst ("schon auf Display 2") und kann so einen Stand gar nicht bauen.
+    // Eine Config, die dieselbe Station samt Richtung auf ZWEI Brettern fuehrt, ist
+    // Altlast: der Wiener Steig-Fehler vor dem 27.10.2026 hat genau das gespeichert
+    // (Alaudagasse lag mit beiden U1-Richtungen auf d1 UND d2), und seitdem stand das
+    // zweite Brett mit denselben Zeilen bei jedem Oeffnen wieder da, obwohl die Ursache
+    // behoben war. Das erste Brett gewinnt, das zweite faellt leer weg (Paul 27.10.2026,
+    // an seinem Stand nachgestellt). Uhr-Zeilen sind ausgenommen: eine Uhr darf auf
+    // mehreren Brettern stehen.
+    d.richtungen = d.richtungen.filter(k => {
+      if (istUhrKey(k)) return true;
+      if (schonVergeben.has(k)) return false;
+      schonVergeben.add(k);
+      return true;
+    });
+    gruppenPruefen(d);
     if (d.richtungen.length) neu.push(d);
   });
   if (misslungen || !neu.length) return false;
