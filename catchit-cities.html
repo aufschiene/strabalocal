@@ -8235,7 +8235,13 @@ function zurNeuenOberflaeche(cfg) {
           // falls eine Linie gar keine Id hat (Paul 23.10.2026).
           richtungen: (st.directions || []).map(function (d) {
             return { line: d.line || '', ziel: d.towards || d.ziel || '',
-                     rid: String(d.richtungsId || '').trim() };
+                     rid: String(d.richtungsId || '').trim(),
+                     // Wien fuehrt JE RICHTUNG einen eigenen Steig und schickt alle Ids
+                     // einer Station in EINEM Feld ("4136,4131" = Leopoldau, Oberlaa).
+                     // Ohne diese Angabe bekam drueben jeder Steig ALLE Richtungen und
+                     // aus zwei Zeilen wurden vier (Paul 27.10.2026). Die Auswahl weiss
+                     // es (d.stopId), sie hat es nur nie weitergereicht.
+                     steig: String(d.stopId || '').trim() };
           }),
           // Netz-Kenntnis JE STATION, damit die neue Oberflaeche keine eigenen
           // Netz-Tabellen fuehren muss. Zwei Kopien davon lagen dort schon herum, und

@@ -845,15 +845,26 @@ function nurBloeckeAuf(d) {
   const ks = ((d && d.richtungen) || []).filter(k => !istUhrKey(k));
   return ks.length > 0 && ks.every(istAlleKey);
 }
+// Von Hand gesetzte Zeilenzahl gewinnt. Sie haengt am DISPLAY, nicht am Design: das
+// Geraet liest r aus dem Eintrag der Anzeige, zwei Anzeigen mit verschiedenen Designs
+// haben darum auch verschiedene Zeilenzahlen (Paul 27.10.2026).
 function zeilenSelbst(d) {
-  if (zeitbasiert(d)) return zeitZeilen(d);
+  const max = maxZeilen(stilVon(d));
+  if (d && d.zeilen != null) return Math.max(1, Math.min(max, d.zeilen));
+  return zeilenAuto(d);
+}
+// Was ohne Zutun herauskommt.
+function zeilenAuto(d) {
+  const max = maxZeilen(stilVon(d));
+  // Chronologisch: die Zeilen haengen nicht an der Zahl der Linien, darum so viele, wie
+  // der Stil kann, hoechstens 3.
+  if (zeitbasiert(d)) return Math.min(3, max);
   // Ein Stations-Block ist EINE Zeile in der Liste, am Geraet aber so viele Abfahrten,
   // wie das Brett hergibt. Darum zaehlt er nicht als eine Zeile, sondern holt das
   // Maximum des Stils (Paul 25.10.2026).
-  if ((d.richtungen || []).some(istAlleKey)) return maxZeilen(stilVon(d));
+  if ((d.richtungen || []).some(istAlleKey)) return max;
   // Zusammengefasste Richtungen teilen sich eine Zeile, darum die Einheiten zaehlen.
   const n = zeilenEinheiten(d).length;
-  const max = maxZeilen(stilVon(d));
   if (n === 1 && max >= 3) return 3;
   return Math.max(1, Math.min(max, n));
 }
@@ -967,13 +978,8 @@ function zeitbasiert(d) {
   return kannSortieren(stilVon(d)) && nurBloeckeAuf(d);
 }
 
-// Zeilen im zeitlichen Modus stellt der Nutzer selbst ein, denn sie haengen nicht mehr
-// an der Zahl der Linien. Vorgabe: so viele, wie der Stil kann, hoechstens 3.
-function zeitZeilen(d) {
-  const max = maxZeilen(stilVon(d));
-  const v = (d && d.zeilen != null) ? d.zeilen : Math.min(3, max);
-  return Math.max(1, Math.min(max, v));
-}
+// Alter Name, gleiche Antwort: die Zeilenzahl ist ueberall dieselbe Frage.
+function zeitZeilen(d) { return zeilenSelbst(d); }
 // Welche Stile gehoeren zu welchem Netz? Wie im Konfigurator stehen die passenden oben,
 // damit die Liste nicht 25 Eintraege lang vor einem liegt.
 const NETZ_STILE = {
@@ -2215,6 +2221,7 @@ function editorZeichnen() {
   }
   h += '<label class="feld" for="stilWahl">Anzeige-Stil dieses Displays</label>'
      + '<select id="stilWahl" onchange="stilSetzen(this.value)">' + stilOptionen(dHier) + '</select>';
+  h += zeilenzahlFeld();
 
 
   const nHier = (dHier && dHier.richtungen.length) || 0;
@@ -2448,18 +2455,25 @@ function badgeFarben(dep) {
 // Station steht als ruhige Unterzeile darunter (Paul 22.10.2026).
 // Zeitfenster: kommt spaeter dran und steht darum in einer eigenen Karte ganz unten
 // (Paul 22.10.2026). Inhalt unveraendert, nur der Platz ist ein anderer.
-// Wie viele Abfahrten ein chronologisches Brett zeigt, ergibt sich fast immer von selbst
-// aus dem Stil. Wer es doch von Hand will, findet es unter Erweitert, nicht mitten im
-// Hauptweg (Paul 26.10.2026).
+// Die Zeilenzahl steht bei den Linien, gleich unter dem Stil: dort sieht man, was auf dem
+// Display liegt, und entscheidet im selben Blick, wie viel davon zu sehen ist (Paul
+// 27.10.2026, vorher stand das Feld unter Erweitert und gab es nur fuer chronologische
+// Bretter). Die Automatik bleibt die Vorgabe und bleibt erreichbar.
 function zeilenzahlFeld() {
   const sHier = schirme[zeiger];
   const d = sHier && sHier.display;
-  if (!d || !zeitbasiert(d)) return '';
-  let h = '<label class="feld" for="zeilenWahl">Wie viele Abfahrten auf Display '
-        + (displays.indexOf(d) + 1) + '</label>'
-        + '<select id="zeilenWahl" onchange="zeitZeilenSetzen(' + sHier.index + ',this.value)">';
-  for (let z = 1; z <= maxZeilen(stilVon(d)); z++) {
-    h += '<option value="' + z + '"' + (z === zeitZeilen(d) ? ' selected' : '') + '>' + z + '</option>';
+  if (!d || zeigtUhr(d)) return '';   // Ein Uhr-Brett hat keine Abfahrtszeilen
+  const max = maxZeilen(stilVon(d));
+  const auto = zeilenAuto(d);
+  const wort = z => z + (z === 1 ? ' Zeile' : ' Zeilen');
+  let h = '<label class="feld" for="zeilenWahl">Zeilen auf diesem Display</label>'
+        + '<select id="zeilenWahl" onchange="zeilenSetzen(' + sHier.index + ', this.value)">'
+        + '<option value=""' + (d.zeilen == null ? ' selected' : '') + '>Automatisch, '
+        + wort(auto) + '</option>';
+  for (let z = 1; z <= max; z++) {
+    h += '<option value="' + z + '"'
+       + ((d.zeilen != null && zeilenVon(d) === z) ? ' selected' : '') + '>'
+       + wort(z) + '</option>';
   }
   return h + '</select>';
 }
@@ -2471,7 +2485,7 @@ function zeitfensterZeichnen() {
   if (!s) { el.innerHTML = ''; return; }
   const dHier = s.display;
   const di = s.index;
-  let h = zeilenzahlFeld();
+  let h = '';
 
   // Die Uhr selbst legt man unten aus dem Linien-Topf aufs Display. Hier steht nur,
   // wie sie aussieht.
@@ -2798,7 +2812,7 @@ function customrowBauen() {
       if (name) p.push(name + ':' + (lc.bg || '') + ':' + (lc.tx || '') + ':' + (lc.ol || ''));
     });
     if (p.length) teile.push('P' + p.join(','));
-    if (g.N) teile.push('N' + g.N);
+    if (g.N && String(g.N).trim()) teile.push('N' + String(g.N).trim());
     if (teile.length) segs.push('c' + (c - 100) + '|' + teile.join('|'));
   }
   // Nichts gelesen und nichts gebaut, das Geraet hatte aber eine Zeile? Dann unveraendert
@@ -4285,10 +4299,11 @@ function alleHierher(di) {
   zeiger = 0;
   allesZeichnen();
 }
-function zeitZeilenSetzen(di, wert) {
+function zeilenSetzen(di, wert) {
   const d = displays[di];
   if (!d) return;
-  d.zeilen = parseInt(wert, 10) || 3;
+  const z = parseInt(wert, 10);
+  if (z > 0) d.zeilen = z; else delete d.zeilen;   // leer = zurueck zur Automatik
   allesZeichnen();
 }
 
@@ -4332,7 +4347,8 @@ function eigenSchritte(c) {
   teile.push({ kurz: 'Name', titel: 'Wie soll es hei\u00dfen?',
     text: 'Der Name steht in der Auswahl, damit du dein Design wiederfindest.',
     html: '<input id="eigenName" type="text" maxlength="24" value="' + escapeHtmlFt(g.N) + '"'
-        + ' oninput="eigenNameSetzen(' + c + ', this.value)">' });
+        + ' oninput="eigenNameTippt(' + c + ', this.value)"'
+        + ' onchange="eigenNameSetzen(' + c + ', this.value)">' });
   // Farbfelder in handlichen Haeppchen: erst die Flaeche, dann das Badge. Fuenf
   // Farbwaehler nebeneinander waren eine Wand (Paul 26.10.2026).
   const farbBlock = (schluessel) => '<div class="farbfelder">' + schluessel.map(key => {
@@ -4551,9 +4567,17 @@ function eigenSetzen(c, key, wert) {
   allesZeichnen();
 }
 function eigenSchalten(c, key, an) { eigenVon(c)[key] = an ? '1' : '0'; allesZeichnen(); }
+// Beim Tippen NUR merken, nicht zeichnen. allesZeichnen() baut den Dialog neu, damit
+// fliegt das Eingabefeld aus der Seite und der Cursor mit ihm: es kam genau EIN Zeichen je
+// Klick an (Kunde Rostock 27.10.2026, "nur einzelne Buchstaben nacheinander"). Getrimmt
+// wird erst beim Verlassen, sonst frisst es jedes Leerzeichen schon waehrend des Tippens.
+function eigenNameTippt(c, wert) {
+  eigenVon(c).N = String(wert || '').replace(/[|;:,]/g, ' ').slice(0, 24);
+}
 function eigenNameSetzen(c, wert) {
-  // Die Trennzeichen des Formats duerfen nicht in den Namen.
-  eigenVon(c).N = String(wert || '').replace(/[|;:,]/g, ' ').trim().slice(0, 24);
+  eigenNameTippt(c, wert);
+  const g = eigenVon(c);
+  g.N = g.N.trim() || ('Mein Display ' + (c - 100));
   allesZeichnen();
 }
 
@@ -4829,6 +4853,23 @@ function rblKanon(rbl) {
   return rblTeile(rbl).kahl.trim().replace(/^WLB?:/i, '').toUpperCase();
 }
 
+// Die Richtungen, die zu DIESEM Steig gehoeren. Wien fuehrt je Richtung einen eigenen
+// Steig und schickt alle Ids einer Station in EINEM Feld ("4136,4131"); hier wird daraus
+// eine Station je Id, und ungefiltert erbte jede BEIDE Richtungen. Aus U1 Leopoldau, U1
+// Oberlaa und 13A wurden so fuenf Zeilen auf zwei Brettern, das zweite mit denselben
+// U1-Zeilen noch einmal (Paul 27.10.2026, nachgestellt).
+// Eine Richtung ohne Steig-Angabe gehoert wie bisher zu jeder Id der Station. Faende die
+// Filterung gar nichts, zaehlt die ganze Liste: eine leere Auswahl hiesse sonst "alle
+// Abfahrten", und dann stuende die halbe Haltestelle auf dem Brett.
+function richtungenAmSteig(liste, rbl) {
+  const nummer = rblKanon(rbl);
+  const passt = (liste || []).filter(r => {
+    const s = String((r && r.steig) || '').trim();
+    return !s || rblKanon(s) === nummer;
+  });
+  return passt.length ? passt : (liste || []);
+}
+
 function gehoertDazu(nur, linie) {
   return !nur || nur.indexOf(String(linie || '').trim().toUpperCase()) >= 0;
 }
@@ -5010,7 +5051,7 @@ function uebergabeHolen() {
       const vomPicker = wahl.get(rbl) || (ausFilter.length
                         ? { alle: false, gruppen: ausFilter, genau: false } : null);
       const w = wahlVereinen(vomPicker, wahlGeraet.get(rbl) || null);
-      const wunsch = st.richtungen || [];
+      const wunsch = richtungenAmSteig(st.richtungen, rbl);
       if (schon) {
         if (st.alle || (w && w.alle)) schon.alle = true;
         wunsch.forEach(r => {
@@ -5242,9 +5283,12 @@ function displaysAusEintraegen(eintraege) {
     else if (erste.z > 1) d.richtungen.splice(erste.z - 2, 0, UHR_KEY);
     if (gruppen.length) d.gruppen = gruppen;
     if (erste.c) d.stil = erste.c;
-    if (erste.r) d.zeilen = erste.r;
     if (erste.w) d.fenster = erste.w;
     if (erste.s) d.sortierung = (erste.s === 3) ? 'zeit' : 'fest';
+    // Zeilenzahl nur dann als EIGENE Wahl merken, wenn sie von der Automatik abweicht.
+    // Sonst waere jedes wiederhergestellte Brett auf seinen alten Stand festgenagelt und
+    // eine spaeter dazugelegte Linie bekaeme keine Zeile mehr (27.10.2026).
+    if (erste.r && erste.r !== zeilenAuto(d)) d.zeilen = erste.r;
     d.einst = erste.e;
     if (d.richtungen.length) neu.push(d);
   });
