@@ -1691,7 +1691,21 @@ function versionMin(ist, soll) {
 // komme ich gar nicht ans Geraet (Mixed Content plus Private Network Access), meine
 // eigene Abfrage laeuft dort immer ins Leere. Und die Schwelle soll nur an EINER Stelle
 // stehen, sonst zieht beim Verschieben jemand nicht nach (26.10.2026).
+// Ab dieser Firmware darf DIESELBE Station mehrfach auf einem Brett stehen, je Linie ein
+// Eintrag, und die Zeilenfolge ist dann genau die Eintragsfolge. Damit laesst sich auch
+// eine zusammengefasste Zeile ans Ende legen, was im Format "ein Eintrag je Station"
+// nicht geht (Firmware-Sitzung 28.10.2026, Variante b). Aeltere Geraete werfen den
+// zweiten Eintrag derselben Station weg, darum das Gate.
+const FW_MIT_ZEILENFOLGE = '2.6.3';
+// Laufende Gruppen-Nummer ueber ALLE Bretter. Firmware VOR 2.6.3 fasst m-Gruppen ueber
+// die ganze Config zusammen: zwei Bretter mit je einer Gruppe 1 flossen dort in EINE
+// Zeile (Firmware-Sitzung 28.10.2026). Eindeutige Nummern kosten nichts und sind auf
+// neuen Geraeten genauso richtig.
+let gidBasis = 0;
 let dFeldVonAussen = null;
+function fwZeilenfolge() {
+  return !!geraetVersion && versionMin(geraetVersion, FW_MIT_ZEILENFOLGE);
+}
 function fwNeu() {
   if (dFeldVonAussen != null) return !!dFeldVonAussen;
   return !!geraetVersion && versionMin(geraetVersion, FW_MIT_UHR);
@@ -1782,6 +1796,10 @@ function schirmeBauen() {
       seiten = [alle.slice(0, proSeite)];
     } else {
       // Die Zeilen aller Quellen hintereinander, in Display-Reihenfolge.
+      // Bewusst in der EINGESTELLTEN Folge, nicht in der des Geraets: bei Linien, die
+      // sich dieselben Bahnsteige teilen, weichen die beiden voneinander ab (siehe
+      // geraeteFolge). Den Unterschied nennt der Hinweis unter der Zeilenliste, die
+      // Vorschau bleibt bei dem, was eingestellt ist (Paul 28.10.2026).
       let einheiten = [];
       quellen.forEach(i => { einheiten = einheiten.concat(zeilenEinheiten(displays[i])); });
       if (einheiten.length === 1 && proSeite >= 3) {
@@ -2448,6 +2466,102 @@ function editorZeichnen() {
   el.innerHTML = h;
 }
 
+// Wie das GERAET die Zeilen ordnet, und warum das nicht immer die eingestellte Folge ist.
+// Die masterrow fuehrt EINEN Eintrag je Station, und das Geraet liest die Eintraege der
+// Reihe nach und darin die Linien des Linienfelds. Eine zusammengefasste Zeile steht an
+// der Stelle ihres ERSTEN Mitglieds (joinGroupedTokens in der Firmware). Daraus folgt:
+// die Zeilen EINER Haltestelle stehen am Geraet immer beieinander. Eine Station darf je
+// Brett auch nur einmal vorkommen (masterEntryKey = rbl + Display), die Folge laesst sich
+// also nicht verschraenken.
+// Kunde David, 28.10.2026: an der Rauscherstrasse teilen sich 5 und 5A DIESELBEN zwei
+// Steige (349 und 388). Seine Folge "5 Praterstern, 5 Westbahnhof, 5A zusammengefasst"
+// braucht genau diese Verschraenkung, und darum rutschte die 5A-Gruppe am Geraet in die
+// zweite Zeile. Statt das stillschweigend anders zu zeigen, sagen wir es.
+function istWienRbl(rbl) {
+  return /^\d/.test(String(rbl)) || /^WLB?:/i.test(String(rbl));
+}
+
+// Die Token je Station, in der Reihenfolge der eingestellten Zeilen. Wien fuehrt im
+// Linienfeld nackte Liniennamen (die Richtung steckt im Steig), alle anderen ein Token je
+// Zeile: nur bei Wien fallen darum zwei Zeilen derselben Linie an derselben Station zu
+// EINEM Token zusammen.
+function stationsToken(d) {
+  const proRbl = new Map();
+  zeilenEinheiten(d).forEach((teil, ui) => teil.forEach(k => {
+    if (istUhrKey(k)) return;
+    const r = richtungFinden(k);
+    if (!r || !r.dep || r.dep.alleStation || r.dep.zugZiel) return;
+    const rbl = r.station.rbl;
+    const tok = istWienRbl(rbl) ? String(r.dep.line) : k;
+    if (!proRbl.has(rbl)) proRbl.set(rbl, []);
+    const liste = proRbl.get(rbl);
+    if (!liste.some(x => x.tok === tok)) liste.push({ tok: tok, ui: ui, key: k });
+  }));
+  proRbl.forEach(liste => liste.sort((a, b) => a.ui - b.ui));
+  return proRbl;
+}
+
+// WELCHE Station zuerst in die masterrow kommt, haben wir in der Hand, und daran haengt
+// die Zeilenfolge am Geraet. Vorher nahm die Seite einfach die Folge der Zeilen und
+// verschenkte damit Anordnungen, die sehr wohl gehen: "Gruppe, 5 Praterstern,
+// 5 Westbahnhof" ist ausdrueckbar, kam aber als "Gruppe, 5 Westbahnhof, 5 Praterstern"
+// heraus, weil die Station der Gruppe zuerst geschrieben wurde (Paul 28.10.2026).
+// Darum werden hier alle Reihenfolgen durchprobiert und die genommen, die der
+// eingestellten am naechsten kommt. Mehr als sechs Stationen auf EINEM Brett gibt es
+// nicht, und bei einer oder zweien ist es ohnehin in einem Wimpernschlag vorbei.
+function stationsFolge(d) {
+  const proRbl = stationsToken(d);
+  const rbls = Array.from(proRbl.keys());
+  if (rbls.length < 2 || rbls.length > 6) return rbls;
+  const flach = folge => {
+    const raus = [];
+    folge.forEach(rbl => (proRbl.get(rbl) || []).forEach(x => {
+      if (raus.indexOf(x.ui) < 0) raus.push(x.ui);   // Gruppe: ihr erstes Mitglied zaehlt
+    }));
+    return raus;
+  };
+  // Note: wie viele Zeilen vorne am Stueck stimmen, dann wie viele ueberhaupt.
+  const note = folge => {
+    const soll = folge.slice().sort((a, b) => a - b);
+    let vorn = 0;
+    while (vorn < folge.length && folge[vorn] === soll[vorn]) vorn++;
+    let gleich = 0;
+    folge.forEach((x, i) => { if (x === soll[i]) gleich++; });
+    return vorn * 1000 + gleich;
+  };
+  let beste = rbls, besteNote = note(flach(rbls));
+  const probieren = (rest, gewaehlt) => {
+    if (!rest.length) {
+      const n = note(flach(gewaehlt));
+      if (n > besteNote) { besteNote = n; beste = gewaehlt.slice(); }
+      return;
+    }
+    rest.forEach((x, i) => probieren(rest.slice(0, i).concat(rest.slice(i + 1)), gewaehlt.concat([x])));
+  };
+  probieren(rbls, []);
+  return beste;
+}
+
+function geraeteFolge(d) {
+  const einheiten = zeilenEinheiten(d);
+  const proRbl = stationsToken(d);
+  const folge = [];
+  stationsFolge(d).forEach(rbl => (proRbl.get(rbl) || []).forEach(x => {
+    if (folge.indexOf(x.ui) < 0) folge.push(x.ui);
+  }));
+  // Uhr-Zeilen und Stations-Bloecke stehen nicht im Linienfeld, ihre Stelle steht als
+  // eigenes Feld im Eintrag. Sie bleiben darum, wo sie eingestellt sind.
+  einheiten.forEach((teil, i) => {
+    if (folge.indexOf(i) < 0) folge.splice(Math.min(i, folge.length), 0, i);
+  });
+  return folge;
+}
+
+// Kein Hinweis mehr, wenn die Folge auf einem aelteren Geraet anders herauskommt: wer
+// ein Update hat, bekommt ohnehin den grossen Banner, und die Geraete holen es sich von
+// selbst (Paul 28.10.2026). geraeteFolge() bleibt, daran entscheidet sich, ob die Seite
+// das lange Format "ein Eintrag je Zeile" ueberhaupt braucht.
+
 // Farbe eines Linien-Badges: zuerst die offizielle Farbe aus den Abfahrten, sonst die
 // eingebaute Wiener U-Bahn-Tabelle, sonst neutral. Genau die Quelle, aus der auch das
 // Geraet seine Badges faerbt.
@@ -2788,7 +2902,7 @@ function tokenListeFlach(d) {
       const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
       // Nur eine Zeile mit mehreren Linien ist eine Gruppe. Dass eine Linie in zwei
       // Richtungen faehrt, macht noch keine.
-      const gid = echte.length > 1 ? (gi + 1) : 0;
+      const gid = echte.length > 1 ? (gidBasis + gi + 1) : 0;
       if (gid) merges.push(liste.length + ':' + gid);
       liste.push({ tok: ref ? r.dep.line + '>' + ref : r.dep.line,
                    rbl: r.station.rbl, gid: gid });
@@ -2866,6 +2980,7 @@ function customrowLesen(zeile) {
 // das Speichern, damit beides nie auseinanderlaeuft.
 function configBauen() {
   const teile = [], zeitTeile = [];
+  gidBasis = 0;
   // Die timerow traegt die zeitbasierten Display-TYPEN (OEBB, Westbahn, SBB), NICHT
   // die Sortierung. Die steht als 's' in den displaysettings.
   const teileEinsammeln = (stuecke, c) => {
@@ -2880,7 +2995,7 @@ function configBauen() {
     // die U2 uebrig. Darum fuer Wien EIN EINTRAG JE STATION, so wie es der alte
     // Konfigurator macht. Fremdnetze duerfen mehrere rbls in einem Eintrag fuehren,
     // dort ist der Schluessel Linie:Ziel und das Multi-rbl-Segment ist gewollt.
-    const proStation = new Map();   // rbl -> { station, linien: [] }
+    let proStation = new Map();   // rbl -> { station, linien: [] }
     d.richtungen.forEach(k => {
       const r = richtungFinden(k);
       if (!r) return;
@@ -2897,6 +3012,41 @@ function configBauen() {
       if (eintrag.linien.indexOf(r.dep.line) < 0) { eintrag.linien.push(r.dep.line); eintrag.keys.push(k); }
     });
     if (!proStation.size && !zeigtUhr(d)) return;   // leeres Display kommt nicht ans Geraet
+
+    // Liegen auf dem Brett NUR Linien-Zeilen? Die Uhr darf dabei sein, ein Stations-Block
+    // ('*') und eine Zug-Zeile nicht: die tragen ihre Stelle NICHT im Linienfeld und kommen
+    // im Zeilen-Modell unten gar nicht vor. Ein Brett mit so einer Zeile wird darum nicht
+    // umsortiert, sonst rutscht die Station, die sich nicht mitzaehlen laesst, ans Ende.
+    // Nachgemessen am 28.10.2026: "Alle Abfahrten" als erste Zeile plus zwei Stationen mit
+    // Linien, und der Block stand hinterher hinten.
+    const nurLinien = (d.richtungen || []).every(k => {
+      if (istUhrKey(k)) return true;
+      const r = richtungFinden(k);
+      return !!r && !!r.dep && !r.dep.alleStation && !r.dep.zugZiel;
+    });
+
+    // Eintraege und Linien darin in die Folge bringen, die der eingestellten Zeilenfolge
+    // am naechsten kommt (siehe stationsFolge). Inhaltlich aendert sich dabei nichts, nur
+    // die Reihenfolge, und genau die liest das Geraet als Zeilenfolge.
+    if (nurLinien) {
+      const nrVon = new Map();
+      zeilenEinheiten(d).forEach((teil, ui) => teil.forEach(k => nrVon.set(k, ui)));
+      proStation.forEach(e => {
+        if (e.linien.length < 2) return;
+        const paare = e.linien.map((ln, i) => ({ ln: ln, k: e.keys[i],
+          ui: nrVon.has(e.keys[i]) ? nrVon.get(e.keys[i]) : 9999 }));
+        paare.sort((a, b) => a.ui - b.ui);
+        e.linien = paare.map(x => x.ln);
+        e.keys = paare.map(x => x.k);
+      });
+      const folgeRbls = stationsFolge(d);
+      if (folgeRbls.length > 1) {
+        const sortiert = new Map();
+        folgeRbls.forEach(rbl => { if (proStation.has(rbl)) sortiert.set(rbl, proStation.get(rbl)); });
+        proStation.forEach((e, rbl) => { if (!sortiert.has(rbl)) sortiert.set(rbl, e); });
+        proStation = sortiert;
+      }
+    }
 
     const wien = stopIdFormat(d);
     const c = stilVon(d);
@@ -2926,12 +3076,44 @@ function configBauen() {
       teil.forEach(k => {
         const r = richtungFinden(k);
         const idx = r ? alleLinien.indexOf(r.dep.line) : -1;
-        const marke = idx + ':' + (gi + 1);
+        const marke = idx + ':' + (gidBasis + gi + 1);
         if (idx >= 0 && merges.indexOf(marke) < 0) merges.push(marke);
       });
     });
 
     const stuecke = [];
+
+    // EINE ZEILE = EIN EINTRAG. Nur wenn es noetig ist: dieses Format wiederholt alle
+    // Design-Felder je Eintrag, und die Config hat ein Byte-Budget. Noetig ist es genau
+    // dann, wenn die kompakte Form (ein Eintrag je Station) die eingestellte Zeilenfolge
+    // nicht hergibt, siehe geraeteFolge. Beispiel Rauscherstrasse: 5 und 5A an denselben
+    // zwei Steigen, die zusammengefasste 5A soll unten stehen (Kunde David, 28.10.2026).
+    const folgePasst = !nurLinien || geraeteFolge(d).every((n, i) => n === i);
+    if (proStation.size && !folgePasst && nurLinien && fwZeilenfolge()) {
+      zeilenEinheiten(d).forEach((teil, ui) => {
+        const gid = teil.length > 1 ? (gidBasis + ui + 1) : 0;
+        teil.forEach(k => {
+          if (istUhrKey(k)) return;
+          const r = richtungFinden(k);
+          if (!r || !r.dep) return;
+          const rbl = r.station.rbl;
+          // Wien fuehrt den nackten Liniennamen (die Richtung steckt im Steig), sonst
+          // Linie plus Ziel-Referenz wie in tokenListeFlach.
+          const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
+          const tok = istWienRbl(rbl) ? String(r.dep.line)
+                                      : (ref ? r.dep.line + '>' + ref : r.dep.line);
+          // Jeder Eintrag traegt genau EIN Token, die Gruppe steht also immer auf 0.
+          stuecke.push(rblTeile(rbl).kahl + '|' + tok
+                     + '|c' + c + '|g' + gehwegStation(r.station) + '|r' + zeilenVon(d)
+                     + (gid ? '|m0:' + gid : '')
+                     + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
+        });
+      });
+      gidBasis += zeilenEinheiten(d).length;
+      teileEinsammeln(stuecke, c);
+      return;
+    }
+
     if (!proStation.size) {
       // Nur die Uhr, keine Station: Platzhalter-Station CLOCK:<n>, eindeutig je Brett.
       // Die Firmware fragt sie nie beim Server ab und zaehlt das Brett in der Rotation
@@ -2952,7 +3134,7 @@ function configBauen() {
       // (Paul 24.10.2026, Linie 5 mit Linie 46).
       const gidVon = new Map();
       zeilenEinheiten(d).forEach((teil, gi) => {
-        if (teil.length > 1) teil.forEach(k => gidVon.set(k, gi + 1));
+        if (teil.length > 1) teil.forEach(k => gidVon.set(k, gidBasis + gi + 1));
       });
       // Die nackten Liniennamen gelten nur fuer WIEN, dort steckt die Richtung im
       // Bahnsteig. Liegt eine fremde Station auf demselben Brett, braucht sie ihr
@@ -3070,6 +3252,7 @@ function configBauen() {
                  + qTeil
                  + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil);
     }
+    gidBasis += zeilenEinheiten(d).length;
     teileEinsammeln(stuecke, c);
   });
   // colour-Liste parallel zu den Segmenten: Firmware vor 2.5.3 erkennt eine
@@ -3160,6 +3343,13 @@ async function hostSuchen() {
 }
 
 function speichernFragen() {
+  // Zweites Schloss: ohne Stationen gibt es nichts zu schreiben. Ein leeres Feld am Geraet
+  // waere schlimmer als gar nicht zu speichern (28.10.2026).
+  if (!stationen.length) {
+    sagen('Nichts zu speichern', 'Diese Seite hat keine Stationen bekommen. Geh zur\u00fcck zur '
+        + 'Auswahl und tippe dort wieder auf Feintunen.');
+    return;
+  }
   const c = configBauen();
   if (!c.masterrow && !c.timerow) {
     sagen('Nichts zu speichern', 'Es ist noch kein Display mit Linien da.');
@@ -3716,9 +3906,19 @@ function gruppeDialogZeichnen(di) {
 function gruppeAnlegen(di) {
   const d = displays[di];
   if (!d) return;
-  // Angekreuztes, das noch woanders liegt, kommt zuerst auf dieses Display.
+  // Angekreuztes, das noch woanders liegt, kommt zuerst auf dieses Display. Und zwar
+  // UMZIEHEN, nicht kopieren: vorher stand die Zeile danach auf beiden Brettern, das
+  // alte zeigte dieselbe Abfahrt noch einmal, und beim naechsten Speichern wanderte die
+  // Dopplung ins Geraet (Paul 28.10.2026, beim Gruppieren der 5A an der Rauscherstrasse
+  // gesehen). Wer eine Linie bewusst zweimal haben will, legt sie weiterhin ueber den
+  // Linien-Topf auf das zweite Brett, dort fragt richtungSchalten ausdruecklich nach.
   gruppeWahl.forEach(k => {
     if (d.richtungen.indexOf(k) < 0 && richtungFinden(k)) {
+      displays.forEach((x, xi) => {
+        if (xi === di || x.richtungen.indexOf(k) < 0) return;
+        x.richtungen = x.richtungen.filter(y => y !== k);
+        gruppenPruefen(x);
+      });
       d.richtungen.push(k);
       abgelegt.delete(k);
     }
@@ -5023,6 +5223,20 @@ function wahlVereinen(vomPicker, vomGeraet) {
 function uebergabeHolen() {
   let roh = null;
   try { roh = JSON.parse(sessionStorage.getItem('catchit_feintuning') || 'null'); } catch (e) {}
+  // Zweiter Weg: window.name. Verweigert der Browser den sessionStorage (Safari sperrt ihn
+  // im fremden iframe des Geraete-Portals, config.straba.at in straba.local), legt die
+  // Auswahl ihn dort ab. Der haelt nur im selben Tab und soll NICHT ewig gelten: alles
+  // aelter als eine halbe Stunde ist Altlast, dieselbe Frist wie beim Zurueckgehen
+  // drueben (28.10.2026).
+  if (!roh) {
+    try {
+      const n = String(window.name || '');
+      if (n.indexOf('catchit_feintuning:') === 0) {
+        const aus = JSON.parse(n.slice('catchit_feintuning:'.length));
+        if (aus && aus.stand && (Date.now() - aus.stand) < 30 * 60 * 1000) roh = aus;
+      }
+    } catch (e) {}
+  }
   if (!roh || !roh.stationen || !roh.stationen.length) return null;
   const rohZeilen = (roh.masterrow || '') + ';' + (roh.timerow || '')
                   + ';' + ((roh.geraet && roh.geraet.masterrow) || '')
@@ -5489,9 +5703,35 @@ function ladenAus() {
   document.body.classList.remove('laedt');
 }
 
+// Diese Seite bekommt ihre Stationen von der Stations- und Linienauswahl, durch den
+// sessionStorage. Der gilt JE TAB: direkt geoeffnet, in einem neuen Tab oder nach einem
+// Neustart des Browsers steht dort nichts. Dann zeigt die Seite das hier und blendet alles
+// aus, was ohne Stationen nur Unsinn zeigen kann, vor allem den Speichern-Knopf
+// (Kunde Alexander, 28.10.2026).
+function uebergabeFehlt() {
+  const el = document.getElementById('laden');
+  if (el) {
+    el.classList.add('an');
+    el.innerHTML = '<span class="ladenTitel">Deine Stationen sind hier nicht angekommen</span>'
+      + '<span class="ladenUnter">Diese Seite holt sie aus der Stations- und Linienauswahl.'
+      + ' Direkt ge\u00f6ffnet oder in einem neuen Tab wei\u00df sie nichts davon, und speichern'
+      + ' w\u00fcrde dein Ger\u00e4t \u00fcberschreiben. Geh zur\u00fcck und tippe dort wieder auf'
+      + ' Feintunen.</span>'
+      + '<button style="margin-top:12px" onclick="zurueckZuLinien()">Zur Auswahl</button>';
+  }
+  document.body.classList.remove('laedt');
+  document.querySelectorAll('.streifen, .karte, .reihe').forEach(x => { x.style.display = 'none'; });
+}
+
 (async function start() {
-  // Testaufbau, solange niemand etwas uebergibt: fuenf Wiener Stationen mit je einer
-  // Linie. Damit sieht man sofort, wie aus Zeilen Seiten werden und wie die Stile wirken.
+  // Testaufbau NUR mit ?test=1 in der Adresse: fuenf Wiener Stationen mit je einer Linie,
+  // zum Ausprobieren, wie aus Zeilen Seiten werden und wie die Stile wirken.
+  // Bis zum 28.10.2026 lief er, sobald keine Uebergabe da war, und das war eine Falle:
+  // wer diese Seite direkt oder in einem neuen Tab oeffnete (sessionStorage gilt je Tab),
+  // sah Stephansplatz, Schottenring, Westbahnhof, Karlsplatz und Thaliastrasse wie seine
+  // eigenen Stationen, und "Ans Geraet speichern" schrieb sie aufs Geraet. Kunde Alexander
+  // 28.10.2026: "es wird immer eine Wiener Haltestelle geoeffnet und im Anschluss
+  // gespeichert statt der ausgewaehlten eigenen Haltestelle".
   const TEST = [
     { rbl: '4111', name: 'Stephansplatz', linie: 'U1', ziel: 'Leopoldau',   lat: 48.2083, lon: 16.3725 },
     { rbl: '4201', name: 'Schottenring',  linie: 'U2', ziel: 'Karlsplatz',  lat: 48.2163, lon: 16.3724 },
@@ -5500,6 +5740,9 @@ function ladenAus() {
     { rbl: '4621', name: 'Thaliastra\u00dfe', linie: 'U6', ziel: 'Floridsdorf', lat: 48.2098, lon: 16.3368 }
   ];
   const ueber = uebergabeHolen();
+  // Keine Uebergabe und kein ?test=1: dann wissen wir NICHT, was der Kunde gewaehlt hat.
+  // Lieber ehrlich stehen bleiben als fremde Stationen zeigen.
+  if (!ueber && !new URLSearchParams(location.search).has('test')) { uebergabeFehlt(); return; }
   if (ueber && ueber.helligkeit) helligkeit = ueber.helligkeit;
   // Der Wizard sagt, wie automatisch verteilt werden soll.
   if (ueber && ueber.modus) modus = ueber.modus;

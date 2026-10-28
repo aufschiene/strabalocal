@@ -8212,7 +8212,22 @@ function uebergabeSchreiben(ue) {
     return s2;
   });
   console.warn('[uebergabe] zu gross fuer sessionStorage, Abfahrten weggelassen');
-  return versuch(ohne);
+  if (versuch(ohne)) return true;
+  // Letzter Weg: window.name. Der ueberlebt den Seitenwechsel im SELBEN Tab und haengt
+  // nicht am Speicher-Recht der Seite. Genau das brauchen wir, wenn der Browser
+  // sessionStorage verweigert: diese Seite laeuft im Geraete-Portal in einem FREMDEN
+  // iframe (config.straba.at in straba.local), und Safari mit "Cross-Site-Tracking
+  // verhindern" sperrt dort den Speicher. Ohne Uebergabe stand drueben frueher die
+  // Wiener Testaufstellung, die sich auch noch speichern liess (Kunde Alexander,
+  // 28.10.2026). Nur die schlanke Fassung, window.name ist kein Lager fuer Megabytes,
+  // und nichts Geheimes: Haltestellen-Ids und Einstellungen.
+  try {
+    window.name = 'catchit_feintuning:' + JSON.stringify(ohne);
+    console.warn('[uebergabe] sessionStorage gesperrt, ueber window.name uebergeben');
+    return true;
+  } catch (e) {}
+  console.warn('[uebergabe] konnte nicht uebergeben werden');
+  return false;
 }
 
 function zurNeuenOberflaeche(cfg) {
