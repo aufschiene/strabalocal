@@ -584,6 +584,13 @@ function stilVon(d) { return stilErsatz((d && d.stil != null) ? d.stil : stil); 
 // (`var rMin = f.minRows || 1, rMax = f.maxRows || 3`). Wiener Linien kann also 3.
 const STIL_ZEILEN = { 2: 4, 13: 4, 15: 4, 18: 4, 21: 4, 23: 5, 24: 4, 26: 5, 101: 5, 102: 5, 103: 5 };
 const ZEILEN_VORGABE = 3;
+// Und was ein Stil als KLEINSTE Zeilenzahl kann. Die OeBB- und die Westbahn-Tafel
+// bestehen aus einer grossen Hauptzeile plus Kompaktzeilen darunter und klemmen am
+// Geraet selbst hoch: "OeBB S-Bahn braucht IMMER mindestens 2 Zeilen"
+// (display_oebb_sbahn.cpp und display_westbahn.cpp, beide `if (rows < 2) rows = 2`).
+// Eine 1 zur Wahl zu stellen waere also eine Luege, das Geraet zeigt trotzdem zwei
+// (Paul 27.10.2026: "oebb kann auch 2 oder 3 zeilen").
+const STIL_ZEILEN_MIN = { 11: 2, 12: 2, 14: 2 };
 
 // Was ein Anzeige-Stil an Farben kann. Gleiche Quelle wie im Konfigurator:
 // DISPLAY_TYPE_FEATURES.textColor (1, 23, 24), Hintergrund nur Wien, Badges
@@ -787,6 +794,7 @@ function dsSegment(c, zeilenZahl, fenster, sortierung, d) {
   return seg;
 }
 function maxZeilen(c) { return STIL_ZEILEN[parseInt(c, 10)] || ZEILEN_VORGABE; }
+function minZeilen(c) { return STIL_ZEILEN_MIN[parseInt(c, 10)] || 1; }
 
 // ---- Zusammengefasste Zeilen ---------------------------------------------------------
 // Zwei Richtungen, die dieselbe Strecke fahren, brauchen keine zwei Zeilen. Wer sie
@@ -850,8 +858,9 @@ function nurBloeckeAuf(d) {
 // haben darum auch verschiedene Zeilenzahlen (Paul 27.10.2026).
 function zeilenSelbst(d) {
   const max = maxZeilen(stilVon(d));
-  if (d && d.zeilen != null) return Math.max(1, Math.min(max, d.zeilen));
-  return zeilenAuto(d);
+  const min = minZeilen(stilVon(d));
+  if (d && d.zeilen != null) return Math.max(min, Math.min(max, d.zeilen));
+  return Math.max(min, zeilenAuto(d));
 }
 // Was ohne Zutun herauskommt.
 function zeilenAuto(d) {
@@ -2469,7 +2478,9 @@ function zeilenzahlFeld() {
         + '<select id="zeilenWahl" onchange="zeilenSetzen(' + sHier.index + ', this.value)">'
         + '<option value=""' + (d.zeilen == null ? ' selected' : '') + '>Automatisch, '
         + wort(auto) + '</option>';
-  for (let z = 1; z <= max; z++) {
+  // Ab der kleinsten Zahl, die der Stil wirklich kann: OeBB und Westbahn zeichnen auch
+  // bei einer angefragten 1 immer zwei Zeilen.
+  for (let z = minZeilen(stilVon(d)); z <= max; z++) {
     h += '<option value="' + z + '"'
        + ((d.zeilen != null && zeilenVon(d) === z) ? ' selected' : '') + '>'
        + wort(z) + '</option>';
