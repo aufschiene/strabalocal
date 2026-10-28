@@ -5831,13 +5831,45 @@ function uebergabeFehlt() {
     // (Paul 26.10.2026: "der grosse Fehler ist, dass du immer selber suchst").
     if (!e.alle && e.richtungen && e.richtungen.length) {
       const paare = [];
+      // DIESELBE FALTUNG WIE BEI DEN ABFAHRTEN. kurzfuehrungenFalten legt mehrere
+      // Zieltexte unter DERSELBEN Richtungs-Id zusammen: das ist EINE Richtung, nur mit
+      // Kurzfuehrung. Der Picker schickt seine Richtungen einzeln (Linz Unionkreuzung,
+      // Linie 2: "Remise Kleinmuenchen" und "solarCity", beide vom selben Steig) und
+      // zeigt sie selbst als EINE Zeile "Remise Kleinmuenchen / solarCity". Ungefaltet
+      // blieb der zweite Zieltext hier als eigene Zeile stehen und liess sich sogar auf
+      // ein zweites Brett legen, obwohl beide dasselbe Token tragen und das Geraet sie
+      // ohnehin wieder zu einer Zeile entdoppelt (Paul 28.10.2026: "du sollst ja einfach
+      // nur vom Picker uebernehmen").
+      const ridZiel = new Map();
+      (st.abfahrten || []).forEach(d => {
+        if (!d || !d.rid) return;
+        const k = String(d.line || '').trim().toUpperCase() + '>' + String(d.rid).trim();
+        if (!ridZiel.has(k)) ridZiel.set(k, d.dest);
+      });
+      // Ohne Abfahrten (nachts, oder die Station antwortet gerade nicht) gibt es nichts zu
+      // falten. Dann zaehlt die ERSTE Richtung je Id, so wie der Picker auch nur eine
+      // Zeile zeigt.
+      const gesehenRid = new Set();
+      const zielVon = r => {
+        const rid = String(r.rid || '').trim();
+        const eigen = String(r.ziel || '').trim();
+        if (!rid) return eigen;
+        const k = String(r.line || '').trim().toUpperCase() + '>' + rid;
+        const gefaltet = ridZiel.get(k);
+        if (gefaltet != null && String(gefaltet).trim()) return String(gefaltet).trim();
+        if (gesehenRid.has(k)) return null;      // zweiter Zieltext derselben Richtung
+        gesehenRid.add(k);
+        return eigen;
+      };
       e.richtungen.forEach(r => {
         const linie = String(r.line || '').trim();
         if (!linie) return;
-        st.gewaehlt.add(linie + '|' + String(r.ziel || '').trim());
+        const ziel = zielVon(r);
+        if (ziel === null) return;
+        st.gewaehlt.add(linie + '|' + ziel);
         if (r.rid) {
           if (!st.ruhtRid) st.ruhtRid = {};
-          st.ruhtRid[linie + '|' + String(r.ziel || '').trim()] = String(r.rid).trim();
+          st.ruhtRid[linie + '|' + ziel] = String(r.rid).trim();
           // Linie UND Richtung merken. Nur den Liniennamen zu pruefen reicht nicht: die
           // Gerätezeile traegt oft beide Richtungen, der Picker aber nur eine, und dann
           // kam die Gegenrichtung durch (Paul 26.10.2026, Linie 1 und 2 in Linz).
