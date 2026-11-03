@@ -325,8 +325,18 @@
     display: block; margin: 4px auto 0; padding: 3px 6px; border-radius: 4px;
     width: fit-content; line-height: 0;
   }
+  /* Mit normaler Schrift statt LED-Punkten braucht die Probe eine echte Zeilenhoehe.
+     Ohne sie war der Kasten 6 px hoch und die Ziffer stand oben und unten heraus: ein
+     schwarzer Balken, der im Takt aufblitzte (Paul 03.11.2026: "schaut affig aus"). */
+  .bprobe.schrift { line-height: 1.15; }
+  /* Im Knopf pulst es sanft. Das harte An/Aus gehoert in die Geraete-Vorschau, wo es
+     zeigt, wie das Display wirklich blinkt, nicht in einen Knopf. */
+  .bprobe .pulst { display: inline-block; animation: pulsNull 1.3s ease-in-out infinite alternate; }
+  @keyframes pulsNull { from { opacity: 1; } to { opacity: .18; } }
   .schalter button { line-height: 1.25; }
-  @media (prefers-reduced-motion: reduce) { .blinkt { animation: none; opacity: .5; } }
+  @media (prefers-reduced-motion: reduce) {
+    .blinkt, .bprobe .pulst { animation: none; opacity: .5; }
+  }
 
   .uhr-flaeche {
     position: absolute; inset: 0;
@@ -2780,13 +2790,8 @@ function zeitfensterZeichnen() {
   // Ein Uhr-Brett hat keine Abfahrten, also auch nichts zum Wechseln. Dort bleibt nur
   // die Frage, wie lange die Seite steht (Paul 23.10.2026).
   const nurUhr = zeigtUhr(dHier);
-  if (!nurUhr) {
-    // Erst die Frage OB, dann die Frage wie lange. Ohne die zweite Abfahrt haben die
-    // Wechselzeiten keinen Sinn, darum fallen sie dann weg (Paul 03.11.2026).
-    h += schalterZeile('Zweite Abfahrt zeigen',
-                       'Jede Zeile wechselt zwischen der n\u00e4chsten und der \u00fcbern\u00e4chsten Abfahrt',
-                       e.a !== 0, 'zweiteAbfahrtSchalten(' + di + ')');
-  }
+  // Der Schalter dazu steht bei den Features (Paul 03.11.2026), hier nur noch das
+  // Wie-lange. Ohne zweite Abfahrt gibt es nichts zu wechseln, dann faellt es weg.
   if (!nurUhr && e.a !== 0) {
     h += '<label class="feld" style="margin-top:18px">Abfahrtszeiten im Wechsel</label>'
        + '<div class="hinweis" style="margin-top:0">Wie lange jede der beiden Abfahrtszeiten '
@@ -4377,7 +4382,10 @@ function fahrzeugZeichnen() {
   const k = STIL_KANN[parseInt(c, 10)] || {};
   const nullWahl = nullKnoepfe(k.blinken, c, fwNullwahl());
   const bahnsteigWahl = !!k.bahnsteig && fwBahnsteig();
-  const kann = k.fahrzeug || k.verspaetung || nullWahl.length > 0 || bahnsteigWahl;
+  // Die zweite Abfahrt kann jeder Stil mit Countdown, nur ein Uhr-Brett nicht. Damit hat
+  // dieser Block auch bei Stilen etwas zu zeigen, die sonst nichts koennen.
+  const zweiteWahl = !!d && !zeigtUhr(d);
+  const kann = k.fahrzeug || k.verspaetung || nullWahl.length > 0 || bahnsteigWahl || zweiteWahl;
   block.style.display = kann ? '' : 'none';
   if (!kann) { block.classList.remove('offen'); return; }
   const e = einstFuer(d);
@@ -4385,6 +4393,7 @@ function fahrzeugZeichnen() {
   const unter = document.getElementById('featuresUnter');
   if (unter) {
     const worte = [];
+    if (zweiteWahl) worte.push('Zweite Abfahrt');
     if (nullWahl.length) worte.push('Anzeige bei 0');
     if (k.verspaetung) worte.push('Versp\u00e4tung');
     if (bahnsteigWahl) worte.push('Bahnsteig');
@@ -4398,6 +4407,11 @@ function fahrzeugZeichnen() {
          + '" onclick="' + ruf + '"><span class="kugel"></span></button></div>';
   };
   let h = '';
+  if (zweiteWahl) {
+    h += schieber('Zweite Abfahrt zeigen',
+                  'Jede Zeile wechselt zwischen der n\u00e4chsten und der \u00fcbern\u00e4chsten Abfahrt',
+                  e.a !== 0, 'zweiteAbfahrtSchalten(' + di + ')');
+  }
   // Null-Darstellung bei 0. Kommt am Geraet mit 2.6, aeltere Firmware ueberliest das Feld o
   // folgenlos (Paul 23.10.2026); die Stufe o3 und die Stile ausser Matrix brauchen 2.6.4.
   if (nullWahl.length) {
@@ -4410,10 +4424,10 @@ function fahrzeugZeichnen() {
     const ledProbe = STIL_MATRIX.indexOf(parseInt(c, 10)) >= 0 && typeof dvLedTextSvg === 'function';
     const probe = function (txt, blinkt) {
       const inner = ledProbe ? dvLedTextSvg(txt, 2, look.fg, true)
-                             : '<span style="color:' + look.fg + ';font-weight:700;font-size:15px">'
+                             : '<span style="color:' + look.fg + ';font-weight:700;font-size:13px">'
                                + escapeHtmlFt(txt) + '</span>';
-      return '<span class="bprobe" style="background:' + look.bg + '">'
-           + '<span class="' + (blinkt ? 'blinkt' : '') + '">' + inner + '</span></span>';
+      return '<span class="bprobe' + (ledProbe ? '' : ' schrift') + '" style="background:' + look.bg + '">'
+           + '<span class="' + (blinkt ? 'pulst' : '') + '">' + inner + '</span></span>';
     };
     h += '<label class="feld">Wenn eine Abfahrt bei 0 steht ' + neuBadge('blinken')
        + '</label><div class="schalter">';
