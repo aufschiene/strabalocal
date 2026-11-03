@@ -597,18 +597,62 @@ const STIL_ZEILEN_MIN = { 11: 2, 12: 2, 14: 2 };
 // DT_BADGE_COLOURS = 1, 3, 16. Steht ein Stil nicht hier, hat er nichts davon.
 // verspaetung: das Display kann eine Verspaetung hervorheben (Feld d). Die Matrix-Stile
 // zeichnen einfarbig und koennen darum nichts hervorheben.
+// blinken: WIE der Stil eine Abfahrt bei 0 von Haus aus zeigt. Seit 29.10.2026 koennen das
+// alle Stile mit Countdown einstellen, nicht mehr nur die Matrix (Paul: "bei wien und
+// generell auch bei fremden"). Die Arten entsprechen den Renderern der Firmware:
+//   quadrat = blinkendes Quadrat (DisplayWien, DisplayBodo, DisplayCZHU, DisplayFreeColor)
+//   stern   = blinkender Stern   (DisplaySBahnBerlin, DisplayOEBBSBahn, DisplayWestbahn)
+//   still   = die 0 steht da     (DisplayMatrix, DisplayMVG, DisplayPaperWhite,
+//                                 DisplayCHLI, DisplayDBFern)
+//   blinkt  = die 0 blinkt       (DisplayParis)
+// Die SBB-Tafel (25) steht bewusst nicht hier: sie zeigt Uhrzeiten statt Minuten.
 const STIL_KANN = {
-  1:  { schrift: 'wien',   grund: true, badges: true, fahrzeug: true },
-  3:  { badges: true },
-  16: { badges: true },
-  2:  { blinken: true, verspaetung: true },
-  12: { verspaetung: true },
-  15: { blinken: true, verspaetung: true },
-  18: { blinken: true, verspaetung: true },
-  21: { blinken: true, verspaetung: true },
-  23: { schrift: 'matrix', matrixSchrift: true, blinken: true, verspaetung: true },
-  24: { schrift: 'papier' }
+  1:  { schrift: 'wien',   grund: true, badges: true, fahrzeug: true, blinken: 'quadrat' },
+  3:  { badges: true, blinken: 'quadrat' },
+  16: { badges: true, blinken: 'quadrat' },
+  2:  { blinken: 'still', verspaetung: true },
+  12: { verspaetung: true, blinken: 'stern' },
+  15: { blinken: 'still', verspaetung: true },
+  18: { blinken: 'still', verspaetung: true },
+  21: { blinken: 'still', verspaetung: true },
+  23: { schrift: 'matrix', matrixSchrift: true, blinken: 'still', verspaetung: true },
+  24: { schrift: 'papier', blinken: 'still' },
+  5:  { blinken: 'stern' },
+  6:  { blinken: 'still' },
+  7:  { blinken: 'quadrat' },
+  9:  { blinken: 'blinkt' },
+  14: { blinken: 'stern' },
+  22: { blinken: 'still' },
+  26: { blinken: 'still' },
+  101: { blinken: 'quadrat' },
+  102: { blinken: 'quadrat' },
+  103: { blinken: 'quadrat' }
 };
+// Zeichen, mit dem die Vorschau die stil-eigene Darstellung (o0) nachbildet.
+const NULL_ART_ZEICHEN = { quadrat: '\u25A0', stern: '*' };
+// Die Knoepfe der Auswahl: [Wert von o, Aufschrift, Probe-Text, blinkt die Probe].
+// Der erste ist immer "wie bisher". Ein Knopf, der dasselbe tut wie die Vorgabe des Stils,
+// faellt weg, damit nicht zwei Knoepfe mit gleicher Wirkung nebeneinander stehen.
+function nullKnoepfe(art, colour, voll) {
+  if (!voll) {
+    // Vor 2.6.4 wertet nur die Matrix das Feld o aus, und dort gibt es die Stufe 3 nicht.
+    // Fuer die anderen Stile zeigen wir die Auswahl gar nicht, statt etwas zu versprechen,
+    // was das Geraet noch nicht tut.
+    if (STIL_MATRIX.indexOf(parseInt(colour, 10)) < 0) return [];
+    return [[0, '0 steht still', '0', false], [1, '0 blinkt', '0', true],
+            [2, 'Wie in Berlin', 'Ziel', true]];
+  }
+  const eigen = { quadrat: ['Quadrat blinkt', '\u25A0', true],
+                  stern:   ['Stern blinkt',   '*',        true],
+                  still:   ['0 steht still',  '0',        false],
+                  blinkt:  ['0 blinkt',       '0',        true] }[art];
+  if (!eigen) return [];
+  const liste = [[0, eigen[0], eigen[1], eigen[2]]];
+  if (art !== 'blinkt') liste.push([1, '0 blinkt', '0', true]);
+  if (art !== 'still')  liste.push([3, '0 steht still', '0', false]);
+  liste.push([2, 'Wie in Berlin', 'Ziel', true]);
+  return liste;
+}
 // Matrix-Schriftart, Feld f: 0 = DACH (font1), 1 = CZ+HU (Matrix8x6). Die zweite traegt
 // die tschechischen und ungarischen Zeichen, die der DACH-Satz nicht hat.
 const MATRIX_SCHRIFT = [[0, 'DACH'], [1, 'CZ + HU']];
@@ -1264,10 +1308,28 @@ function abfahrtenSetzen(st, liste) {
 }
 
 // ---- Daten holen ---------------------------------------------------------------------
-async function abfahrten(rbl) {
+// Koordinaten der Station aus der Antwort mitnehmen. Daran haengt der Stadtplan im
+// Hintergrund (karteAufStation). Die Uebergabe aus der Linienauswahl traegt KEINE
+// Koordinaten, ihre Stationen kennen nur Id und Name, darum stand die Seite seit dem
+// Umbau ohne Plan da (Paul 30.10.2026). Der Server schickt sie dagegen bei jeder
+// Abfrage mit: locationStop.geometry.coordinates, Reihenfolge [lon, lat] wie in GeoJSON.
+// Hier abgeholt gilt es fuer JEDE Station, egal auf welchem Weg sie hereinkommt.
+function ortMerken(st, d) {
+  if (!st || (st.lat != null && st.lon != null)) return;
+  const m = ((d && d.data && d.data.monitors) || [])[0];
+  const c = m && m.locationStop && m.locationStop.geometry && m.locationStop.geometry.coordinates;
+  if (!Array.isArray(c) || c.length < 2) return;
+  const lon = Number(c[0]), lat = Number(c[1]);
+  if (!isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0)) return;
+  st.lat = lat; st.lon = lon;
+}
+
+async function abfahrten(rbl, st) {
   const r = await fetch(DEP_API + '?rbl=' + encodeURIComponent(rbl) + '&_=' + Date.now(), { cache: 'no-store' });
   if (!r.ok) throw new Error('HTTP ' + r.status);
-  return abfahrtenAus(await r.json());
+  const d = await r.json();
+  ortMerken(st, d);
+  return abfahrtenAus(d);
 }
 
 // Dieselbe Antwort, nur schon geholt: die Linienauswahl hat die Abfahrten beim Laden
@@ -1325,7 +1387,7 @@ function zurueckZuLinien() {
 const NEU_WOCHEN = 4;
 const NEU_SEIT = {
   uhr:     '2026-10-23',   // Uhrzeit als Zeile oder als ganzes Display
-  blinken: '2026-10-23'    // Blinken bei 0 (Matrix)
+  blinken: '2026-10-29'    // Null-Darstellung bei 0, jetzt fuer alle Stile mit Countdown
 };
 // Welcher Block zeigt das NEU oben? Ein Block ist neu, solange eine seiner Funktionen neu ist.
 const NEU_BLOCK = {
@@ -1705,6 +1767,14 @@ let gidBasis = 0;
 let dFeldVonAussen = null;
 function fwZeilenfolge() {
   return !!geraetVersion && versionMin(geraetVersion, FW_MIT_ZEILENFOLGE);
+}
+// Ab dieser Firmware wertet JEDER Stil mit Countdown das Feld o aus, und es gibt die Stufe
+// o3 (die 0 steht still). Davor konnte es nur die Matrix, und nur die Stufen 0 bis 2
+// (29.10.2026). Aeltere Geraete ueberliesen das Feld folgenlos und klemmen eine 3 auf 0,
+// es geht also nichts kaputt — die Auswahl waere dort nur eine Behauptung, darum das Gate.
+const FW_MIT_NULLWAHL = '2.6.4';
+function fwNullwahl() {
+  return !!geraetVersion && versionMin(geraetVersion, FW_MIT_NULLWAHL);
 }
 function fwNeu() {
   if (dFeldVonAussen != null) return !!dFeldVonAussen;
@@ -3654,13 +3724,16 @@ function seiteVerteilen(zeilen, kopf, zeilenH, fach, eigene) {
   });
 }
 
-// Blinken bei 0, nur Matrix. o1 laesst die Null blinken, o2 nimmt die Zahl weg und
-// laesst daf\u00fcr das Ziel blinken. Die Vorschau bildet das in der grossen Ansicht nach
-// (bis 3 Zeilen), dort ist die Zeile Linie, Ziel, Zahl (Firmware-Sitzung 23.10.2026).
+// Null-Darstellung bei 0 (Feld o): o1 laesst die Null blinken, o2 nimmt die Zahl weg und
+// laesst daf\u00fcr das Ziel blinken, o3 laesst sie still stehen. Bei o0 macht der Stil sein
+// eigenes Ding, und das bildet die Vorschau jetzt mit nach: Wien und BODO ein blinkendes
+// Quadrat, die Zug-Tafeln einen blinkenden Stern (29.10.2026). Die Vorschau zeigt das in
+// der grossen Ansicht (bis 3 Zeilen), dort ist die Zeile Linie, Ziel, Zahl.
 function nullBlinken(colour, zeilen, daten, d) {
-  const kann = (STIL_KANN[parseInt(colour, 10)] || {}).blinken;
+  const art = (STIL_KANN[parseInt(colour, 10)] || {}).blinken;
+  if (!art) return;
   const o = (d ? einstFuer(d) : einstVon(colour)).o;
-  if (!kann || !o) return;
+  if (o === 3) return;                     // steht still, nichts zu tun
   zeilen.forEach((k, i) => {
     const dep = daten[i];
     if (!k || !dep || parseInt(dep.time, 10) !== 0) return;
@@ -3668,8 +3741,22 @@ function nullBlinken(colour, zeilen, daten, d) {
     if (teile.length < 3) return;          // kleine Ansicht sieht anders aus
     const zahl = teile[teile.length - 1];
     const ziel = teile[1];
-    if (o === 1) { zahl.classList.add('blinkt'); }
-    else { zahl.style.visibility = 'hidden'; ziel.classList.add('blinkt'); }
+    if (!zahl || !ziel) return;
+    // Die Vorschauen sind je Stil verschieden aufgebaut. [Linie, Ziel, Zahl] stimmt bei den
+    // Wien-artigen und den Matrix-Stilen; die OEBB-Tafel etwa traegt Ziel UND Zahl in einem
+    // Element ("Leopoldau1"), und ein Zugriff auf gut Glueck wuerde dort den Zieltext
+    // ueberschreiben. Also nur anfassen, wo das letzte Element wirklich die Minutenzahl ist
+    // (Matrix zeichnet sie als SVG, hat also keinen Text). Bei den uebrigen Stilen bleibt die
+    // Vorschau wie sie ist, das Geraet stellt die 0 trotzdem richtig dar (29.10.2026).
+    const txt = (zahl.textContent || '').trim();
+    if (!(/^\d+$/.test(txt) || (!txt && STIL_MATRIX.indexOf(parseInt(colour, 10)) >= 0))) return;
+    if (o === 2) { zahl.style.visibility = 'hidden'; ziel.classList.add('blinkt'); return; }
+    if (o === 1) { zahl.classList.add('blinkt'); return; }
+    // o0: die Vorgabe des Stils. Das Zeichen nur setzen, wo die Zahl echter Text ist —
+    // die Matrix-Stile zeichnen sie als SVG, und die stehen ohnehin auf 'still'.
+    const z = NULL_ART_ZEICHEN[art];
+    if (z) { zahl.textContent = z; zahl.classList.add('blinkt'); }
+    else if (art === 'blinkt') zahl.classList.add('blinkt');
   });
 }
 
@@ -4237,7 +4324,8 @@ function fahrzeugZeichnen() {
   const d = sHier && sHier.display;
   const c = d ? stilVon(d) : 0;
   const k = STIL_KANN[parseInt(c, 10)] || {};
-  const kann = k.fahrzeug || k.verspaetung || k.blinken;
+  const nullWahl = nullKnoepfe(k.blinken, c, fwNullwahl());
+  const kann = k.fahrzeug || k.verspaetung || nullWahl.length > 0;
   block.style.display = kann ? '' : 'none';
   if (!kann) { block.classList.remove('offen'); return; }
   const e = einstFuer(d);
@@ -4245,7 +4333,7 @@ function fahrzeugZeichnen() {
   const unter = document.getElementById('featuresUnter');
   if (unter) {
     const worte = [];
-    if (k.blinken) worte.push('Blinken bei 0');
+    if (nullWahl.length) worte.push('Anzeige bei 0');
     if (k.verspaetung) worte.push('Versp\u00e4tung');
     if (k.fahrzeug) worte.push('Hochflurer, Niederflur, Klimaanlage');
     unter.textContent = worte.join(', ');
@@ -4257,25 +4345,29 @@ function fahrzeugZeichnen() {
          + '" onclick="' + ruf + '"><span class="kugel"></span></button></div>';
   };
   let h = '';
-  // Blinken bei 0, nur Matrix. Kommt am Geraet mit 2.6, aeltere Firmware ueberliest
-  // das Feld o folgenlos (Paul 23.10.2026).
-  if (k.blinken) {
+  // Null-Darstellung bei 0. Kommt am Geraet mit 2.6, aeltere Firmware ueberliest das Feld o
+  // folgenlos (Paul 23.10.2026); die Stufe o3 und die Stile ausser Matrix brauchen 2.6.4.
+  if (nullWahl.length) {
     // Jeder Knopf zeigt klein, was er tut. Das ersetzt den erklaerenden Satz
     // (Paul 23.10.2026: "einfach im Toggle das zeigen").
     const look = uhrLook(c, d) || { bg: '#000000', fg: '#ffffff' };
+    // Der LED-Font gehoert den Matrix-Stilen. Fuer alle anderen normale Schrift, sonst
+    // stuende Wien ein Matrix-Muster auf dem Knopf — und das Quadrat kennt der LED-Satz
+    // gar nicht, der Knopf blieb leer (29.10.2026).
+    const ledProbe = STIL_MATRIX.indexOf(parseInt(c, 10)) >= 0 && typeof dvLedTextSvg === 'function';
     const probe = function (txt, blinkt) {
-      const inner = (typeof dvLedTextSvg === 'function') ? dvLedTextSvg(txt, 2, look.fg, true)
-                                                         : escapeHtmlFt(txt);
+      const inner = ledProbe ? dvLedTextSvg(txt, 2, look.fg, true)
+                             : '<span style="color:' + look.fg + ';font-weight:700;font-size:15px">'
+                               + escapeHtmlFt(txt) + '</span>';
       return '<span class="bprobe" style="background:' + look.bg + '">'
            + '<span class="' + (blinkt ? 'blinkt' : '') + '">' + inner + '</span></span>';
     };
     h += '<label class="feld">Wenn eine Abfahrt bei 0 steht ' + neuBadge('blinken')
        + '</label><div class="schalter">';
-    [[0, 'Still', probe('0', false)],
-     [1, '0 blinkt', probe('0', true)],
-     [2, 'Wie in Berlin', probe('Ziel', true)]].forEach(b => {
+    nullWahl.forEach(b => {
       h += '<button class="' + (e.o === b[0] ? 'an' : '') + '"'
-         + ' onclick="blinkenSetzen(' + di + ',' + b[0] + ')">' + b[1] + b[2] + '</button>';
+         + ' onclick="blinkenSetzen(' + di + ',' + b[0] + ')">' + b[1] + probe(b[2], b[3])
+         + '</button>';
     });
     h += '</div>';
   }
@@ -4812,7 +4904,7 @@ function stationWeg(si) { stationen.splice(si, 1); zeiger = 0; allesZeichnen(); 
 
 async function neuLaden() {
   for (const st of stationen) {
-    try { abfahrtenSetzen(st, await abfahrten(st.rbl)); } catch (e) { /* alte Daten behalten */ }
+    try { abfahrtenSetzen(st, await abfahrten(st.rbl, st)); } catch (e) { /* alte Daten behalten */ }
   }
   allesZeichnen();
 }
@@ -4827,7 +4919,7 @@ async function stationNehmen(rbl, name, lat, lon, netz) {
                lat: (lat != null ? Number(lat) : null), lon: (lon != null ? Number(lon) : null) };
   stationen.push(st);
   allesZeichnen();
-  try { st.abfahrten = await abfahrten(rbl); } catch (e) { /* bleibt leer */ }
+  try { st.abfahrten = await abfahrten(rbl, st); } catch (e) { /* bleibt leer */ }
   allesZeichnen();
 }
 
@@ -5802,7 +5894,7 @@ function uebergabeFehlt() {
     // falsche Minuten da, und das waere schlimmer als kurz zu warten (Paul 26.10.2026).
     const standAlter = e.abfahrtenStand ? (Date.now() - e.abfahrtenStand) : 0;
     let roh = (e.abfahrtenStand && standAlter > 90000) ? null : (e.abfahrten || e.rohAbfahrten || null);
-    if (roh && !Array.isArray(roh)) roh = abfahrtenAus(roh);
+    if (roh && !Array.isArray(roh)) { ortMerken(st, roh); roh = abfahrtenAus(roh); }
     // HIER NICHT 'continue': darunter steht die AUSWAHL. Weil die Linienauswahl die
     // Abfahrten fast immer mitschickt, wurde der Block darunter in der Praxis nie
     // erreicht, und dann stand jede Abfahrt der Haltestelle auf dem Brett. In jeder
@@ -5813,10 +5905,10 @@ function uebergabeFehlt() {
       abfahrtenSetzen(st, roh);
     } else {
       try {
-        abfahrtenSetzen(st, await abfahrten(e.rbl));
+        abfahrtenSetzen(st, await abfahrten(e.rbl, st));
       } catch (err) {
         await new Promise(r => setTimeout(r, 1500));
-        try { abfahrtenSetzen(st, await abfahrten(e.rbl)); }
+        try { abfahrtenSetzen(st, await abfahrten(e.rbl, st)); }
         catch (err2) { st.fehler = String((err2 && err2.message) || err2); abfahrtenSetzen(st, []); }
       }
     }
