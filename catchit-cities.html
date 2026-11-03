@@ -8369,6 +8369,11 @@ function zurNeuenOberflaeche(cfg) {
       // kleingeschriebene displaylight. Das war immer undefined, also ging an die neue
       // Oberflaeche IMMER Helligkeit 3, egal was am Geraet stand (25.10.2026).
       helligkeit: _zahlOderVorgabe(cfg.displayLight, cfg.displaylight, 3),
+      // Zweite Abfahrt (Feld a): die GLOBALE Vorgabe des Geraets. Pro Display steht sie
+      // in den displaysettings, die oben mitgehen; fehlt sie dort, braucht die neue
+      // Oberflaeche diesen Wert, sonst schaltet sie ein Geraet, bei dem es aus ist,
+      // beim ersten Speichern wieder ein (03.11.2026).
+      zweiteAbfahrt: (recommendedConfig && recommendedConfig.alternateNext === false) ? 0 : 1,
       // Nachtmodus und Standzeit kamen bisher gar nicht mit. Die neue Oberflaeche startete
       // deshalb mit IHREN Vorgaben (Nachtmodus aus, Standzeit 10) und schrieb die beim
       // Speichern aufs Geraet: der Nachtmodus des Kunden war nach jedem Besuch geloescht,
@@ -8566,16 +8571,24 @@ function showWienLineDropdown(query) {
     const bCat = getCategory(bName);
     if (aCat !== bCat) return aCat - bCat;
 
-    // Numerisch sortieren
-    const aNum = parseInt(aName.replace(/\D/g, '')) || 999;
-    const bNum = parseInt(bName.replace(/\D/g, '')) || 999;
-    if (aNum !== bNum) return aNum - bNum;
+    // Numerisch sortieren. Linien OHNE Ziffer (D, O, WLB) bekamen hier 999 und landeten
+    // damit ganz hinten: gemessen 03.11.2026 stand D auf Platz 153 von 177, die Liste zeigt
+    // aber nur die ersten 100. Kundin Birgit Schulz: "auf local findet man Linie D beim
+    // Scrollen der verfuegbaren Linien gar nicht und muss es eingeben." Jetzt stehen sie
+    // VORNE in ihrer Gruppe, also gleich hinter den U-Bahnen.
+    const aNum = parseInt(aName.replace(/\D/g, ''));
+    const bNum = parseInt(bName.replace(/\D/g, ''));
+    const aWert = isNaN(aNum) ? 0 : aNum;
+    const bWert = isNaN(bNum) ? 0 : bNum;
+    if (aWert !== bWert) return aWert - bWert;
 
     return aName.localeCompare(bName, 'de');
   });
 
-  // Immer alle prefix-Matches anzeigen — bei "1" sollen 1, 1A, 10, 13, … alle sichtbar bleiben
-  filtered = filtered.slice(0, 100);
+  // Immer alle prefix-Matches anzeigen — bei "1" sollen 1, 1A, 10, 13, … alle sichtbar
+  // bleiben. Wien hat 177 Linien mit Haltestellen, die Grenze von 100 schnitt also ein
+  // Fuenftel der Liste ab (03.11.2026 nachgezaehlt).
+  filtered = filtered.slice(0, 400);
 
   const resultsList = document.getElementById('wienLineResults');
 
@@ -8623,6 +8636,29 @@ function selectWienLine(lineID) {
   showStep('wienStation');
   document.getElementById('wienStationInput').focus();
   setTimeout(() => showWienStationDropdown(''), 50);
+}
+
+// Zieltexte der Wiener Richtungen nachtragen, siehe Aufruf in loadExistingConfig.
+function wienRichtungenBenennen() {
+  try {
+    if (!Array.isArray(wienData)) return;
+    (stations || []).forEach(function (s) {
+      if (!s || (s.network !== 'WL' && s.network !== 'WLB')) return;
+      var sid = String(s.stopId || '').split(',')[0].trim();
+      if (!sid) return;
+      (s.directions || []).forEach(function (d) {
+        if (!d || !d.line || String(d.towards || '').trim()) return;
+        var l = wienData.find(function (x) { return String(x.lineName) === String(d.line); });
+        if (!l || !Array.isArray(l.lineStation)) return;
+        var e = l.lineStation.find(function (x) {
+          return x.station && String(x.station.stationID) === sid;
+        });
+        if (!e) return;
+        var ziel = getWienDirectionName(l, e.patternID);
+        if (ziel) d.towards = ziel;
+      });
+    });
+  } catch (e) { /* Beschriftung ist Kosmetik, nie den Aufbau stoeren */ }
 }
 
 // Stationsnamen normalisieren
@@ -17049,6 +17085,20 @@ function fcStyleVal(cid, key) {
   return fcStored(cid, key) || FC_DEFAULTS[key];
 }
 
+// Abfahrten-Modus eines eigenen Displays: offener Wizard-Toggle → live, sonst der
+// gespeicherte displaysettings-Wert ('a'), sonst die globale Vorgabe (an).
+// ACHTUNG: 'a' ist KEIN customrow-Token, sondern ein displaysettings-Feld (so liest es
+// die Firmware, resolveGroupLook: Eintrag 'a' → displaysettings 'a' → alternate_next).
+function fcAltVal(cid) {
+  if (document.getElementById('ftFcAlt_' + cid)) {
+    var v = getFtToggleVal('ftFcAlt_' + cid);
+    if (v) return String(v);
+  }
+  var a = dsVal(cid, 'a');
+  if (a !== undefined) return (a === 1) ? '1' : '0';
+  return (recommendedConfig && recommendedConfig.alternateNext === false) ? '0' : '1';
+}
+
 // Name des Displays (N-Token): ohne |;, (Trenner in customrow bzw. P-Liste), max. 10 Zeichen.
 function fcSanitizeName(v) {
   return String(v || '').replace(/[|;,]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 10).trim();
@@ -17623,6 +17673,12 @@ function fcOpenWizard(cid, opts) {
   // der oberen von zwei möglichen Zeilen, Mittig auf Höhe von Linie und Minuten.
   var fcM = fcStyleVal(cid, 'M');
   h += fcRow('Position', 'Mittig = auf gleicher H&ouml;he wie Linie und Minuten', fcToggle('M', [['0', 'Oben'], ['1', 'Mittig']], fcM));
+  // Abfahrten (displaysettings-Feld 'a'): die Firmware zeigt je Zeile die erste und die
+  // zweite Abfahrt im Wechsel. Die Wahl gab es nur im alten Feintuning, und das ist seit
+  // dem Umzug auf die neue Oberflaeche nicht mehr zu sehen (Paul 03.11.2026).
+  h += fcSec('Abfahrten');
+  h += fcRow('Zweite Abfahrt', 'Beide = 1. und 2. Abfahrt im Wechsel',
+             fcToggle('Alt', [['1', 'Beide'], ['0', 'Nur die n&auml;chste']], fcAltVal(cid)));
   h += '</div>';
 
   // === Schritt 2: Badges (An/Aus, Badge-Farben, Farben pro Linie) ===
@@ -17760,6 +17816,8 @@ function fcWizardCancel() {
 function fcWizardFinish() {
   var cid = fcWizardCid;
   if (cid == null) return;
+  // Abfahrten-Wahl JETZT lesen: fcWizardCancel() raeumt das Overlay und damit den Toggle.
+  var altGewaehlt = fcAltVal(cid);
   // Werte aus den Wizard-Inputs in den Store persistieren (nur Nicht-Defaults → schlanke Row)
   var o = {};
   ['B', 'T', 'U', 'H', 'V'].forEach(function(k) {
@@ -17805,6 +17863,11 @@ function fcWizardFinish() {
     }
   }
   customRowBySlot[fcSlot(cid)] = o;
+  // Abfahrten-Wahl in den per-Typ-Speicher: von dort holt sie buildDisplaySettings als
+  // Feld 'a'. renderDisplayTypeSections() unten baut den (versteckten) Toggle
+  // ftAltNext_<cid> daraus neu auf, und genau den liest dsKeepBool beim Speichern.
+  if (!dsByCid[cid]) dsByCid[cid] = {};
+  dsByCid[cid].a = altGewaehlt;
 
   var wasCreate = fcWizardCreate;
   var tgt = fcWizardTarget;  // VOR fcWizardCancel lesen (Cancel räumt das Ziel auf)
@@ -21875,12 +21938,13 @@ function buildMasterAndTimeRows(gehwegByStopId) {
         var rbl = net + ':' + sid + _lsTok;
         var lp;
         if (net === 'WL') {
-          // Wien: Richtung steckt im Bahnsteig (stopId/rbl) — die Firmware gruppiert über
-          // stopId:Linie. NICHT das Ziel als "Richtung" anhängen (war: U1>Leopoldau);
-          // nur eine echte richtungsId verwenden, sonst nur die Linie.
-          var wr = d.richtungsId ? String(d.richtungsId).trim() : '';
-          var wl = String(d.line || '').trim();
-          lp = wr ? (wl + '>' + wr) : wl;
+          // Wien: NUR der Linienname. Die Richtung steckt im Bahnsteig, und der steht schon
+          // in der rbl; die Firmware gruppiert ueber stopId:Linie und liest ohnehin nur den
+          // Teil vor dem '>'. Die Richtungs-Id ("1"/"2") kommt ausserdem AUSSCHLIESSLICH aus
+          // den Live-Abfahrten, ist also offline nicht verfuegbar: haengt man sie an, sieht
+          // eine Zeile je nach Tageszeit anders aus, obwohl sie dasselbe meint (Paul
+          // 03.11.2026). Die Anzeigen-Oberflaeche schreibt Wien ebenfalls ohne Id.
+          lp = String(d.line || '').trim();
         } else if (sid.indexOf('>') >= 0) {
           // Richtung steckt SCHON in der rbl ("OEBB:1291501>8100013") — der Server liefert
           // dann nur noch diese Richtung. Denselben Grund wie bei Wien oben: kein Ziel als
@@ -22173,6 +22237,18 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     }
   } catch (e) { _zusatz = null; }
   var _zusatzLauf = { false: 0, true: 0 };
+  // Automatik (Feld y, Paul 03.11.2026): eine NEUE Konfiguration startet darin, also ein
+  // Geraet ohne Zeilen. Ebenso eine Station, die in eine schon automatische dazukommt (die
+  // masterrow des Geraets traegt dann ein y1). Alles andere bleibt, wie es am Geraet steht:
+  // ein vorhandenes y kommt unten mit den Zusatzfeldern unveraendert durch.
+  var _automatikNeu = true;
+  try {
+    if (typeof _geraetRows !== 'undefined' && _geraetRows) {
+      _automatikNeu = String(_geraetRows.masterrow || '').split(';').some(function(seg) {
+        return seg.split('|').slice(2).some(function(f) { return String(f).trim() === 'y1'; });
+      });
+    }
+  } catch (e) { _automatikNeu = false; }
   // Zeilenfolge des Geraets je Station, damit sie das Speichern uebersteht.
   var _tokOrd = null;
   try {
@@ -22236,8 +22312,13 @@ function buildMasterAndTimeRows(gehwegByStopId) {
       });
       if (_liste.length) _extra = '|' + _liste.join('|');
     }
+    // y1 nur auf Brettern mit festen Linien: nicht in der timerow (Zug-Bretter) und nicht
+    // bei "Alle Abfahrten", die fuellen sich ohnehin selbst. Das Geraet ueberliest das Feld,
+    // die Anzeigen-Oberflaeche liest daraus den Modus und legt die Linien auf ein Brett.
+    var yPart = '';
+    if (_automatikNeu && !e.isTime && lines !== '*' && !/\|[yY]\d/.test(_extra)) yPart = '|y1';
     e.str = e.rbl + '|' + lines + '|c' + e.colour + '|g' + gPart
-          + (mParts.length ? '|m' + mParts.join(',') : '') + qPart + dPart + _extra;
+          + (mParts.length ? '|m' + mParts.join(',') : '') + qPart + dPart + _extra + yPart;
   });
 
   // Kompakt (ein Display für alle): ZEILEN global nach dt-Rang sortieren — so kann eine
@@ -24462,7 +24543,19 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       _segIdx2++;
       const linesField = (f[1] || '').trim();
       if (!linesField || linesField === '*') continue;
-      const segStations = stations.filter(s => s.displayInstance === _segIdx2 + 1 && !s.allDepartures && !s.isJourney);
+      // Display-Instanz dieses Segments GENAUSO bestimmen wie der Leser oben (_instVon):
+      // traegt das Segment ein Feld d, ist sie 1000 + d, sonst der Segment-Index + 1. Ohne
+      // das fand dieses Netz seine Stationen nicht mehr, sobald eine Config ein d trug, und
+      // der ganze Schutz gegen verlorene Tokens lief leer. Die Umstellung auf d kam am
+      // 26.10.2026, bemerkt am 03.11.2026 am Wiener Nachtbus (WL:18|N38,71|…|d1: N38 war
+      // nach dem Laden weg, weil hier nichts mehr gegriffen hat).
+      let _segD = 0;
+      for (let fi = 2; fi < f.length; fi++) {
+        const t = String(f[fi] || '').trim();
+        if (t.charAt(0) === 'd' || t.charAt(0) === 'D') { _segD = parseInt(t.substring(1), 10) || 0; break; }
+      }
+      const _instSeg = _segD ? 1000 + _segD : _segIdx2 + 1;
+      const segStations = stations.filter(s => s.displayInstance === _instSeg && !s.allDepartures && !s.isJourney);
       if (!segStations.length) continue;
       const union = new Set();
       segStations.forEach(s => (s.directions || []).forEach(d => {
@@ -24566,6 +24659,14 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
   // Richtungs-Dubletten mit identischer richtungsId zusammenlegen (Leonard-Fall).
   dedupeDirectionsByRid('loadExistingConfig');
 
+  // WIEN: der BAHNSTEIG ist die Richtung, jede Linie hat dort genau eine (Paul 03.11.2026).
+  // Eine nachgetragene Richtung ohne Zieltext stuende sonst als "Alle Richtungen" auf der
+  // Stationskarte, obwohl das Ziel feststeht. wienData weiss es OFFLINE, also auch dann,
+  // wenn die Linie gerade nicht faehrt: das Muster, das ueber diesen Steig laeuft, hat ein
+  // Ende. Der Zeilen-Token bleibt unberuehrt (nackter Linienname, die Richtung steckt in
+  // der rbl), das hier ist nur die Beschriftung.
+  wienRichtungenBenennen();
+
   // „Nach Städten gruppieren"-Zustand aus der Config ableiten: mehrere Stationen derselben
   // Stadt-Gruppe (Netz+colour) in GETRENNTEN Segmenten = Toggle AUS (Instanz-Modus).
   // Sonst Default AN. Nur relevant wenn die Firmware merged Segmente überhaupt kann.
@@ -24663,7 +24764,21 @@ function dropStaleDirectionIds() {
       var g = gueltig[String(d.line)];
       if (!g) return true;                       // Linie dem Index unbekannt → behalten
       var rid = String(d.richtungsId || '');
-      if (rid) return !!g[rid];                   // Kennung muss der Index noch führen
+      if (rid) {
+        if (g[rid]) return true;                  // Kennung fuehrt der Index noch
+        // Kennung unbekannt heisst NICHT automatisch veraltet: der Linien-Index fuehrt eine
+        // Nachtlinie tagsueber oft ohne ihre Richtungen, und dann flog die gespeicherte
+        // Auswahl hier wieder raus, direkt nachdem das Sicherheitsnetz sie nachgetragen
+        // hatte (Kunde Max Blobel, Bremen, nachgestellt 03.11.2026: "N5>11111111" wurde
+        // angehaengt und in derselben Runde wieder entfernt). Wegwerfen nur dann, wenn
+        // dieselbe Linie an dieser Station noch eine ANDERE Richtung hat, die der Index
+        // kennt: DAS ist der Fall, fuer den die Regel gebaut wurde (Server stellt auf neue
+        // Kennungen um, die alte steht daneben). Sonst ist es die einzige Spur der Auswahl.
+        var andereGueltige = st.directions.some(function(x) {
+          return x !== d && String(x.line) === String(d.line) && !!g[String(x.richtungsId || '')];
+        });
+        return !andereGueltige;
+      }
       // Ohne Kennung: Steht im ZIELTEXT eine alte Kennung ("pBstg. 3"), ist das kein Ziel,
       // sondern ein Rest aus dem Nachtrag — die Richtung existiert bereits überführt.
       var tw = String(d.towards || '').trim();
@@ -26248,6 +26363,8 @@ window.addEventListener('DOMContentLoaded', () => {
     'Öffi': 'Public transit',
     'Spart Strom: das Display schaltet sich nachts automatisch ab.': 'Saves power: the display turns off automatically at night.',
     'An = 1. & 2. Abfahrt im Wechsel · Aus = nur die 1. Abfahrt': 'On = 1st & 2nd departure alternating · Off = only the 1st departure',
+    'Zweite Abfahrt': 'Second departure', 'Beide': 'Both', 'Nur die nächste': 'Only the next',
+    'Beide = 1. und 2. Abfahrt im Wechsel': 'Both = 1st and 2nd departure alternating',
     'Wechselzeiten': 'Alternation times',
     'Wie lange jede der beiden Abfahrtszeiten steht, bevor die andere kommt': 'How long each of the two departure times stays before the other appears',
     'Automatisch = 4 s erste, 1,5 s zweite Abfahrt': 'Automatic = 4 s first, 1.5 s second departure',

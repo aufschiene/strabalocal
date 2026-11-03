@@ -21,7 +21,7 @@ var DV_DEMO_DATA = {
   23: [{ line: '1', dest: 'Auwiesen', time: 2 }, { line: '3', dest: 'Landgutstr.', time: 5 }, { line: '46', dest: 'Hauptbahnhof', time: 8 }, { line: '17', dest: 'Solarcity', time: 12 }, { line: '25', dest: 'Universität', time: 16 }],
   24: [{ line: 'S2', dest: 'Hauptbahnhof', time: 3 }, { line: '1', dest: 'Salzburg Süd', time: 6 }, { line: '22', dest: 'Aigen', time: 9 }, { line: '7', dest: 'Itzling', time: 13 }, { line: '4', dest: 'Liefering', time: 17 }],
   4: [{ line: 'WLB', dest: 'Baden Josefsplatz', time: 4 }, { line: 'WLB', dest: 'Wien Oper', time: 12 }, { line: 'WLB', dest: 'Baden Josefsplatz', time: 19 }],
-  12: [{ line: 'S3', dest: 'Wien Floridsdorf', time: 4, via: 'Wien Handelskai', vehicleType: '4020' }, { line: 'REX3', dest: 'St. Pölten Hbf', time: 12 }, { line: 'RJX', dest: 'Salzburg Hbf', time: 28 }],
+  12: [{ line: 'S3', dest: 'Wien Floridsdorf', time: 4, via: 'Wien Handelskai', vehicleType: '4020', platform: '2' }, { line: 'REX3', dest: 'St. Pölten Hbf', time: 12 }, { line: 'RJX', dest: 'Salzburg Hbf', time: 28 }],
   14: [{ line: 'WB', dest: 'Wien Westbahnhof', time: 9, trainNumber: 'WB 921' }, { line: 'WB', dest: 'Wien Meidling', time: 39 }, { line: 'WB', dest: 'Salzburg Hbf', time: 65 }],
   16: [{ line: '22', dest: 'Bílá Hora', time: 3 }, { line: '9', dest: 'Sídliště Řepy', time: 6 }, { line: 'A', dest: 'Nemocnice Motol', time: 8 }],
   22: [{ line: 'U3', dest: 'Moosach', time: 3 }, { line: 'U6', dest: 'Klinikum Großhadern', time: 5 }, { line: '12', dest: 'Amalienburgstraße', time: 8 }],
@@ -177,6 +177,43 @@ function dvSplitTrainType(line) {
   }
   return [l, ''];
 }
+// Schriftbreiten wie am Gerät: xAdvance aus fonts.cpp für die Zeichen 0x20 bis 0x7E, je
+// Zeichen ein Buchstabe mit Wert = Code - 48. Damit entscheidet die Vorschau wie die
+// Firmware, was in die Kopfzeile der ÖBB-Tafel passt.
+var DV_GERAET_BREITE = {
+  sans9:  '566::@<4667;5655::::::::::55;;;:B<<==;;>=5:<:?=><>=<;=<A<<;5558:5::9::5::4494?::::695:9=9996569',  // FreeSansExt9pt7b
+  fett12: '78;==EA6889>6867==========66>>>?GAAAA@?BB7>A?EBC@CA@?B@G@??878>=6>?=?>8??77>6E????9=8?=C==<979<',  // FreeSansBoldExt12pt7b
+  pop12:  '689E?DC5<<<@6>6;?8>>@??=>?68>A==JA?BA==BA7=@;FBC?C?>>AAH@?=<B<@C7@@>@>9@@66>7I@?@@:<:?>D=><<7<>'   // Poppins_SemiBold12pt7b
+};
+function dvGeraetBreite(schrift, text) {
+  var t = DV_GERAET_BREITE[schrift], w = 0;
+  String(text == null ? '' : text).split('').forEach(function (ch) {
+    var i = ch.charCodeAt(0) - 32;
+    if (i < 0 || i >= t.length) i = 31;   // ausserhalb von ASCII: so breit wie '?'
+    w += t.charCodeAt(i) - 48;
+  });
+  return w;
+}
+// Was in der Kopfzeile hinter der Linie steht, Logik aus drawMainRow: mit Feld l der
+// Bahnsteig, "Bstg. 9A-B" oder ohne Sektoren "Bstg. 9", sonst der Zugtyp. Was nicht bis
+// zur Zugnase der Uhr reicht (x 209), lässt das Gerät weg, die Vorschau also auch.
+// Linie: S-Rondell 24 + 4, sonst kursiver Zugtyp + 22; der Text beginnt 17 nach der Nummer.
+function dvOebbKopfInfo(colour, dep, brand) {
+  var tp = dvSplitTrainType(dep.line);
+  var x = (brand ? 68 : 6) + ((tp[0] === 'S') ? 28 : dvGeraetBreite('pop12', tp[0]) + 22)
+        + dvGeraetBreite('fett12', tp[1]) + 17;
+  var passt = function (txt) { return x + dvGeraetBreite('sans9', txt) <= 209; };
+  if (dsVal(colour, 'l')) {
+    var p = String(dep.platform || '').trim();
+    if (!p) return '';
+    var ziffern = (p.match(/^\d+/) || [''])[0];
+    if (passt('Bstg. ' + p)) return 'Bstg. ' + p;
+    return (ziffern && passt('Bstg. ' + ziffern)) ? 'Bstg. ' + ziffern : '';
+  }
+  // ptTrain und Co. sind die Fahrzeug-Kategorie, keine Garnitur: das Gerät zeigt sie nicht.
+  var vt = String(dep.vehicleType || '');
+  return (vt && !/^pt/i.test(vt) && passt(vt)) ? vt : '';
+}
 // ÖBB/Westbahn-Topbar: dunkles Uhrzeit-Panel rechts mit Zugnasen-Kurve (drawFastHLine-
 // Schleife der Firmware, hier als clip-path-Kurve angenähert).
 function dvNosePanel(panelBg, panelH, clock) {
@@ -190,6 +227,17 @@ function dvSBahnLogo(size, sColor) {
 // ÖBB-Wortmarke (nur ÖBB-Brand-Geräte): weiße Box mit roter kursiver Marke
 function dvOebbBox(w, h) {
   return '<div style="position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;background:#fff;display:flex;align-items:center;justify-content:center;"><span style="color:#e50012;font-weight:800;font-style:italic;font-family:' + DV_ARIAL + ';font-size:16px;">&Ouml;BB</span></div>';
+}
+
+// WLB-Pfeil statt Linienname bei der Badner Bahn, wie auf den Anzeigen der Wiener Linien,
+// in der Schriftfarbe der Zeile (Paul 03.11.2026). Dieselbe Form wie icons/wlb_logo.h der
+// Firmware (aus Logo_Wiener_Lokalbahn.svg), am Geraet 40x34 Pixel.
+var DV_WLB_PFEIL = 'm185,300c30,-52 60,-103 90,-155-58,-0-115,1-173,0 13,-22 25,-45 38,-67 56,-0 112,0 168,0 14,24 28,48 42,73-28,50-57,100-86,149-26,-0.2112-53,0-79,0zM167,0c-30,53-61,107-91,160 58,0 115,-0 173,0-13,22-26,45-39,67-56,0-112,0-167,0C28,203 14,179 0,154 29,102 58,51 88,0';
+// Wie die Firmware (display_wien.cpp): genau "WLB" oder "BB".
+function dvIstWlb(line) { return /^(WLB|BB)$/.test(String(line || '').trim()); }
+function dvWlbLogo(farbe) {
+  return '<svg viewBox="0 0 350 300" width="40" height="34" style="display:block;" role="img" aria-label="WLB">'
+       + '<path fill="' + farbe + '" d="' + DV_WLB_PFEIL + '"/></svg>';
 }
 
 // ---------- Wien / VBB / CZ-HU (display_wien.cpp; CZHU = schwarz/weiß-Ableger) ----------
@@ -215,7 +263,9 @@ function dvWienHTML(colour, data, rows, previewEl, fixed) {
   var rowH = Math.floor(170 / rows);
   var margin = 8;
   var lineFs = 34, destFs = 14, cdFs = 34;   // Poppins Bold 24pt / Bold 12pt / Bold 24pt
-  var lineW = Math.max.apply(null, data.map(function(d) { return Math.ceil(String(d.line || '').length * lineFs * 0.62); }).concat([42]));
+  var lineW = Math.max.apply(null, data.map(function(d) {
+    return dvIstWlb(d.line) ? 44 : Math.ceil(String(d.line || '').length * lineFs * 0.62);
+  }).concat([42]));
   // Badge-Farbe einer Abfahrt. Ohne Farbe ODER wenn die Fahrzeugart nicht angehakt ist,
   // gibt es KEIN Badge, dann wird der Linienname als großer Text gezeichnet.
   function dvBadgeFarbe(dep) {
@@ -252,9 +302,10 @@ function dvWienHTML(colour, data, rows, previewEl, fixed) {
     if (wChopper && isTramLine && !dep.hf) marker = ' <span style="font-weight:400;font-size:22px;">&#9855;</span>';
     else if (wKlima && /^U[256]$/i.test(String(dep.line || ''))) marker = ' <span style="font-weight:400;font-size:24px;">*</span>';
     var wBadgeH = Math.min(rowH - 4, Math.round(rowH * 52 / 56));
+    var linie = dvIstWlb(dep.line) ? dvWlbLogo(lineBadge ? bTxt : color) : escapeHtmlFt(dep.line);
     var lineHtml = lineBadge
-      ? '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';"><span style="background:' + bCol + ';color:' + bTxt + ';border-radius:8px;height:' + wBadgeH + 'px;min-width:' + wBadgeH + 'px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:0 8px;font-weight:700;font-size:28px;">' + escapeHtmlFt(dep.line) + '</span>' + marker + '</div>'
-      : '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';font-weight:700;font-size:' + lineFs + 'px;">' + escapeHtmlFt(dep.line) + marker + '</div>';
+      ? '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';"><span style="background:' + bCol + ';color:' + bTxt + ';border-radius:8px;height:' + wBadgeH + 'px;min-width:' + wBadgeH + 'px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:0 8px;font-weight:700;font-size:28px;">' + linie + '</span>' + marker + '</div>'
+      : '<div style="position:absolute;left:' + margin + 'px;top:0;height:' + rowH + 'px;display:flex;align-items:center;color:' + color + ';font-weight:700;font-size:' + lineFs + 'px;">' + linie + marker + '</div>';
     var d2 = dvDest2(destX, rowH, destW, 20, 4, destFs, color, 700);   // fontHeight 20 + lineSpacing 4
     return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;' + (fullRow ? 'background:' + bCol + ';' : '') + '">'
       + lineHtml
@@ -294,7 +345,8 @@ function dvOebbHTML(colour, data, rows, previewEl) {
   if (brand) html += dvOebbBox(64, panelH);
   var headX = brand ? 68 : 6;
   html += '<div style="position:absolute;left:' + headX + 'px;top:0;height:' + panelH + 'px;display:flex;align-items:center;gap:0;">' + badgeHtml(dep0.line, 24, 17, BG);
-  if (dep0.vehicleType) html += '<span style="color:' + DIM + ';font-family:' + DV_ARIAL + ';font-size:12px;margin-left:8px;">&middot; ' + escapeHtmlFt(dep0.vehicleType) + '</span>';
+  var kopfInfo = dvOebbKopfInfo(colour, dep0, brand);
+  if (kopfInfo) html += '<span style="color:' + DIM + ';font-family:' + DV_ARIAL + ';font-size:12px;margin-left:8px;">&middot; ' + escapeHtmlFt(kopfInfo) + '</span>';
   html += '</div>';
   // Ziel groß (FreeSansBold 18pt ≈ 26px) + Countdown rechts auf gleicher Höhe
   var destTop = panelH + 8 - (rows >= 3 ? 16 : 0);
