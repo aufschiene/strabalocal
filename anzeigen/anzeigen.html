@@ -5354,6 +5354,12 @@ function rblTeile(rbl) {
   const r = String(rbl || '');
   const i = r.indexOf('!');
   if (i < 0) return { kahl: r, nur: null };
+  // DB und Daenemark fuehren hinter dem '!' KEINE Linienliste, sondern ihre Auswahl:
+  // Gleis, Gattung oder Linie ("DBSTEIG:de-DELFI_de:09186:8134:2:4!1", "DBALL:…!ICE").
+  // Wer das hier abschneidet, schreibt die Station als "alle Abfahrten" ins Geraet, und
+  // der Kunde sieht trotz "nur Gleis 1" beide Gleise (Lena, Pfaffenhofen (Ilm), und ein
+  // Kunde in Hessen, 04.11.2026). Die Auswahl bleibt Teil der rbl.
+  if (/^(DBALL|DBSTEIG|DKALL|DKSTEIG):/i.test(r)) return { kahl: r, nur: null };
   const nur = r.slice(i + 1).split('~').map(x => x.trim().toUpperCase()).filter(Boolean);
   return { kahl: r.slice(0, i), nur: nur.length ? nur : null };
 }
