@@ -668,15 +668,35 @@ function dvWlbHTML(colour, data, rows, previewEl) {
 }
 
 // ---------- Paris RATP (display_paris.cpp) ----------
-// EINE Richtung pro Ansicht: weißer Header 34px mit Metro-Logo, gelbem Linienkreis
-// (r12, blaue Nummer), Ziel in RATP-Blau und schwarzem Uhr-Kästchen (gelbe Zeit).
-// Darunter auf Schwarz: Labels "1er métro" / "2e métro", dicker weißer Trennbalken
-// mittig und ZWEI riesige gelbe Countdown-Zahlen (Poppins Bold 42pt ≈ 60px).
+// Wie am Geraet seit 06.11.2026: 1 Zeile, oder nur Abfahrten EINER Linie, ergibt die grosse
+// Metro-Ansicht mit erster und zweiter Abfahrt. 2 oder 3 Zeilen ergeben eine Liste, je
+// Zeile Linie, Ziel und beide Abfahrten. Die zweite kommt als time2 (null = keine, dann
+// "--"); fehlt das Feld ganz (Beispieldaten), wird sie geschaetzt.
+// Linie im Kreis in der Linienfarbe vom Server, sonst Gelb mit RATP-Blau.
+function dvParisLinie(dep, r, fs) {
+  var bg = dvLineColorCss(dep.lineColor) || '#ffcd00';
+  var fg = dvLineColorCss(dep.lineTextColor);
+  if (!fg) {
+    var n = parseInt(bg.substring(1), 16);
+    var hell = ((n >> 16) & 255) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114 > 150000;
+    fg = hell ? '#003278' : '#ffffff';
+  }
+  return '<span style="flex:0 0 auto;min-width:' + (2 * r) + 'px;height:' + (2 * r) + 'px;box-sizing:border-box;padding:0 4px;border-radius:' + r + 'px;background:' + bg + ';color:' + fg + ';font-weight:700;font-size:' + fs + 'px;display:inline-flex;align-items:center;justify-content:center;">' + escapeHtmlFt(dep.line) + '</span>';
+}
+function dvParisZweite(dep, naechste, geschaetzt) {
+  if (typeof dep.time2 === 'number') return dep.time2;
+  if (dep.time2 === null) return null;
+  if (naechste) return naechste.time;
+  return geschaetzt;
+}
 function dvParisHTML(colour, data, rows, previewEl) {
   previewEl.style.background = '#000000';
   previewEl.style.backgroundImage = 'none';
-  var dep0 = data[0] || { line: '1', dest: 'La Défense', time: 2 };
-  var cd2 = (dep0.time2 != null) ? dep0.time2 : (data[1] && data[1].line === dep0.line ? data[1].time : dep0.time + 4);
+  var gueltig = (data || []).filter(function (d) { return d && d.line && d.time != null && !d.uhr; });
+  var dep0 = gueltig[0] || { line: '1', dest: 'La Défense', time: 2 };
+  var eineLinie = gueltig.every(function (d) { return d.line === dep0.line && d.dest === dep0.dest; });
+  if ((rows || 1) > 1 && !eineLinie) return dvParisListe(gueltig, rows);
+  var cd2 = dvParisZweite(dep0, eineLinie ? gueltig[1] : null, dep0.time + 4);
   var l = String(dep0.line || '');
   var isMetro = /^\d{1,2}$/.test(l);
   var mode = isMetro ? 'métro' : (/^T/i.test(l) ? 'tram' : 'bus');
@@ -684,7 +704,7 @@ function dvParisHTML(colour, data, rows, previewEl) {
   // Header (34px, weiß)
   html += '<div style="position:absolute;left:0;top:0;width:320px;height:34px;background:#fff;display:flex;align-items:center;padding:0 10px;gap:6px;">';
   if (isMetro) html += '<span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#003278;color:#fff;font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;">M</span>';
-  html += '<span style="flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:#ffcd00;color:#003278;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;">' + escapeHtmlFt(dep0.line) + '</span>';
+  html += dvParisLinie(dep0, 12, 14);
   html += '<span style="flex:1;color:#003278;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;margin-left:2px;">' + escapeHtmlFt(dep0.dest) + '</span>';
   html += '<span style="flex:0 0 52px;height:20px;background:#000;color:#ffcd00;border-radius:3px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;">' + dvClockStr(false) + '</span>';
   html += '</div>';
@@ -695,7 +715,33 @@ function dvParisHTML(colour, data, rows, previewEl) {
   html += '<div style="position:absolute;left:157px;top:68px;width:6px;height:68px;border-radius:3px;background:#fff;"></div>';
   // Zwei große gelbe Zahlen, je Hälfte zentriert
   html += '<div style="position:absolute;left:0;top:56px;width:160px;height:114px;display:flex;align-items:center;justify-content:center;color:#ffcd00;font-weight:700;font-size:60px;">' + dep0.time + '</div>';
-  html += '<div style="position:absolute;left:160px;top:56px;width:160px;height:114px;display:flex;align-items:center;justify-content:center;color:#ffcd00;font-weight:700;font-size:60px;">' + cd2 + '</div>';
+  html += (cd2 == null)
+    ? '<div style="position:absolute;left:160px;top:56px;width:160px;height:114px;display:flex;align-items:center;justify-content:center;color:#a0aac8;font-weight:600;font-size:28px;">--</div>'
+    : '<div style="position:absolute;left:160px;top:56px;width:160px;height:114px;display:flex;align-items:center;justify-content:center;color:#ffcd00;font-weight:700;font-size:60px;">' + cd2 + '</div>';
+  return dvWrap(html, DV_POPPINS);
+}
+// Liste: weisser Kopf "Prochains passages" mit Uhr, darunter je Zeile Linie, Ziel und die
+// beiden Abfahrten in zwei rechtsbuendigen gelben Spalten, getrennt von feinen Linien.
+function dvParisListe(gueltig, rows) {
+  var kopf = 24, rowH = Math.floor((170 - kopf) / rows);
+  var r = Math.min(Math.floor(rowH / 2) - 6, 15);
+  var zielFs = rows <= 2 ? 16 : 13;
+  var html = '<div style="position:absolute;left:0;top:0;width:320px;height:' + kopf + 'px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;box-sizing:border-box;">'
+    + '<span style="color:#003278;font-weight:600;font-size:11px;">Prochains passages</span>'
+    + '<span style="width:52px;height:20px;background:#000;color:#ffcd00;border-radius:3px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;">' + dvClockStr(false) + '</span></div>';
+  for (var i = 0; i < rows; i++) {
+    var top = kopf + i * rowH;
+    if (i > 0) html += '<div style="position:absolute;left:10px;top:' + top + 'px;width:300px;height:1px;background:#505064;"></div>';
+    var d = gueltig[i];
+    if (!d) continue;
+    var t2 = dvParisZweite(d, null, d.time + 7);
+    html += '<div style="position:absolute;left:10px;top:' + top + 'px;width:300px;height:' + rowH + 'px;display:flex;align-items:center;gap:10px;">'
+      + dvParisLinie(d, r, rows <= 2 ? 15 : 13)
+      + '<span style="flex:1;min-width:0;color:#fff;font-weight:600;font-size:' + zielFs + 'px;white-space:nowrap;overflow:hidden;">' + escapeHtmlFt(d.dest) + '</span>'
+      + '<span style="flex:0 0 36px;text-align:right;color:#ffcd00;font-weight:700;font-size:27px;">' + d.time + '</span>'
+      + '<span style="flex:0 0 36px;text-align:right;font-weight:' + (t2 == null ? 600 : 700) + ';font-size:27px;color:' + (t2 == null ? '#a0aac8' : '#ffcd00') + ';">' + (t2 == null ? '--' : t2) + '</span>'
+      + '</div>';
+  }
   return dvWrap(html, DV_POPPINS);
 }
 

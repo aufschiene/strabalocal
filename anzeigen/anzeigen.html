@@ -1252,10 +1252,25 @@ function beispielAbfahrten(st) {
 // Linienauswahl mitschickt, was wir uns gemerkt haben und was gerade faehrt. Jede
 // einzelne Quelle zeigt nur, was zu IHREM Zeitpunkt unterwegs war, und nachts waere das
 // eine Linie statt sechs. Nur Namen, sortiert wie im Picker.
+// Die OEBB fuehrt im Liniennamen die ZUGNUMMER mit ("IC 408", "RJX 764", "NJ 19946",
+// "WB 79223"). Waehlbar ist bei der OEBB aber nur die GATTUNG: Zug 408 faehrt morgen unter
+// einer anderen Nummer, ein Filter darauf waere am naechsten Tag leer (Paul 07.11.2026:
+// "bei oebb kann ich ja nur gattungen haben"). Darum in der Auswahl zusammenlegen.
+// NUR beim Fernverkehr. Bei R2, R70, REX70, S1 oder CJX 9 ist die Zahl die LINIE und bleibt
+// stehen, sonst fielen alle Regionalzuege zu einem einzigen "R" zusammen.
+const OEBB_GATTUNG_RE = /^(RJX|RJ|ICE|IC|EC|NJ|EN|WB|D)(?:\s*\d+)?$/i;
+function oebbGattung(name) {
+  const m = String(name || '').trim().match(OEBB_GATTUNG_RE);
+  return m ? m[1].toUpperCase() : String(name || '').trim();
+}
+function istOebbStation(st) {
+  return netzKuerzel(st).indexOf('OEBB') === 0;
+}
 function halteLinien(st) {
   const raus = [];
+  const oebb = istOebbStation(st);
   const nimm = n => {
-    const x = String(n || '').trim();
+    const x = oebb ? oebbGattung(n) : String(n || '').trim();
     if (x && raus.indexOf(x) < 0) raus.push(x);
   };
   (st.linienAmHalt || []).forEach(nimm);
@@ -1910,6 +1925,7 @@ function schirmeBauen() {
     // eine Zeile je Block statt der Abfahrten (Paul 25.10.2026).
     const nurBloecke = quellen.every(i => nurBloeckeAuf(displays[i]));
     const zeitlich = nurBloecke || quellen.some(i => zeitbasiert(displays[i]));
+    const zweiZeiten = STIL_ZWEI_ZEITEN.indexOf(parseInt(stilVon(erste), 10)) >= 0;
     let seiten;
     if (zeigtUhr(erste)) {
       seiten = [[]];
@@ -1937,7 +1953,9 @@ function schirmeBauen() {
           }
         }));
       }
-      seiten = [alle.slice(0, proSeite)];
+      // Paris zeigt je Linie und Richtung ZWEI Abfahrten (Sortierung s2, siehe
+      // zeitSortierung), also hier auch: je Linie eine Zeile, die zweite als time2.
+      seiten = [(zweiZeiten ? nachLinieMitZweiter(alle) : alle).slice(0, proSeite)];
     } else {
       // Die Zeilen aller Quellen hintereinander, in Display-Reihenfolge.
       // Bewusst in der EINGESTELLTEN Folge, nicht in der des Geraets: bei Linien, die
@@ -1997,6 +2015,8 @@ function schirmeBauen() {
                                  { time: BEISPIEL_ZEIT[ti % BEISPIEL_ZEIT.length], beispiel: true });
           }
           const vorn = faehrt.reduce((a, b) => (b.time < a.time ? b : a));
+          if (zweiZeiten) return Object.assign({}, vorn, { time2: zweiteAbfahrt(teil) },
+                                               teil.length > 1 ? { zusammen: teil.length } : {});
           return teil.length > 1 ? Object.assign({}, vorn, { zusammen: teil.length }) : vorn;
         }).filter(Boolean);
         seiten = [];
@@ -3194,7 +3214,7 @@ function configBauen() {
     // Richtung. s3 wuerde stattdessen alle Richtungen der Linie zeigen, denn es filtert
     // nur nach Liniennamen (Firmware-Sitzung 23.10.2026). Leere Zeilen kamen vom
     // Server-Deckel an grossen Knoten, nicht von der Sortierung.
-    const sTeil = kannSortieren(c) ? '|s' + (zeitbasiert(d) ? '3' : '1') : '';
+    const sTeil = kannSortieren(c) ? '|s' + (zeitbasiert(d) ? zeitSortierung(c) : '1') : '';
     const zTeil = uhrToken(d);
     // d<n> = Nummer des Displays. Eintraege mit gleichem d sind EIN Brett, egal welches
     // Netz und welche Farbe. Das loest den Wien-Merge und x1 gleich mit ab
@@ -3292,7 +3312,8 @@ function configBauen() {
         const feld = istWien
           ? (e.linien.length ? e.linien.join(',') : '*')
           : (meineTok.length ? meineTok.join(',') : '*');
-        stuecke.push(rbl + '|' + feld
+        // Bei "Alle Abfahrten" traegt das Praefix die OEBB-Gattungswahl, s. rblAlleAbfahrten.
+        stuecke.push((e.alle ? rblAlleAbfahrten(e.station, rbl) : rbl) + '|' + feld
                    + '|c' + c + '|g' + gehwegStation(e.station) + '|r' + zeilenVon(d)
                    + (marken.length ? '|m' + marken.join(',') : '')
                    + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil + yTeil);
@@ -3314,7 +3335,7 @@ function configBauen() {
       // ist '*', und das vertraegt sich nicht mit einer Liste konkreter Linien daneben.
       proStation.forEach((e, rbl) => {
         if (!e.alle) return;
-        stuecke.push(rblTeile(rbl).kahl + '|*|c' + c + '|g' + gehwegStation(e.station)
+        stuecke.push(rblAlleAbfahrten(e.station, rbl) + '|*|c' + c + '|g' + gehwegStation(e.station)
                    + '|r' + zeilenVon(d) + (w ? '|w' + w : '') + zTeil + sTeil + dTeil + dsgTeil + yTeil);
       });
       // Wie viele Stationen teilen sich das gemeinsame Segment? Die Bloecke stehen
@@ -3893,12 +3914,37 @@ function displaysettingsBauen() {
     if (d.fenster && !alt.w) alt.w = fensterToken(d);
     // Sortierung haengt am Stil, nicht am Display. Will EIN Display dieses Stils
     // chronologisch, gilt das fuer alle mit diesem Stil.
-    if (!alt.s && zeitbasiert(d)) alt.s = 3;
+    if (!alt.s && zeitbasiert(d)) alt.s = parseInt(zeitSortierung(c), 10);
     proStil.set(c, alt);
   });
   const teile = [];
   proStil.forEach((v, c) => { teile.push(dsSegment(c, v.r, v.w, v.s || 1)); });
   return teile.join(';');
+}
+// Sortierung eines Bretts nach Uhrzeit. Normal flach (s3): die naechsten Abfahrten
+// untereinander. Paris zeigt aber je Seite EINE Linie mit ihren zwei naechsten Abfahrten
+// ("1er" und "2e"), und die flache Liste fuellt die zweite nie, dort stand immer "--"
+// (Paul 06.11.2026). Darum dort s2: je Linie und Richtung gruppiert, nach Uhrzeit.
+const STIL_ZWEI_ZEITEN = [9];
+function zeitSortierung(c) { return STIL_ZWEI_ZEITEN.indexOf(parseInt(c, 10)) >= 0 ? '2' : '3'; }
+// Fuer die Vorschau dieser Stile: die zweite Abfahrt einer Zeile, sonst null (dann "--").
+function zweiteAbfahrt(keys) {
+  let alle = [];
+  keys.forEach(k => { if (!istUhrKey(k)) alle = alle.concat(abfahrtenDerRichtung(k)); });
+  alle.sort((a, b) => a.time - b.time);
+  return alle.length > 1 ? alle[1].time : null;
+}
+// Eine nach Uhrzeit sortierte Liste je Linie und Ziel zusammenfassen, wie s2 am Geraet:
+// die erste Abfahrt bestimmt den Platz, die naechste derselben Linie wird time2.
+function nachLinieMitZweiter(liste) {
+  const raus = [], wo = new Map();
+  liste.forEach(x => {
+    const k = x.line + '|' + x.dest;
+    if (!wo.has(k)) { wo.set(k, raus.length); raus.push(Object.assign({}, x, { time2: null })); return; }
+    const z = raus[wo.get(k)];
+    if (z.time2 == null && !x.beispiel) z.time2 = x.time;
+  });
+  return raus;
 }
 
 // Zeile innerhalb eines Displays verschieben. Gezaehlt wird in ZEILEN, nicht in
@@ -5371,6 +5417,37 @@ function rblTeile(rbl) {
 function rblKanon(rbl) {
   return rblTeile(rbl).kahl.trim().replace(/^WLB?:/i, '').toUpperCase();
 }
+// Die OEBB fuehrt die GATTUNGSWAHL im Netz-Praefix, nicht im Linienfeld: bei "Alle
+// Abfahrten" ist das Linienfeld '*', und dort gibt es sonst nichts, was die Wahl traegt.
+// Nur drei Netze filtert der Server: OEBBALL (alle Gattungen), OEBBREGALL (nur Regional),
+// OEBBFERNALL (nur Fernverkehr). Der Konfigurator schickt die Wahl je Station mit
+// (allDepCat), diese Seite haengt sie beim Schreiben wieder an.
+// Ohne das stand "OEBB:1241703|*" im Geraet, und das ist serverseitig UNGEFILTERT: Matthias
+// sah in Attnang-Puchheim R-Zuege trotz "nur Fernverkehr", und am Wien Hbf wuchs die Antwort
+// auf 18,3 KB, mehr als der JSON-Deckel der Firmware (16 KB) fasst, also zeigte das Geraet
+// "Keine Abfahrten" (Kunden Matthias und Lukas, 07.11.2026).
+// Fehlt die Angabe (Uebergabe einer aelteren Fassung), liest die Kategorie das Praefix.
+const OEBB_ALLE_PFX = { all: 'OEBBALL', reg: 'OEBBREGALL', fern: 'OEBBFERNALL' };
+// NUR diese Netze umschreiben. OEBB_SBAHN, OEBB_REG_NOE und Westbahn sind eigene Kacheln
+// mit eigenem Verhalten, die wuerden sonst stillschweigend zu "alle Gattungen".
+const OEBB_ALLE_NETZE = ['OEBB', 'OEBBREG', 'OEBBFERN', 'OEBBALL', 'OEBBREGALL', 'OEBBFERNALL'];
+function rblAlleAbfahrten(st, rbl) {
+  const r = String(rbl || '');
+  const i = r.indexOf(':');
+  // Was wir nicht umschreiben, geben wir UNVERAENDERT zurueck: wer hier rblTeile().kahl
+  // liefert, schneidet einem fremden Netz sein Linien-Token ab ("DELFI:6019!S4~S5").
+  if (i <= 0) return r;
+  const netz = r.slice(0, i).toUpperCase();
+  // Ein Zug-Brett ("von>ziel") traegt seine Gattungen im Linienfeld und bleibt, wie es ist.
+  if (OEBB_ALLE_NETZE.indexOf(netz) < 0 || r.indexOf('>') > 0) return r;
+  const kahl = rblTeile(r).kahl;
+  let kat = String((st && st.allDepCat) || '').trim().toLowerCase();
+  if (kat !== 'all' && kat !== 'reg' && kat !== 'fern') {
+    kat = (netz === 'OEBBREGALL' || netz === 'OEBBREG') ? 'reg'
+        : ((netz === 'OEBBFERNALL' || netz === 'OEBBFERN') ? 'fern' : 'all');
+  }
+  return OEBB_ALLE_PFX[kat] + ':' + kahl.slice(i + 1);
+}
 
 // Die Richtungen, die zu DIESEM Steig gehoeren. Wien fuehrt je Richtung einen eigenen
 // Steig und schickt alle Ids einer Station in EINEM Feld ("4136,4131"); hier wird daraus
@@ -5601,6 +5678,8 @@ function uebergabeHolen() {
       raus.push({ rbl: rbl, kennung: kennung, name: st.name || rbl,
                   netz: netzAusRbl || String(st.netz || 'WL').trim().toUpperCase(),
                   alle: !!st.alle || !!(w && w.alle),
+                  // OEBB-Gattungswahl bei "Alle Abfahrten", siehe rblAlleAbfahrten.
+                  allDepCat: String(st.allDepCat || '').trim().toLowerCase() || null,
                   wahl: (w && w.gruppen.length) ? w.gruppen : ausFilter,
                   // Der Konfigurator weiss, was zu dieser Station gehoert, und sagt es
                   // uns. Damit braucht diese Seite keine eigene Netz-Tabelle mehr
@@ -5773,6 +5852,22 @@ function displaysAusEintraegen(eintraege) {
       }
       if (ein.alle) {
         stats.forEach(st => {
+          // Die Linienauswahl ist die neuere Wahl. Hat der Kunde dort Linien gewaehlt,
+          // gelten SIE, auch wenn das Geraet die Station noch als "Alle Abfahrten" fuehrt.
+          // Vorher drehte die alte Geraetezeile jede neue Auswahl wieder auf "Alle
+          // Abfahrten" zurueck, und gespeichert wurde wieder der Stern (Paul 06.11.2026,
+          // Paris Chatelet: "wenn ich Linie anklicke geht er immer auf alle Abfahrten").
+          // Kommt die Station dagegen als "Alle Abfahrten" aus der Auswahl (alleFix) oder
+          // ohne gewaehlte Linien, bleibt es beim Stationsblock wie gespeichert.
+          if (!st.alleFix && st.gewaehlt && st.gewaehlt.size) {
+            st.alle = false;
+            const si = stationen.indexOf(st);
+            zeilenEintraege(st).forEach(dep => {
+              const k = zeilenKey(si, dep);
+              if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k);
+            });
+            return;
+          }
           st.alle = true;
           const k = zeilenKey(stationen.indexOf(st), { line: ALLE_LINIE, dest: '' });
           if (d.richtungen.indexOf(k) < 0) d.richtungen.push(k);
@@ -6098,6 +6193,9 @@ function uebergabeFehlt() {
                  // Schalter sinnlos und fuehrt nur zu einer leeren, grauen Zeile
                  // (Paul 26.10.2026).
                  alleFix: !!e.alle,
+                 // OEBB-Gattungswahl bei "Alle Abfahrten", s. rblAlleAbfahrten. Muss hier
+                 // mit: dieses Objekt ist die Station, mit der configBauen arbeitet.
+                 allDepCat: e.allDepCat || null,
                  linienAmHalt: e.linienAmHalt || null, ridNamen: e.ridNamen || null,
                  zielNamen: e.zielNamen || null, gattungen: e.gattungen || '',
                  linienToken: (e.linienToken == null) ? null : e.linienToken,

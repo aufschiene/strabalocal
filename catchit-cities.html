@@ -8241,6 +8241,14 @@ function zurNeuenOberflaeche(cfg) {
           name: st.stopName,
           netz: st.network,
           alle: !!st.allDepartures,
+          // OEBB fuehrt die Gattungswahl im NETZ-PRAEFIX, nicht im Linienfeld: bei "Alle
+          // Abfahrten" ist das ohnehin '*'. Nur OEBBALL (alles), OEBBREGALL (nur Regional)
+          // und OEBBFERNALL (nur Fernverkehr) filtert der Server. fullId traegt aber nur das
+          // BASIS-Netz (OEBB), das Praefix haengt erst buildMasterAndTimeRows an. Ohne diese
+          // Angabe schrieb die Anzeigen-Oberflaeche "OEBB:1241703|*" ins Geraet, und das ist
+          // serverseitig UNGEFILTERT: Matthias sah in Attnang-Puchheim R-Zuege trotz "nur
+          // Fernverkehr" (07.11.2026). Siehe rblAlleAbfahrten in anzeigen.html.
+          allDepCat: st.allDepCat || 'all',
           // Nur noch der Rueckfall, falls keine Config berechnet wurde: die Auswahl
           // steht kanonisch in masterrow/timerow (siehe unten).
           filter: st.filter || '',
