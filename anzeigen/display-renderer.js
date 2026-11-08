@@ -183,7 +183,10 @@ function dvSplitTrainType(line) {
 var DV_GERAET_BREITE = {
   sans9:  '566::@<4667;5655::::::::::55;;;:B<<==;;>=5:<:?=><>=<;=<A<<;5558:5::9::5::4494?::::695:9=9996569',  // FreeSansExt9pt7b
   fett12: '78;==EA6889>6867==========66>>>?GAAAA@?BB7>A?EBC@CA@?B@G@??878>=6>?=?>8??77>6E????9=8?=C==<979<',  // FreeSansBoldExt12pt7b
-  pop12:  '689E?DC5<<<@6>6;?8>>@??=>?68>A==JA?BA==BA7=@;FBC?C?>>AAH@?=<B<@C7@@>@>9@@66>7I@?@@:<:?>D=><<7<>'   // Poppins_SemiBold12pt7b
+  pop12:  '689E?DC5<<<@6>6;?8>>@??=>?68>A==JA?BA==BA7=@;FBC?C?>>AAH@?=<B<@C7@@>@>9@@66>7I@?@@:<:?>D=><<7<>',  // Poppins_SemiBold12pt7b
+  pop10:  '577B=A@4:::>5;5:=8<<==<;<<56;?;;D>=@>::?=5<=9A>@<@<<<=>D==;:?;=@6==<==8=<55;5C<===8;8<<A;<::7:<',  // Poppins_SemiBold10pt7b (eigenes Display, ab 4 Zeilen)
+  pop16:  '7;;MEJI6??@F8B7?E;ABDEDADD7:BGB@QFCGF@@HF8BD>LGHCHDDBEFPEDC?H?EH9EEBEC;ED99B8PDDEE<A<DCJAC?@:?C',  // Poppins_SemiBold16pt7b (eigenes Display)
+  pop8:   '446?:>=4888:4948:5::;:::::449<99@;:<;89=;49:8>;=:=:::;;@;:98<8;=5;;:;:7;:4494@:;;;797:9=8988489'   // Poppins_SemiBold8pt7b (eigenes Display, kleinste Stufe)
 };
 function dvGeraetBreite(schrift, text) {
   var t = DV_GERAET_BREITE[schrift], w = 0;
@@ -879,7 +882,11 @@ function dvFreeColorHTML(colour, data, rows, previewEl, cfg) {
     : (cfg.F === '2'
         ? { badge: [17, 17], dest: [13, 13], cd: [30, 20], fh: [(cfg.W === '1' ? 22 : 17), 15], ls: [4, 2],
             badgeH: [38, 26], badgeW: [[38, 54, 70, 84], [28, 38, 50, 60]], cdSpace: [55, 42] }
-        : { badge: [20, 13], dest: [14, 10], cd: [34, 23], fh: [19, 14], ls: [4, 2],
+        // Modern in Geraetegroesse (Paul 08.11.2026): Poppins trifft die Breiten der
+        // Geraeteschriften bei rund 1,95 Pixel je Punkt. Badge SemiBold 16/10pt, Ziel
+        // Medium 12pt / Regular 8pt, Minuten Bold 24pt / SemiBold 16pt. Vorher stand hier
+        // alles ein Drittel kleiner, und ein Kaestchen, das am Geraet voll ist, sah leer aus.
+        : { badge: [30.7, 19.8], dest: [23.4, 15.4], cd: [46.8, 30.7], fh: [19, 14], ls: [4, 2],
             badgeH: [38, 26], badgeW: [[38, 54, 70, 84], [28, 38, 50, 60]], cdSpace: [55, 42] });
   var fsIdx = big ? 0 : 1;
   var badgeFs = FC_FONTS.badge[fsIdx], destFs = FC_FONTS.dest[fsIdx], cdFs = FC_FONTS.cd[fsIdx];
@@ -889,10 +896,34 @@ function dvFreeColorHTML(colour, data, rows, previewEl, cfg) {
   var destFh = FC_FONTS.fh[fsIdx];
   var destLH = destFh + FC_FONTS.ls[fsIdx];
   var badgeWTab = FC_FONTS.badgeW[fsIdx];
-  var badgeWFor = function (ln) {
-    var l = String(ln || '').length;
-    return badgeWTab[Math.max(0, Math.min(3, l - 1))];
+  // Wie DisplayFreeColor (calculateBadgeWidth, drawNormalView), Paul 08.11.2026: die
+  // Tabelle ist die Mindestbreite. Lange Namen ("RB 5883") bekommen zuerst eine kleinere
+  // Schriftstufe, und nur was dann noch nicht passt, ein breiteres Kaestchen. Gerechnet mit
+  // den Breiten des GERAETS: die Vorschau schrieb kleiner, und so passte hier, was am Geraet
+  // aus dem Kaestchen lief.
+  var badgeTab = function (s) { return badgeWTab[Math.max(0, Math.min(3, s.length - 1))]; };
+  var badgeRand = big ? 12 : 8;
+  var badgeStufen = (isMatrix || cfg.F === '2') ? [null] : (big ? ['pop16', 'pop12', 'pop10'] : ['pop10', 'pop8']);
+  var badgeText = function (s, stufe) {
+    return isMatrix ? s.length * 12 : (cfg.F === '2' ? dvGeraetBreite('fett12', s) : dvGeraetBreite(stufe, s));
   };
+  var badgeStufe = badgeStufen[0];
+  for (var bs = 0; bs < badgeStufen.length; bs++) {
+    badgeStufe = badgeStufen[bs];
+    var passt = data.every(function (dp) {
+      var s = String(dp.line || '');
+      return badgeText(s, badgeStufe) + badgeRand <= badgeTab(s);
+    });
+    if (passt) break;
+  }
+  var badgeWFor = function (ln) {
+    var s = String(ln || '');
+    return Math.max(badgeTab(s), badgeText(s, badgeStufe) + badgeRand);
+  };
+  // Badge-Schrift so gross wie am Geraet (im Browser nachgemessen: Poppins SemiBold trifft
+  // die Geraetebreiten bei rund 1,95 Pixel je Punkt), damit das Kaestchen hier genauso
+  // gefuellt aussieht wie dort.
+  if (badgeStufe) badgeFs = { pop16: 30.7, pop12: 23.6, pop10: 19.8, pop8: 16.1 }[badgeStufe];
   var ledCdPx = big ? 4 : 3;
   var maxW = 0;
   data.forEach(function (dp) {

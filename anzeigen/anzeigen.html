@@ -1073,11 +1073,19 @@ function kannSortieren(c) { return STIL_OHNE_SORTIERUNG.indexOf(parseInt(c, 10))
 function zeitbasiert(d) {
   if (!d) return false;
   if (istZeitTyp(stilVon(d))) return true;   // Zugbretter sind immer chronologisch
-  // Keine eigene Wahl mehr: ein Brett, auf dem nur ganze Stationen liegen, zeigt deren
-  // Abfahrten nach Uhrzeit, ein Brett mit Linien zeigt feste Zeilen. Die Entscheidung
-  // faellt dort, wo sie hingehoert, naemlich am Schalter "als Station" der Haltestelle
-  // (Paul 26.10.2026). Die beiden Reiter darueber waren damit doppelt gemoppelt.
-  return kannSortieren(stilVon(d)) && nurBloeckeAuf(d);
+  if (!kannSortieren(stilVon(d))) return false;
+  // Ein Brett, auf dem nur ganze Stationen liegen, zeigt deren Abfahrten nach Uhrzeit.
+  // Die Entscheidung faellt am Schalter "als Station" der Haltestelle (Paul 26.10.2026).
+  if (nurBloeckeAuf(d)) return true;
+  // Dazu ein Brett mit festen Linien-Zeilen, das der Nutzer AUSDRUECKLICH nach Abfahrt
+  // sortiert haben will (Schalter im Editor, sortierungSetzen): dann s3 mit den
+  // gewaehlten Richtungen. Die Firmware filtert bei s2/s3 nach den Richtungs-Tokens des
+  // Eintrags (entryDirectionFilter, 23.10.2026), es kommt also NICHT die Gegenrichtung
+  // mit. Kunde Quirin, Wuerzburg Sanderring (08.11.2026): Linien 4, 5 und 10 je in
+  // seiner Richtung, die vier naechsten Abfahrten nach Uhrzeit, dieselbe Linie darf
+  // zweimal stehen. Vorher war d.sortierung zwar gespeichert und beim Laden erkannt
+  // (s3 -> 'zeit'), floss hier aber nicht ein, und jedes Speichern schrieb s1 zurueck.
+  return d.sortierung === 'zeit' && (d.richtungen || []).some(k => !istUhrKey(k));
 }
 
 // Alter Name, gleiche Antwort: die Zeilenzahl ist ueberall dieselbe Frage.
@@ -2405,6 +2413,23 @@ function editorZeichnen() {
        + '<button class="schiene" role="switch" aria-checked="false" onclick="automatikAn('
        + s.index + ')"><span class="kugel"></span></button></div>';
   }
+  // Sortierung nach Abfahrt fuer Bretter mit Linien-Zeilen (s3 statt s1, siehe
+  // zeitbasiert). Stations-Bloecke sortieren ohnehin nach Uhrzeit, eine Uhr allein hat
+  // nichts zu sortieren. Schalter statt Reiter, wie ueberall in diesem Editor.
+  if (kannSortieren(stilVon(dHier)) && !nurBloeckeAuf(dHier) && !zeigtUhr(dHier)
+      && (dHier.richtungen || []).some(k => !istUhrKey(k))) {
+    const zeitAn = zeitbasiert(dHier);
+    h += '<div class="schieber"><div class="wort">Nach Abfahrt sortieren'
+       + '<small>' + (zeitAn
+            ? 'Die n\u00e4chsten Abfahrten aller Linien dieses Displays nach Uhrzeit, nur in '
+              + 'den gew\u00e4hlten Richtungen. Dieselbe Linie darf mehrmals stehen.'
+            : 'Jede Linie hat ihre feste Zeile. Eingeschaltet stehen stattdessen die '
+              + 'n\u00e4chsten Abfahrten aller Linien nach Uhrzeit, nur in den gew\u00e4hlten '
+              + 'Richtungen.') + '</small></div>'
+       + '<button class="schiene' + (zeitAn ? ' an' : '') + '" role="switch" aria-checked="' + (zeitAn ? 'true' : 'false')
+       + '" onclick="sortierungSetzen(' + s.index + ',\'' + (zeitAn ? 'statisch' : 'zeit')
+       + '\')"><span class="kugel"></span></button></div>';
+  }
 
 
   const nHier = (dHier && dHier.richtungen.length) || 0;
@@ -3013,6 +3038,25 @@ function zielRef(txt) {
     .trim();
 }
 
+// Taugt diese Richtungs-Id ueberhaupt als RICHTUNG? Waehlt der Kunde an einer
+// DB-Station OHNE Bahnsteig eine LINIE, vergibt der Server ALLEN Abfahrten dieselbe Id
+// ("dbsS1" heisst "die ganze Auswahl", nicht "diese Richtung"). Hin- und Rueckrichtung
+// tragen sie dann gemeinsam, und wer sie als Zeilen-Token schreibt, verliert die
+// Richtung: das Geraet zeigte die S1 nach Wannsee UND nach Frohnau, obwohl nur eine
+// gewaehlt war (Kunde Timo, Feuerbachstrasse, 07.11.2026).
+// In dem Fall trennt nur der ZIELTEXT, und den vergleicht die Firmware sogar ZUERST
+// (isLineDestinationAllowed: erst allowedDests, dann die Id).
+// Bahnsteig-Ids ("dbp12lS42") bleiben unangetastet, dort IST das Gleis die Richtung.
+function ridIstRichtung(rid) {
+  const r = String(rid || '');
+  return !!r && !/^dbs/i.test(r);
+}
+// Der Verweis, der eine Zeile an ihre Richtung bindet: am liebsten die Id, sonst das Ziel.
+function richtungsRef(dep) {
+  if (!dep) return '';
+  return ridIstRichtung(dep.rid) ? zielRef(dep.rid) : zielRef(dep.dest);
+}
+
 // Ein Token je ZEILE, in der Reihenfolge der Zeilen: "Linie>Ziel", Mitglieder einer
 // Gruppe mit '+' verbunden. Der Zieltext MUSS mit: die Firmware nimmt nur Tokens mit
 // Trenner als Richtungsfilter (main.cpp, lineFilterDest). Stand nur der Linienname da,
@@ -3031,7 +3075,7 @@ function tokenListe(d) {
       if (!vonRbl) vonRbl = r.station.rbl;
       // Immer zuerst die Richtungs-Id, nur ohne sie den bereinigten Zieltext. Genau
       // so macht es der alte Konfigurator, und die Firmware vergleicht die Id exakt.
-      const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
+      const ref = richtungsRef(r.dep);
       stueck.push(ref ? r.dep.line + '>' + ref : r.dep.line);
     });
     if (stueck.length) raus.push({ tok: stueck.join('+'), rbl: vonRbl });
@@ -3054,7 +3098,7 @@ function tokenListeFlach(d) {
     });
     echte.forEach(k => {
       const r = richtungFinden(k);
-      const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
+      const ref = richtungsRef(r.dep);
       // Nur eine Zeile mit mehreren Linien ist eine Gruppe. Dass eine Linie in zwei
       // Richtungen faehrt, macht noch keine.
       const gid = echte.length > 1 ? (gidBasis + gi + 1) : 0;
@@ -3211,9 +3255,10 @@ function configBauen() {
     // (Firmware-Sitzung 23.10.2026).
     // Auch bei nur EINER Linie bleibt es bei s1. Das Geraet erkennt ein einzelnes
     // Zeilen-Token und zeigt dann die naechsten Abfahrten genau dieser Linie UND
-    // Richtung. s3 wuerde stattdessen alle Richtungen der Linie zeigen, denn es filtert
-    // nur nach Liniennamen (Firmware-Sitzung 23.10.2026). Leere Zeilen kamen vom
-    // Server-Deckel an grossen Knoten, nicht von der Sortierung.
+    // Richtung. Leere Zeilen kamen vom Server-Deckel an grossen Knoten, nicht von der
+    // Sortierung. s3 schreiben wir, wenn das Brett nach Abfahrt sortiert (Stations-
+    // Bloecke oder der Schalter "Nach Abfahrt sortieren"); die Richtungs-Tokens bleiben
+    // in den Eintraegen und die Firmware filtert bei s2/s3 danach (entryDirectionFilter).
     const sTeil = kannSortieren(c) ? '|s' + (zeitbasiert(d) ? zeitSortierung(c) : '1') : '';
     const zTeil = uhrToken(d);
     // d<n> = Nummer des Displays. Eintraege mit gleichem d sind EIN Brett, egal welches
@@ -3257,7 +3302,7 @@ function configBauen() {
           const rbl = r.station.rbl;
           // Wien fuehrt den nackten Liniennamen (die Richtung steckt im Steig), sonst
           // Linie plus Ziel-Referenz wie in tokenListeFlach.
-          const ref = r.dep.rid ? zielRef(r.dep.rid) : zielRef(r.dep.dest);
+          const ref = richtungsRef(r.dep);
           const tok = istWienRbl(rbl) ? String(r.dep.line)
                                       : (ref ? r.dep.line + '>' + ref : r.dep.line);
           // Jeder Eintrag traegt genau EIN Token, die Gruppe steht also immer auf 0.
