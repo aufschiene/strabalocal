@@ -29,8 +29,8 @@ function dvHostLoadDisplaySettings(zeile) {
       if (!f) continue;
       var key = f.charAt(0);
       var rest = f.substring(1);
-      // Zeitfenster 'w' bleibt Text ("6-22"), alles andere ist eine Zahl.
-      werte[key] = (key === 'w') ? rest : parseInt(rest, 10);
+      // Zeitfenster 'w' und die Linienfarben 'P' (DB S-Bahn) bleiben Text, alles andere ist eine Zahl.
+      werte[key] = (key === 'w' || key === 'P') ? rest : parseInt(rest, 10);
     }
     out[colour] = werte;
   });

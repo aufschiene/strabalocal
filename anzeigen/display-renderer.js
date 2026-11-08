@@ -186,7 +186,10 @@ var DV_GERAET_BREITE = {
   pop12:  '689E?DC5<<<@6>6;?8>>@??=>?68>A==JA?BA==BA7=@;FBC?C?>>AAH@?=<B<@C7@@>@>9@@66>7I@?@@:<:?>D=><<7<>',  // Poppins_SemiBold12pt7b
   pop10:  '577B=A@4:::>5;5:=8<<==<;<<56;?;;D>=@>::?=5<=9A>@<@<<<=>D==;:?;=@6==<==8=<55;5C<===8;8<<A;<::7:<',  // Poppins_SemiBold10pt7b (eigenes Display, ab 4 Zeilen)
   pop16:  '7;;MEJI6??@F8B7?E;ABDEDADD7:BGB@QFCGF@@HF8BD>LGHCHDDBEFPEDC?H?EH9EEBEC;ED99B8PDDEE<A<DCJAC?@:?C',  // Poppins_SemiBold16pt7b (eigenes Display)
-  pop8:   '446?:>=4888:4948:5::;:::::449<99@;:<;89=;49:8>;=:=:::;;@;:98<8;=5;;:;:7;:4494@:;;;797:9=8988489'   // Poppins_SemiBold8pt7b (eigenes Display, kleinste Stufe)
+  pop8:   '446?:>=4888:4948:5::;:::::449<99@;:<;89=;49:8>;=:=:::;;@;:98<8;=5;;:;:7;:4494@:;;;797:9=8988489',   // Poppins_SemiBold8pt7b (eigenes Display, kleinste Stufe)
+  asap16: '24577:83445834358888888888337876<887976894586;998987798<777454672786874784474<888856587:67643479999999999999999999999999999999992467873549478494484428733447;;;6888888;7777744449999999899999788777777:6777744448888888888888787',  // AsapCondensed_Medium16pt7b, 0x20 bis 0xFF
+  asap20: '35798<:3556:45479999999999449:97@:99;98;<56:8=<<:<:89<:?9995757939979969:5595>:999676:8<8874449;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;357899475<58:5<56:663:844658===7::::::>999995555;<<<<<<:<<<<<9:9999999=7999955559:99999:9::::898',  // AsapCondensed_Medium20pt7b, 0x20 bis 0xFF
+  asap24: '368;:?<4667<4648;;;;;;;;;;44;<;9C<;;=::=>68<9@>><><:;><A;;;6869:4;;9;;7:<66;6A<;;;787<:>::9555;=================================369:;;586>6:<6>67<774<:5576:@@@9<<<<<<A;::::6666=>>>>>><>>>>>;<;;;;;;;@9;;;;6666;<;;;;;<;<<<<:;:',  // AsapCondensed_Medium24pt7b, 0x20 bis 0xFF
 };
 function dvGeraetBreite(schrift, text) {
   var t = DV_GERAET_BREITE[schrift], w = 0;
@@ -518,43 +521,280 @@ function dvChliHTML(colour, data, rows, previewEl) {
   return dvWrap(html, DV_POPPINS);
 }
 
-// ---------- DB S-Bahn Berlin (display_sbahn_berlin.cpp: Zebra, Linien-Pillen, Pixel-Schrift) ----------
+// ---------- DB S-Bahn (display_sbahn_berlin.cpp, seit 08.11.2026 wie die Berliner Anzeiger) ----------
+// Blaue Flaeche ohne Zebrastreifen, Linie als runde Pille in der Linienfarbe vom Server, Ziel
+// und Minuten (ohne "min") in Asap Condensed wie das DB-Fernverkehrs-Display. Masse und
+// Regeln 1:1 aus der Firmware, Breiten aus den Glyphentabellen (asap16/20/24), Text als SVG
+// auf der Grundlinie des Geraets. Webschrift 16/20/24 px = Geraeteschrift 16/20/24pt.
+var DV_ASAP = "'Asap Condensed','Arial Narrow',Arial,sans-serif";
+var DV_ASAP_CAP = { asap16: 12, asap20: 15, asap24: 17 };
+var DV_ASAP_PX = { asap16: 16, asap20: 20, asap24: 24 };
+function dvAsapText(x, base, schrift, farbe, text, anker) {
+  return '<text x="' + x + '" y="' + base + '" font-size="' + DV_ASAP_PX[schrift] + '" font-weight="500" fill="' + farbe + '"'
+    + (anker ? ' text-anchor="' + anker + '"' : '') + '>' + escapeHtmlFt(text) + '</text>';
+}
+// Grundlinie, auf der die Versalhoehe mittig in [oben, oben + hoehe] steht (digitCenteredBaseline)
+function dvAsapMitte(schrift, oben, hoehe) { return oben + Math.floor((hoehe + DV_ASAP_CAP[schrift]) / 2); }
+// Mit Punkt auf die Breite kuerzen, wie kuerze() am Geraet
+function dvAsapKuerzen(schrift, text, breite) {
+  var t = String(text);
+  if (dvGeraetBreite(schrift, t) <= breite) return t;
+  while (t.length > 1 && dvGeraetBreite(schrift, t + '.') > breite) t = t.slice(0, -1);
+  return t.trim() + '.';
+}
+// Linienfarbe ohne Server-Farbe: Tabelle nach Verkehrsmittel (fallbackLineColor)
+function dvSBahnErsatzfarbe(line) {
+  var l = String(line || '').toUpperCase().trim(), n = l.length;
+  if (!n) return '#505050';
+  var a = l.charAt(0), z2 = n >= 2 && /\d/.test(l.charAt(1));
+  if (a === 'U' && z2) return '#0064b4';
+  if (a === 'S' && z2) return '#009640';
+  if (['ICE', 'IC', 'EC', 'TGV', 'RJ', 'RJX'].indexOf(l) >= 0) return '#c80000';
+  if (l === 'NJ' || l === 'EN') return '#1e1e64';
+  if (a === 'R' && n >= 2 && (l.charAt(1) === 'E' || l.charAt(1) === 'B' || z2)) return '#646464';
+  if (a === 'N') return '#282828';
+  if (a === 'F' && z2) return '#00a0c8';
+  if (l === 'WLB') return '#0078c8';
+  var z = l.charAt(n - 1);
+  if (n >= 2 && (z === 'A' || z === 'B')) return '#005a8c';
+  if (/^\d{3}$/.test(l)) return '#005a8c';
+  if (n === 1 || /^\d\d$/.test(l)) return '#dc2828';
+  return '#505050';
+}
+function dvHexRgb(css) {
+  var n = parseInt(String(css).substring(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+// Hintergrund nach Feld t wie setColorVariant der Firmware: 1 Blau, 2 Hellblau, 3 Dunkelblau
+var DV_SBAHN_GRUND = { 1: '#003cb4', 2: '#2878e1', 3: '#001e64' };
+// Eigene Pillenfarben aus c5|P ("Linie:flaeche:schrift", komma-getrennt), wie setPerLineBadgeColors
+function dvSBahnEigeneFarben(colour) {
+  var raus = {};
+  var roh = (typeof dsVal === 'function') ? dsVal(colour, 'P') : undefined;
+  String(roh == null ? '' : roh).split(',').forEach(function (x) {
+    var st = x.split(':');
+    var ln = (st[0] || '').trim();
+    var bg = dvLineColorCss(st[1]);
+    if (ln && bg) raus[ln] = { bg: bg, fg: dvLineColorCss(st[2]) };
+  });
+  return raus;
+}
 function dvSBerlinHTML(colour, data, rows, previewEl) {
-  var BG = '#0a1628';
+  var BG = DV_SBAHN_GRUND[dvSetting(colour, 'ftTxtCol_', 't', 1)] || DV_SBAHN_GRUND[1];
+  var eigene = dvSBahnEigeneFarben(colour);
   previewEl.style.background = BG;
   previewEl.style.backgroundImage = 'none';
-  var LINE = { S1: '#dd4dae', S2: '#009640', S25: '#009640', S3: '#00368c', S5: '#ff5e00', S7: '#7764b0', S75: '#7764b0', S9: '#912a49', S41: '#af642d', S42: '#af642d' };
   var rowH = Math.floor(170 / rows);
-  var html = data.map(function(dep, i) {
-    var rowBg = (i % 2 === 0) ? '#192846' : '#0f1c32';
-    var l = String(dep.line || '').toUpperCase();
-    var w = l.length <= 2 ? 44 : (l.length === 3 ? 52 : 60);
-    var col = LINE[l] || '#505050';
-    var cdW = dvLedWidth(String(dep.time), 2);
-    var destMax = 320 - 6 - w - cdW - 32;
-    var destTxt = dvLedWrap2(dep.dest, Math.max(3, Math.floor(destMax / 12)))[0];
-    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;background:' + rowBg + ';display:flex;align-items:center;padding:0 6px;gap:10px;">'
-      + '<span style="background:' + col + ';border-radius:5px;width:' + w + 'px;height:28px;display:inline-flex;align-items:center;justify-content:center;">' + dvLedTextSvg(dep.line, 2, '#fff', false) + '</span>'
-      + '<span style="flex:1;display:flex;">' + dvLedTextSvg(destTxt, 2, '#fff', false) + '</span>'
-      + dvLedTextSvg(String(dep.time), 2, '#fff', false) + '</div>';
+  var M = rowH < 40
+    ? { pille: 'asap16', ziel: 'asap20', zielKlein: 'asap16', zeit: 'asap20', pillH: 22 }
+    : { pille: 'asap20', ziel: 'asap24', zielKlein: 'asap20', zeit: 'asap24', pillH: rowH >= 50 ? 30 : 28 };
+  var zeilen = data.slice(0, rows);
+  // Alle Pillen einer Seite gleich breit; lange Namen in der kleineren Schrift
+  var pf = M.pille, breit = 0;
+  for (var stufe = 0; stufe < 2; stufe++) {
+    breit = 0;
+    zeilen.forEach(function (d) { if (d && d.line) breit = Math.max(breit, dvGeraetBreite(pf, d.line)); });
+    if (breit + M.pillH <= 90 || pf === 'asap16') break;
+    pf = 'asap16';
+  }
+  var pillW = Math.min(110, Math.max(2 * M.pillH, breit + M.pillH));
+  var bgRgb = dvHexRgb(BG);
+  var html = zeilen.map(function (dep, i) {
+    if (!dep || !dep.line) return '';
+    var pillH = M.pillH, py = Math.floor((rowH - pillH) / 2);
+    var bg = dvLineColorCss(dep.lineColor), fg = dvLineColorCss(dep.lineTextColor);
+    var eigen = eigene[String(dep.line)];
+    if (eigen) { bg = eigen.bg; fg = eigen.fg; }
+    if (!bg) { bg = dvSBahnErsatzfarbe(dep.line); fg = fg || '#ffffff'; }
+    else if (!fg) {
+      var c = dvHexRgb(bg);
+      fg = (c[0] * 299 + c[1] * 587 + c[2] * 114 > 150000) ? '#000000' : '#ffffff';
+    }
+    var cr = dvHexRgb(bg);
+    var nah = Math.abs(cr[0] - bgRgb[0]) / 8 + Math.abs(cr[1] - bgRgb[1]) / 8 + Math.abs(cr[2] - bgRgb[2]) / 8 < 6;
+    var name = String(dep.line);
+    while (name.length > 1 && dvGeraetBreite(pf, name) > pillW - pillH / 2) name = name.slice(0, -1);
+    var pille = '<g>'
+      + (nah ? '<rect x="5" y="' + (py - 1) + '" width="' + (pillW + 2) + '" height="' + (pillH + 2) + '" rx="' + (pillH / 2 + 1) + '" fill="#ffffff"/>' : '')
+      + '<rect x="6" y="' + py + '" width="' + pillW + '" height="' + pillH + '" rx="' + (pillH / 2) + '" fill="' + bg + '"/>'
+      + dvAsapText(6 + pillW / 2, dvAsapMitte(pf, py, pillH), pf, fg, name, 'middle') + '</g>';
+    // Zeit rechts, mindestens zwei Ziffern Platz; Verspaetung als "+X" davor
+    var rechts = 312, zeit = String(dep.time);
+    var platz1 = Math.max(dvGeraetBreite(M.zeit, '00'), dvGeraetBreite(M.zeit, zeit));
+    var base = dvAsapMitte(M.zeit, 0, rowH);
+    var verz = parseInt(dep.delay, 10) || 0;
+    var links = rechts - platz1, plus = '';
+    var zeitFarbe = '#ffffff';
+    if (verz > 0) {
+      var farbe = verz >= 12 ? '#ff5050' : '#ffa000';
+      if (verz >= 5) zeitFarbe = farbe;
+      links = rechts - platz1 - 6 - dvGeraetBreite(M.zeit, '+' + verz);
+      plus = dvAsapText(links, base, M.zeit, farbe, '+' + verz, '');
+    }
+    var zielX = 6 + pillW + 9, platz = links - 10 - zielX;
+    var ziel = String(dep.dest || '').replace(/\n/g, ' ').replace(/,/g, ' ').trim();
+    var zf = M.ziel;
+    if (dvGeraetBreite(zf, ziel) > platz) zf = M.zielKlein;
+    ziel = dvAsapKuerzen(zf, ziel, platz);
+    // Reihenfolge der Kinder: Pille, Ziel, (+X), Zeit. Die Null-Darstellung der Vorschau
+    // (nullBlinken) nimmt das zweite als Ziel und das letzte als Zahl.
+    return '<svg style="position:absolute;left:0;top:' + (i * rowH) + 'px;font-family:' + DV_ASAP + ';" width="320" height="' + rowH + '" viewBox="0 0 320 ' + rowH + '">'
+      + pille
+      + dvAsapText(zielX, dvAsapMitte(zf, 0, rowH), zf, '#ffffff', ziel, '')
+      + plus
+      + dvAsapText(rechts, base, M.zeit, zeitFarbe, zeit, 'end')
+      + '</svg>';
   }).join('');
-  return dvWrap(html, DV_LED);
+  return dvWrap(html, DV_ASAP);
 }
 
-// ---------- DB Fernverkehr (display_db_fern.cpp: Zugzielanzeiger, Asap Condensed) ----------
-function dvDbFernHTML(colour, data, rows, previewEl) {
+// ---------- DB Fernverkehr (display_db_fern.cpp, seit 08.11.2026 wie die Anzeiger in Muenchen) ----------
+// Ab zwei Zeilen zwei Zuege nebeneinander mit dunkelblauem Steg, mit einer Zeile ein Zug ueber
+// den ganzen Schirm samt Wagenreihung. Kopfbalken weiss, Zugnummer in grauer Bubble rechts.
+function dvDbFernZeit(dep) {
+  if (dep.plan) return dep.plan;
+  var d = new Date(Date.now() + (parseInt(dep.time, 10) || 0) * 60000);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function dvDbFernIst(plan, verz) {
+  if (!(verz > 0) || !/^\d\d:\d\d/.test(plan)) return plan;
+  var m = parseInt(plan.substring(0, 2), 10) * 60 + parseInt(plan.substring(3, 5), 10) + verz;
+  m %= 1440;
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+}
+function dvDbFernHatWagen(dep) {
+  var t = String(dep.vehicleType || dep.vt || '').toLowerCase();
+  if (/bus|tram|metro|subway/.test(t)) return false;
+  var l = String(dep.line || '').trim();
+  return l !== '' && !/^\d+$/.test(l);
+}
+function dvDbFernFeld(dep, x0, w, haelfte) {
   var BG = '#003399', DIM = '#a0b9dc';
+  var rand = haelfte ? 5 : 8, L = x0 + rand, R = x0 + w - rand, innen = R - L;
+  var via = String(dep.via || '').replace(/ \u00b7 /g, ' - ').replace(/,/g, ' -').replace(/\s+/g, ' ').trim();
+  var zielText = String(dep.dest || '').trim();
+  if (via === zielText) via = '';
+  else if (zielText && via.slice(-(zielText.length + 3)) === ' - ' + zielText) via = via.slice(0, -(zielText.length + 3));
+  var wagen = !haelfte && dvDbFernHatWagen(dep);
+  var o = '';
+  // Kopf: ganzer Schirm "Faehrt ueber ...", in der Haelfte das Gleis (ohne Gleis die Route)
+  o += '<rect x="' + x0 + '" y="0" width="' + w + '" height="22" fill="#ffffff"/>';
+  // Ohne Zwischenhalte nie "Faehrt ueber <Ziel>" (Paul 08.11.2026): dann das Gleis, sonst leer
+  var kopfGleis = !!dep.platform && (haelfte || !via);
+  var kopf = kopfGleis ? 'Gleis ' + dep.platform : (via ? 'F\u00e4hrt \u00fcber ' + via : '');
+  while (dvGeraetBreite('asap16', kopf) > innen && kopf.lastIndexOf(' - ') > 12) kopf = kopf.substring(0, kopf.lastIndexOf(' - '));
+  o += dvAsapText(L, dvAsapMitte('asap16', 0, 22), 'asap16', '#000000', dvAsapKuerzen('asap16', kopf, innen), '');
+  // Zeile 2: Uhrzeit, Verspaetung, (Gleis), Zugnummer in grauer Bubble rechts
+  var z2Y = 25, z2H = 20;
+  var zeit = dvDbFernZeit(dep);
+  var verz = parseInt(dep.delay, 10) || 0;
+  var ist = verz > 0 ? dvDbFernIst(zeit, verz) : '';
+  var plus = verz > 0 ? '+' + verz : '';
+  var zug = String(dep.line || '') + (dep.trainNumber ? ' ' + dep.trainNumber : '');
+  var gleis = (!kopfGleis && dep.platform) ? 'Gl. ' + dep.platform : '';
+  var istW = (!ist || ist === zeit) ? 0 : dvGeraetBreite('asap24', ist) + 6;
+  var plusW = plus ? dvGeraetBreite('asap16', plus) + 6 : 0;
+  var gleisW = gleis ? dvGeraetBreite('asap16', gleis) + 8 : 0;
+  var bubbleW = dvGeraetBreite('asap16', zug) + 10;
+  var kurz = istW === 0, klein = false;
+  var belegt = function () {
+    return dvGeraetBreite(klein ? 'asap20' : 'asap24', zeit) + (verz > 0 ? 4 + (kurz ? plusW : istW) : 0) + 6 + gleisW + bubbleW;
+  };
+  if (belegt() > innen) kurz = true;
+  if (belegt() > innen) klein = true;
+  if (belegt() > innen && zug !== String(dep.line || '')) { zug = String(dep.line || ''); bubbleW = dvGeraetBreite('asap16', zug) + 10; }
+  var bx = R - bubbleW, b16 = dvAsapMitte('asap16', z2Y, z2H);
+  o += '<rect x="' + bx + '" y="' + z2Y + '" width="' + bubbleW + '" height="' + z2H + '" rx="5" fill="#80889c"/>';
+  o += dvAsapText(bx + bubbleW / 2, b16, 'asap16', '#ffffff', zug, 'middle');
+  if (gleis) o += dvAsapText(bx - gleisW, b16, 'asap16', DIM, gleis, '');
+  var zf = klein ? 'asap20' : 'asap24', zb = dvAsapMitte(zf, z2Y, z2H), capZ = DV_ASAP_CAP[zf];
+  o += dvAsapText(L, zb, zf, '#ffffff', zeit, '');
+  if (verz > 0) {
+    var x = L + dvGeraetBreite(zf, zeit) + 4;
+    if (!kurz) {
+      o += '<rect x="' + x + '" y="' + (zb - capZ - 3) + '" width="' + istW + '" height="' + (capZ + 6) + '" rx="2" fill="#ffffff"/>';
+      o += dvAsapText(x + 3, zb, 'asap24', BG, ist, '');
+    } else {
+      var kh = 12 + 6, ky = zb - Math.floor(capZ / 2) - kh / 2;
+      o += '<rect x="' + x + '" y="' + ky + '" width="' + plusW + '" height="' + kh + '" rx="2" fill="#ffffff"/>';
+      o += dvAsapText(x + 3, dvAsapMitte('asap16', ky, kh), 'asap16', BG, plus, '');
+    }
+  }
+  // Ziel: ganzer Schirm eine Zeile, Haelfte bis zwei; 24, 20, 16, dann gekuerzt
+  var ziel = String(dep.dest || '').replace(/\n/g, ' ').trim() || '-';
+  var maxZ = haelfte ? 2 : 1, zeilen = null, zs = 'asap16';
+  var trenn = function (s, t) {
+    var sp = t.lastIndexOf(' ');
+    while (sp > 0 && dvGeraetBreite(s, t.substring(0, sp)) > innen) sp = t.lastIndexOf(' ', sp - 1);
+    return sp;
+  };
+  ['asap24', 'asap20', 'asap16'].some(function (s) {
+    if (dvGeraetBreite(s, ziel) <= innen) { zeilen = [ziel]; zs = s; return true; }
+    if (maxZ < 2) return false;
+    var sp = trenn(s, ziel);
+    if (sp > 0 && dvGeraetBreite(s, ziel.substring(sp + 1)) <= innen) { zeilen = [ziel.substring(0, sp), ziel.substring(sp + 1)]; zs = s; return true; }
+    return false;
+  });
+  if (!zeilen) {
+    zs = 'asap16';
+    var sp = maxZ >= 2 ? trenn(zs, ziel) : -1;
+    zeilen = sp > 0 ? [ziel.substring(0, sp), dvAsapKuerzen(zs, ziel.substring(sp + 1), innen)] : [dvAsapKuerzen(zs, ziel, innen)];
+  }
+  var yAdv = { asap16: 18, asap20: 23, asap24: 28 };
+  var y = z2Y + z2H + 4 + DV_ASAP_CAP[zs];
+  zeilen.forEach(function (t, i) {
+    if (i > 0) y += yAdv[zs] - 2;
+    o += dvAsapText(L, y, zs, '#ffffff', t, '');
+  });
+  // Zwischenhalte, gedimmt, so viele Zeilen wie Platz ist
+  if (via) {
+    var grenze = wagen ? 170 - 44 : 169, b = y + 6 + 12, rest = via;
+    while (rest && b + 4 <= grenze) {
+      var z = rest, naechste = '';
+      while (dvGeraetBreite('asap16', z) > innen && z.lastIndexOf(' - ') > 0) {
+        var st = z.lastIndexOf(' - ');
+        naechste = z.substring(st + 3) + (naechste ? ' - ' + naechste : '');
+        z = z.substring(0, st);
+      }
+      o += dvAsapText(L, b, 'asap16', DIM, dvAsapKuerzen('asap16', z, innen), '');
+      rest = naechste;
+      b += 18;
+    }
+  }
+  // Wagenreihung (nur ganzer Schirm, nur Zuege): Umrisse wie am Geraet, schematisch
+  if (wagen) {
+    var tt = String(dep.line || '').toUpperCase();
+    var n = tt === 'ICE' ? 12 : (tt === 'IC' || tt === 'EC') ? 10 : (tt === 'RJ' || tt === 'RJX') ? 9 : (tt === 'NJ' || tt === 'EN') ? 8 : 6;
+    var erste = tt === 'ICE' || tt === 'RJ' || tt === 'RJX' ? 3 : (n === 6 ? 1 : 2);
+    var ww = Math.max(14, Math.min(24, Math.floor((312 - (n - 1) * 2) / n)));
+    var tot = n * ww + (n - 1) * 2, sx = 4 + Math.floor((312 - tot) / 2), wy = 170 - 40, wh = Math.max(14, Math.floor(38 * 55 / 100));
+    o += '<line x1="' + L + '" y1="128.5" x2="' + R + '" y2="128.5" stroke="#0046b4"/>';
+    for (var k = 0; k < n; k++) {
+      var wx = sx + k * (ww + 2);
+      o += '<rect x="' + (wx + 0.5) + '" y="' + (wy + 0.5) + '" width="' + (ww - 1) + '" height="' + (wh - 1) + '" fill="' + (k < erste ? '#ffffff' : 'none') + '" stroke="#ffffff"/>';
+      o += '<text x="' + (wx + ww / 2) + '" y="' + (wy + wh / 2 + 4) + '" font-size="9" text-anchor="middle" fill="' + (k < erste ? BG : '#ffffff') + '" font-family="monospace">' + (k + 1) + '</text>';
+    }
+    'ABCDEF'.split('').forEach(function (c, k) {
+      o += '<text x="' + (sx + k * Math.floor(tot / 6) + Math.floor(tot / 12)) + '" y="' + (wy + wh + 11) + '" font-size="9" text-anchor="middle" fill="' + DIM + '" font-family="monospace">' + c + '</text>';
+    });
+  }
+  return o;
+}
+function dvDbFernHTML(colour, data, rows, previewEl) {
+  var BG = '#003399';
   previewEl.style.background = BG;
   previewEl.style.backgroundImage = 'none';
-  var dep = data[0] || { line: 'ICE', dest: 'Berlin Hbf', time: 15 };
-  var font = "'Asap Condensed','Arial Narrow',Arial,sans-serif";
-  var html = '';
-  html += '<div style="position:absolute;left:0;top:0;width:320px;height:22px;background:#fff;color:#000;display:flex;align-items:center;padding:0 8px;font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;">' + escapeHtmlFt(dep.dest) + '</div>';
-  html += '<div style="position:absolute;left:8px;top:27px;right:8px;display:flex;justify-content:space-between;color:#fff;font-size:15px;"><span>' + escapeHtmlFt(dep.line) + (dep.trainNumber ? ' ' + escapeHtmlFt(dep.trainNumber) : ' 823') + '</span><span>Gl. 2</span></div>';
-  html += '<div style="position:absolute;left:8px;top:52px;right:8px;color:#fff;font-size:22px;font-weight:500;display:flex;gap:12px;align-items:baseline;"><span>' + dvClockStr(false) + '</span><span style="overflow:hidden;white-space:nowrap;">' + escapeHtmlFt(dep.dest) + '</span></div>';
-  html += '<div style="position:absolute;left:8px;top:86px;right:8px;color:' + DIM + ';font-size:13px;line-height:17px;overflow:hidden;max-height:51px;">&uuml;ber ' + escapeHtmlFt(dep.via || 'Hauptbahnhof &middot; Flughafen') + '</div>';
-  html += '<div style="position:absolute;left:8px;bottom:8px;color:#fff;font-size:26px;font-weight:500;">in ' + dep.time + ' min</div>';
-  return dvWrap(html, font);
+  var echte = (data || []).filter(function (d) { return d && d.line; });
+  if (!echte.length) echte = [{ line: 'ICE', trainNumber: '1000', dest: 'Berlin Gesundbrunnen', time: 15, platform: '20' }];
+  var o;
+  if (rows >= 2 && echte.length >= 2) {
+    var halb = Math.floor((320 - 4) / 2);
+    o = dvDbFernFeld(echte[0], 0, halb, true) + dvDbFernFeld(echte[1], 320 - halb, halb, true)
+      + '<rect x="' + halb + '" y="0" width="' + (320 - 2 * halb) + '" height="170" fill="#001648"/>';
+  } else {
+    o = dvDbFernFeld(echte[0], 0, 320, false);
+  }
+  return dvWrap('<svg style="position:absolute;left:0;top:0;font-family:' + DV_ASAP + ';" width="320" height="170" viewBox="0 0 320 170">' + o + '</svg>', DV_ASAP);
 }
 
 // ---------- Paper White (display_paperwhite.cpp: t = 1 komplett weiß, 2 weiß/schwarz, 3 weiß/hellgrau) ----------

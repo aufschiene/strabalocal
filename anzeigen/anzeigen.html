@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Meine Anzeigen</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Silkscreen&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Asap+Condensed:wght@500&family=Silkscreen&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   :root {
@@ -553,10 +553,10 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="renderer-host.js"></script>
+<script src="renderer-host.js?v=2"></script>
 <!-- Die Versionsnummer bei jeder Aenderung am Renderer hochzaehlen: GitHub Pages
      liefert die Datei sonst bis zu zehn Minuten aus dem Cache weiter. -->
-<script src="display-renderer.js?v=4"></script>
+<script src="display-renderer.js?v=6"></script>
 <script>
 const DEP_API  = 'https://api.straba.at/api/v1/wl/departures';
 const SUCH_API = 'https://api.straba.at/api/v1/stops/search';
@@ -612,7 +612,7 @@ function stilVon(d) { return stilErsatz((d && d.stil != null) ? d.stil : stil); 
 // Wie viele Zeilen ein Anzeige-Stil kann. Werte aus DISPLAY_TYPE_FEATURES des
 // Konfigurators; wo dort nichts steht, gilt dessen Vorgabe 3
 // (`var rMin = f.minRows || 1, rMax = f.maxRows || 3`). Wiener Linien kann also 3.
-const STIL_ZEILEN = { 2: 4, 13: 4, 15: 4, 18: 4, 21: 4, 23: 5, 24: 4, 26: 5, 101: 5, 102: 5, 103: 5 };
+const STIL_ZEILEN = { 2: 4, 5: 4, 6: 2, 13: 4, 15: 4, 18: 4, 21: 4, 23: 5, 24: 4, 26: 5, 101: 5, 102: 5, 103: 5 };
 const ZEILEN_VORGABE = 3;
 // Und was ein Stil als KLEINSTE Zeilenzahl kann. Die OeBB- und die Westbahn-Tafel
 // bestehen aus einer grossen Hauptzeile plus Kompaktzeilen darunter und klemmen am
@@ -649,7 +649,7 @@ const STIL_KANN = {
   21: { blinken: 'still', verspaetung: true },
   23: { schrift: 'matrix', matrixSchrift: true, blinken: 'still', verspaetung: true },
   24: { schrift: 'papier', blinken: 'still' },
-  5:  { blinken: 'stern' },
+  5:  { blinken: 'stern', schrift: 'sbahn', linienFarben: true },
   6:  { blinken: 'still' },
   7:  { blinken: 'quadrat' },
   9:  { blinken: 'blinkt' },
@@ -693,7 +693,9 @@ const MATRIX_SCHRIFT = [[0, 'DACH'], [1, 'CZ + HU']];
 const SCHRIFT_WAHL = {
   wien:   { titel: 'Schriftfarbe', knoepfe: [[1, 'Gelb', '#FFD700', '#000'], [2, 'Wei\u00df', '#fff', '#000'], [3, 'Orange', '#FF8C00', '#000']] },
   matrix: { titel: 'Farbton', knoepfe: [[1, 'Wei\u00df', '#ffffff', '#222'], [2, 'Gr\u00fcn', '#94ce39', '#0a2e00'], [3, 'Orange', '#ff8c00', '#3a1d00']] },
-  papier: { titel: 'Farbton', knoepfe: [[1, 'Komplett wei\u00df', '#ffffff', '#222'], [2, 'Wei\u00df/Schwarz', '#1a1a1a', '#ffffff'], [3, 'Wei\u00df/Hellgrau', '#bbbbbb', '#222']] }
+  papier: { titel: 'Farbton', knoepfe: [[1, 'Komplett wei\u00df', '#ffffff', '#222'], [2, 'Wei\u00df/Schwarz', '#1a1a1a', '#ffffff'], [3, 'Wei\u00df/Hellgrau', '#bbbbbb', '#222']] },
+  // DB S-Bahn: t ist dort der Hintergrund (Paul 08.11.2026), Farben wie in der Firmware
+  sbahn:  { titel: 'Hintergrund', knoepfe: [[1, 'Blau', '#003cb4', '#fff'], [2, 'Hellblau', '#2878e1', '#fff'], [3, 'Dunkelblau', '#001e64', '#fff']] }
 };
 // Fahrzeugarten fuer die Badges, als Bitmaske im Feld v (ohne v gilt 4, nur U-Bahn).
 const BADGE_FAHRZEUGE = [[1, 'Tram'], [2, 'Bus'], [4, 'U-Bahn'], [8, 'Zug/S-Bahn']];
@@ -796,8 +798,10 @@ function einstFuer(d) {
   if (!d) return standardEinst();
   if (!d.einst) {
     const e = standardEinst();
-    const ton = matrixTon(d);
-    if (ton) e.t = ton;
+    // Der Farbton der Netz-Vorgabe gehoert zu IHREM Stil (Berlin: Matrix orange). Auf einem
+    // anderen Stil hiesse dieselbe 3 etwas anderes, bei DB S-Bahn etwa Dunkelblau.
+    const vg = netzVorgabe(d);
+    if (vg && vg[1] && stilErsatz(vg[0]) === stilVon(d)) e.t = vg[1];
     const za = zweiteNachStil[parseInt(stilVon(d), 10)];
     if (za !== undefined) e.a = za;
     // Solange keine Linie drauf liegt, kennen wir das Netz nicht. Dann noch nichts
@@ -884,6 +888,10 @@ function dsSegment(c, zeilenZahl, fenster, sortierung, d) {
   if (k.fahrzeug && e.k) seg += '|k' + e.k;
   if (k.blinken && e.o) seg += '|o' + e.o;
   if (e.a === 0) seg += '|a0';
+  if (k.linienFarben) {
+    const liste = sbahnPListe();
+    if (liste) seg += '|P' + liste;
+  }
   return seg;
 }
 function maxZeilen(c) { return STIL_ZEILEN[parseInt(c, 10)] || ZEILEN_VORGABE; }
@@ -1077,15 +1085,21 @@ function zeitbasiert(d) {
   // Ein Brett, auf dem nur ganze Stationen liegen, zeigt deren Abfahrten nach Uhrzeit.
   // Die Entscheidung faellt am Schalter "als Station" der Haltestelle (Paul 26.10.2026).
   if (nurBloeckeAuf(d)) return true;
-  // Dazu ein Brett mit festen Linien-Zeilen, das der Nutzer AUSDRUECKLICH nach Abfahrt
-  // sortiert haben will (Schalter im Editor, sortierungSetzen): dann s3 mit den
-  // gewaehlten Richtungen. Die Firmware filtert bei s2/s3 nach den Richtungs-Tokens des
-  // Eintrags (entryDirectionFilter, 23.10.2026), es kommt also NICHT die Gegenrichtung
-  // mit. Kunde Quirin, Wuerzburg Sanderring (08.11.2026): Linien 4, 5 und 10 je in
-  // seiner Richtung, die vier naechsten Abfahrten nach Uhrzeit, dieselbe Linie darf
-  // zweimal stehen. Vorher war d.sortierung zwar gespeichert und beim Laden erkannt
-  // (s3 -> 'zeit'), floss hier aber nicht ein, und jedes Speichern schrieb s1 zurueck.
-  return d.sortierung === 'zeit' && (d.richtungen || []).some(k => !istUhrKey(k));
+  // Dazu ein Brett mit Linien-Zeilen, das nach Abfahrt sortieren SOLL. Kein Schalter,
+  // die Software entscheidet (Paul 08.11.2026):
+  //   a) mehr Zeilen von Hand eingestellt, als Linien-Zeilen daliegen (Quirin, Wuerzburg
+  //      Sanderring: 3 Linien, 4 Zeilen). Eine feste Zuordnung liesse die vierte Zeile
+  //      leer, also die naechsten Abfahrten aller Linien nach Uhrzeit. Eine EINZELNE
+  //      Linie bleibt der alte Sonderfall einzelLinie (ein Token, Geraet zeigt deren
+  //      naechste Abfahrten), die Regel greift erst ab zwei Zeilen-Einheiten.
+  //   b) im Dialog "Display ist voll" wurde "Naechste Abfahrten" gewaehlt (platzFrei),
+  //      oder das Geraet kam schon mit s3 (Ladepfad setzt d.sortierung = 'zeit').
+  // Die Firmware filtert bei s2/s3 nach den Richtungs-Tokens des Eintrags
+  // (entryDirectionFilter, 23.10.2026), es kommt also NICHT die Gegenrichtung mit.
+  const einheiten = zeilenEinheiten(d).filter(t => !t.every(istUhrKey)).length;
+  if (!einheiten) return false;
+  if (d.sortierung === 'zeit') return true;
+  return d.zeilen != null && einheiten >= 2 && d.zeilen > einheiten;
 }
 
 // Alter Name, gleiche Antwort: die Zeilenzahl ist ueberall dieselbe Frage.
@@ -1407,6 +1421,14 @@ async function abfahrten(rbl, st) {
 // Dieselbe Antwort, nur schon geholt: die Linienauswahl hat die Abfahrten beim Laden
 // ohnehin abgefragt und reicht sie mit. Zweimal dasselbe zu holen kostet nur Zeit, und
 // beim Kunden waren das die Sekunden, in denen die Seite leer stand (Paul 26.10.2026).
+// "2026-11-08T19:18:00+01:00" oder "19:18" -> "19:18" (hhmmFromTimeField der Firmware)
+function planHHMM(roh) {
+  const t = String(roh || '');
+  if (t.length < 5) return '';
+  const tp = t.indexOf('T');
+  if (tp >= 0 && t.length >= tp + 6) return t.substring(tp + 1, tp + 6);
+  return t.substring(0, 5);
+}
 function abfahrtenAus(d) {
   const raus = [];
   ((d && d.data && d.data.monitors) || []).forEach(m => {
@@ -1425,7 +1447,13 @@ function abfahrtenAus(d) {
                     lineTextColor: l.lineTextColor || null,
                     // Fuer die Kopfzeile der OEBB-Tafel: Zugtyp oder, mit Feld l, Bahnsteig.
                     vehicleType: dep.vehicleType || '',
-                    platform: dep.platform || l.platform || '' });
+                    platform: dep.platform || l.platform || '',
+                    // Fuer die DB-Tafeln (S-Bahn "+X", Fernverkehr Bubble, Halte, Ist-Zeit),
+                    // gelesen wie die Firmware: Abfahrt vor Linie, via vor den Halten.
+                    trainNumber: dep.trainNumber || l.trainNumber || '',
+                    via: l.via || (Array.isArray(l.stopovers) ? l.stopovers.join(' \u00b7 ') : ''),
+                    plan: planHHMM(dep.departureTime && dep.departureTime.timePlanned),
+                    delay: (dep.delayMinutes != null ? dep.delayMinutes : l.delayMinutes) || 0 });
       });
     });
   });
@@ -2113,9 +2141,15 @@ function platzFrei(d, di, key) {
   dialogZeigen('Display ' + (di + 1) + ' ist voll',
     stilName + ' zeigt h\u00f6chstens ' + max + (max === 1 ? ' Zeile' : ' Zeilen') + '.'
     + (max < 5 ? ' Mit dem Stil Matrix w\u00e4ren 5 Zeilen m\u00f6glich.' : '')
-    + ' Oder die Linie kommt auf eine neue Seite.',
+    + ' Die Linie kann auf eine neue Seite, die im Wechsel gezeigt wird. Oder dieses'
+    + ' Display zeigt ab jetzt nur die n\u00e4chsten Abfahrten aller seiner Linien nach'
+    + ' Uhrzeit, dann passen beliebig viele Linien darauf.',
     [{ text: 'Nicht jetzt', still: true },
-     { text: 'Neue Seite anlegen', tun: function () { displayMitLinie(key); } }], 'warnung');
+     { text: 'Neue Seite anlegen', tun: function () { displayMitLinie(key); } },
+     // Nach Abfahrt sortieren (s3) statt einer weiteren Seite (Paul 08.11.2026). Die
+     // Aufteilung wird wie beim alten Reiter gesichert, damit ein Zurueck nichts kostet.
+     { text: 'N\u00e4chste Abfahrten', tun: function () {
+         aufteilungSichern(); d.sortierung = 'zeit'; richtungDrauf(di, key); } }], 'warnung');
   return false;
 }
 
@@ -2297,7 +2331,7 @@ function streifenZeichnen() {
       // mittig in ihrem Fach (170 - kopf) / eigene Zeilen. Wien 3 und 2 ergibt
       // Zeilenhoehe 56, Fach 85, Zeilen bei 14 und 99.
       const eigene = Math.max(1, s.zeilen || s.daten.length);
-      const gross = (istZeitTyp(stilHier) || matrixSeiteGross(stilHier, eigene))
+      const gross = (istZeitTyp(stilHier) || matrixSeiteGross(stilHier, eigene) || parseInt(stilHier, 10) === 6)
                     ? eigene : Math.max(eigene, zeilenDesStils(stilHier));
       const kopf = (parseInt(stilHier, 10) === 22) ? 18 : 0;
       const hoehe = Math.floor((170 - kopf) / gross);
@@ -2413,24 +2447,6 @@ function editorZeichnen() {
        + '<button class="schiene" role="switch" aria-checked="false" onclick="automatikAn('
        + s.index + ')"><span class="kugel"></span></button></div>';
   }
-  // Sortierung nach Abfahrt fuer Bretter mit Linien-Zeilen (s3 statt s1, siehe
-  // zeitbasiert). Stations-Bloecke sortieren ohnehin nach Uhrzeit, eine Uhr allein hat
-  // nichts zu sortieren. Schalter statt Reiter, wie ueberall in diesem Editor.
-  if (kannSortieren(stilVon(dHier)) && !nurBloeckeAuf(dHier) && !zeigtUhr(dHier)
-      && (dHier.richtungen || []).some(k => !istUhrKey(k))) {
-    const zeitAn = zeitbasiert(dHier);
-    h += '<div class="schieber"><div class="wort">Nach Abfahrt sortieren'
-       + '<small>' + (zeitAn
-            ? 'Die n\u00e4chsten Abfahrten aller Linien dieses Displays nach Uhrzeit, nur in '
-              + 'den gew\u00e4hlten Richtungen. Dieselbe Linie darf mehrmals stehen.'
-            : 'Jede Linie hat ihre feste Zeile. Eingeschaltet stehen stattdessen die '
-              + 'n\u00e4chsten Abfahrten aller Linien nach Uhrzeit, nur in den gew\u00e4hlten '
-              + 'Richtungen.') + '</small></div>'
-       + '<button class="schiene' + (zeitAn ? ' an' : '') + '" role="switch" aria-checked="' + (zeitAn ? 'true' : 'false')
-       + '" onclick="sortierungSetzen(' + s.index + ',\'' + (zeitAn ? 'statisch' : 'zeit')
-       + '\')"><span class="kugel"></span></button></div>';
-  }
-
 
   const nHier = (dHier && dHier.richtungen.length) || 0;
   const maxHier = maxZeilen(stilVon(dHier));
@@ -2447,7 +2463,12 @@ function editorZeichnen() {
         ? 'Nur die Uhrzeit, gro\u00df \u00fcber das ganze Display.'
         : zeitbasiert(dHier)
         ? nHier + (nHier === 1 ? ' Linie' : ' Linien') + ' im Display, davon stehen die '
-          + zeitZeilen(dHier) + ' n\u00e4chsten Abfahrten darauf, nach Uhrzeit sortiert.'
+          + zeitZeilen(dHier) + ' n\u00e4chsten Abfahrten darauf, nach Uhrzeit sortiert, nur in '
+          + 'den gew\u00e4hlten Richtungen.'
+          + (dHier.sortierung !== 'zeit'
+             ? ' Grund: mehr Zeilen eingestellt als Linien. Auf Automatisch bekommt jede Linie wieder ihre feste Zeile.'
+             : ' <button class="link" onclick="sortierungSetzen(' + s.index + ',\'statisch\')">'
+               + 'Zur\u00fcck zu festen Zeilen je Linie</button>')
         : nurBloeckeAuf(dHier)
         ? (nHier === 1 ? 'Eine ganze Station' : nHier + ' ganze Stationen')
           + ', davon stehen die ' + zeilenVon(dHier)
@@ -2779,6 +2800,16 @@ function zeilenzahlFeld() {
   if (!d || zeigtUhr(d)) return '';   // Ein Uhr-Brett hat keine Abfahrtszeilen
   const max = maxZeilen(stilVon(d));
   const auto = zeilenAuto(d);
+  if (parseInt(stilVon(d), 10) === 6) {
+    // DB Fernverkehr: die Zeilen sind hier die Ansicht. 1 = ein Zug ueber den ganzen Schirm,
+    // 2 = Doppelscreen, zwei Zuege nebeneinander wie am Bahnsteig (Paul 08.11.2026).
+    const z = zeilenVon(d);
+    return '<label class="feld">Ansicht</label><div class="schalter">'
+         + '<button class="' + (z < 2 ? 'an' : '') + '" onclick="zeilenSetzen(' + sHier.index + ', 1)">1 Screen</button>'
+         + '<button class="' + (z >= 2 ? 'an' : '') + '" onclick="zeilenSetzen(' + sHier.index + ', 2)">Doppelscreen</button>'
+         + '</div><div class="hinweis">Doppelscreen zeigt zwei Z\u00fcge nebeneinander wie am Bahnsteig. '
+         + 'F\u00e4hrt nur einer, steht er \u00fcber den ganzen Schirm.</div>';
+  }
   const wort = z => z + (z === 1 ? ' Zeile' : ' Zeilen');
   let h = '<label class="feld" for="zeilenWahl">Zeilen auf diesem Display</label>'
         + '<select id="zeilenWahl" onchange="zeilenSetzen(' + sHier.index + ', this.value)">'
@@ -3038,23 +3069,52 @@ function zielRef(txt) {
     .trim();
 }
 
-// Taugt diese Richtungs-Id ueberhaupt als RICHTUNG? Waehlt der Kunde an einer
-// DB-Station OHNE Bahnsteig eine LINIE, vergibt der Server ALLEN Abfahrten dieselbe Id
-// ("dbsS1" heisst "die ganze Auswahl", nicht "diese Richtung"). Hin- und Rueckrichtung
-// tragen sie dann gemeinsam, und wer sie als Zeilen-Token schreibt, verliert die
-// Richtung: das Geraet zeigte die S1 nach Wannsee UND nach Frohnau, obwohl nur eine
-// gewaehlt war (Kunde Timo, Feuerbachstrasse, 07.11.2026).
-// In dem Fall trennt nur der ZIELTEXT, und den vergleicht die Firmware sogar ZUERST
-// (isLineDestinationAllowed: erst allowedDests, dann die Id).
-// Bahnsteig-Ids ("dbp12lS42") bleiben unangetastet, dort IST das Gleis die Richtung.
-function ridIstRichtung(rid) {
+// Taugt diese Richtungs-Id ueberhaupt als RICHTUNG?
+// Bei DB sind die Ids SYNTHETISCH, der Server baut sie aus der Auswahl:
+//   "dbsS1"       = Linienauswahl ohne Bahnsteig  -> die GANZE Auswahl, beide Richtungen
+//   "dbp678sRE3"  = drei Bahnsteige + Linie       -> die GANZE Auswahl, beide Richtungen
+//   "dbp12lS42"   = EIN Bahnsteig, eine Linie     -> echte Richtung, das Gleis ist sie
+// Die ersten beiden Formen fasst der Server absichtlich zusammen (sonst stuenden bei
+// "alle ICE" fuenfzehn Zeilen da). Wer so eine Id als Zeilen-Token schreibt, verliert
+// die Richtung: Feuerbachstrasse zeigte die S1 nach Wannsee UND nach Frohnau, Suedkreuz
+// die RE3 nach Stralsund (Gleis 7) UND nach Schwedt (Gleis 6), obwohl je eine gewaehlt
+// war (Kunde Timo, 25.10. bis 08.11.2026).
+// Welche Form vorliegt, verraet kein Praefix zuverlaessig, die ABFAHRTEN sagen es.
+// Und zwar ueber den BAHNSTEIG, denn bei der DB IST das Gleis die Richtung:
+//   mehrere Gleise unter einer Id -> die Id buendelt die Auswahl, sie trennt nicht
+//   genau ein Gleis              -> echte Richtung, auch wenn mehrere Ziele drunter
+//                                   stehen (Schoeneberg Gleis 12: "Ringbahn S 42",
+//                                   "Suedkreuz Bhf" und "Schoeneweide Bhf" sind
+//                                   Kurzfuehrungen DERSELBEN Fahrtrichtung, die
+//                                   duerfen NICHT auseinandergerissen werden)
+//   gar kein Gleis               -> nur dann entscheidet der Zieltext
+//                                   (Feuerbachstrasse liefert keine Gleise)
+// Traegt die Id nicht, kommt der ZIELTEXT in den Token, und den vergleicht die Firmware
+// sogar zuerst (isLineDestinationAllowed: erst allowedDests, dann die Id).
+// Nur bei DB geprueft: anderswo sind die Ids echt und duerfen mehrere Zieltexte
+// buendeln, das ist die gewollte Richtungs-Zusammenfuehrung (dir-canon).
+function ridIstRichtung(rid, st) {
   const r = String(rid || '');
-  return !!r && !/^dbs/i.test(r);
+  if (!r) return false;
+  if (!/^db[ps]/i.test(r)) return true;
+  const gleise = new Set(), ziele = new Set();
+  const sammeln = liste => (liste || []).forEach(d => {
+    if (String((d && d.rid) || '') !== r) return;
+    const g = String((d && d.platform) || '').trim();
+    if (g) gleise.add(g);
+    const z = zielRef(d && d.dest);
+    if (z) ziele.add(z);
+  });
+  sammeln(st && st.abfahrten);
+  sammeln(st && st.letzteLinien);
+  if (gleise.size) return gleise.size === 1;
+  return ziele.size <= 1;
 }
 // Der Verweis, der eine Zeile an ihre Richtung bindet: am liebsten die Id, sonst das Ziel.
-function richtungsRef(dep) {
+function richtungsRef(r) {
+  const dep = r && r.dep;
   if (!dep) return '';
-  return ridIstRichtung(dep.rid) ? zielRef(dep.rid) : zielRef(dep.dest);
+  return ridIstRichtung(dep.rid, r.station) ? zielRef(dep.rid) : zielRef(dep.dest);
 }
 
 // Ein Token je ZEILE, in der Reihenfolge der Zeilen: "Linie>Ziel", Mitglieder einer
@@ -3075,7 +3135,7 @@ function tokenListe(d) {
       if (!vonRbl) vonRbl = r.station.rbl;
       // Immer zuerst die Richtungs-Id, nur ohne sie den bereinigten Zieltext. Genau
       // so macht es der alte Konfigurator, und die Firmware vergleicht die Id exakt.
-      const ref = richtungsRef(r.dep);
+      const ref = richtungsRef(r);
       stueck.push(ref ? r.dep.line + '>' + ref : r.dep.line);
     });
     if (stueck.length) raus.push({ tok: stueck.join('+'), rbl: vonRbl });
@@ -3098,7 +3158,7 @@ function tokenListeFlach(d) {
     });
     echte.forEach(k => {
       const r = richtungFinden(k);
-      const ref = richtungsRef(r.dep);
+      const ref = richtungsRef(r);
       // Nur eine Zeile mit mehreren Linien ist eine Gruppe. Dass eine Linie in zwei
       // Richtungen faehrt, macht noch keine.
       const gid = echte.length > 1 ? (gidBasis + gi + 1) : 0;
@@ -3257,7 +3317,7 @@ function configBauen() {
     // Zeilen-Token und zeigt dann die naechsten Abfahrten genau dieser Linie UND
     // Richtung. Leere Zeilen kamen vom Server-Deckel an grossen Knoten, nicht von der
     // Sortierung. s3 schreiben wir, wenn das Brett nach Abfahrt sortiert (Stations-
-    // Bloecke oder der Schalter "Nach Abfahrt sortieren"); die Richtungs-Tokens bleiben
+    // Bloecke, mehr Zeilen als Linien, Dialog "Naechste Abfahrten"); die Richtungs-Tokens bleiben
     // in den Eintraegen und die Firmware filtert bei s2/s3 danach (entryDirectionFilter).
     const sTeil = kannSortieren(c) ? '|s' + (zeitbasiert(d) ? zeitSortierung(c) : '1') : '';
     const zTeil = uhrToken(d);
@@ -3302,7 +3362,7 @@ function configBauen() {
           const rbl = r.station.rbl;
           // Wien fuehrt den nackten Liniennamen (die Richtung steckt im Steig), sonst
           // Linie plus Ziel-Referenz wie in tokenListeFlach.
-          const ref = richtungsRef(r.dep);
+          const ref = richtungsRef(r);
           const tok = istWienRbl(rbl) ? String(r.dep.line)
                                       : (ref ? r.dep.line + '>' + ref : r.dep.line);
           // Jeder Eintrag traegt genau EIN Token, die Gruppe steht also immer auf 0.
@@ -3718,7 +3778,7 @@ function uhrLook(c, d) {
            : v === 3 ? { bg: '#0f0500', fg: '#ff8c00', raster: '#281200' }
                      : { bg: '#000000', fg: '#ffffff', raster: '#181818' };
     }
-    case 5:  return { bg: '#0a1628', fg: '#ffffff' };
+    case 5:  return { bg: '#003cb4', fg: '#ffffff' };
     case 24: return { bg: '#ffffff', fg: '#1a1a1a' };
     case 25: return { bg: '#264c9a', fg: '#ffffff' };
     // Seit dem Release geht z1 fuer ALLE Stile (Firmware-Sitzung 23.10.2026). Wo wir
@@ -4290,7 +4350,7 @@ function designZeichnen() {
   if (!k.schrift && !k.grund && !k.badges && !k.matrixSchrift) {
     h += '<div class="hinweis">' + escapeHtmlFt(stilName)
        + ' bringt seine Farben fest mit, daran gibt es nichts einzustellen. '
-       + 'Wiener Linien, Matrix und Paper White lassen sich f\u00e4rben.</div>';
+       + 'Wiener Linien, DB S-Bahn, Matrix und Paper White lassen sich f\u00e4rben.</div>';
     el.innerHTML = h;
     return;
   }
@@ -4346,6 +4406,10 @@ function designZeichnen() {
       h += '<div class="hinweis">Nur Linien mit hinterlegter Linienfarbe bekommen ein Badge. '
          + 'F\u00fcr die Wiener U-Bahn sind die Farben fest eingebaut.</div></div>';
     }
+  }
+
+  if (k.linienFarben) {
+    h += '<label class="feld">Linienfarben</label>' + sbahnLinienHtml(c);
   }
 
   // Die Schalter stehen in JEDEM Eintrag und gelten darum je Brett: die Firmware liest
@@ -4561,6 +4625,102 @@ function fzSetzen(di, feld) {
 
 // Alle Setzer bekommen die Nummer des DISPLAYS, nicht mehr die colour.
 function schriftSetzen(di, v) { einstFuer(displays[di]).t = parseInt(v, 10); allesZeichnen(); }
+
+// ---- DB S-Bahn: Pillenfarben je Linie ---------------------------------------------------
+// Gelten fuer den Stil, nicht je Display: eine Linie hat ueberall dieselbe Farbe. Am Geraet
+// stehen sie im displaysettings-Segment des Stils als grosses P (c5|P...): "Linie:flaeche:schrift"
+// komma-getrennt, Hex ohne '#'. Ohne Eintrag gilt die Linienfarbe vom Server (Paul 08.11.2026).
+const sbahnFarben = {};
+function sbahnPListe() {
+  return Object.keys(sbahnFarben).map(ln => {
+    const f = sbahnFarben[ln] || {};
+    const name = String(ln).replace(/[|;:,]/g, '');
+    return (name && f.bg) ? name + ':' + f.bg + ':' + (f.tx || '') : '';
+  }).filter(Boolean).join(',');
+}
+function sbahnPLesen(wert) {
+  Object.keys(sbahnFarben).forEach(k => delete sbahnFarben[k]);
+  String(wert || '').split(',').forEach(x => {
+    const st = x.split(':');
+    const ln = (st[0] || '').trim();
+    if (ln && /^[0-9a-fA-F]{6}$/.test(st[1] || '')) {
+      sbahnFarben[ln] = { bg: st[1].toLowerCase(), tx: /^[0-9a-fA-F]{6}$/.test(st[2] || '') ? st[2].toLowerCase() : '' };
+    }
+  });
+}
+// Was fuer eine Linie gerade gilt: eigene Farbe, sonst die vom Server, sonst die Tabelle
+// der Firmware nach Verkehrsmittel. Schrift ohne Angabe nach Helligkeit wie am Geraet.
+function sbahnLinieFarben(ln, dep) {
+  const eigen = sbahnFarben[ln];
+  const amt = eigenAmtlich(dep);
+  const bg = (eigen && eigen.bg) || (amt && amt.bg)
+          || (typeof dvSBahnErsatzfarbe === 'function' ? dvSBahnErsatzfarbe(ln) : '#009640').replace('#', '');
+  let tx = (eigen && eigen.tx) || (!eigen && amt && amt.tx) || '';
+  if (!tx) {
+    const n = parseInt(bg, 16);
+    tx = (((n >> 16) & 255) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114 > 150000) ? '000000' : 'ffffff';
+  }
+  return { bg: bg.toLowerCase(), tx: tx.toLowerCase() };
+}
+function sbahnLinienHtml(c) {
+  const deps = eigenLinienDeps(c);
+  const linien = Array.from(deps.keys());
+  if (!linien.length) {
+    return '<div class="hinweis" style="margin-top:0">Auf diesem Display liegt noch keine Linie. '
+         + 'Sobald eine daliegt, kannst du ihre Pille hier einf\u00e4rben.</div>';
+  }
+  let h = '<div class="hinweis" style="margin-top:0">Ohne eigene Farbe nimmt jede Linie ihre '
+        + 'offizielle Farbe. Die eigenen Farben gelten auf allen DB-S-Bahn-Displays.</div>';
+  linien.forEach(ln => {
+    const an = !!sbahnFarben[ln];
+    const f = sbahnLinieFarben(ln, deps.get(ln));
+    const ln2 = escapeHtmlFt(ln);
+    const arg = "'" + String(ln).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+    h += '<div class="linienfarbe" data-linie="' + ln2 + '"><div class="kopf">'
+       + '<b style="background:#' + f.bg + ';color:#' + f.tx + ';border-radius:999px">' + ln2 + '</b>'
+       + '<span class="wort">' + (an ? 'Eigene Farbe' : 'Offizielle Farbe') + '</span>'
+       + '<button class="schiene' + (an ? ' an' : '') + '" role="switch"'
+       + ' aria-checked="' + (an ? 'true' : 'false') + '"'
+       + ' onclick="sbahnLinieSchalten(' + arg + ')"><span class="kugel"></span></button>'
+       + '</div>';
+    if (an) {
+      h += '<div class="farbfelder">'
+         + [['bg', 'Pille'], ['tx', 'Schrift']].map(fd =>
+             '<label class="farbfeld"><span>' + fd[1] + '</span>'
+           + '<input type="color" value="#' + f[fd[0]] + '"'
+           + ' oninput="sbahnLinieFarbe(' + arg + ',\'' + fd[0] + '\', this.value, false)"'
+           + ' onchange="sbahnLinieFarbe(' + arg + ',\'' + fd[0] + '\', this.value, true)"></label>'
+           ).join('')
+         + '</div>';
+    }
+    h += '</div>';
+  });
+  return h;
+}
+// An: die Linie bekommt einen eigenen Eintrag, gleich mit ihrer heutigen Farbe. Aus: wieder
+// die offizielle.
+function sbahnLinieSchalten(ln) {
+  if (sbahnFarben[ln]) delete sbahnFarben[ln];
+  else sbahnFarben[ln] = sbahnLinieFarben(ln, eigenLinienDeps(5).get(ln));
+  allesZeichnen();
+}
+function sbahnLinieFarbe(ln, feld, wert, fertig) {
+  if (!sbahnFarben[ln]) sbahnFarben[ln] = sbahnLinieFarben(ln, eigenLinienDeps(5).get(ln));
+  sbahnFarben[ln][feld] = String(wert == null ? '' : wert).replace('#', '').toLowerCase();
+  // Beim Ziehen nur die Vorschau und die Pillen hier, nicht den ganzen Editor: sonst fliegt
+  // der offene Farbwaehler aus dem Dokument (wie eigenZiehtFrisch).
+  if (fertig) { allesZeichnen(); return; }
+  streifenZeichnen();
+  ausgabeZeichnen();
+  const deps = eigenLinienDeps(5);
+  document.querySelectorAll('.linienfarbe').forEach(el => {
+    const name = el.dataset.linie, chip = el.querySelector('b');
+    if (!name || !chip) return;
+    const f = sbahnLinieFarben(name, deps.get(name));
+    chip.style.background = '#' + f.bg;
+    chip.style.color = '#' + f.tx;
+  });
+}
 function grundSetzen(di, v) { einstFuer(displays[di]).b = parseInt(v, 10); allesZeichnen(); }
 function badgeSetzen(di, v) { einstFuer(displays[di]).u = parseInt(v, 10); allesZeichnen(); }
 function blinkenSetzen(di, v) { einstFuer(displays[di]).o = parseInt(v, 10); allesZeichnen(); }
@@ -4926,7 +5086,21 @@ function stilSetzen(v) {
     eigenOeffnen(frei);
     return;
   }
-  if (d) d.stil = parseInt(v, 10) || 1; else stil = parseInt(v, 10) || 1;
+  const neu = parseInt(v, 10) || 1;
+  if (d) {
+    // Feld t heisst je Stil etwas anderes (Wien Schriftfarbe, Matrix Farbton, DB S-Bahn
+    // Hintergrund). Beim Wechsel in eine andere Art den alten Wert nicht mitnehmen, sonst
+    // wird aus "Matrix orange" ein dunkelblauer S-Bahn-Hintergrund (Paul 08.11.2026).
+    const altArt = (STIL_KANN[stilVon(d)] || {}).schrift;
+    const neuArt = (STIL_KANN[stilErsatz(neu)] || {}).schrift;
+    if (d.einst && altArt !== neuArt) {
+      const vg = netzVorgabe(d);
+      d.einst.t = (vg && vg[1] && stilErsatz(vg[0]) === stilErsatz(neu)) ? vg[1] : 1;
+    }
+    d.stil = neu;
+  } else {
+    stil = neu;
+  }
   allesZeichnen();
 }
 
@@ -5777,6 +5951,13 @@ function uebergabeHolen() {
   if (roh.zweiteAbfahrt !== undefined) {
     zweiteStart = (parseInt(roh.zweiteAbfahrt, 10) === 0) ? 0 : 1;
   }
+  // Linienfarben von DB S-Bahn: zuerst das Geraet, denn nur dort stehen sie.
+  [(roh.geraet && roh.geraet.displaysettings) || '', roh.displaysettings || ''].some(z => {
+    const seg = String(z).split(';').map(x => x.trim()).find(x => /^c5\|/.test(x));
+    const pT = seg && seg.split('|').map(x => x.trim()).find(x => x[0] === 'P');
+    if (pT) { sbahnPLesen(pT.slice(1)); return true; }
+    return false;
+  });
   String(roh.displaysettings || (roh.geraet && roh.geraet.displaysettings) || '')
     .split(';').forEach(seg => {
       const t = seg.split('|').map(x => x.trim()).filter(Boolean);
