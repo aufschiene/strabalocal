@@ -5855,6 +5855,10 @@ function _stationNameCache() {
 }
 function setCachedStationName(key, name) {
   if (!key || !name || /^Station\s/.test(name)) return;  // keine Fallback-Namen cachen
+  // Kein zusammengesetzter DB-Name ("Berlin Suedkreuz · Gl 4 RE4"): der Cache liefert
+  // beim naechsten Laden den Stationsnamen, und die Wiederherstellung haengt die Auswahl
+  // dann ein zweites Mal an (Paul 08.11.2026).
+  if (/ · (Gl |alle )/.test(name)) return;
   try { var c = _stationNameCache(); if (c[key] === name) return; c[key] = name; localStorage.setItem('catchit_station_names', JSON.stringify(c)); } catch (e) {}
 }
 function getCachedStationName(key) {
@@ -12663,6 +12667,31 @@ function resetFinetuningData() {
   console.log('[resetFinetuningData] Alle Feintuning-Daten zurückgesetzt, directionsChanged=true');
 }
 
+// Lesbare Auswahl einer DB-Station aus ihrem rbl-Token. Der DB-Weg legt JEDE Auswahl
+// als "alle Abfahrten" an (allDepartures) und schreibt das Gewaehlte in den rbl:
+//   DBSTEIG:<id>!4~5!RE4~RB10  →  "Gleis 4 und 5, nur RE4, RB10"
+//   DBALL:<id>!RE              →  "nur RE"
+// Ohne das stand auf der Karte "Alle Abfahrten", obwohl der Kunde ein Gleis und eine
+// Linie gewaehlt hatte (Paul 08.11.2026). Liefert '' fuer alles, was nicht DB ist.
+function dbAuswahlLabel(s) {
+  if (!s) return '';
+  var voll = String(s.fullId || '');
+  var netz = voll.split(':')[0];
+  if (!/^(DBSTEIG|DBALL|DKSTEIG|DKALL)$/.test(netz)) return '';
+  var teile = voll.split('!');
+  if (teile.length < 2) return 'Alle Abfahrten';
+  var istSteig = /STEIG$/.test(netz);
+  var linien = (istSteig ? teile[2] : teile[1]) || '';
+  var linienTxt = linien ? ('nur ' + linien.split('~').filter(Boolean).join(', ')) : '';
+  if (!istSteig) return linienTxt || 'Alle Abfahrten';
+  var gl = (teile[1] || '').split('~').filter(Boolean);
+  var glTxt = gl.length === 0 ? ''
+            : gl.length === 1 ? ('Gleis ' + gl[0])
+            : gl.length === 2 ? ('Gleis ' + gl[0] + ' und ' + gl[1])
+            : ('Gleise ' + gl.join(', '));
+  return [glTxt, linienTxt || 'alle Abfahrten'].filter(Boolean).join(', ');
+}
+
 function updateStationsList() {
   console.log('[updateStationsList] stations array:', JSON.stringify(stations.map(s => ({
     fullId: s.fullId,
@@ -12678,17 +12707,24 @@ function updateStationsList() {
     // Vorlaeufige Namen aus der Abfahrts-Antwort bleiben draussen — die weichen manchmal
     // vom kanonischen ab ("Gmunden Rathausplatz" statt "Gmunden"); nameNachtragen merkt
     // den richtigen, sobald die Suche ihn liefert.
-    if (s.fullId && s.stopName && !s._nameVorlaeufig) setCachedStationName(s.fullId, s.stopName);
+    // DB-Stationen tragen ihre Auswahl IM Namen ("Berlin Suedkreuz · Gl 4 RE4"). Dieser
+    // Text darf nicht in den Namens-Cache: beim naechsten Laden haengt die
+    // Wiederherstellung die Auswahl noch einmal an, und der Titel wuchs mit jedem
+    // Oeffnen weiter ("· Gl 4 · Gl 4 RE4 · Gl 4 RE4", Paul 08.11.2026). Gemerkt wird
+    // darum immer der reine Stationsname.
+    const _merkName = s.dbBaseName || s.stopName;
+    if (s.fullId && _merkName && !s._nameVorlaeufig) setCachedStationName(s.fullId, _merkName);
     // Zusätzlich netz-unabhängig per blanker stopId (Nicht-Journey): findet den Namen
     // beim Reload auch wenn sich das Netz-Prefix unterscheidet (FV OEBB vs WESTBAHN) →
     // sonst greift resolveStationName mit dem abweichenden Departures-API-Titel
     // (z.B. "Gmunden Rathausplatz" statt "Gmunden").
-    if (s.stopId && s.stopName && !s._nameVorlaeufig && !(s.fullId || '').includes('>')) setCachedStationName('#' + s.stopId, s.stopName);
+    if (s.stopId && _merkName && !s._nameVorlaeufig && !(s.fullId || '').includes('>')) setCachedStationName('#' + s.stopId, _merkName);
     const key = `${s.network}:${s.stopName}`;
     if (!groupedStations.has(key)) {
       groupedStations.set(key, {
         network: s.network,
         stopName: s.stopName,
+        dbBaseName: s.dbBaseName,
         isJourney: s.isJourney,
         isExisting: s.isExisting,
         indices: [],
@@ -12780,7 +12816,10 @@ function updateStationsList() {
     // Prüfe ob eine der Stationen "Alle Abfahrten" ist
     const isAllDeps = group.indices.some(idx => stations[idx]?.allDepartures);
     const isFv = group.network === 'WESTBAHN';
-    if (isAllDeps) {
+    const dbSel = dbAuswahlLabel(stations[group.indices[0]]);
+    if (dbSel) {
+      filterLabel = dbSel;
+    } else if (isAllDeps) {
       filterLabel = 'Alle Abfahrten';
     } else if (group.isJourney) {
       const uniqueFilters = [...new Set(group.filters)];
@@ -12882,7 +12921,9 @@ function updateStationsList() {
     // von→nach-Stationen auf ZWEI Zeilen: "Von: X" / "Nach: Y". In einer Zeile schnitt
     // der Name ab und das Ziel war nicht mehr lesbar ("Wien Stadlau → Br…", Paul 03.10.2026).
     const nameHtml = (function() {
-      const n = String(group.stopName || '');
+      // Bei DB steht die Auswahl schon in der Zeile darunter, der Titel bleibt der
+      // reine Stationsname (Paul 08.11.2026).
+      const n = String((dbSel && group.dbBaseName) || group.stopName || '');
       const p = n.indexOf(' \u2192 ');
       if (p < 0) return escapeHtmlFt(n);
       return '<span class="vnk-zeile"><span class="vnk-label">Von:</span> ' + escapeHtmlFt(n.slice(0, p)) + '</span>'
@@ -24109,9 +24150,14 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       station.network = (network === 'DKALL' || network === 'DKSTEIG') ? 'DKTRAIN' : 'DB';
       station.networkName = (station.network === 'DKTRAIN') ? 'Rejseplanen Züge' : 'Deutsche Bahn';
       station.dbMode = (network === 'DBSTEIG' || network === 'DKSTEIG') ? 'steig' : 'all';
-      station.dbBaseName = stopName;
+      // Kommt der Name schon zusammengesetzt an (aus einem alten Namens-Cache oder aus
+      // einer Sitzung vor dem 08.11.2026), wieder auf den reinen Stationsnamen kuerzen.
+      // Sonst haengt die Zeile darunter die Auswahl ein zweites Mal an, und der Titel
+      // wird bei jedem Oeffnen laenger.
+      var _basis = String(stopName || '').split(' · ')[0].trim() || stopName;
+      station.dbBaseName = _basis;
       var _selTxt = _selRaw ? String(_selRaw).replace(/!/g, ' ').replace(/~/g, '/').trim() : '';
-      station.stopName = stopName + ' · ' + (_selTxt ? ((network === 'DBSTEIG') ? ('Gl ' + _selTxt) : ('alle ' + _selTxt)) : 'alle Abfahrten');
+      station.stopName = _basis + ' · ' + (_selTxt ? ((network === 'DBSTEIG') ? ('Gl ' + _selTxt) : ('alle ' + _selTxt)) : 'alle Abfahrten');
     }
 
     // "Alle Abfahrten": KEINE Richtungen einbacken — die Station ist ein generischer
