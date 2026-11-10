@@ -3242,6 +3242,11 @@
   <!-- Added Stations -->
   <div class="card" id="stationsCard">
     <h2>Deine Stationen (<span id="stationCount">0</span>)</h2>
+    <!-- Nur auf der Zwischenseite nach der Linien-Auswahl, s. updateStationsList: dort
+         fuehren genau ZWEI Wege weiter, und der Kopf sagt welche. -->
+    <p class="hidden" id="stationsWeiterHinweis" style="margin:-6px 0 16px;font-size:14px;line-height:1.5;color:#6b6258;">
+      Noch eine Station dazu, oder weiter.
+    </p>
     <div id="stationsContainer">
       <div class="empty-state" id="emptyState">
         <p>Noch keine Stationen hinzugefügt</p>
@@ -12777,20 +12782,23 @@ function updateStationsList() {
     // kann (Paul 26.10.2026): also ein Feld in der Geraete-Zeile, das diese Seite gar nicht
     // schreibt, Aufteilung, Zeilen, Sortierung, Design. Eine Config allein reicht nicht,
     // die entsteht auch beim ersten Speichern von hier.
-    var _warImFeintuning = (typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder();
     var _aufZwischenseite = (typeof currentStep !== 'undefined' && currentStep === 'added');
     var schnellstartBtn = document.getElementById('schnellstartBtn');
     // Der ROTE Hauptknopf ist immer der Schnellstart. War der Kunde noch nie im Feintuning,
     // heisst er "Weiter", denn dann gibt es nichts anderes, und der Wizard IST der
     // Schnellstart.
+    // Der rote Knopf heisst IMMER "Weiter". Wohin er fuehrt, entscheidet er selbst
+    // (s. schnellstartNachfragen): war der Kunde schon im Feintuning, direkt dorthin,
+    // sonst in den Wizard. Vorher hiess er bei bestehenden Einstellungen "Schnellstart",
+    // daneben stand "Feintunen", und dahinter kam noch eine Rueckfrage mit zwei Knoepfen:
+    // drei Wege von einer Seite (Paul 10.11.2026: "derzeit etwas zu kompliziert").
     if (schnellstartBtn) {
       schnellstartBtn.classList.toggle('hidden', !(_aufZwischenseite && stations.length > 0));
-      schnellstartBtn.textContent = _warImFeintuning ? 'Schnellstart' : 'Weiter';
+      schnellstartBtn.textContent = 'Weiter';
     }
-    if (openFinetuningBtn) {
-      openFinetuningBtn.classList.toggle('hidden', !(_aufZwischenseite && _warImFeintuning));
-      openFinetuningBtn.textContent = 'Feintunen';
-    }
+    if (openFinetuningBtn) openFinetuningBtn.classList.add('hidden');
+    var _kopfHinweis = document.getElementById('stationsWeiterHinweis');
+    if (_kopfHinweis) _kopfHinweis.classList.toggle('hidden', !(_aufZwischenseite && stations.length > 0));
     // Laeuft der Wizard (seine Fortschrittsleiste steht), bleibt die Stationsliste weg:
     // der Schritt kommt NACH der Linien-Auswahl und soll nicht darunter haengen
     // (Paul 25.10.2026). Diese Zeile holte sie bisher bedingungslos wieder hervor und hat
@@ -25010,46 +25018,22 @@ async function _heilungArbeiten() {
   } finally { _heilungLaeuft = false; }
 }
 
-// Vor dem Schnellstart nachfragen, wenn schon eigene Display-Einstellungen da sind
-// (Paul 26.10.2026). Gemessen am 26.10.2026: das OEFFNEN des Wizards aendert nichts, und
-// auch sein Bau laesst eine bestehende Bretter-Aufteilung stehen, solange die Stationen
-// gleich bleiben (zwei Bretter d1/d2 mit r5/t2 und r3/t3 kamen unveraendert heraus).
-// Anfassen kann er sie trotzdem: der Stil-Schritt (Kompakt gegen Spielerisch) legt bei
-// mehreren Anzeige-Typen alles neu zusammen. Geraete-Sachen wie Helligkeit, Nachtmodus und
-// Standzeit bleiben in jedem Fall, die fragt der Wizard selbst ab.
+// Der rote "Weiter" nach der Stations-Auswahl. Er entscheidet selbst, wohin es geht:
+// hat der Kunde schon eine Einstellung, die NUR das Feintuning schreibt (Aufteilung,
+// Zeilen, Sortierung, Design), war er dort schon einmal, und dann hat der Wizard nichts
+// mehr zu fragen. Also direkt hinueber, ohne Rueckfrage.
+// Bis zum 10.11.2026 stand hier eine Rueckfrage ("Ja, Schnellstart" / "Nein, lieber
+// feintunen") und auf der Seite davor noch ein eigener "Feintunen"-Knopf. Drei Wege von
+// einer Seite, und der Wizard haette die bestehende Aufteilung ohnehin stehen gelassen
+// (gemessen 26.10.2026: zwei Bretter d1/d2 mit r5/t2 und r3/t3 kamen unveraendert heraus).
+// Eine Config allein ist KEIN Feintuning: die entsteht auch beim ersten Speichern von hier.
 function schnellstartNachfragen() {
-  // Nur fragen, wenn es etwas zu verlieren gibt: eigene Felder in der Geraete-Zeile, die
-  // nur das Feintuning schreibt. Sonst waere die Frage beim ersten Einrichten sinnlos.
-  if (!((typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder())) {
-    startSetupWizard(); return;
-  }
-  var alt = document.getElementById('schnellstartFrage');
-  if (alt) alt.remove();
-  var ov = document.createElement('div');
-  ov.id = 'schnellstartFrage';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:10001;display:flex;align-items:center;'
-    + 'justify-content:center;padding:20px;background:rgba(27,27,27,.45);';
-  var box = document.createElement('div');
-  box.style.cssText = 'max-width:420px;width:100%;background:var(--paper);border:3px solid var(--ink);'
-    + 'border-radius:14px;box-shadow:6px 6px 0 var(--ink);padding:24px;font-family:var(--font-main);';
-  var h = document.createElement('h2');
-  h.textContent = 'Du hast schon eigene Display-Einstellungen';
-  h.style.cssText = 'margin:0 0 10px;font-size:20px;font-weight:800;color:var(--ink);';
-  var p = document.createElement('p');
-  p.textContent = 'Der Schnellstart richtet dein catch-it neu ein und kann dabei deine Aufteilung der Displays überschreiben. Helligkeit, Nachtmodus und Standzeit bleiben.';
-  p.style.cssText = 'margin:0 0 20px;font-size:14px;line-height:1.5;color:#6b6258;';
-  var ja = document.createElement('button');
-  ja.className = 'btn btn-primary'; ja.textContent = 'Ja, Schnellstart';
-  ja.style.cssText = 'width:100%;margin-bottom:10px;';
-  var nein = document.createElement('button');
-  nein.className = 'btn'; nein.textContent = 'Nein, lieber feintunen';
-  nein.style.cssText = 'width:100%;';
-  ja.onclick = function () { ov.remove(); startSetupWizard(); };
-  nein.onclick = function () { ov.remove(); handleStationsNextStep(); };
-  box.appendChild(h); box.appendChild(p); box.appendChild(ja); box.appendChild(nein);
-  ov.appendChild(box);
-  ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
-  document.body.appendChild(ov);
+  var fremd = false;
+  try { fremd = (typeof geraetHatFremdeFelder === 'function') && geraetHatFremdeFelder(); } catch (e) {}
+  // handleStationsNextStep ist oben ueberschrieben und fuehrt in genau diesem Fall ins
+  // Feintuning (goToDisplayConfig, dann zurNeuenOberflaeche).
+  if (fremd) { handleStationsNextStep(); return; }
+  startSetupWizard();
 }
 
 // Zieltexte nachtragen. Eine Richtung, die gerade nicht faehrt (Abend, Wochenende,
