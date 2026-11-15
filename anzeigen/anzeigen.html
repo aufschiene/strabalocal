@@ -1697,6 +1697,12 @@ function displaysAuffuellen() {
     stil: stilVorschlagStation(r.station),
     typ: typRang(r.dep.vt),
     netz: netzRang.get(r.station.netz || 'WL') || 0,
+    // Welches BRETT die Linienauswahl fuer diese Zeile wollte. Dieselbe Haltestelle kann
+    // ZWEIMAL in der Uebergabe stehen (Kantplatz einmal Richtung Arbeit, einmal Richtung
+    // Innenstadt): gleiche rbl, gleiches Netz, gleicher Stil, aber zwei Displays. Ohne
+    // diesen Wert fielen beide zusammen, die Linie 4 stand in beiden Richtungen auf
+    // einem Brett und das zweite Display fehlte ganz (Kunde Norman, Hannover, 13.11.2026).
+    brett: String((r.station && r.station.kennung) || ''),
     st: stationen.indexOf(r.station), linie: r.dep.line, i: i
   }));
   // Eine Richtung darf auf MEHREREN Displays stehen (Paul 22.10.2026: "U2 ist meine
@@ -1764,6 +1770,17 @@ function displaysAuffuellen() {
     const w = wissen.get(k);
     return !w || w.netz === meine.netz;
   };
+  // Was die Linienauswahl getrennt hat, bleibt getrennt: die Kennung sagt, welche Zeilen
+  // EIN Brett meinen, und zwei Eintraege derselben Haltestelle tragen zwei verschiedene.
+  // Der Picker entscheidet das, hier wird nichts mehr nachgeraten. Bringt eine Seite keine
+  // Kennung mit (Altbestand, Wien), zaehlen wie bisher Stil, Netz und Platz.
+  const brettPasst = (d, meine) => {
+    if (!meine || !meine.brett) return true;
+    const k = (d.richtungen || []).find(x => !istUhrKey(x));
+    if (!k) return true;
+    const w = wissen.get(k);
+    return !w || !w.brett || w.brett === meine.brett;
+  };
   offen.forEach(k => {
     const meine = wissen.get(k);
     let ziel = null;
@@ -1772,17 +1789,20 @@ function displaysAuffuellen() {
       // In Automatik gehoert eine Linien-Zeile auf DAS Display ihres Designs und Netzes.
       // Gibt es dort nur ein festes (der Kunde hat die Automatik verlassen), dann wie
       // bisher dorthin, solange Platz ist. Ein Brett mit Stations-Bloecken nimmt sie nicht.
-      ziel = displays.find(d => d.auto && platz(d, k) && stilPasst(d, meine) && netzPasst(d, meine))
+      ziel = displays.find(d => d.auto && platz(d, k) && stilPasst(d, meine) && netzPasst(d, meine)
+                                && brettPasst(d, meine))
           || displays.find(d => !d.auto && automatikMoeglich(d) && platz(d, k)
-                                && stilPasst(d, meine) && netzPasst(d, meine));
+                                && stilPasst(d, meine) && netzPasst(d, meine) && brettPasst(d, meine));
     } else if (modus === 'spielerisch' && meine) {
       // Ein Brett, auf dem schon Linien DIESES NETZES stehen, sonst ein leeres.
-      ziel = displays.find(d => platz(d, k) && stilPasst(d, meine) && d.richtungen.some(k2 => {
+      ziel = displays.find(d => platz(d, k) && stilPasst(d, meine) && brettPasst(d, meine)
+                                && d.richtungen.some(k2 => {
         const w = wissen.get(k2);
         return w && w.netz === meine.netz;
       })) || displays.find(d => platz(d, k) && !d.richtungen.length);
     } else {
-      ziel = displays.find(d => platz(d, k) && stilPasst(d, meine) && netzPasst(d, meine));
+      ziel = displays.find(d => platz(d, k) && stilPasst(d, meine) && netzPasst(d, meine)
+                                && brettPasst(d, meine));
     }
     if (!ziel) { ziel = { richtungen: [], vomNutzer: false, auto: automatisch }; displays.push(ziel); }
     ziel.richtungen.push(k);
@@ -4963,11 +4983,23 @@ function netzSchluessel(d) { return Array.from(netzeVon(d)).sort().join(','); }
 // Automatik heisst EIN Display je Design und Netz. Kommen zwei an, etwa weil der
 // Schnellstart je Station ein Brett angelegt und beide mit y1 gespeichert hat, werden sie
 // hier eins. Das erste behaelt sein Aussehen, die Linien der anderen kommen hinten dran.
+// Welches BRETT der Linienauswahl dieses Display meint: die Kennung der Station seiner
+// ersten Zeile. Dieselbe Haltestelle kann zweimal in der Auswahl stehen, einmal je
+// Display, und dann tragen die beiden Eintraege verschiedene Kennungen. Ohne sie legte
+// die Automatik zwei bewusst getrennte Bretter wieder zusammen: die Linie 4 stand in
+// beiden Richtungen auf einem Brett, das zweite Display fehlte ganz, und von fuenf
+// Zeilen passten nur zwei (Kunde Norman, Hannover, 13.11.2026).
+function brettSchluessel(d) {
+  const k = (d.richtungen || []).find(x => !istUhrKey(x));
+  const r = k ? richtungFinden(k) : null;
+  return (r && r.station && r.station.kennung) || '';
+}
+
 function automatikBuendeln() {
   const erstes = new Map();
   displays.forEach(d => {
     if (!automatikAktiv(d)) return;
-    const k = stilVon(d) + '|' + netzSchluessel(d);
+    const k = stilVon(d) + '|' + netzSchluessel(d) + '|' + brettSchluessel(d);
     const ziel = erstes.get(k);
     if (!ziel) { erstes.set(k, d); return; }
     d.richtungen.forEach(x => {
@@ -6414,6 +6446,10 @@ function uebergabeFehlt() {
   for (const e of liste) {
     const st = { rbl: e.rbl, name: e.name, netz: e.netz || 'WL', abfahrten: [],
                  alle: !!e.alle,
+                 // Welches BRETT die Linienauswahl gemeint hat. Dieselbe Haltestelle kann
+                 // zweimal in der Uebergabe stehen, einmal je Display, und ohne diesen
+                 // Wert raet die Verteilung die Zuordnung neu (s. displaysAuffuellen).
+                 kennung: e.kennung || '',
                  // Kam sie schon als "Alle Abfahrten" aus der Linienauswahl, gibt es gar
                  // keine Linienauswahl, auf die man zurueckschalten koennte. Dann ist der
                  // Schalter sinnlos und fuehrt nur zu einer leeren, grauen Zeile

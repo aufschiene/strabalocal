@@ -5258,13 +5258,17 @@ async function augmentLinesFromLinesEndpoint(network, stopId) {
         if (/fernbus/i.test(nm)) availableLines.splice(i, 1);
       }
     }
-    const ohneSBahn = (network === 'BERLIN');
-    const ohneZuege = ohneSBahn ||
-      (network === 'BWEGT' && !(typeof isBodoDevice === 'function' && isBodoDevice()));
+    // Berlin: der Knopf oben entscheidet, ob Nahverkehr (Bus, Tram, U-Bahn) oder S-Bahn und
+    // Regionalzuege in der Auswahl stehen. Beides sind dieselben VBB-Daten, die S-Bahn ist nur
+    // ein Filter (Paul 15.11.2026). Den Fernverkehr haelt schon der Server heraus, dafuer ist
+    // die DB-Kachel da. Die Rohliste merken wir uns, damit das Umschalten ohne neue Abfrage geht.
+    if (network === 'BERLIN') { _berlinRohLinien = availableLines.slice(); berlinLinienFiltern(); return; }
+    _berlinRohLinien = null;
+    const ohneZuege = (network === 'BWEGT' && !(typeof isBodoDevice === 'function' && isBodoDevice()));
     if (!ohneZuege) return;
     for (let i = availableLines.length - 1; i >= 0; i--) {
       const t = availableLines[i] && availableLines[i].type;
-      if (t === 'ptTrain' || (ohneSBahn && t === 'ptTrainS')) availableLines.splice(i, 1);
+      if (t === 'ptTrain') availableLines.splice(i, 1);
     }
   };
   hideRailInPicker();
@@ -6815,9 +6819,15 @@ DISPLAY_PRESETS.berlin = {
   name: 'Berlin & Brandenburg',
   parent: 'DE',
   photo: 'fotos/berlin.jpg',
+  // Drei Kacheln (Paul 15.11.2026): Nahverkehr und S-Bahn kommen beide aus den VBB-Daten,
+  // die S-Bahn ist nur ein Filter darauf (berlinMode). Sie gehoert hierher und nicht zur
+  // DB-Kachel, weil nur dieser Weg den Baufahrplan kennt: an Potsdam Hbf zeigte die DB am
+  // 15.11.2026 "Ahrensfelde", gefahren wurde bis Zoologischer Garten (Kunde Niels Berkholz).
   networks: [
-    { id: 'BERLIN', jumpTo: { region: 'DE' } },
-    { id: 'DB',     label: 'DB Regio', desc: 'RE, RB, S-Bahn', jumpTo: { region: 'DE' } }
+    { id: 'BERLIN', label: 'U-Bahn, Tram, Bus', desc: 'BVG-Nahverkehr',     jumpTo: { region: 'DE' }, berlinMode: 'nah' },
+    { id: 'BERLIN', label: 'S-Bahn und Regio',  desc: 'S-Bahn, RE, RB',     jumpTo: { region: 'DE' }, berlinMode: 'sbahn',
+      color: { bg: '#008D4F', fg: '#fff' } },
+    { id: 'DB',     label: 'DB Fernverkehr',    desc: 'ICE, IC, EC',        jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.hamburg = {
@@ -7041,8 +7051,11 @@ function renderDisplayPreset(displayKey) {
       var brandCls = brand ? ' brand-btn' : '';
       var label = entry.label || net.name || entry.id;
       var desc  = entry.desc != null ? entry.desc : (net.desc || '');
+      // Zwei Kacheln koennen dasselbe Netz meinen und sich nur im Modus unterscheiden
+      // (Berlin: Nahverkehr gegen S-Bahn). Der Modus geht als drittes Argument mit.
+      var modusArg = entry.berlinMode ? (", '" + entry.berlinMode + "'") : '';
       return '<button class="selection-btn' + brandCls + '"' + styleAttr +
-        ' onclick="jumpToPresetNetwork(\'' + entry.id + '\', JSON.parse(this.dataset.jump))" data-jump="' + jumpJson + '">' +
+        ' onclick="jumpToPresetNetwork(\'' + entry.id + '\', JSON.parse(this.dataset.jump)' + modusArg + ')" data-jump="' + jumpJson + '">' +
         '<div class="name">' + label + '</div>' +
         '<div class="desc">' + desc + '</div>' +
       '</button>';
@@ -7059,7 +7072,9 @@ function renderDisplayPreset(displayKey) {
   return true;
 }
 
-function jumpToPresetNetwork(networkId, jumpTo) {
+function jumpToPresetNetwork(networkId, jumpTo, modus) {
+  // Berlin: die Kachel entscheidet, ob Nahverkehr oder S-Bahn und Regio gezeigt werden.
+  if (typeof berlinMode !== 'undefined') { berlinMode = modus || 'nah'; _berlinRohLinien = null; }
   // Setze die globalen Selectors so, als hätte der User sich durch den Flow geklickt
   if (typeof selectedRegion !== 'undefined') selectedRegion = jumpTo.region || null;
   if (typeof selectedVerkehrsart !== 'undefined') selectedVerkehrsart = jumpTo.verkehrsart || null;
@@ -10353,7 +10368,28 @@ function isRegionalOebbNetwork() {
           'OEBB_REG_NOE', 'OEBB_REG_OOE'].includes(selectedNetwork);
 }
 
+// Berlin-Umschalter: 'nah' = Bus, Tram, U-Bahn; 'sbahn' = S-Bahn und Regionalzuege.
+// Beide Listen stammen aus derselben Abfrage, darum braucht das Umschalten keinen Server.
+let berlinMode = 'nah';
+let _berlinRohLinien = null;
+function berlinLinienFiltern() {
+  const sbahn = (berlinMode === 'sbahn');
+  for (let i = availableLines.length - 1; i >= 0; i--) {
+    const t = (availableLines[i] && availableLines[i].type) || '';
+    const istZug = (t === 'ptTrain' || t === 'ptTrainS');
+    if (sbahn ? !istZug : istZug) availableLines.splice(i, 1);
+  }
+}
+// Nach einem Wechsel in eine andere Stadt darf der Berlin-Modus nicht haengen bleiben:
+// Wien und andere Netze laufen an der Filterfunktion vorbei, die ihn sonst zuruecksetzen
+// wuerde (gemessen 15.11.2026).
+function berlinToggleZeigen() {
+  const istBerlin = (typeof selectedNetwork !== 'undefined' && selectedNetwork === 'BERLIN');
+  if (!istBerlin) { _berlinRohLinien = null; berlinMode = 'nah'; }
+}
+
 function renderLines() {
+  berlinToggleZeigen();
   // von→nach-Netze (FV/Regional) NICHT in die Sackgasse schicken, wenn gerade keine Abfahrt da
   // ist: Ziele kommen aus /lines (unabhängig von Live-Abfahrten) und der User soll trotzdem
   // „Alle Abfahrten" + Zugtypen wählen können, damit ein späterer Zug (z.B. 1x/Tag IC) angezeigt wird.
@@ -26193,6 +26229,7 @@ window.addEventListener('DOMContentLoaded', () => {
     'Ja, Schnellstart': 'Yes, quick start', 'Nein, lieber feintunen': 'No, fine-tune instead',
     'Alle auswählen': 'Select all', 'Alle abwählen': 'Deselect all', 'Abwählen': 'Deselect',
     'Alle Abfahrten': 'All departures', 'Alle Linien': 'All lines', 'Alle Richtungen': 'All directions',
+    'Nahverkehr': 'Local transport',
     'Einzelne Linien': 'Individual lines', 'Nach Linie filtern': 'Filter by line',
     'Richtung wählen': 'Choose direction', 'Richtung(en) wählen': 'Choose direction(s)',
     'Richtungen wählen': 'Choose directions',
