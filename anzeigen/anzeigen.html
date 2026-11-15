@@ -6140,6 +6140,27 @@ function displaysAusEintraegen(eintraege) {
         teil.forEach(m => stats.forEach(st => {
           if (nurRbl && rblKanon(st.rbl) !== nurRbl) return;
           if (!nurRbl && !gehoertDazu(nurVon.get(rblKanon(st.rbl)), m.linie)) return;
+          // Traegt der Token eine RICHTUNG, muss genau diese in der Auswahl DIESER Station
+          // stehen. Zwei Bretter koennen dieselbe Haltestelle und dieselbe Linie fuehren
+          // (Kantplatz: die 4 nach Roderbruch auf Brett 1, die 4 nach Garbsen auf Brett 2)
+          // und teilen sich dann dieselben Abfahrten. Ohne diese Pruefung fand die Suche bei
+          // BEIDEN Stationen einen Treffer fuer "4", und die Zeile des zweiten Bretts landete
+          // zusaetzlich auf dem ersten, waehrend das zweite nur mit der 5 zurueckblieb
+          // (Kunde Norman Holzhauer, Hannover 15.11.2026).
+          // Das Token-Feld heisst 'richtung' und traegt die Richtungs-Id.
+          const tokRichtung = String((m && (m.richtung != null ? m.richtung : m.ziel)) || '');
+          if (tokRichtung && Array.isArray(st.letzteLinien) && st.letzteLinien.length) {
+            const kenntRichtung = st.letzteLinien.some(r => String(r.dest || '') === tokRichtung);
+            const kenntLinieMitRid = st.letzteLinien.some(r => String(r.line || '') === String(m.linie || '')
+                                                            && String(r.dest || '') === tokRichtung);
+            // Nur aussortieren, wenn diese Station die Richtung NICHT kennt, eine andere
+            // Station derselben rbl sie aber sehr wohl fuehrt. Sonst wuerde eine Station
+            // ohne mitgegebene Richtungsliste gar nichts mehr finden.
+            if (!kenntLinieMitRid && !kenntRichtung
+                && stats.some(o => Array.isArray(o.letzteLinien)
+                                && o.letzteLinien.some(r => String(r.line || '') === String(m.linie || '')
+                                                         && String(r.dest || '') === tokRichtung))) return;
+          }
           const si = stationen.indexOf(st);
           const nimm = (linie, ziel) => {
             const k = zeilenKey(si, { line: linie, dest: ziel });
