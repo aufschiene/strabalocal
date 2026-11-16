@@ -553,10 +553,10 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="renderer-host.js?v=2"></script>
+<script src="renderer-host.js?v=3"></script>
 <!-- Die Versionsnummer bei jeder Aenderung am Renderer hochzaehlen: GitHub Pages
      liefert die Datei sonst bis zu zehn Minuten aus dem Cache weiter. -->
-<script src="display-renderer.js?v=6"></script>
+<script src="display-renderer.js?v=7"></script>
 <script>
 const DEP_API  = 'https://api.straba.at/api/v1/wl/departures';
 const SUCH_API = 'https://api.straba.at/api/v1/stops/search';
@@ -603,7 +603,11 @@ let zeilen = 2;
 //  10 Straba -> BODO                       13 Holding Graz -> BODO
 //  17 Bruenn -> Prag                       19 KVB Koeln -> BODO
 //  20 AVV Aachen -> BODO
-const STIL_ERSATZ = { 4: 1, 8: 7, 10: 7, 13: 7, 17: 16, 19: 7, 20: 7 };
+//  18 BVG Berlin -> Matrix (Paul 16.11.2026: "hau nur bvg berlin raus"). Es WAR schon die
+//     Matrix in Orange, nur unter eigener Nummer und ohne Farbwahl; Berlin stand in
+//     NETZ_VORGABE ohnehin auf [23, 3]. Den Farbton traegt eintraegeAusZeilen nach, sonst
+//     wuerde ein Bestandsbrett beim Umsetzen weiss.
+const STIL_ERSATZ = { 4: 1, 8: 7, 10: 7, 13: 7, 17: 16, 18: 23, 19: 7, 20: 7 };
 function stilErsatz(c) {
   const n = parseInt(c, 10);
   return STIL_ERSATZ[n] != null ? STIL_ERSATZ[n] : n;
@@ -612,7 +616,7 @@ function stilVon(d) { return stilErsatz((d && d.stil != null) ? d.stil : stil); 
 // Wie viele Zeilen ein Anzeige-Stil kann. Werte aus DISPLAY_TYPE_FEATURES des
 // Konfigurators; wo dort nichts steht, gilt dessen Vorgabe 3
 // (`var rMin = f.minRows || 1, rMax = f.maxRows || 3`). Wiener Linien kann also 3.
-const STIL_ZEILEN = { 2: 4, 5: 4, 6: 2, 13: 4, 15: 4, 18: 4, 21: 4, 23: 5, 24: 4, 26: 5, 101: 5, 102: 5, 103: 5 };
+const STIL_ZEILEN = { 2: 4, 5: 4, 6: 2, 13: 4, 15: 4, 18: 4, 21: 4, 23: 5, 24: 4, 26: 5, 27: 5, 101: 5, 102: 5, 103: 5 };
 const ZEILEN_VORGABE = 3;
 // Und was ein Stil als KLEINSTE Zeilenzahl kann. Die OeBB- und die Westbahn-Tafel
 // bestehen aus einer grossen Hauptzeile plus Kompaktzeilen darunter und klemmen am
@@ -656,6 +660,10 @@ const STIL_KANN = {
   14: { blinken: 'stern' },
   22: { blinken: 'still' },
   26: { blinken: 'still' },
+  // NL: Flaeche in der Linienfarbe (Feld u) kennt nur an und aus, eine Fahrzeugauswahl
+  // wertet DisplayNL nicht aus. Bei 0 zeigt der Stil von Haus aus das Bus-Symbol, und
+  // die Kopfzeile traegt einen frei waehlbaren Stationsnamen (Feld '#').
+  27: { badges: true, badgesEinfach: true, kopfName: true, blinken: 'bus' },
   101: { blinken: 'quadrat' },
   102: { blinken: 'quadrat' },
   103: { blinken: 'quadrat' }
@@ -677,7 +685,8 @@ function nullKnoepfe(art, colour, voll) {
   const eigen = { quadrat: ['Quadrat blinkt', '\u25A0', true],
                   stern:   ['Stern blinkt',   '*',        true],
                   still:   ['0 steht still',  '0',        false],
-                  blinkt:  ['0 blinkt',       '0',        true] }[art];
+                  blinkt:  ['0 blinkt',       '0',        true],
+                  bus:     ['Bus-Symbol',     'Bus',      false] }[art];
   if (!eigen) return [];
   const liste = [[0, eigen[0], eigen[1], eigen[2]]];
   if (art !== 'blinkt') liste.push([1, '0 blinkt', '0', true]);
@@ -730,8 +739,11 @@ let zweiteStart = 1;
 // sagen wir es dem Nutzer, bevor er speichert (Konfigurator-Sitzung 25.10.2026).
 let wahlGeraten = false;
 function standardEinst() {
+  // kopf: der Stationsname der NL-Kopfzeile. null heisst "noch nicht gesetzt", dann
+  // schlaegt nlKopfVorgabe die erste Station vor; ein leerer Text heisst "kein Name".
   return { t: 1, b: 0, u: 0, v: 4, h: 1, n: 0, k: 0, o: 0, a: zweiteStart,
-           f: 0, d: 0, l: 0, x: 0, y: 0, i: standzeitStart || STANDZEIT_VORGABE };
+           f: 0, d: 0, l: 0, x: 0, y: 0, kopf: null,
+           i: standzeitStart || STANDZEIT_VORGABE };
 }
 // Welcher Anzeige-Stil passt zu welchem Netz, und in welchem Farbton. Dieselbe Zuordnung
 // wie im Konfigurator (CITY_CAPABILITIES: defaultColour und defaultColorVariant), damit
@@ -762,6 +774,17 @@ const NETZ_VORGABE = {
   REJSEPLANEN: [1, 0], VR: [1, 0], PEATUS: [1, 0], IRISHRAIL: [1, 0], SNCB: [1, 0],
   CFL: [1, 0], FLIXBUS: [1, 0], EUSLEEPER: [1, 0]
 };
+// Die vier niederlaendischen Netze bekommen den NL-Screen, sobald das Geraet ihn kann
+// (Paul 16.11.2026: "wer die NL-Schnittstelle benutzt, bekommt automatisch den NL-Screen").
+// Meldet sich das Geraet nicht oder ist es aelter als 2.6.12, bleibt die bisherige
+// Vorgabe stehen: die 27 waere dort eine Behauptung, gezeichnet wuerde das Wiener Display.
+// NS (Zuege) bleibt bewusst aussen vor, das ist kein Haltestellen-Anzeiger.
+const NETZ_NL = ['NL_OEFFI', 'OVAPI', 'GVB', 'RET'];
+function netzStilVorgabe(n) {
+  if (fwNl() && NETZ_NL.indexOf(n) >= 0) return [27, 0];
+  return NETZ_VORGABE[n] || null;
+}
+
 // Die Netze der Linien, die auf diesem Display liegen.
 function netzeVon(d) {
   const raus = new Set();
@@ -787,7 +810,7 @@ function netzVorgabe(d) {
   });
   if (aus) return aus;
   let v = null;
-  netzeVon(d).forEach(n => { if (!v && NETZ_VORGABE[n]) v = NETZ_VORGABE[n]; });
+  netzeVon(d).forEach(n => { if (!v) v = netzStilVorgabe(n); });
   return v;
 }
 function matrixTon(d) {
@@ -804,6 +827,8 @@ function einstFuer(d) {
     if (vg && vg[1] && stilErsatz(vg[0]) === stilVon(d)) e.t = vg[1];
     const za = zweiteNachStil[parseInt(stilVon(d), 10)];
     if (za !== undefined) e.a = za;
+    // NL faengt MIT Flaeche in der Linienfarbe an, so haengen die Anzeiger in Utrecht.
+    if (parseInt(stilVon(d), 10) === 27) e.u = 1;
     // Solange keine Linie drauf liegt, kennen wir das Netz nicht. Dann noch nichts
     // merken, sonst bliebe der Farbton auf Weiss stehen, wenn die Linien kommen.
     if (!(d.richtungen && d.richtungen.length)) return e;
@@ -850,12 +875,17 @@ function designTeil(d) {
   let aus = '';
   if (k.schrift) aus += '|t' + e.t;
   if (k.grund) aus += '|b' + e.b;
-  if (k.badges) aus += '|u' + e.u + '|v' + e.v;
+  // NL kennt keine Fahrzeugauswahl, dort waere ein v nur Ballast in der Zeile.
+  if (k.badges) aus += '|u' + e.u + (k.badgesEinfach ? '' : '|v' + e.v);
   if (k.fahrzeug) aus += '|h' + e.h + '|n' + e.n + '|k' + e.k;
   if (k.blinken) aus += '|o' + e.o;
   if (k.matrixSchrift) aus += '|f' + e.f;
   if (k.verspaetung) aus += '|p' + e.d;
   if (k.bahnsteig) aus += '|l' + (e.l || 0);
+  // Stationsname der NL-Kopfzeile. Alle 26 Buchstaben sind am Geraet belegt, darum '#'.
+  // Immer schreiben, auch leer: so bleibt "kein Name" beim naechsten Oeffnen erhalten.
+  // Das Geraet ueberliest ein leeres Feld ohnehin (entryField verlangt Laenge > 1).
+  if (k.kopfName) aus += '|#' + nlKopfText(d);
   aus += '|a' + (e.a === 0 ? 0 : 1);
   aus += '|j' + (e.x || 0) + '-' + (e.y || 0);
   aus += '|i' + standzeitVon(e, zeigtUhr(d));
@@ -880,8 +910,19 @@ function dsSegment(c, zeilenZahl, fenster, sortierung, d) {
   if (k.bahnsteig && e.l) seg += '|l' + e.l;
   if (k.schrift && e.t !== 1) seg += '|t' + e.t;
   if (k.grund && e.b) seg += '|b' + e.b;
-  if (k.badges && e.u) seg += '|u' + e.u;
-  if (k.badges && e.u && e.v !== 4) seg += '|v' + e.v;
+  // Wo die Flaeche die VORGABE ist (NL), muss auch die 0 in der Zeile stehen: sonst liest
+  // die Vorschau ihren Standard "an" und zeigte sie weiter, obwohl der Schalter aus ist.
+  if (k.badges && (e.u || k.badgesEinfach)) seg += '|u' + e.u;
+  if (k.badges && !k.badgesEinfach && e.u && e.v !== 4) seg += '|v' + e.v;
+  // Das GERAET liest den Namen nur aus dem Eintrag (resolveGroupLook). Hier steht er
+  // trotzdem, denn die Vorschau dieser Seite liest ihre Werte aus genau dieser Zeile.
+  // Ohne Display (displaysettingsBauen ruft je STIL auf) gilt das erste Display dieses
+  // Stils, dieselbe Regel wie bei einstVon. Sonst stuende die Zeile ohne Namen da.
+  if (k.kopfName) {
+    const dKopf = d || displays.find(x => stilVon(x) === parseInt(c, 10));
+    const kn = dKopf ? nlKopfText(dKopf) : '';
+    if (kn) seg += '|#' + kn;
+  }
   // Diese drei sind am Geraet von Haus aus aus, darum steht nur die 1 in der Zeile.
   if (k.fahrzeug && e.h) seg += '|h' + e.h;
   if (k.fahrzeug && e.h && e.n) seg += '|n' + e.n;
@@ -1118,7 +1159,12 @@ const NETZ_STILE = {
   KAERNTEN:[23, 12, 24, 21],
   VOR:     [23, 12, 24, 21],
   VVT:     [23, 12, 24, 21],
-  VVV:     [23, 12, 24, 21]
+  VVV:     [23, 12, 24, 21],
+  // Niederlande: der NL-Screen zuerst, dahinter Matrix, Paper White und Wien.
+  NL_OEFFI: [27, 23, 24, 1],
+  OVAPI:    [27, 23, 24, 1],
+  GVB:      [27, 23, 24, 1],
+  RET:      [27, 23, 24, 1]
 };
 // Stile, die ueberall gehen und darum immer angeboten werden.
 const STILE_UNIVERSELL = [23, 21, 24];
@@ -1132,12 +1178,18 @@ function stilOptionen(d) {
   const passend = [];
   // Die Vorgabe des Netzes zuerst, danach, was sonst dazu passt.
   netze.forEach(n => {
-    const v = NETZ_VORGABE[n];
+    const v = netzStilVorgabe(n);
     if (v && passend.indexOf(v[0]) < 0) passend.push(v[0]);
   });
   netze.forEach(n => (NETZ_STILE[n] || []).forEach(c => { if (passend.indexOf(c) < 0) passend.push(c); }));
   STILE_UNIVERSELL.forEach(c => { if (passend.indexOf(c) < 0) passend.push(c); });
   const jetzt = stilVon(d);
+  // Was das Geraet noch nicht zeichnen kann, steht nicht zur Wahl, egal ueber welchen Weg
+  // es in die Liste kam (Netz-Vorgabe, NETZ_STILE oder "alle weiteren"). Was schon
+  // eingestellt IST, bleibt sichtbar, sonst verschwaende die Auswahl stillschweigend.
+  const passendFrei = passend.filter(c => !stilBrauchtFirmware(c) || c === jetzt);
+  passend.length = 0;
+  passendFrei.forEach(c => passend.push(c));
   const eintrag = id => {
     const x = STILE.find(y => y.id === id);
     // Name: auf Marken-Geraeten der Marken-Name, sonst der aus dem Katalog.
@@ -1150,7 +1202,7 @@ function stilOptionen(d) {
     h += '<optgroup label="F\u00fcr dein Ger\u00e4t">' + nurMarke.map(eintrag).join('') + '</optgroup>';
   } else {
     h += '<optgroup label="Passend zu deinen Linien">' + passend.map(eintrag).join('') + '</optgroup>';
-    const rest = STILE.filter(x => passend.indexOf(x.id) < 0);
+    const rest = STILE.filter(x => passend.indexOf(x.id) < 0 && (!stilBrauchtFirmware(x.id) || x.id === jetzt));
     if (rest.length) h += '<optgroup label="Alle weiteren">' + rest.map(x => eintrag(x.id)).join('') + '</optgroup>';
   }
   // Schon angelegte eigene Designs stehen hier mit ihrem Namen, danach erst das Anlegen.
@@ -1161,6 +1213,17 @@ function stilOptionen(d) {
   });
   if (eigenFrei()) eig += '<option value="neu">+ Eigenes Display erstellen</option>';
   h += '<optgroup label="Eigenes">' + eig + '</optgroup>';
+  // Steht das Brett auf einem Stil, den DIESE Seite nicht kennt? Das passiert, wenn eine
+  // aeltere Fassung der Seite auf eine neuere Config trifft (Paul 16.11.2026: sein Geraet
+  // stand auf 27, die Seite kannte die Nummer noch nicht). Dann waere KEIN Eintrag
+  // ausgewaehlt, und das Aufklappfeld zeigte stillschweigend den ersten, als waere er
+  // eingestellt. Lieber ehrlich: der Stil steht mit seiner Nummer da und bleibt gewaehlt.
+  // Das schliessende Anfuehrungszeichen muss mit in die Suche, sonst findet value="2"
+  // sich selbst in value="23".
+  if (h.indexOf('value="' + jetzt + '"') < 0) {
+    h = '<optgroup label="Am Ger\u00e4t eingestellt"><option value="' + jetzt + '" selected>'
+      + escapeHtmlFt(stilTitel(jetzt)) + '</option></optgroup>' + h;
+  }
   return h;
 }
 
@@ -1175,7 +1238,7 @@ function stilVorschlagStation(st) {
   if (!st) return null;
   if (!isNaN(st.stil) && st.stil) return parseInt(st.stil, 10);
   const n = netzKuerzel(st);
-  const v = n ? NETZ_VORGABE[n] : null;
+  const v = n ? netzStilVorgabe(n) : null;
   return v ? (Array.isArray(v) ? v[0] : v) : 1;
 }
 
@@ -1233,14 +1296,18 @@ const STILE = [
   { id: 14, name: 'Westbahn' },
   { id: 15, name: 'Liechtenstein / Schweiz Nahverkehr' },
   { id: 16, name: 'Prag / CZ-HU (schwarz/weiß)' },
-  { id: 18, name: 'BVG Berlin' },
   { id: 21, name: 'Schwarz/Weiß Matrix' },
   { id: 22, name: 'MVG' },
   { id: 23, name: 'Matrix' },
   { id: 24, name: 'Paper White' },
   { id: 25, name: 'SBB' },
-  { id: 26, name: 'CH/LI' }
+  { id: 26, name: 'CH/LI' },
+  { id: 27, name: 'Niederlande (DRIS)' }
 ];
+// Stile, die nur neue Geraete zeichnen koennen. Sie stehen nur dann zur Wahl, sonst
+// verspricht die Liste etwas, das am Geraet anders aussieht (der NL-Screen fiele auf das
+// Wiener Display zurueck). Was schon eingestellt IST, bleibt sichtbar.
+function stilBrauchtFirmware(id) { return parseInt(id, 10) === 27 && !fwNl(); }
 
 // ---- Beispieldaten -------------------------------------------------------------------
 // Nachts steht an vielen Stationen gar nichts mehr an. Statt leerer Karten zeigt die
@@ -1920,6 +1987,15 @@ const FW_MIT_BAHNSTEIG = '2.6.5';
 function fwBahnsteig() {
   return !!geraetVersion && versionMin(geraetVersion, FW_MIT_BAHNSTEIG);
 }
+// Ab dieser Firmware gibt es den NL-Screen (colour 27, die Haltestellen-Anzeiger in den
+// Niederlanden). Aeltere Geraete kennen die 27 nicht und fallen auf das Wiener Display
+// zurueck. Darum schlagen wir NL nur vor und bieten es nur an, wenn das Geraet sich
+// gemeldet hat UND neu genug ist; sonst bleibt es bei der bisherigen Vorgabe
+// (Firmware-Sitzung 16.11.2026).
+const FW_MIT_NL = '2.6.12';
+function fwNl() {
+  return !!geraetVersion && versionMin(geraetVersion, FW_MIT_NL);
+}
 function fwNeu() {
   if (dFeldVonAussen != null) return !!dFeldVonAussen;
   return !!geraetVersion && versionMin(geraetVersion, FW_MIT_UHR);
@@ -2353,7 +2429,8 @@ function streifenZeichnen() {
       const eigene = Math.max(1, s.zeilen || s.daten.length);
       const gross = (istZeitTyp(stilHier) || matrixSeiteGross(stilHier, eigene) || parseInt(stilHier, 10) === 6)
                     ? eigene : Math.max(eigene, zeilenDesStils(stilHier));
-      const kopf = (parseInt(stilHier, 10) === 22) ? 18 : 0;
+      // MVG traegt oben die Min-Leiste (18), NL die Kopfzeile samt Spaltenleiste (18 + 11).
+      const kopf = nlKopfHoehe(stilHier);
       const hoehe = Math.floor((170 - kopf) / gross);
       const fach = Math.floor((170 - kopf) / eigene);
       const html = zeigtUhr(s.display)
@@ -2489,6 +2566,7 @@ function editorZeichnen() {
              ? ' Grund: mehr Zeilen eingestellt als Linien. Auf Automatisch bekommt jede Linie wieder ihre feste Zeile.'
              : ' <button class="link" onclick="sortierungSetzen(' + s.index + ',\'statisch\')">'
                + 'Zur\u00fcck zu festen Zeilen je Linie</button>')
+          + ' Jede Zeile ist dabei eine eigene Abfahrt. Eine zweite Zeit pro Zeile gibt es hier deshalb nicht.'
         : nurBloeckeAuf(dHier)
         ? (nHier === 1 ? 'Eine ganze Station' : nHier + ' ganze Stationen')
           + ', davon stehen die ' + zeilenVon(dHier)
@@ -3792,6 +3870,9 @@ function uhrLook(c, d) {
                fg: (e.t === 2 ? '#ffffff' : (e.t === 3 ? '#f8a400' : '#fff05d')) };
     case 11: case 12: case 14:
       return { bg: '#000094', fg: '#ffffff' };
+    case 27:
+      // Das NL-Display ist weiss mit dunkler Schrift, auch wenn nur die Uhr darauf steht.
+      return { bg: '#ffffff', fg: '#191919' };
     case 2: case 15: case 18: case 21: case 23: {
       const v = (ci === 2) ? 2 : ((ci === 15 || ci === 18) ? 3 : (ci === 21 ? 1 : e.t));
       return v === 2 ? { bg: '#001405', fg: '#94ce39', raster: '#001e0a' }
@@ -3968,7 +4049,7 @@ function uhrZeileHTML(colour, daten, zeilen, d) {
   const i = daten.findIndex(x => x && x.uhr);
   if (i < 0) return '';
   const look = uhrLook(colour, d) || { bg: '#000', fg: '#fff' };
-  const kopf = (parseInt(colour, 10) === 22) ? 18 : 0;   // MVG traegt oben die Min-Leiste
+  const kopf = nlKopfHoehe(colour);   // MVG 18, NL 29, sonst nichts ueber den Zeilen
   const rowH = Math.floor((170 - kopf) / zeilen);
   const oben = kopf + i * rowH;
   const klein = zeilen >= 4;
@@ -4333,6 +4414,96 @@ function schalterZeile(titel, text, an, klick) {
        + '<span class="kugel"></span></button></div>';
 }
 
+// ---- NL-Kopfzeile ----------------------------------------------------------------
+// Wie viel ueber den Abfahrtszeilen steht: MVG seine Min-Leiste (18), NL die Kopfzeile
+// samt Spaltenleiste (18 + 11 = 29, rowsTop() der Firmware), sonst nichts. Die Zeilen-
+// hoehe rechnet sich davon ab, darum steht die Zahl an genau einer Stelle.
+function nlKopfHoehe(c) {
+  const ci = parseInt(c, 10);
+  return (ci === 22) ? 18 : (ci === 27 ? 29 : 0);
+}
+// Hoechstens 12 Zeichen, nie '|', ';' oder ',': die drei trennen im Geraeteformat die
+// Felder, die Linien und die Eintraege. Beim TIPPEN nicht trimmen, sonst frisst es jedes
+// Leerzeichen schon waehrend der Eingabe (dieselbe Falle wie beim Namen eines eigenen
+// Designs, Kunde Rostock 27.10.2026).
+const NL_KOPF_MAX = 12;
+function nlKopfKurz(t) {
+  return String(t == null ? '' : t).replace(/[|;,]/g, ' ').slice(0, NL_KOPF_MAX);
+}
+// Vorschlag: die erste Station dieses Bretts, Teil nach dem letzten Komma
+// ("Utrecht, Janskerkhof" wird "Janskerkhof"), auf 12 Zeichen gekuerzt.
+function nlKopfVorgabe(d) {
+  let name = '';
+  ((d && d.richtungen) || []).forEach(k => {
+    if (name) return;
+    const r = richtungFinden(k);
+    if (r && r.station) name = String(r.station.name || '');
+  });
+  const i = name.lastIndexOf(',');
+  return nlKopfKurz((i >= 0 ? name.slice(i + 1) : name).trim()).trim();
+}
+// Was in der Kopfzeile steht: die eigene Eingabe, sonst der Vorschlag. Ein LEERER Text
+// ist eine Entscheidung ("kein Name"), kein fehlender Wert, darum die Pruefung auf null.
+function nlKopfText(d) {
+  const e = einstFuer(d);
+  return (e.kopf == null) ? nlKopfVorgabe(d) : nlKopfKurz(e.kopf).trim();
+}
+// Die Stationen dieses Bretts als Vorschlaege, je Station der gekuerzte Name.
+function nlStationsNamen(d) {
+  const raus = [];
+  ((d && d.richtungen) || []).forEach(k => {
+    const r = richtungFinden(k);
+    if (!r || !r.station) return;
+    const voll = String(r.station.name || '');
+    const i = voll.lastIndexOf(',');
+    const kurz = nlKopfKurz((i >= 0 ? voll.slice(i + 1) : voll).trim()).trim();
+    if (kurz && raus.indexOf(kurz) < 0) raus.push(kurz);
+  });
+  return raus;
+}
+function nlKopfMerken(di, wert) {
+  const d = displays[di];
+  if (!d) return null;
+  if (!d.einst) d.einst = einstFuer(d);   // ohne Linien gibt einstFuer nur eine Kopie heraus
+  d.einst.kopf = nlKopfKurz(wert);
+  return d;
+}
+// Beim Tippen nur den Streifen neu zeichnen: allesZeichnen() baut die Karte per innerHTML
+// neu, und dann waere der Fokus nach dem ersten Buchstaben weg (Falle vom 23.10.2026).
+function nlKopfTippt(di, wert) { if (nlKopfMerken(di, wert)) streifenZeichnen(); }
+function nlKopfFertig(di, wert) {
+  const d = nlKopfMerken(di, wert);
+  if (!d) return;
+  d.einst.kopf = d.einst.kopf.trim();
+  allesZeichnen();
+}
+function nlKopfWaehlen(di, wert) {
+  if (!wert) return;
+  nlKopfFertig(di, wert);
+}
+// Das Feld in der Design-Karte: Vorschlaege aus den Stationen, daneben frei schreibbar.
+function nlKopfFeld(d, di) {
+  const jetzt = nlKopfText(d);
+  const namen = nlStationsNamen(d);
+  let h = '<label class="feld" for="nlKopfText">Name in der Kopfzeile</label>';
+  if (namen.length) {
+    h += '<select id="nlKopfWahl" onchange="nlKopfWaehlen(' + di + ', this.value)">'
+       + '<option value="">Station übernehmen …</option>';
+    namen.forEach(n => {
+      h += '<option value="' + escapeHtmlFt(n) + '"' + (n === jetzt ? ' selected' : '') + '>'
+         + escapeHtmlFt(n) + '</option>';
+    });
+    h += '</select>';
+  }
+  h += '<input id="nlKopfText" type="text" maxlength="' + NL_KOPF_MAX + '"'
+     + ' placeholder="Kein Name" value="' + escapeHtmlFt(jetzt) + '"'
+     + ' oninput="nlKopfTippt(' + di + ', this.value)"'
+     + ' onchange="nlKopfFertig(' + di + ', this.value)">'
+     + '<div class="hinweis">Höchstens ' + NL_KOPF_MAX + ' Zeichen, so viel passt zwischen '
+     + 'Bus-Symbol und Uhr. Leer lassen heißt: kein Name in der Kopfzeile.</div>';
+  return h;
+}
+
 function designZeichnen() {
   const el = document.querySelector('#klappDesign .klapp-koerper');
   if (!el) return;
@@ -4348,6 +4519,9 @@ function designZeichnen() {
   // Erweitert: dort hat sie niemand gesucht (Paul 27.10.2026). Sie gilt fuer alle drei
   // Wege darunter, auch fuer ein eigenes Design und fuer Stile ohne Farbwahl.
   let h = zeilenzahlFeld();
+  // Der Stationsname in der Kopfzeile gehoert zum Aussehen DIESES Bretts und steht darum
+  // hier, gleich neben der Zeilenzahl (nur der NL-Screen hat eine Kopfzeile dafuer).
+  if (k.kopfName) h += nlKopfFeld(d, di);
 
   // Eigenes Display: der Baukasten steht im Pop-up und geht Schritt fuer Schritt, wie im
   // alten Konfigurator. Alles auf einmal in der Karte war zu viel auf einmal
@@ -4409,15 +4583,18 @@ function designZeichnen() {
   }
 
   if (k.badges) {
+    // NL kennt nur an und aus: DisplayNL zeichnet die Flaeche hinter der Liniennummer,
+    // eine "ganze Zeile" gibt es dort nicht, und eine Fahrzeugauswahl wertet es nicht aus.
+    const stufen = k.badgesEinfach ? [[0, 'Aus'], [1, 'An']] : [[0, 'Aus'], [1, 'Linie'], [2, 'Ganze Zeile']];
     h += '<label class="feld">Linien-Badges</label><div class="schalter">';
-    [[0, 'Aus'], [1, 'Linie'], [2, 'Ganze Zeile']].forEach(b => {
+    stufen.forEach(b => {
       h += '<button class="' + (e.u === b[0] ? 'an' : '') + '"'
          + ' onclick="badgeSetzen(' + di + ',' + b[0] + ')">' + b[1] + '</button>';
     });
     h += '</div>'
        + '<div class="hinweis">Farbige Linien-K\u00e4stchen in der offiziellen Linienfarbe, '
        + 'wie auf den echten Anzeigen.</div>';
-    if (e.u) {
+    if (e.u && !k.badgesEinfach) {
       h += '<div class="kasten"><div class="titelchen">Badges f\u00fcr</div>';
       BADGE_FAHRZEUGE.forEach(bv => {
         h += '<label class="haken-zeile"><input type="checkbox" ' + ((e.v & bv[0]) ? 'checked ' : '')
@@ -4559,7 +4736,13 @@ function fahrzeugZeichnen() {
   const bahnsteigWahl = !!k.bahnsteig && fwBahnsteig();
   // Die zweite Abfahrt kann jeder Stil mit Countdown, nur ein Uhr-Brett nicht. Damit hat
   // dieser Block auch bei Stilen etwas zu zeigen, die sonst nichts koennen.
-  const zweiteWahl = !!d && !zeigtUhr(d);
+  // NICHT auf einem chronologischen Brett: dort ist jede Zeile eine eigene Abfahrt, und
+  // die Firmware fuellt die zweite Zeit gar nicht (prepareDataFlat setzt countdown2
+  // nirgends, nur die gruppierten Modi tun das). Der Schalter stand trotzdem da und tat
+  // nichts; der Kunde drehte daran und wunderte sich (David aus Bremen, 16.11.2026,
+  // derselbe Fall wie beim Paris-Display am 06.11.). Warum das Brett nach Uhrzeit
+  // sortiert, steht als Satz ueber der Zeilenliste.
+  const zweiteWahl = !!d && !zeigtUhr(d) && !zeitbasiert(d);
   const kann = k.fahrzeug || k.verspaetung || nullWahl.length > 0 || bahnsteigWahl || zweiteWahl;
   block.style.display = kann ? '' : 'none';
   if (!kann) { block.classList.remove('offen'); return; }
@@ -5129,6 +5312,9 @@ function stilSetzen(v) {
       const vg = netzVorgabe(d);
       d.einst.t = (vg && vg[1] && stilErsatz(vg[0]) === stilErsatz(neu)) ? vg[1] : 1;
     }
+    // Wer in den NL-Screen wechselt, bekommt die Flaeche in der Linienfarbe dazu: dort
+    // ist sie die Vorgabe, bei Wien ist sie es nicht.
+    if (d.einst && stilErsatz(neu) === 27 && stilVon(d) !== 27 && !d.einst.u) d.einst.u = 1;
     d.stil = neu;
   } else {
     stil = neu;
@@ -5625,6 +5811,8 @@ function eintraegeAusZeilen(zeilen) {
         }
         // p heisst im Eintrag, was in den displaysettings d heisst: Verspaetung.
         case 'p': e.e.d = zahl(wert) || 0; break;
+        // '#' ist der Stationsname der NL-Kopfzeile und bleibt Text, keine Zahl.
+        case '#': e.e.kopf = wert; break;
         case 'a': e.e.a = (zahl(wert) === 0) ? 0 : 1; break;
         case 't': case 'b': case 'u': case 'v': case 'h':
         case 'n': case 'k': case 'o': case 'f': case 'l': case 'i':
@@ -5637,6 +5825,12 @@ function eintraegeAusZeilen(zeilen) {
     if (!hatA && e.c && zweiteNachStil[e.c] !== undefined) {
       e.e.a = zweiteNachStil[e.c];
     }
+    // Die Alt-Orange-Matrix 18 zeichnet am Geraet ORANGE, auch ohne t in der Zeile
+    // (resolveGroupLook: tDef = 3 fuer 15 und 18). Sie heisst jetzt Matrix, und die liest
+    // ihren Farbton aus t. Ohne diese Zeile wuerde ein Berliner Brett beim naechsten
+    // Speichern weiss, obwohl der Kunde nichts angefasst hat.
+    const hatT = teile.slice(2).some(t => t.trim()[0] === 't');
+    if (!hatT && e.c === 18) e.e.t = 3;
     raus.push(e);
   });
   return raus;

@@ -26,6 +26,10 @@ var DV_DEMO_DATA = {
   16: [{ line: '22', dest: 'Bílá Hora', time: 3 }, { line: '9', dest: 'Sídliště Řepy', time: 6 }, { line: 'A', dest: 'Nemocnice Motol', time: 8 }],
   22: [{ line: 'U3', dest: 'Moosach', time: 3 }, { line: 'U6', dest: 'Klinikum Großhadern', time: 5 }, { line: '12', dest: 'Amalienburgstraße', time: 8 }],
   25: [{ line: 'IR16', dest: 'Bern', time: 7 }, { line: 'IC1', dest: 'Genève-Aéroport', time: 23 }],
+  27: [{ line: '7', dest: 'Zuilen', time: 0, via: 'Utrecht CS', lineColor: '#f5a000', lineTextColor: '#191919' },
+       { line: '65', dest: 'Utrecht CS', time: 8, lineColor: '#f5a000', lineTextColor: '#191919' },
+       { line: '77', dest: 'Bilthoven', time: 9, via: 'Utrecht CS', lineColor: '#2196f3', lineTextColor: '#ffffff' },
+       { line: '74', dest: 'Driebergen-Zeist', time: 14, via: 'Utrecht CS', lineColor: '#f5a000', lineTextColor: '#191919' }],
   26: [{ line: '12', dest: 'Schaan', time: 4 }, { line: '11', dest: 'Vaduz Post', time: 7 }, { line: 'S2', dest: 'Buchs SG', time: 12 }],
   10: [{ line: 'U1', dest: 'Leopoldau', time: 3, dest2: 'Alaudagasse', time2: 8 }, { line: '31', dest: 'Stammersdorf', time: 5, dest2: 'Schottenring', time2: 12 }],
   101: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
@@ -187,6 +191,7 @@ var DV_GERAET_BREITE = {
   pop10:  '577B=A@4:::>5;5:=8<<==<;<<56;?;;D>=@>::?=5<=9A>@<@<<<=>D==;:?;=@6==<==8=<55;5C<===8;8<<A;<::7:<',  // Poppins_SemiBold10pt7b (eigenes Display, ab 4 Zeilen)
   pop16:  '7;;MEJI6??@F8B7?E;ABDEDADD7:BGB@QFCGF@@HF8BD>LGHCHDDBEFPEDC?H?EH9EEBEC;ED99B8PDDEE<A<DCJAC?@:?C',  // Poppins_SemiBold16pt7b (eigenes Display)
   pop8:   '446?:>=4888:4948:5::;:::::449<99@;:<;89=;49:8>;=:=:::;;@;:98<8;=5;;:;:7;:4494@:;;;797:9=8988489',   // Poppins_SemiBold8pt7b (eigenes Display, kleinste Stufe)
+  fett18: ':<ADDPJ9<<>E9<9:DDDDDDDDDD99EEEFSIIJJHGLK;EJFOKLHLJIGKHSHGF<:<ED9DFDFE<FF::D:PFFFF>D<FDLDDB>:>B000000000000000000000000000000000:<DDDD:D<K=DE<K<FE==<FD:<;=DOOOFIIIIIIUJHHHH;;;;KKLLLLLELKKKKGHFDDDDDDPDEEEE::;;FFFFFFFEFFFFFDFD',  // FreeSansBoldExt18pt7b, 0x20 bis 0xFF (NL-Display)
   asap16: '24577:83445834358888888888337876<887976894586;998987798<777454672786874784474<888856587:67643479999999999999999999999999999999992467873549478494484428733447;;;6888888;7777744449999999899999788777777:6777744448888888888888787',  // AsapCondensed_Medium16pt7b, 0x20 bis 0xFF
   asap20: '35798<:3556:45479999999999449:97@:99;98;<56:8=<<:<:89<:?9995757939979969:5595>:999676:8<8874449;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;357899475<58:5<56:663:844658===7::::::>999995555;<<<<<<:<<<<<9:9999999=7999955559:99999:9::::898',  // AsapCondensed_Medium20pt7b, 0x20 bis 0xFF
   asap24: '368;:?<4667<4648;;;;;;;;;;44;<;9C<;;=::=>68<9@>><><:;><A;;;6869:4;;9;;7:<66;6A<;;;787<:>::9555;=================================369:;;586>6:<6>67<774<:5576:@@@9<<<<<<A;::::6666=>>>>>><>>>>>;<;;;;;;;@9;;;;6666;<;;;;;<;<<<<:;:',  // AsapCondensed_Medium24pt7b, 0x20 bis 0xFF
@@ -1235,6 +1240,330 @@ function dvFreeColorHTML(colour, data, rows, previewEl, cfg) {
        + ';overflow:hidden;' + dvFreeColorBg(cfg) + '">' + html + '</div>';
 }
 
+// ---------- NL (display_nl.cpp, colour 27: die Haltestellen-Anzeiger in den Niederlanden) ----------
+// Dunkelblaue Kopfzeile mit Stationsname (Feld '#', bis 12 Zeichen) und Uhr, darunter die
+// Spaltenleiste im eingebauten 5x7-Font, dann weisse Zeilen: Linie rechtsbuendig in ihrer
+// Spalte (mit Flaeche in der Linienfarbe, Feld u), das Echtzeit-Zeichen ((o)) oder drei
+// Punkte, das Ziel und darunter klein "via ..." oder "rit 10:56 vervalt", rechts die
+// Minuten mit kleinem "min", bei 0 das Fahrzeug-Symbol.
+// Masse, Schriftwechsel und Grundlinien 1:1 aus der Firmware (massFuer, zeichneZeile).
+
+// FreeSans(Ext) am Geraet: die GFX-Fonts sind mit 141 dpi gebaut, ein 9pt-Font hat also
+// 9 * 141 / 72 = 17,6 px Kegel. Arial trifft FreeSans metrisch, darum traegt die Webschrift
+// genau diese Kegelgroesse und die Versalhoehen stimmen (13 / 17 / 26 px wie am Geraet).
+// Der alte Merksatz oben ("FreeSansBold18pt = 26px") setzt die SCHRIFTGROESSE auf die
+// Glyphenhoehe und zeichnet damit rund ein Drittel zu klein; hier steht die Rechnung.
+var DV_FS_PX   = { sans9: 17.6, fett12: 23.5, fett18: 35.25 };
+var DV_FS_CAP  = { sans9: 13, fett12: 17, fett18: 26 };   // Hoehe der '0' (digitCenteredBaseline)
+var DV_FS_CAPH = { sans9: 13, fett12: 18, fett18: 27 };   // Hoehe des 'H' (kapitaelchen)
+// Unterlaenge je Zeichen 0x20 bis 0x7E, Wert = Zeichen - 48 (Aufbau wie DV_GERAET_BREITE).
+// Nur ASCII, genau wie unterlaenge() am Geraet: die Akzente der Ext-Schriften reichen nach
+// oben, nicht nach unten.
+var DV_FS_UNTER = {
+  sans9:  '00002000440030000000000000030000300000000000000001000000000404030000000400400000330000000404440',
+  fett12: '00002000440040000000000000040000300000000000000000000000000505050000000500500000550000000505450',
+  fett18: '00003000660060000000000000060000500000000000000001000000000707070000000800800000880000000807670'
+};
+// Grundlinie, auf der die Versalhoehe mittig in [oben, oben + hoehe] steht
+function dvFsMitte(schrift, oben, hoehe) { return oben + Math.floor((hoehe + DV_FS_CAP[schrift]) / 2); }
+function dvFsUnter(schrift, text) {
+  var t = DV_FS_UNTER[schrift], u = 0;
+  String(text == null ? '' : text).split('').forEach(function (ch) {
+    var i = ch.charCodeAt(0) - 32;
+    if (i < 0 || i >= t.length) return;
+    u = Math.max(u, t.charCodeAt(i) - 48);
+  });
+  return u;
+}
+// Hinten kuerzen wie kuerze() am Geraet, mit Punkt wo das Geraet einen setzt
+function dvFsKuerzen(schrift, text, breite, mitPunkt) {
+  var t = String(text == null ? '' : text), ende = mitPunkt ? '.' : '';
+  if (dvGeraetBreite(schrift, t) <= breite) return t;
+  while (t.length > 1 && dvGeraetBreite(schrift, t + ende) > breite) t = t.slice(0, -1);
+  return t.replace(/\s+$/, '') + ende;
+}
+// Ein Text auf der Grundlinie. "fett" zeichnet ihn zweimal um 1 px versetzt: die 9pt gibt
+// es nur mager, und das Geraet macht daraus genauso sein Halbfett.
+function dvFsText(x, base, schrift, farbe, text, anker, fett) {
+  var eins = function (dx) {
+    return '<text x="' + (x + dx) + '" y="' + base + '" font-size="' + DV_FS_PX[schrift] + '"'
+         + ' font-weight="' + (schrift === 'sans9' ? '400' : '700') + '" fill="' + farbe + '"'
+         + (anker ? ' text-anchor="' + anker + '"' : '') + '>' + escapeHtmlFt(text) + '</text>';
+  };
+  return fett ? ('<g>' + eins(0) + eins(1) + '</g>') : eins(0);
+}
+// Fahrzeug von der Seite wie auf den NL-Anzeigern (bus() in display_nl.cpp): Wagenkasten,
+// Fensterband mit breiterer Frontscheibe, zwei Raeder. Tram und Metro tragen oben einen
+// Stromabnehmer, der Wagenkasten wird dafuer niedriger. Alles Ganzzahl wie am Geraet.
+function dvNlBus(x, y, w, h, kasten, glas, tram) {
+  var g = Math.floor, o = '';
+  if (tram) {
+    var ph = Math.max(2, g(h / 4));
+    o += '<path d="M' + (x + g(w / 2) - ph) + ' ' + (y + ph) + 'L' + (x + g(w / 2)) + ' ' + y
+       + 'L' + (x + g(w / 2) + ph) + ' ' + (y + ph) + '" stroke="' + kasten + '" stroke-width="1" fill="none"/>'
+       + '<rect x="' + (x + g(w / 2) - ph) + '" y="' + y + '" width="' + (2 * ph + 1) + '" height="1" fill="' + kasten + '"/>';
+    y += ph;
+    h -= ph;
+  }
+  var rad = Math.max(2, g(h / 5)), kh = h - rad;
+  o += '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + kh + '" rx="'
+     + Math.max(1, g(h / 6)) + '" fill="' + kasten + '"/>';
+  var steg = Math.max(1, g(w / 24));
+  var fy = y + Math.max(1, g(kh / 6)), fh = Math.max(2, g(kh * 2 / 5));
+  var front = Math.max(3, g(w / 6));
+  o += '<rect x="' + (x + w - steg - front) + '" y="' + fy + '" width="' + front
+     + '" height="' + (fh + Math.max(1, g(kh / 6))) + '" fill="' + glas + '"/>';
+  var n = Math.max(2, g((w - front - 3 * steg) / 7));
+  var fw = g((w - front - 2 * steg - n * steg) / n);
+  var fx = x + steg;
+  for (var i = 0; i < n; i++, fx += fw + steg) {
+    o += '<rect x="' + fx + '" y="' + fy + '" width="' + fw + '" height="' + fh + '" fill="' + glas + '"/>';
+  }
+  for (var k = 1; k <= 3; k += 2) {
+    var cx = x + g(w * k / 4) + (k === 1 ? 0 : -1), cy = y + kh;
+    o += '<circle cx="' + cx + '" cy="' + cy + '" r="' + (rad + 1) + '" fill="' + glas + '"/>';
+    o += '<circle cx="' + cx + '" cy="' + cy + '" r="' + rad + '" fill="' + kasten + '"/>';
+    if (rad >= 3) o += '<circle cx="' + cx + '" cy="' + cy + '" r="' + g(rad / 2) + '" fill="' + glas + '"/>';
+  }
+  return o;
+}
+// Fahrzeugart fuer Spaltentitel und Piktogramm: 0 Bus (auch ohne Angabe), 1 Tram, 2 Metro.
+// Das Feld heisst in der Vorschau vt, am Geraet vehicleType.
+function dvNlFahrzeugArt(dep) {
+  var t = String((dep && (dep.vt || dep.vehicleType)) || '').toLowerCase();
+  if (t.indexOf('tram') >= 0) return 1;
+  if (t.indexOf('metro') >= 0 || t.indexOf('subway') >= 0 || t.indexOf('u-bahn') >= 0) return 2;
+  return 0;
+}
+// Echtzeit "((o))": Punkt mit je zwei Boegen links und rechts. Dieselbe Pixelschleife wie
+// am Geraet (echtzeit()), darum sitzt jeder Bogen auf demselben Pixel.
+function dvNlEchtzeit(cx, cy, r, farbe) {
+  var o = '<circle cx="' + (cx + 0.5) + '" cy="' + (cy + 0.5) + '" r="' + r + '" fill="' + farbe + '"/>';
+  var dick = (r >= 2) ? 2 : 1;
+  for (var k = 1; k <= 2; k++) {
+    var ra = r + 1 + k * (r + 2), hoch = Math.floor(ra * 3 / 4);
+    for (var dy = -hoch; dy <= hoch; dy++) {
+      var dx = 0;
+      while ((dx + 1) * (dx + 1) + dy * dy <= ra * ra) dx++;
+      o += '<rect x="' + (cx - dx) + '" y="' + (cy + dy) + '" width="' + dick + '" height="1" fill="' + farbe + '"/>'
+         + '<rect x="' + (cx + dx - dick + 1) + '" y="' + (cy + dy) + '" width="' + dick + '" height="1" fill="' + farbe + '"/>';
+    }
+  }
+  return o;
+}
+// Nur Fahrplan: drei Punkte
+function dvNlPunkte(cx, cy, r, farbe) {
+  var s = (r >= 2) ? 3 : 2, a = s + (r >= 2 ? 3 : 2), o = '';
+  for (var i = -1; i <= 1; i++) {
+    o += '<rect x="' + (cx + i * a - Math.floor(s / 2)) + '" y="' + (cy - Math.floor(s / 2))
+       + '" width="' + s + '" height="' + s + '" fill="' + farbe + '"/>';
+  }
+  return o;
+}
+// massFuer(h): bis 3 Zeilen 18pt / 12pt fett, ab 4 Zeilen 12pt / 9pt halbfett
+function dvNlMass(h) {
+  if (h >= 40) return { zahl: 'fett18', ziel: 'fett12', zielFett: false,
+                        flaecheH: Math.min(40, h - 10), pad: 7, rtR: 2, busW: 40 };
+  return { zahl: 'fett12', ziel: 'sans9', zielFett: true,
+           flaecheH: Math.max(16, h - 8), pad: 5, rtR: 2, busW: (h >= 32 ? 32 : 28) };
+}
+function dvNlEchtzeitBreite(m) { return 2 * (m.rtR + 1 + 2 * (m.rtR + 2)) + 1; }
+// Der Stationsname der Kopfzeile (Feld '#'). Er steht als Text in den displaysettings,
+// nicht als Zahl, darum dsStrVal statt dsVal. Im Konfigurator gewinnt ein offenes
+// Eingabefeld, damit man beim Tippen zusieht.
+function dvNlKopfText(colour) {
+  var el = document.getElementById('ftNlKopf_' + colour);
+  if (el) return String(el.value || '');
+  if (_awLook && parseInt(_awLook.colour) === parseInt(colour) && _awLook.vals && _awLook.vals['#'] != null) {
+    return String(_awLook.vals['#']);
+  }
+  var v = (typeof dsStrVal === 'function') ? dsStrVal(colour, '#') : undefined;
+  return (v == null) ? '' : String(v);
+}
+
+function dvNlHTML(colour, data, rows, previewEl) {
+  var NAVY = '#00205b', LEISTE = '#1e6ebe', GRAU = '#464e64', VIA_BLAU = '#0055aa',
+      ROT = '#cd0000', ORANGE = '#f5a000', TINTE = '#191919';
+  var RAND_L = 4, RAND_R = 5, LUECKE = 6, KOPF_H = 18, LEISTE_H = 11, TOP = KOPF_H + LEISTE_H;
+  previewEl.style.background = '#ffffff';
+  previewEl.style.backgroundImage = 'none';
+
+  var rowH = Math.floor((170 - TOP) / rows);
+  var m = dvNlMass(rowH);
+  var zeilen = data.slice(0, rows);
+  var echteZeilen = zeilen.filter(function (d) { return d && d.line && !d.uhr; });
+  // Feld u: Flaeche in der Linienfarbe an oder aus. Vorgabe an, wie auf dem Utrecht-Foto.
+  var flaecheAn = dvSetting(colour, 'ftWienBadges_', 'u', 1) > 0;
+  var nullArt = dvSetting(colour, 'ftBlink_', 'o', 0);
+
+  // Linienspalte der Seite: so breit wie die laengste Linie, alle Zeilen buendig.
+  // Liniennummern breiter als zwei Ziffern ("350", "N12") nehmen bis 3 Zeilen die kleinere
+  // Schrift, sonst frisst die Linienspalte das Ziel.
+  var lf = m.zahl, breit = 0;
+  for (var stufe = 0; stufe < 2; stufe++) {
+    breit = dvGeraetBreite(lf, '00');
+    var zweiZiffern = breit;
+    echteZeilen.forEach(function (d) { breit = Math.max(breit, dvGeraetBreite(lf, String(d.line))); });
+    if (lf === 'fett12' || breit <= zweiZiffern + 2) break;
+    lf = 'fett12';
+  }
+  var lpad = (lf === 'fett12') ? 5 : m.pad;
+  var lw = flaecheAn ? Math.max(breit + 2 * lpad, Math.floor(m.flaecheH * 3 / 2)) : breit;
+  lw = Math.min(lw, 96);
+  var zx = RAND_L + lw + LUECKE + dvNlEchtzeitBreite(m) + LUECKE;
+
+  // Was auf dieser Seite faehrt: Bus, Tram, Metro oder gemischt. Danach richten sich der
+  // Titel der Linienspalte und das Piktogramm oben links.
+  var art = -1;
+  echteZeilen.forEach(function (d) {
+    var a = dvNlFahrzeugArt(d);
+    art = (art < 0 || art === a) ? a : 3;
+  });
+  var seitenArt = (art < 0) ? 0 : art;
+  var spaltenTitel = ['Bus', 'Tram', 'Metro', 'Lijn'][seitenArt];
+
+  // === Kopfzeile + Spaltenleiste ===
+  var uhr = dvClockStr(false);
+  var uw = dvGeraetBreite('sans9', uhr);
+  var kBase = dvFsMitte('sans9', 0, KOPF_H);
+  var kopfName = String(dvNlKopfText(colour) || '');
+  var links = 5 + 22 + 8, rechts = 320 - RAND_R - uw - 8;
+  kopfName = dvFsKuerzen('sans9', kopfName, rechts - links - 1, false);
+  var tw = dvGeraetBreite('sans9', kopfName);
+  var tx = Math.floor((320 - tw) / 2);
+  if (tx < links) tx = links;
+  if (tx + tw + 1 > rechts) tx = rechts - tw - 1;
+  var kopf = '<svg style="position:absolute;left:0;top:0;font-family:' + DV_ARIAL
+           + ';shape-rendering:crispEdges;" width="320" height="' + TOP + '" viewBox="0 0 320 ' + TOP + '">'
+           + '<rect x="0" y="0" width="320" height="' + KOPF_H + '" fill="' + NAVY + '"/>'
+           + '<rect x="0" y="' + KOPF_H + '" width="320" height="' + LEISTE_H + '" fill="' + LEISTE + '"/>'
+           + dvNlBus(5, 3, 22, 12, '#ffffff', NAVY, seitenArt === 1 || seitenArt === 2)
+           + '<g shape-rendering="auto">'
+           + dvFsText(320 - RAND_R - uw - 1, kBase, 'sans9', '#ffffff', uhr, '', true)
+           + (kopfName ? dvFsText(tx, kBase, 'sans9', '#ffffff', kopfName, '', true) : '')
+           + '</g></svg>';
+  // Spaltenleiste im eingebauten 5x7-Font, ohne LED-Schimmer: am Geraet ist das schlichter Text
+  var ly = KOPF_H + Math.floor((LEISTE_H - 7) / 2);
+  var leiste = [[RAND_L, spaltenTitel], [zx, 'Richting'], [320 - RAND_R - dvLedWidth('Vertrek', 1) - 1, 'Vertrek']]
+    .map(function (p) {
+      return '<div style="position:absolute;left:' + p[0] + 'px;top:' + ly + 'px;">'
+           + dvLedTextSvg(p[1], 1, '#ffffff', false) + '</div>';
+    }).join('');
+
+  // === Zeilen ===
+  var R = 320 - RAND_R;
+  var minW = dvGeraetBreite('sans9', 'min');
+  var unterzeile = rowH >= 34;
+  var reihen = zeilen.map(function (dep, i) {
+    var inhalt = '';
+    if (dep && dep.line && !dep.uhr) {
+      var cd = parseInt(dep.time, 10);
+      var ausfall = !!dep.cancelled;
+      // Echtzeit hat die Vorschau nicht als Feld: ein Beispielwert und eine ruhende Linie
+      // sind sicher KEINE Ist-Zeit, alles andere kommt aus den echten Abfahrten.
+      var echt = !dep.beispiel && !dep.ruht;
+      var lx;   // linke Kante des Zeitblocks
+      var zeit = '';
+      if (ausfall) {
+        if (unterzeile) { zeit = dvNlPunkte(R - 12, Math.floor(rowH / 2), m.rtR, GRAU); lx = R - 24; }
+        else {
+          lx = R - dvGeraetBreite('sans9', 'vervalt');
+          zeit = dvFsText(lx, dvFsMitte('sans9', 0, rowH), 'sans9', ROT, 'vervalt', '', false);
+        }
+      } else if (cd === 0 && nullArt === 0) {
+        // o0: die Vorgabe dieses Stils ist das Fahrzeug-Symbol
+        var bh = Math.floor(m.busW / 2);
+        zeit = dvNlBus(R - m.busW, Math.floor((rowH - bh) / 2), m.busW, bh, TINTE, '#ffffff',
+                       dvNlFahrzeugArt(dep) > 0);
+        lx = R - m.busW;
+      } else {
+        // o1 laesst die 0 blinken, o2 nimmt sie weg und laesst das Ziel blinken, o3 still
+        var txt = isNaN(cd) ? '' : String(cd);
+        if (cd === 0 && nullArt === 2) txt = '';
+        var zahlR = R - minW - 3;
+        var platz1 = Math.max(dvGeraetBreite(m.zahl, '00'), dvGeraetBreite(m.zahl, txt || '0'));
+        lx = zahlR - platz1;
+        if (txt !== '') {
+          var blinkt = (cd === 0 && nullArt === 1) ? ' class="blinkt"' : '';
+          zeit = '<g' + blinkt + '>'
+               + dvFsText(zahlR, dvFsMitte(m.zahl, 0, rowH), m.zahl, TINTE, txt, 'end', false)
+               + dvFsText(R - minW, dvFsMitte(m.zahl, 0, rowH), 'sans9', TINTE, 'min', '', false) + '</g>';
+        }
+      }
+      // Linie: rechtsbuendig in ihrer Spalte, mit oder ohne Flaeche
+      var name = dvFsKuerzen(lf, String(dep.line), lw - (flaecheAn ? 2 * lpad : 0), false);
+      var linie;
+      if (flaecheAn) {
+        var bg = dvLineColorCss(dep.lineColor) || ORANGE;
+        var fg = dvLineColorCss(dep.lineTextColor);
+        var c = dvHexRgb(bg);
+        if (!fg) fg = (c[0] * 299 + c[1] * 587 + c[2] * 114 > 150000) ? TINTE : '#ffffff';
+        var by = Math.floor((rowH - m.flaecheH) / 2);
+        linie = '<rect x="' + RAND_L + '" y="' + by + '" width="' + lw + '" height="' + m.flaecheH
+              + '" fill="' + bg + '"/>';
+        // Weisse (oder fast weisse) Linienfarbe verschwaende auf dem weissen Grund: grauer Rand
+        if (c[0] >= 232 && c[1] >= 232 && c[2] >= 232) {
+          linie += '<rect x="' + (RAND_L + 0.5) + '" y="' + (by + 0.5) + '" width="' + (lw - 1)
+                 + '" height="' + (m.flaecheH - 1) + '" fill="none" stroke="' + GRAU + '" stroke-width="1"/>';
+        }
+        linie += dvFsText(RAND_L + lw - lpad, dvFsMitte(lf, by, m.flaecheH), lf, fg, name, 'end', false);
+      } else {
+        linie = dvFsText(RAND_L + lw, dvFsMitte(lf, 0, rowH), lf, TINTE, name, 'end', false);
+      }
+      // Ziel, darunter klein via oder Ausfall. NL-Feeds schreiben den Zwischenhalt oft ins
+      // Ziel ("Zuilen via Utrecht CS"): Ziel und via-Zeile wie am Anzeiger trennen, auch
+      // wenn fuer die Unterzeile kein Platz ist (dann faellt das via weg).
+      var ziel = String(dep.dest || '').replace(/\n/g, ' ').trim();
+      // viaMatch des Geraets ist EIN Halt; die Vorschau bekommt die Kette und nimmt den ersten
+      var via = String(dep.viaMatch || dep.via || '').split('·')[0].trim();
+      var vi = ziel.toLowerCase().indexOf(' via ');
+      if (vi > 0) {
+        if (!via) via = ziel.slice(vi + 5).trim();
+        ziel = ziel.slice(0, vi).trim();
+      }
+      var unten = '', untenFarbe = VIA_BLAU;
+      if (unterzeile) {
+        if (ausfall) {
+          unten = dep.plan ? ('rit ' + dep.plan + ' vervalt') : 'vervalt';
+          untenFarbe = ROT;
+        } else if (via) {
+          unten = 'via ' + via;
+        }
+      }
+      var platz = lx - 8 - zx;
+      var zf = m.ziel, fett = m.zielFett;
+      if (dvGeraetBreite(zf, ziel) > platz && zf !== 'sans9') { zf = 'sans9'; fett = true; }
+      ziel = dvFsKuerzen(zf, ziel, platz - (fett ? 1 : 0), true);
+      var capZ = DV_FS_CAPH[zf], capU = DV_FS_CAPH.sans9, zielBase, untenBase = 0;
+      if (unten) {
+        var luecke = Math.max((rowH >= 40) ? 5 : 2, dvFsUnter(zf, ziel) + 1);
+        zielBase = Math.max(1, Math.floor((rowH - (capZ + luecke + capU)) / 2)) + capZ;
+        untenBase = zielBase + luecke + capU;
+      } else {
+        zielBase = dvFsMitte(zf, 0, rowH);
+      }
+      var zielBlinkt = (cd === 0 && nullArt === 2) ? ' class="blinkt"' : '';
+      var zielHtml = '<g' + zielBlinkt + '>'
+                   + dvFsText(zx, zielBase, zf, ausfall ? GRAU : TINTE, ziel, '', fett) + '</g>';
+      var untenHtml = unten
+        ? dvFsText(zx, untenBase, 'sans9', untenFarbe, dvFsKuerzen('sans9', unten, platz, true), '', false)
+        : '';
+      // Echtzeit-Zeichen zwischen Linie und Ziel, auf Hoehe der Zielzeile
+      var icx = RAND_L + lw + LUECKE + Math.floor(dvNlEchtzeitBreite(m) / 2);
+      var icy = zielBase - Math.floor(capZ / 2);
+      var icon = (echt && !ausfall) ? dvNlEchtzeit(icx, icy, m.rtR, GRAU) : dvNlPunkte(icx, icy, m.rtR, GRAU);
+      // Reihenfolge: Linie, Ziel, via, Zeichen, Zeit. nullBlinken fasst die Zeile nicht an
+      // (das letzte Kind ist nie eine blanke Zahl), die Null-Darstellung steht schon drin.
+      inhalt = linie + zielHtml + untenHtml + icon + zeit;
+    }
+    return '<svg style="position:absolute;left:0;top:' + (TOP + i * rowH) + 'px;font-family:' + DV_ARIAL
+         + ';shape-rendering:crispEdges;" width="320" height="' + rowH + '" viewBox="0 0 320 ' + rowH + '">'
+         + '<rect x="0" y="0" width="320" height="' + rowH + '" fill="#ffffff"/>'
+         + '<g shape-rendering="auto">' + inhalt + '</g></svg>';
+  }).join('');
+  return dvWrap(kopf + leiste + reihen, DV_ARIAL);
+}
+
 function dvPreviewHTML(colour, data, rows, previewEl, cfg) {
   switch (colour) {
     case 101: case 102: case 103:
@@ -1253,6 +1582,8 @@ function dvPreviewHTML(colour, data, rows, previewEl, cfg) {
       return dvMvgHTML(colour, data, rows, previewEl);
     case 26:
       return dvChliHTML(colour, data, rows, previewEl);
+    case 27:
+      return dvNlHTML(colour, data, rows, previewEl);
     case 5:
       return dvSBerlinHTML(colour, data, rows, previewEl);
     case 6:

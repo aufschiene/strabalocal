@@ -29,8 +29,9 @@ function dvHostLoadDisplaySettings(zeile) {
       if (!f) continue;
       var key = f.charAt(0);
       var rest = f.substring(1);
-      // Zeitfenster 'w' und die Linienfarben 'P' (DB S-Bahn) bleiben Text, alles andere ist eine Zahl.
-      werte[key] = (key === 'w' || key === 'P') ? rest : parseInt(rest, 10);
+      // Zeitfenster 'w', die Linienfarben 'P' (DB S-Bahn) und der Stationsname '#'
+      // (NL-Kopfzeile) bleiben Text, alles andere ist eine Zahl.
+      werte[key] = (key === 'w' || key === 'P' || key === '#') ? rest : parseInt(rest, 10);
     }
     out[colour] = werte;
   });
@@ -53,6 +54,14 @@ function dsVal(colour, key) {
   if (!s) return undefined;
   var v = s[key];
   return (v === undefined || (typeof v === 'number' && isNaN(v))) ? undefined : v;
+}
+
+// Derselbe Wert als ROHER Text, fuer Felder, die keine Zahl sind (NL-Kopfzeile '#').
+// Gegenstueck zu dsStrVal im Konfigurator.
+function dsStrVal(colour, key) {
+  var s = DV_HOST.settings[parseInt(colour, 10)];
+  if (!s || s[key] === undefined) return undefined;
+  return String(s[key]);
 }
 
 // Fahrzeugarten-Maske fuer die Linien-Badges (Bit 1 Tram, 2 Bus, 4 U-Bahn, 8 Zug).
