@@ -6086,7 +6086,27 @@ function displaysAusEintraegen(eintraege) {
       // welche Linien zu ihr gehoeren.
       const nurVon = new Map();
       ein.rbls.forEach(r => { const x = rblTeile(r); nurVon.set(rblKanon(r), x.nur); });
-      const stats = stationen.filter(st => nurVon.has(rblKanon(st.rbl)));
+      let stats = stationen.filter(st => nurVon.has(rblKanon(st.rbl)));
+      // Mehrere Bretter an DERSELBEN Haltestelle: der Eintrag gehoert zu GENAU dem Brett,
+      // dessen Nummer er traegt (Feld d). Die Uebergabe fuehrt sie als Kennung
+      // 'b<1000+d>' — so nummeriert der Picker ein Brett mit d-Feld. Ohne diese
+      // Zuordnung findet ein Token, das BEIDE Bretter fuehren, bei beiden Stationen
+      // einen Treffer: an der Osloer Strasse steht die U9 einmal allein und einmal
+      // zusammen mit den Bussen, und danach stand sie auf JEDEM der beiden Bretter
+      // doppelt (15.11.2026). Nur filtern, wenn wirklich ein Brett dazu passt, sonst
+      // bleibt es bei allen Stationen dieser rbl.
+      if (ein.dnr && stats.length > 1) {
+        // Der Picker zaehlt ein Brett mit d-Feld als 1000+d, aeltere Uebergaben fuehren
+        // die nackte Nummer. Erst die 1000er-Form suchen, damit eine gemischte Liste
+        // nicht die falsche Station trifft.
+        const nrVon = st => {
+          const t = String(st.kennung || '').match(/^b(\d+)$/);
+          return t ? parseInt(t[1], 10) : null;
+        };
+        let passend = stats.filter(st => nrVon(st) === 1000 + ein.dnr);
+        if (!passend.length) passend = stats.filter(st => nrVon(st) === ein.dnr);
+        if (passend.length) stats = passend;
+      }
       // "Alle Abfahrten" steht als '*' in der Config. Das ist jetzt ein Stations-Block,
       // also genau EINE Zeile, und damit laesst es sich zurueckholen. Vorher gab die
       // Wiederherstellung hier auf, und jeder Kunde mit "alle Abfahrten" verlor bei
@@ -6140,27 +6160,6 @@ function displaysAusEintraegen(eintraege) {
         teil.forEach(m => stats.forEach(st => {
           if (nurRbl && rblKanon(st.rbl) !== nurRbl) return;
           if (!nurRbl && !gehoertDazu(nurVon.get(rblKanon(st.rbl)), m.linie)) return;
-          // Traegt der Token eine RICHTUNG, muss genau diese in der Auswahl DIESER Station
-          // stehen. Zwei Bretter koennen dieselbe Haltestelle und dieselbe Linie fuehren
-          // (Kantplatz: die 4 nach Roderbruch auf Brett 1, die 4 nach Garbsen auf Brett 2)
-          // und teilen sich dann dieselben Abfahrten. Ohne diese Pruefung fand die Suche bei
-          // BEIDEN Stationen einen Treffer fuer "4", und die Zeile des zweiten Bretts landete
-          // zusaetzlich auf dem ersten, waehrend das zweite nur mit der 5 zurueckblieb
-          // (Kunde Norman Holzhauer, Hannover 15.11.2026).
-          // Das Token-Feld heisst 'richtung' und traegt die Richtungs-Id.
-          const tokRichtung = String((m && (m.richtung != null ? m.richtung : m.ziel)) || '');
-          if (tokRichtung && Array.isArray(st.letzteLinien) && st.letzteLinien.length) {
-            const kenntRichtung = st.letzteLinien.some(r => String(r.dest || '') === tokRichtung);
-            const kenntLinieMitRid = st.letzteLinien.some(r => String(r.line || '') === String(m.linie || '')
-                                                            && String(r.dest || '') === tokRichtung);
-            // Nur aussortieren, wenn diese Station die Richtung NICHT kennt, eine andere
-            // Station derselben rbl sie aber sehr wohl fuehrt. Sonst wuerde eine Station
-            // ohne mitgegebene Richtungsliste gar nichts mehr finden.
-            if (!kenntLinieMitRid && !kenntRichtung
-                && stats.some(o => Array.isArray(o.letzteLinien)
-                                && o.letzteLinien.some(r => String(r.line || '') === String(m.linie || '')
-                                                         && String(r.dest || '') === tokRichtung))) return;
-          }
           const si = stationen.indexOf(st);
           const nimm = (linie, ziel) => {
             const k = zeilenKey(si, { line: linie, dest: ziel });

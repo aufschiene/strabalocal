@@ -24897,8 +24897,7 @@ function dedupeStationsByFullId() {
   // neben den echten Stationen). Regeln pro fullId-Gruppe:
   //   gleiche Instanz               → exakte Dublette, weg (auch null == null)
   //   ohne Instanz neben MIT Instanz → Alt-Pfad-Kopie, weg (egal welche zuerst kam)
-  //   beide mit Instanz, ÜBERLAPPENDE Linien oder leere Linienliste → Race-Kopie, weg
-  //   beide mit Instanz, disjunkte Linien → legitimer Linien-Split, BEIDE behalten
+  //   beide mit Instanz, verschiedene Instanz → zwei Bretter, BEIDE behalten
   var before = stations.length;
   var keep = [];
   var byId = {};
@@ -24907,9 +24906,6 @@ function dedupeStationsByFullId() {
     var g = byId[fid];
     if (!g) { byId[fid] = [s]; keep.push(s); return; }
     var inst = (s.displayInstance == null) ? null : s.displayInstance;
-    var myLines = {};
-    (s.directions || []).forEach(function(d) { if (d.line) myLines[String(d.line)] = 1; });
-    var myLineCount = Object.keys(myLines).length;
     var drop = false;
     for (var i = 0; i < g.length && !drop; i++) {
       var o = g[i];
@@ -24923,9 +24919,14 @@ function dedupeStationsByFullId() {
         g.splice(i, 1); i--;
         continue;
       }
-      var overlap = false;
-      (o.directions || []).forEach(function(d) { if (d.line && myLines[String(d.line)]) overlap = true; });
-      if (overlap || myLineCount === 0) { drop = true; break; }
+      // Zwei Instanzen = zwei Bretter der masterrow, also BEIDE behalten. Frueher
+      // entschied hier zusaetzlich, ob sich die Linien ueberschneiden: dieselbe Linie
+      // auf zwei Brettern galt als Race-Kopie und flog raus. Das traf echte Configs
+      // (Kantplatz Hannover: die 4 nach Roderbruch und die 4 nach Garbsen; Osloer
+      // Strasse Berlin: die U9 allein neben der U9 mit den Bussen) - das zweite Brett
+      // war in der Oberflaeche verschwunden. Eine echte Race-Kopie entsteht aus
+      // DERSELBEN masterrow und traegt damit dieselbe Instanz: die faengt die Regel
+      // oben, und ein Lauf ohne masterrow traegt gar keine (Regel darunter).
     }
     if (!drop) { g.push(s); keep.push(s); }
   });
