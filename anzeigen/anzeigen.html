@@ -607,7 +607,11 @@ let zeilen = 2;
 //     Matrix in Orange, nur unter eigener Nummer und ohne Farbwahl; Berlin stand in
 //     NETZ_VORGABE ohnehin auf [23, 3]. Den Farbton traegt eintraegeAusZeilen nach, sonst
 //     wuerde ein Bestandsbrett beim Umsetzen weiss.
-const STIL_ERSATZ = { 4: 1, 8: 7, 10: 7, 13: 7, 17: 16, 18: 23, 19: 7, 20: 7 };
+//   3 VBB Berlin -> Matrix (Paul 21.11.2026: "mape berlin nicht mit VBB Berlin screen den
+//     gibt es nicht"). Stimmt: display_factory.h hat keinen case 3, die 3 landet im
+//     default und wird als DisplayWien gezeichnet. Der Name versprach also etwas, das
+//     kein Geraet je gezeigt hat. Berlin gehoert auf die Matrix in Orange.
+const STIL_ERSATZ = { 3: 23, 4: 1, 8: 7, 10: 7, 13: 7, 17: 16, 18: 23, 19: 7, 20: 7 };
 function stilErsatz(c) {
   const n = parseInt(c, 10);
   return STIL_ERSATZ[n] != null ? STIL_ERSATZ[n] : n;
@@ -663,7 +667,8 @@ const STIL_KANN = {
   // NL: Flaeche in der Linienfarbe (Feld u) kennt nur an und aus, eine Fahrzeugauswahl
   // wertet DisplayNL nicht aus. Bei 0 zeigt der Stil von Haus aus das Bus-Symbol, und
   // die Kopfzeile traegt einen frei waehlbaren Stationsnamen (Feld '#').
-  27: { badges: true, badgesEinfach: true, kopfName: true, blinken: 'bus' },
+  27: { badges: true, badgesEinfach: true, kopfName: true, blinken: 'bus',
+        linienFarben: true },
   101: { blinken: 'quadrat' },
   102: { blinken: 'quadrat' },
   103: { blinken: 'quadrat' }
@@ -825,6 +830,11 @@ function einstFuer(d) {
     // anderen Stil hiesse dieselbe 3 etwas anderes, bei DB S-Bahn etwa Dunkelblau.
     const vg = netzVorgabe(d);
     if (vg && vg[1] && stilErsatz(vg[0]) === stilVon(d)) e.t = vg[1];
+    // Berlin blinkt wie in Berlin: bei 0 faellt die Zahl weg und das Ziel blinkt, so
+    // haengen die BVG-Anzeiger da. Nur auf der Matrix, nur solange niemand selbst etwas
+    // eingestellt hat (Paul 21.11.2026). Der Stil kann aus der Netz-Vorgabe kommen oder
+    // vom Konfigurator, darum haengt die Stufe am NETZ und nicht an der Vorgabe-Zeile.
+    if (!e.o && istMatrix(stilVon(d)) && netzeVon(d).has('BERLIN')) e.o = 2;
     const za = zweiteNachStil[parseInt(stilVon(d), 10)];
     if (za !== undefined) e.a = za;
     // NL faengt MIT Flaeche in der Linienfarbe an, so haengen die Anzeiger in Utrecht.
@@ -929,8 +939,11 @@ function dsSegment(c, zeilenZahl, fenster, sortierung, d) {
   if (k.fahrzeug && e.k) seg += '|k' + e.k;
   if (k.blinken && e.o) seg += '|o' + e.o;
   if (e.a === 0) seg += '|a0';
+  // Eigene Linienfarben. Je Stil eine eigene Liste, darum die Nummer mit. Ohne
+  // Firmware-Schranke: der EDITOR haengt daran (kannLinienFarben), eine schon gesetzte
+  // Farbe darf ein altes Geraet aber nicht wegwerfen, es ueberliest das Feld einfach.
   if (k.linienFarben) {
-    const liste = sbahnPListe();
+    const liste = pListeVon(c);
     if (liste) seg += '|P' + liste;
   }
   return seg;
@@ -1287,7 +1300,6 @@ let abgelegt = new Set();
 const STILE = [
   { id: 1,  name: 'Wiener Linien' },
   { id: 2,  name: 'Linz AG' },
-  { id: 3,  name: 'VBB Berlin' },
   { id: 5,  name: 'DB S-Bahn' },
   { id: 6,  name: 'DB Fernverkehr' },
   { id: 7,  name: 'BODO Bodensee' },
@@ -1995,6 +2007,28 @@ function fwBahnsteig() {
 const FW_MIT_NL = '2.6.12';
 function fwNl() {
   return !!geraetVersion && versionMin(geraetVersion, FW_MIT_NL);
+}
+// Ab dieser Firmware liest DisplayNL auch die eigenen Linienfarben (c27|P), so wie die
+// DB-S-Bahn-Tafel sie kennt. Vorher steht im Feld nichts, was das Geraet auswertet: der
+// Editor waere eine Behauptung, darum liegt er hinter dieser Schranke. Die LISTE selbst
+// schreiben wir trotzdem immer weiter (siehe dsSegment), sonst wuerfe ein altes Geraet die
+// Farben weg, die ein neues schon gesetzt hat.
+// Stand 18.11.2026 (Firmware-Sitzung): die Firmware kann es noch NICHT, main.cpp gibt das
+// P nur bei c == 5 weiter und DisplayNL liest bis heute nur dep.lineColor. 2.6.14 liegt
+// lokal und unreleased (Uhr ohne Sekunden). Kommt c27|P noch vor dem Release dazu, ist es
+// 2.6.14, sonst 2.6.15 - bis zur Entscheidung steht hier die sichere, hoehere Nummer, der
+// Editor bleibt also zu.
+const FW_MIT_NL_FARBEN = '2.6.15';
+function fwNlFarben() {
+  return !!geraetVersion && versionMin(geraetVersion, FW_MIT_NL_FARBEN);
+}
+// Darf der Kunde die Linienfarben dieses Stils selbst setzen? Der Stil muss es koennen
+// UND das Geraet. Bei der DB-S-Bahn fragt niemand nach der Version: dort gibt es die
+// Farben seit der Firmware, die auch den Stil mitbrachte.
+function kannLinienFarben(c) {
+  c = parseInt(c, 10);
+  if (!(STIL_KANN[c] || {}).linienFarben) return false;
+  return (c === 27) ? fwNlFarben() : true;
 }
 function fwNeu() {
   if (dFeldVonAussen != null) return !!dFeldVonAussen;
@@ -3482,7 +3516,7 @@ function configBauen() {
       // Wird IMMER geschrieben (Paul 23.10.2026). Kennt ein Geraet CLOCK noch nicht,
       // bleibt dort eine Seite leer, kaputt geht nichts.
       stuecke.push('CLOCK:' + (di + 1) + '|*|c' + c + '|g0|r' + zeilenVon(d)
-                 + (w ? '|w' + w : '') + '|z1' + sTeil + dTeil + dsgTeil);
+                 + (w ? '|w' + w : '') + '|z1' + uhrFormatTeil() + sTeil + dTeil + dsgTeil);
     } else if (wien && proStation.size > 1) {
       // Je Station ein Eintrag. Sie gehoeren zusammen, also KEIN x1: das Geraet legt
       // gleichfarbige Wien-Eintraege zu einem Brett zusammen, und genau das wollen wir
@@ -4084,11 +4118,16 @@ function uhrZeilenNr(d) {
   const i = zeilenEinheiten(d).findIndex(teil => teil.length === 1 && istUhrKey(teil[0]));
   return i < 0 ? 0 : (i + 1);
 }
+// "m" hinter dem z-Feld (z1m, z3m) = Uhr ohne Sekunden. Kann die Firmware ab 2.6.14, eine
+// aeltere liest nur die Zahl davor und zeigt weiter mit Sekunden (Kunden 18.11.2026: die
+// Wahl 14:07 wurde bis dahin nirgends gespeichert und stand beim naechsten Oeffnen wieder
+// auf 14:07:32).
+function uhrFormatTeil() { return uhrSekunden ? '' : 'm'; }
 function uhrToken(d) {
-  if (zeigtUhr(d)) return '|z1';                 // ganzes Brett, geht bei jedem Stil
+  if (zeigtUhr(d)) return '|z1' + uhrFormatTeil();   // ganzes Brett, geht bei jedem Stil
   if (!hatUhrNeben(d)) return '';
   if (!kannUhrZeile(stilVon(d))) return '';      // dort ignoriert die Firmware z2..z5
-  return '|z' + (uhrZeilenNr(d) + 1);
+  return '|z' + (uhrZeilenNr(d) + 1) + uhrFormatTeil();
 }
 
 function fensterToken(d) {
@@ -4422,16 +4461,46 @@ function nlKopfHoehe(c) {
   const ci = parseInt(c, 10);
   return (ci === 22) ? 18 : (ci === 27 ? 29 : 0);
 }
-// Hoechstens 12 Zeichen, nie '|', ';' oder ',': die drei trennen im Geraeteformat die
-// Felder, die Linien und die Eintraege. Beim TIPPEN nicht trimmen, sonst frisst es jedes
-// Leerzeichen schon waehrend der Eingabe (dieselbe Falle wie beim Namen eines eigenen
-// Designs, Kunde Rostock 27.10.2026).
-const NL_KOPF_MAX = 12;
+// Hoechstens 32 Zeichen, nie '|', ';' oder ',': die drei trennen im Geraeteformat die
+// Felder, die Linien und die Eintraege. Was nicht zwischen Bus und Uhr passt (226 px in
+// FreeSans 9pt halbfett), kuerzt das Geraet selbst nach Pixeln, hinten und ohne Punkt
+// (zeichneKopf, schon seit 2.6.12), die Vorschau (dvNlHTML) genauso. Bis 18.11.2026 stand
+// hier 12, und der Kunde sah "Station Stad" statt "Station Stadspolders", obwohl der volle
+// Name gepasst haette. Beim TIPPEN nicht trimmen, sonst frisst es jedes Leerzeichen schon
+// waehrend der Eingabe (dieselbe Falle wie beim Namen eines eigenen Designs, Kunde Rostock
+// 27.10.2026).
+const NL_KOPF_MAX = 32;
 function nlKopfKurz(t) {
   return String(t == null ? '' : t).replace(/[|;,]/g, ' ').slice(0, NL_KOPF_MAX);
 }
+// Gespeichert ist vielleicht noch der alte Schnitt nach 12 Zeichen. Steht im Feld GENAU der
+// Anfang eines Stationsnamens dieses Bretts, wie ihn die alte Grenze abgeschnitten hat,
+// gilt beim Oeffnen der volle Name, sonst muesste jeder Bestandskunde neu tippen. Nur der
+// genaue Schnitt: ein selbst getipptes "Station" bleibt, wie es ist. Zwei alte Fassungen:
+// hier wurde der Teil nach dem Komma vor dem Schneiden getrimmt, in der Linienauswahl erst
+// danach (" Station Stad" wurde dort zu "Station Sta").
+const NL_KOPF_ALT = 12;
+function nlKopfHeilen(kopf, d) {
+  const k = String(kopf == null ? '' : kopf);
+  if (!k || k.length > NL_KOPF_ALT) return kopf;
+  const sauber = t => String(t).replace(/[|;,]/g, ' ');
+  let voll = null;
+  ((d && d.richtungen) || []).forEach(key => {
+    if (voll) return;
+    const r = richtungFinden(key);
+    if (!r || !r.station) return;
+    const name = String(r.station.name || '');
+    const i = name.lastIndexOf(',');
+    const teil = i >= 0 ? name.slice(i + 1) : name;
+    const ganz = nlKopfKurz(teil.trim()).trim();
+    if (ganz.length <= k.length) return;   // dieser Name war nie gekuerzt
+    if (sauber(teil.trim()).slice(0, NL_KOPF_ALT).trim() === k
+        || sauber(teil).slice(0, NL_KOPF_ALT).trim() === k) voll = ganz;
+  });
+  return voll || kopf;
+}
 // Vorschlag: die erste Station dieses Bretts, Teil nach dem letzten Komma
-// ("Utrecht, Janskerkhof" wird "Janskerkhof"), auf 12 Zeichen gekuerzt.
+// ("Utrecht, Janskerkhof" wird "Janskerkhof"), auf 32 Zeichen gekuerzt.
 function nlKopfVorgabe(d) {
   let name = '';
   ((d && d.richtungen) || []).forEach(k => {
@@ -4499,8 +4568,9 @@ function nlKopfFeld(d, di) {
      + ' placeholder="Kein Name" value="' + escapeHtmlFt(jetzt) + '"'
      + ' oninput="nlKopfTippt(' + di + ', this.value)"'
      + ' onchange="nlKopfFertig(' + di + ', this.value)">'
-     + '<div class="hinweis">Höchstens ' + NL_KOPF_MAX + ' Zeichen, so viel passt zwischen '
-     + 'Bus-Symbol und Uhr. Leer lassen heißt: kein Name in der Kopfzeile.</div>';
+     + '<div class="hinweis">Höchstens ' + NL_KOPF_MAX + ' Zeichen. Ist der Name breiter als '
+     + 'der Platz zwischen Bus-Symbol und Uhr, kürzt ihn das Display hinten, so wie in der '
+     + 'Vorschau. Leer lassen heißt: kein Name in der Kopfzeile.</div>';
   return h;
 }
 
@@ -4605,8 +4675,8 @@ function designZeichnen() {
     }
   }
 
-  if (k.linienFarben) {
-    h += '<label class="feld">Linienfarben</label>' + sbahnLinienHtml(c);
+  if (kannLinienFarben(c)) {
+    h += '<label class="feld">Linienfarben</label>' + linienFarbenHtml(c);
   }
 
   // Die Schalter stehen in JEDEM Eintrag und gelten darum je Brett: die Firmware liest
@@ -4829,35 +4899,52 @@ function fzSetzen(di, feld) {
 // Alle Setzer bekommen die Nummer des DISPLAYS, nicht mehr die colour.
 function schriftSetzen(di, v) { einstFuer(displays[di]).t = parseInt(v, 10); allesZeichnen(); }
 
-// ---- DB S-Bahn: Pillenfarben je Linie ---------------------------------------------------
-// Gelten fuer den Stil, nicht je Display: eine Linie hat ueberall dieselbe Farbe. Am Geraet
-// stehen sie im displaysettings-Segment des Stils als grosses P (c5|P...): "Linie:flaeche:schrift"
-// komma-getrennt, Hex ohne '#'. Ohne Eintrag gilt die Linienfarbe vom Server (Paul 08.11.2026).
-const sbahnFarben = {};
-function sbahnPListe() {
-  return Object.keys(sbahnFarben).map(ln => {
-    const f = sbahnFarben[ln] || {};
+// ---- Eigene Linienfarben (DB S-Bahn und NL) -------------------------------------------
+// Gelten fuer den STIL, nicht je Display: eine Linie sieht auf allen Brettern mit diesem
+// Design gleich aus. Am Geraet stehen sie im displaysettings-Segment des Stils als grosses
+// P (c5|P..., c27|P...): "Linie:flaeche:schrift" komma-getrennt, Hex ohne '#'. Ohne Eintrag
+// gilt die Linienfarbe vom Server (Paul 08.11.2026; fuer NL kommt sie seit 18.11.2026 aus
+// dem Feed, U-OV-Gelb fcd900 mit schwarzer Schrift).
+// JE STIL eine eigene Liste: die Berliner Pille und die niederlaendische Flaeche teilen
+// sich das Feld nicht, sonst faerbte das eine Display das andere mit.
+const linienFarbenNachStil = {};
+function stilFarben(c) {
+  c = parseInt(c, 10);
+  if (!linienFarbenNachStil[c]) linienFarbenNachStil[c] = {};
+  return linienFarbenNachStil[c];
+}
+function pListeVon(c) {
+  const farben = stilFarben(c);
+  return Object.keys(farben).map(ln => {
+    const f = farben[ln] || {};
     const name = String(ln).replace(/[|;:,]/g, '');
     return (name && f.bg) ? name + ':' + f.bg + ':' + (f.tx || '') : '';
   }).filter(Boolean).join(',');
 }
-function sbahnPLesen(wert) {
-  Object.keys(sbahnFarben).forEach(k => delete sbahnFarben[k]);
+function pLesen(c, wert) {
+  const farben = stilFarben(c);
+  Object.keys(farben).forEach(k => delete farben[k]);
   String(wert || '').split(',').forEach(x => {
     const st = x.split(':');
     const ln = (st[0] || '').trim();
     if (ln && /^[0-9a-fA-F]{6}$/.test(st[1] || '')) {
-      sbahnFarben[ln] = { bg: st[1].toLowerCase(), tx: /^[0-9a-fA-F]{6}$/.test(st[2] || '') ? st[2].toLowerCase() : '' };
+      farben[ln] = { bg: st[1].toLowerCase(), tx: /^[0-9a-fA-F]{6}$/.test(st[2] || '') ? st[2].toLowerCase() : '' };
     }
   });
 }
+// Die Farbe, die ein Stil einer Linie ohne jede Angabe gibt: Berlin hat seine Tabelle nach
+// Verkehrsmittel, die niederlaendische Flaeche faellt auf das Orange der Anzeiger zurueck
+// (ORANGE in dvNlHTML, dieselbe Farbe wie am Geraet).
+function stilErsatzfarbe(c, ln) {
+  if (parseInt(c, 10) === 27) return 'f5a000';
+  return (typeof dvSBahnErsatzfarbe === 'function' ? dvSBahnErsatzfarbe(ln) : '#009640').replace('#', '');
+}
 // Was fuer eine Linie gerade gilt: eigene Farbe, sonst die vom Server, sonst die Tabelle
-// der Firmware nach Verkehrsmittel. Schrift ohne Angabe nach Helligkeit wie am Geraet.
-function sbahnLinieFarben(ln, dep) {
-  const eigen = sbahnFarben[ln];
+// des Stils. Schrift ohne Angabe nach Helligkeit wie am Geraet.
+function linieFarbenVon(c, ln, dep) {
+  const eigen = stilFarben(c)[ln];
   const amt = eigenAmtlich(dep);
-  const bg = (eigen && eigen.bg) || (amt && amt.bg)
-          || (typeof dvSBahnErsatzfarbe === 'function' ? dvSBahnErsatzfarbe(ln) : '#009640').replace('#', '');
+  const bg = (eigen && eigen.bg) || (amt && amt.bg) || stilErsatzfarbe(c, ln);
   let tx = (eigen && eigen.tx) || (!eigen && amt && amt.tx) || '';
   if (!tx) {
     const n = parseInt(bg, 16);
@@ -4865,34 +4952,39 @@ function sbahnLinieFarben(ln, dep) {
   }
   return { bg: bg.toLowerCase(), tx: tx.toLowerCase() };
 }
-function sbahnLinienHtml(c) {
-  const deps = eigenLinienDeps(c);
+function linienFarbenHtml(c) {
+  const ci = parseInt(c, 10);
+  const deps = eigenLinienDeps(ci);
   const linien = Array.from(deps.keys());
+  // Berlin traegt Pillen, die NL-Anzeiger eine eckige Flaeche mit rechtsbuendiger Nummer:
+  // die Probe hier soll aussehen wie das, was hinterher auf dem Display steht.
+  const rund = (ci === 27) ? '3px' : '999px';
+  const wortFlaeche = (ci === 27) ? 'Fläche' : 'Pille';
   if (!linien.length) {
     return '<div class="hinweis" style="margin-top:0">Auf diesem Display liegt noch keine Linie. '
-         + 'Sobald eine daliegt, kannst du ihre Pille hier einf\u00e4rben.</div>';
+         + 'Sobald eine daliegt, kannst du ihre Farbe hier setzen.</div>';
   }
   let h = '<div class="hinweis" style="margin-top:0">Ohne eigene Farbe nimmt jede Linie ihre '
-        + 'offizielle Farbe. Die eigenen Farben gelten auf allen DB-S-Bahn-Displays.</div>';
+        + 'offizielle Farbe. Die eigenen Farben gelten auf allen Displays mit diesem Design.</div>';
   linien.forEach(ln => {
-    const an = !!sbahnFarben[ln];
-    const f = sbahnLinieFarben(ln, deps.get(ln));
+    const an = !!stilFarben(ci)[ln];
+    const f = linieFarbenVon(ci, ln, deps.get(ln));
     const ln2 = escapeHtmlFt(ln);
     const arg = "'" + String(ln).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-    h += '<div class="linienfarbe" data-linie="' + ln2 + '"><div class="kopf">'
-       + '<b style="background:#' + f.bg + ';color:#' + f.tx + ';border-radius:999px">' + ln2 + '</b>'
+    h += '<div class="linienfarbe" data-stil="' + ci + '" data-linie="' + ln2 + '"><div class="kopf">'
+       + '<b style="background:#' + f.bg + ';color:#' + f.tx + ';border-radius:' + rund + '">' + ln2 + '</b>'
        + '<span class="wort">' + (an ? 'Eigene Farbe' : 'Offizielle Farbe') + '</span>'
        + '<button class="schiene' + (an ? ' an' : '') + '" role="switch"'
        + ' aria-checked="' + (an ? 'true' : 'false') + '"'
-       + ' onclick="sbahnLinieSchalten(' + arg + ')"><span class="kugel"></span></button>'
+       + ' onclick="linieFarbeSchalten(' + ci + ',' + arg + ')"><span class="kugel"></span></button>'
        + '</div>';
     if (an) {
       h += '<div class="farbfelder">'
-         + [['bg', 'Pille'], ['tx', 'Schrift']].map(fd =>
+         + [['bg', wortFlaeche], ['tx', 'Schrift']].map(fd =>
              '<label class="farbfeld"><span>' + fd[1] + '</span>'
            + '<input type="color" value="#' + f[fd[0]] + '"'
-           + ' oninput="sbahnLinieFarbe(' + arg + ',\'' + fd[0] + '\', this.value, false)"'
-           + ' onchange="sbahnLinieFarbe(' + arg + ',\'' + fd[0] + '\', this.value, true)"></label>'
+           + ' oninput="linieFarbeSetzen(' + ci + ',' + arg + ',\'' + fd[0] + '\', this.value, false)"'
+           + ' onchange="linieFarbeSetzen(' + ci + ',' + arg + ',\'' + fd[0] + '\', this.value, true)"></label>'
            ).join('')
          + '</div>';
     }
@@ -4902,24 +4994,26 @@ function sbahnLinienHtml(c) {
 }
 // An: die Linie bekommt einen eigenen Eintrag, gleich mit ihrer heutigen Farbe. Aus: wieder
 // die offizielle.
-function sbahnLinieSchalten(ln) {
-  if (sbahnFarben[ln]) delete sbahnFarben[ln];
-  else sbahnFarben[ln] = sbahnLinieFarben(ln, eigenLinienDeps(5).get(ln));
+function linieFarbeSchalten(c, ln) {
+  const farben = stilFarben(c);
+  if (farben[ln]) delete farben[ln];
+  else farben[ln] = linieFarbenVon(c, ln, eigenLinienDeps(c).get(ln));
   allesZeichnen();
 }
-function sbahnLinieFarbe(ln, feld, wert, fertig) {
-  if (!sbahnFarben[ln]) sbahnFarben[ln] = sbahnLinieFarben(ln, eigenLinienDeps(5).get(ln));
-  sbahnFarben[ln][feld] = String(wert == null ? '' : wert).replace('#', '').toLowerCase();
-  // Beim Ziehen nur die Vorschau und die Pillen hier, nicht den ganzen Editor: sonst fliegt
+function linieFarbeSetzen(c, ln, feld, wert, fertig) {
+  const farben = stilFarben(c);
+  if (!farben[ln]) farben[ln] = linieFarbenVon(c, ln, eigenLinienDeps(c).get(ln));
+  farben[ln][feld] = String(wert == null ? '' : wert).replace('#', '').toLowerCase();
+  // Beim Ziehen nur die Vorschau und die Proben hier, nicht den ganzen Editor: sonst fliegt
   // der offene Farbwaehler aus dem Dokument (wie eigenZiehtFrisch).
   if (fertig) { allesZeichnen(); return; }
   streifenZeichnen();
   ausgabeZeichnen();
-  const deps = eigenLinienDeps(5);
-  document.querySelectorAll('.linienfarbe').forEach(el => {
+  const deps = eigenLinienDeps(c);
+  document.querySelectorAll('.linienfarbe[data-stil="' + parseInt(c, 10) + '"]').forEach(el => {
     const name = el.dataset.linie, chip = el.querySelector('b');
     if (!name || !chip) return;
-    const f = sbahnLinieFarben(name, deps.get(name));
+    const f = linieFarbenVon(c, name, deps.get(name));
     chip.style.background = '#' + f.bg;
     chip.style.color = '#' + f.tx;
   });
@@ -5791,7 +5885,8 @@ function eintraegeAusZeilen(zeilen) {
       switch (buch) {
         case 'c': e.c = zahl(wert); break;
         case 'r': e.r = zahl(wert); break;
-        case 'z': e.z = zahl(wert); break;
+        // z1m, z3m: Uhr ohne Sekunden (siehe uhrFormatTeil)
+        case 'z': e.z = zahl(wert); e.zOhneSek = /m$/i.test(wert); break;
         case 's': e.s = zahl(wert); break;
         case 'd': e.dnr = zahl(wert); break;
         case 'y': e.y = zahl(wert); break;   // Automatik, siehe automatikMoeglich
@@ -5825,12 +5920,17 @@ function eintraegeAusZeilen(zeilen) {
     if (!hatA && e.c && zweiteNachStil[e.c] !== undefined) {
       e.e.a = zweiteNachStil[e.c];
     }
-    // Die Alt-Orange-Matrix 18 zeichnet am Geraet ORANGE, auch ohne t in der Zeile
-    // (resolveGroupLook: tDef = 3 fuer 15 und 18). Sie heisst jetzt Matrix, und die liest
-    // ihren Farbton aus t. Ohne diese Zeile wuerde ein Berliner Brett beim naechsten
-    // Speichern weiss, obwohl der Kunde nichts angefasst hat.
+    // Die Berliner Alt-Stile 3 und 18 werden zur Matrix in Orange. Die 18 zeichnete am
+    // Geraet schon orange, auch ohne t in der Zeile (resolveGroupLook: tDef = 3 fuer 15
+    // und 18); die 3 hatte gar keinen eigenen Renderer. Die Matrix liest ihren Farbton
+    // aus t: ohne diese Zeile stuende ein Berliner Brett beim naechsten Speichern weiss
+    // da, obwohl der Kunde nichts angefasst hat.
     const hatT = teile.slice(2).some(t => t.trim()[0] === 't');
-    if (!hatT && e.c === 18) e.e.t = 3;
+    if (!hatT && (e.c === 3 || e.c === 18)) e.e.t = 3;
+    // Und es blinkt wie in Berlin: bei 0 faellt die Zahl weg, dafuer blinkt das Ziel (o2).
+    // Paul 21.11.2026: "sondern mit matrix orange und beim blinken einstellung wie berlin".
+    const hatO = teile.slice(2).some(t => t.trim()[0] === 'o');
+    if (!hatO && (e.c === 3 || e.c === 18)) e.e.o = 2;
     raus.push(e);
   });
   return raus;
@@ -6177,12 +6277,16 @@ function uebergabeHolen() {
   if (roh.zweiteAbfahrt !== undefined) {
     zweiteStart = (parseInt(roh.zweiteAbfahrt, 10) === 0) ? 0 : 1;
   }
-  // Linienfarben von DB S-Bahn: zuerst das Geraet, denn nur dort stehen sie.
-  [(roh.geraet && roh.geraet.displaysettings) || '', roh.displaysettings || ''].some(z => {
-    const seg = String(z).split(';').map(x => x.trim()).find(x => /^c5\|/.test(x));
-    const pT = seg && seg.split('|').map(x => x.trim()).find(x => x[0] === 'P');
-    if (pT) { sbahnPLesen(pT.slice(1)); return true; }
-    return false;
+  // Eigene Linienfarben: zuerst das Geraet, denn nur dort stehen sie. Je Stil getrennt
+  // lesen, sonst faerbte die Berliner Pille die niederlaendische Flaeche mit.
+  Object.keys(STIL_KANN).filter(c => (STIL_KANN[c] || {}).linienFarben).forEach(c => {
+    const re = new RegExp('^c' + parseInt(c, 10) + '\\|');
+    [(roh.geraet && roh.geraet.displaysettings) || '', roh.displaysettings || ''].some(z => {
+      const seg = String(z).split(';').map(x => x.trim()).find(x => re.test(x));
+      const pT = seg && seg.split('|').map(x => x.trim()).find(x => x[0] === 'P');
+      if (pT) { pLesen(c, pT.slice(1)); return true; }
+      return false;
+    });
   });
   String(roh.displaysettings || (roh.geraet && roh.geraet.displaysettings) || '')
     .split(';').forEach(seg => {
@@ -6400,13 +6504,22 @@ function displaysAusEintraegen(eintraege) {
     else if (erste.z > 1) d.richtungen.splice(erste.z - 2, 0, UHR_KEY);
     if (gruppen.length) d.gruppen = gruppen;
     if (erste.c) d.stil = erste.c;
-    if (erste.w) d.fenster = erste.w;
+    // Das Fenster kommt als Stunden-Zahlen (w3-7), die Auswahl fuehrt aber "03:00". Mit den
+    // Zahlen war dort keine Stunde ausgewaehlt, beide Felder standen auf 00:00 und das
+    // gespeicherte Fenster war unsichtbar (Kunde Andreas 18.11.2026: Display 1 trug 3 bis 7
+    // Uhr und blieb am Vormittag dunkel, die Seite zeigte 00:00 bis 00:00).
+    if (erste.w) {
+      const hh = n => { n = ((n % 24) + 24) % 24; return (n < 10 ? '0' : '') + n + ':00'; };
+      d.fenster = { von: hh(erste.w.von), bis: hh(erste.w.bis) };
+    }
     if (erste.s) d.sortierung = (erste.s === 3) ? 'zeit' : 'fest';
     // Zeilenzahl nur dann als EIGENE Wahl merken, wenn sie von der Automatik abweicht.
     // Sonst waere jedes wiederhergestellte Brett auf seinen alten Stand festgenagelt und
     // eine spaeter dazugelegte Linie bekaeme keine Zeile mehr (27.10.2026).
     if (erste.r && erste.r !== zeilenAuto(d)) d.zeilen = erste.r;
     d.einst = erste.e;
+    // Alter 12-Zeichen-Schnitt des Stationsnamens in der NL-Kopfzeile: voller Name
+    if (d.einst && d.einst.kopf) d.einst.kopf = nlKopfHeilen(d.einst.kopf, d);
     if (buendel.some(ein => ein.y === 1)) d.auto = true;
     // Ein Zeilen-Schluessel gehoert zu GENAU EINEM Brett. Die Oberflaeche sagt das beim
     // Auflegen selbst ("schon auf Display 2") und kann so einen Stand gar nicht bauen.
@@ -6439,6 +6552,13 @@ function displaysAusEintraegen(eintraege) {
   });
   if (misslungen || !neu.length) return false;
   displays = neu;
+  // Liegt eine Uhr auf einem Brett, ist sie an, samt ihrem Format. Bis 18.11.2026 stand der
+  // Schalter beim naechsten Oeffnen auf Aus und das Format auf 14:07:32, obwohl die Uhr
+  // gespeichert war (Kunde Andreas: "Kein Aspekt davon wird gespeichert").
+  if (neu.some(hatUhrZeile)) {
+    uhrAn = true;
+    uhrSekunden = !eintraege.some(ein => ein.z >= 1 && ein.zOhneSek);
+  }
   return true;
 }
 
@@ -6471,6 +6591,7 @@ function aussehenUebernehmen(eintraege) {
     if (d.vomNutzer) return;
     d.stil = c;
     d.einst = Object.assign({}, mit[0].e);
+    if (d.einst.kopf) d.einst.kopf = nlKopfHeilen(d.einst.kopf, d);   // alter 12er-Schnitt
   });
   return true;
 }

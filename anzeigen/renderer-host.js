@@ -29,8 +29,8 @@ function dvHostLoadDisplaySettings(zeile) {
       if (!f) continue;
       var key = f.charAt(0);
       var rest = f.substring(1);
-      // Zeitfenster 'w', die Linienfarben 'P' (DB S-Bahn) und der Stationsname '#'
-      // (NL-Kopfzeile) bleiben Text, alles andere ist eine Zahl.
+      // Zeitfenster 'w', die eigenen Linienfarben 'P' (DB S-Bahn und NL) und der
+      // Stationsname '#' (NL-Kopfzeile) bleiben Text, alles andere ist eine Zahl.
       werte[key] = (key === 'w' || key === 'P' || key === '#') ? rest : parseInt(rest, 10);
     }
     out[colour] = werte;

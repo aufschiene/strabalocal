@@ -13653,6 +13653,60 @@ async function selectStopForEdit(id, name, existingDirections, existingFilter) {
     if (_gen !== _pickerGen) return;
     _availableLinesStop = `${selectedNetwork}:${id}`;
 
+    // GESPEICHERTE RICHTUNG OHNE ABFAHRT NACHTRAGEN (Kunde Dresden, 18.11.2026).
+    // Richtungen, die gerade nicht im Abfahrtsfenster liegen (Abend, Wochenende, Ferien,
+    // Betriebspause, gedrosselter Upstream), bekamen hier gar keine Zeile. Der Kunde sah
+    // seine Auswahl unvollstaendig ("es fehlen wieder Haekchen"), und das naechste
+    // "Aktualisieren" baute die Station nur noch aus den SICHTBAREN Zeilen: die Richtung
+    // war damit endgueltig aus der Config geloescht.
+    // Gemessen an Dresden Foersterlingstrasse: 65 nach Luga und 88 nach Kleinzschachwitz
+    // fielen aus dem Fenster, 65 nach Blasewitz und 88 nach Goppeln blieben drin.
+    // augmentLinesFromLinesEndpoint kann die Luecke nicht fuellen: /stops/lines liefert
+    // fuer DELFI-Netze alle Ziele OHNE richtungsId, und eine Linie, die schon faehrt,
+    // laesst es bewusst unangetastet (sonst ueberschriebe eine Pseudo-Richtung die echte).
+    // Die gespeicherte Richtung traegt ihre richtungsId aber selbst, also als eigene Zeile
+    // nachtragen. Ihr Zieltext kommt, wenn vorhanden, aus der Config bzw. dem Linien-Index.
+    if (existingDirections && existingDirections.length) {
+      // Gleiche Prefix-Regel wie die Vorauswahl unten (und die Firmware): die Steig-rid ist
+      // seit 2026-08 linien-eindeutig, Alt-Configs tragen die kurze Form.
+      const _ridGleich = (a, b) => {
+        a = String(a || '').trim(); b = String(b || '').trim();
+        if (!a || !b) return false;
+        return a === b || b.startsWith(a + 'l') || a.startsWith(b + 'l');
+      };
+      const _normZiel = t => (typeof destDedupeKey === 'function')
+        ? destDedupeKey(t) : String(t == null ? '' : t).trim().toLowerCase();
+      const _ridTexte = (window._dirTextByStop || {})[`${selectedNetwork}:${id}`] || {};
+      let _nachgetragen = 0;
+      existingDirections.forEach(d => {
+        if (!d || !d.line) return;
+        const ref = String(d.richtungsId || '').trim();
+        const txt = String(d.towards || '').trim();
+        // Ohne jede Richtungsangabe ist nichts nachzutragen: die Vorauswahl unten hakt
+        // eine solche Alt-Config ohnehin ueber den reinen Liniennamen an.
+        if (!ref && !txt) return;
+        // Schon da? Per richtungsId, per Zieltext der Config oder per Zieltext IM ref
+        // (Netze ohne richtungsId speichern den Zieltext an dieser Stelle).
+        const schonDa = availableLines.some(l => l.name === d.line && (
+          (!!ref && _ridGleich(ref, l.richtungsId))
+          || (!!txt && _normZiel(txt) === _normZiel(l.towards))
+          || (!!ref && _normZiel(ref) === _normZiel(l.towards))));
+        if (schonDa) return;
+        const _tw = ref ? _ridTexte[String(d.line) + '|' + ref] : '';
+        // Ohne Zieltext darf die Zeile NICHT leer bleiben: renderLines schreibt bei leerem
+        // Ziel "Alle Richtungen", und das waere das Gegenteil dessen, was die Zeile meint.
+        // In die Config kommt der Platzhalter nie, dort gewinnt immer die richtungsId.
+        const ziel = txt || (Array.isArray(_tw) ? _tw[0] : _tw) || 'zur Zeit keine Abfahrt';
+        availableLines.push({ name: d.line, towards: ziel, type: d.type || '',
+                              richtungsId: ref, stopovers: [] });
+        _nachgetragen++;
+      });
+      if (_nachgetragen) {
+        availableLines.sort(compareLinesForDisplay);
+        console.log('[Picker] ' + _nachgetragen + ' gespeicherte Richtung(en) ohne aktuelle Abfahrt nachgetragen');
+      }
+    }
+
     // Vorauswahl: Markiere Linien die bereits ausgewählt waren
 
     availableLines.forEach((line, idx) => {
@@ -13807,11 +13861,46 @@ function nlFaehig() { return fwAtLeast(NL_MIN_FW); }
 
 // Der Stationsname in der NL-Kopfzeile (Feld '#'): offenes Feintuning-Feld zuerst, dann
 // der gespeicherte Wert, sonst die erste Station dieses Displays, Teil nach dem letzten
-// Komma ("Utrecht, Janskerkhof" wird "Janskerkhof"). Hoechstens 12 Zeichen, nie '|', ';'
-// oder ',': die drei trennen im Geraeteformat Felder, Linien und Eintraege.
-var NL_KOPF_MAX = 12;
+// Komma ("Utrecht, Janskerkhof" wird "Janskerkhof"). Hoechstens 32 Zeichen, nie '|', ';'
+// oder ',': die drei trennen im Geraeteformat Felder, Linien und Eintraege. Was nicht
+// zwischen Bus und Uhr passt, kuerzt das Geraet selbst nach Pixeln (226 px, seit 2.6.12),
+// die Vorschau (dvNlHTML) genauso. Bis 18.11.2026 stand hier 12, und der Kunde sah
+// "Station Stad" statt "Station Stadspolders".
+var NL_KOPF_MAX = 32;
 function nlKopfSauber(t) {
   return String(t == null ? '' : t).replace(/[|;,]/g, ' ').slice(0, NL_KOPF_MAX).trim();
+}
+// Teil nach dem letzten Komma, VOR dem Kuerzen getrimmt (sonst zaehlt das Leerzeichen nach
+// dem Komma mit, und aus "Utrecht, Station Stadspolders" wurde bei 12 "Station Sta").
+function nlKopfAusName(voll) {
+  voll = String(voll || '');
+  var i = voll.lastIndexOf(',');
+  return nlKopfSauber((i >= 0 ? voll.slice(i + 1) : voll).trim());
+}
+// Gespeichert ist vielleicht noch der alte Schnitt nach 12 Zeichen. Steht genau so ein
+// Schnitt eines Stationsnamens dieses Displays im Feld, gilt der volle Name, sonst muesste
+// jeder Bestandskunde neu tippen. Nur der genaue Schnitt: ein selbst getipptes "Station"
+// bleibt. Beide alten Fassungen: hier ungetrimmt geschnitten, in anzeigen.html getrimmt.
+var NL_KOPF_ALT = 12;
+function nlKopfHeilen(kopf, cid) {
+  var k = String(kopf == null ? '' : kopf);
+  if (!k || k.length > NL_KOPF_ALT) return kopf;
+  var sauber = function(t) { return String(t).replace(/[|;,]/g, ' '); };
+  var alle = (typeof stations !== 'undefined') ? stations : [];
+  var voll = null;
+  alle.forEach(function(x) {
+    if (voll) return;
+    var c = (typeof stationDisplayColour === 'function') ? stationDisplayColour(x) : NaN;
+    if (parseInt(c, 10) !== parseInt(cid, 10)) return;
+    var name = String(x.stopName || x.name || '');
+    var i = name.lastIndexOf(',');
+    var teil = i >= 0 ? name.slice(i + 1) : name;
+    var ganz = nlKopfAusName(name);
+    if (ganz.length <= k.length) return;   // dieser Name war nie gekuerzt
+    if (sauber(teil.trim()).slice(0, NL_KOPF_ALT).trim() === k
+        || sauber(teil).slice(0, NL_KOPF_ALT).trim() === k) voll = ganz;
+  });
+  return voll || kopf;
 }
 function nlKopfVorschlag(cid) {
   var alle = (typeof stations !== 'undefined') ? stations : [];
@@ -13822,15 +13911,13 @@ function nlKopfVorschlag(cid) {
     if (parseInt(c, 10) === parseInt(cid, 10)) st = x;
   });
   if (!st) st = alle[0];
-  var voll = String((st && (st.stopName || st.name)) || '');
-  var i = voll.lastIndexOf(',');
-  return nlKopfSauber(i >= 0 ? voll.slice(i + 1) : voll);
+  return nlKopfAusName(st && (st.stopName || st.name));
 }
 function nlKopfWert(cid) {
   var el = document.getElementById('ftNlKopf_' + cid);
   if (el) return nlKopfSauber(el.value);
   var ds = (typeof dsStrVal === 'function') ? dsStrVal(cid, '#') : undefined;
-  if (ds !== undefined) return nlKopfSauber(ds);
+  if (ds !== undefined) return nlKopfSauber(nlKopfHeilen(ds, cid));
   return nlKopfVorschlag(cid);
 }
 // Beim Tippen nur die Vorschau nachziehen, nicht die ganze Karte: sonst waere der Fokus
@@ -18324,14 +18411,13 @@ function renderDisplayTypeSections() {
       var nlJetzt = nlKopfWert(dt.colour);
       var nlNamen = [];
       (dt.stations || []).forEach(function(s) {
-        var voll = String(s.stopName || s.name || '');
-        var ci = voll.lastIndexOf(',');
-        var kurz = nlKopfSauber(ci >= 0 ? voll.slice(ci + 1) : voll);
+        var kurz = nlKopfAusName(s.stopName || s.name);
         if (kurz && nlNamen.indexOf(kurz) < 0) nlNamen.push(kurz);
       });
       html += '<div class="form-row"><div><div class="form-label">Name in der Kopfzeile</div>'
             + '<div class="form-hint">Steht oben zwischen Bus-Symbol und Uhr, h&ouml;chstens '
-            + NL_KOPF_MAX + ' Zeichen. Leer lassen hei&szlig;t: kein Name</div></div></div>';
+            + NL_KOPF_MAX + ' Zeichen. Was dort nicht hinpasst, k&uuml;rzt das Display hinten. '
+            + 'Leer lassen hei&szlig;t: kein Name</div></div></div>';
       html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;">';
       if (nlNamen.length) {
         html += '<select onchange="nlKopfUebernehmen(' + dt.colour + ', this.value)" style="padding:8px 10px;border-radius:8px;border:1px solid #ddd;font-size:14px;">'
@@ -19998,10 +20084,12 @@ var DV_DEMO_DATA = {
   16: [{ line: '22', dest: 'Bílá Hora', time: 3 }, { line: '9', dest: 'Sídliště Řepy', time: 6 }, { line: 'A', dest: 'Nemocnice Motol', time: 8 }],
   22: [{ line: 'U3', dest: 'Moosach', time: 3 }, { line: 'U6', dest: 'Klinikum Großhadern', time: 5 }, { line: '12', dest: 'Amalienburgstraße', time: 8 }],
   25: [{ line: 'IR16', dest: 'Bern', time: 7 }, { line: 'IC1', dest: 'Genève-Aéroport', time: 23 }],
-  27: [{ line: '7', dest: 'Zuilen', time: 0, via: 'Utrecht CS', lineColor: '#f5a000', lineTextColor: '#191919' },
-       { line: '65', dest: 'Utrecht CS', time: 8, lineColor: '#f5a000', lineTextColor: '#191919' },
-       { line: '77', dest: 'Bilthoven', time: 9, via: 'Utrecht CS', lineColor: '#2196f3', lineTextColor: '#ffffff' },
-       { line: '74', dest: 'Driebergen-Zeist', time: 14, via: 'Utrecht CS', lineColor: '#f5a000', lineTextColor: '#191919' }],
+  // Die Farben sind die des Feeds, wie der Server sie seit 18.11.2026 liefert: U-OV-Bus
+  // fcd900 mit schwarzer Schrift, die 77 blau. Gelb mit weisser Schrift waere falsch.
+  27: [{ line: '7', dest: 'Zuilen', time: 0, via: 'Utrecht CS', lineColor: '#fcd900', lineTextColor: '#191919' },
+       { line: '65', dest: 'Utrecht CS', time: 8, lineColor: '#fcd900', lineTextColor: '#191919' },
+       { line: '77', dest: 'Bilthoven', time: 9, via: 'Utrecht CS', lineColor: '#00b3ff', lineTextColor: '#ffffff' },
+       { line: '74', dest: 'Driebergen-Zeist', time: 14, via: 'Utrecht CS', lineColor: '#fcd900', lineTextColor: '#191919' }],
   26: [{ line: '12', dest: 'Schaan', time: 4 }, { line: '11', dest: 'Vaduz Post', time: 7 }, { line: 'S2', dest: 'Buchs SG', time: 12 }],
   10: [{ line: 'U1', dest: 'Leopoldau', time: 3, dest2: 'Alaudagasse', time2: 8 }, { line: '31', dest: 'Stammersdorf', time: 5, dest2: 'Schottenring', time2: 12 }],
   101: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
@@ -20688,8 +20776,25 @@ function dvHexRgb(css) {
   return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
 }
 
+// Eigene Linienfarben aus c<stil>|P ("Linie:flaeche:schrift", komma-getrennt), wie
+// setPerLineBadgeColors der Firmware. Die Berliner S-Bahn-Pille und die niederlaendische
+// Flaeche lesen dasselbe Feld, jede aus ihrem eigenen Stil-Segment.
+function dvEigeneLinienFarben(colour) {
+  // dsVal des Konfigurators parst Zahlen und gaebe fuer die Liste nichts zurueck; in
+  // anzeigen.html haelt es sie als Text. Darum zuerst dsStrVal fragen.
+  var roh = (typeof dsStrVal === 'function') ? dsStrVal(colour, 'P') : undefined;
+  if (roh == null && typeof dsVal === 'function') roh = dsVal(colour, 'P');
+  var raus = {};
+  String(roh == null ? '' : roh).split(',').forEach(function (x) {
+    var st = x.split(':');
+    var ln = (st[0] || '').trim();
+    var bg = dvLineColorCss(st[1]);
+    if (ln && bg) raus[ln] = { bg: bg, fg: dvLineColorCss(st[2]) };
+  });
+  return raus;
+}
 // ---------- NL (display_nl.cpp, colour 27: die Haltestellen-Anzeiger in den Niederlanden) ----------
-// Dunkelblaue Kopfzeile mit Stationsname (Feld '#', bis 12 Zeichen) und Uhr, darunter die
+// Dunkelblaue Kopfzeile mit Stationsname (Feld '#', bis 32 Zeichen, nach Breite gekuerzt) und Uhr, darunter die
 // Spaltenleiste im eingebauten 5x7-Font, dann weisse Zeilen: Linie rechtsbuendig in ihrer
 // Spalte (mit Flaeche in der Linienfarbe, Feld u), das Echtzeit-Zeichen ((o)) oder drei
 // Punkte, das Ziel und darunter klein "via ..." oder "rit 10:56 vervalt", rechts die
@@ -20723,12 +20828,29 @@ function dvFsUnter(schrift, text) {
   });
   return u;
 }
-// Hinten kuerzen wie kuerze() am Geraet, mit Punkt wo das Geraet einen setzt
-function dvFsKuerzen(schrift, text, breite, mitPunkt) {
+// Hinten kuerzen wie kuerze() am Geraet, mit Punkt wo das Geraet einen setzt. tft: messen wie
+// TFT_eSPI (dvTftBreite), fuer Stellen, an denen die Vorschau aufs Pixel stimmen muss.
+function dvFsKuerzen(schrift, text, breite, mitPunkt, tft) {
+  var mass = tft ? dvTftBreite : dvGeraetBreite;
   var t = String(text == null ? '' : text), ende = mitPunkt ? '.' : '';
-  if (dvGeraetBreite(schrift, t) <= breite) return t;
-  while (t.length > 1 && dvGeraetBreite(schrift, t + ende) > breite) t = t.slice(0, -1);
+  if (mass(schrift, t) <= breite) return t;
+  while (t.length > 1 && mass(schrift, t + ende) > breite) t = t.slice(0, -1);
   return t.replace(/\s+$/, '') + ende;
+}
+// Was TFT_eSPI fuer das LETZTE Zeichen misst: nicht den Vorschub, sondern xOffset + Breite
+// der Glyphe (textWidth in TFT_eSPI.cpp, auch bei Ziffern). Wo das Geraet mit textWidth
+// kuerzt oder mittet, passt am Rand darum oft ein Zeichen mehr, als die Vorschub-Summe
+// sagt: die NL-Kopfzeile zeigte "Jaarbeurs", das Geraet "Jaarbeursp" (18.11.2026). Werte aus
+// FreeSansExt9pt7bGlyphs, Aufbau wie DV_GERAET_BREITE (Zeichen - 48).
+var DV_GERAET_LETZT = {
+  sans9: '045:9?;3556:3535969999999933:::9A<;<<;:=<38<:><=;=<;;<;@;<;5547:4998995993393>999968599=8885358'
+};
+function dvTftBreite(schrift, text) {
+  var t = String(text == null ? '' : text), l = DV_GERAET_LETZT[schrift];
+  if (!t || !l) return dvGeraetBreite(schrift, t);
+  var i = t.charCodeAt(t.length - 1) - 32;
+  if (i < 0 || i >= l.length) return dvGeraetBreite(schrift, t);
+  return dvGeraetBreite(schrift, t.slice(0, -1)) + (l.charCodeAt(i) - 48);
 }
 // Ein Text auf der Grundlinie. "fett" zeichnet ihn zweimal um 1 px versetzt: die 9pt gibt
 // es nur mager, und das Geraet macht daraus genauso sein Halbfett.
@@ -20842,6 +20964,8 @@ function dvNlHTML(colour, data, rows, previewEl) {
   var echteZeilen = zeilen.filter(function (d) { return d && d.line && !d.uhr; });
   // Feld u: Flaeche in der Linienfarbe an oder aus. Vorgabe an, wie auf dem Utrecht-Foto.
   var flaecheAn = dvSetting(colour, 'ftWienBadges_', 'u', 1) > 0;
+  // Eigene Farben des Kunden (c27|P). Ohne Eintrag gilt die Farbe aus dem Feed.
+  var eigene = dvEigeneLinienFarben(colour);
   var nullArt = dvSetting(colour, 'ftBlink_', 'o', 0);
 
   // Linienspalte der Seite: so breit wie die laengste Linie, alle Zeilen buendig.
@@ -20872,12 +20996,12 @@ function dvNlHTML(colour, data, rows, previewEl) {
 
   // === Kopfzeile + Spaltenleiste ===
   var uhr = dvClockStr(false);
-  var uw = dvGeraetBreite('sans9', uhr);
+  var uw = dvTftBreite('sans9', uhr);   // Uhr, Name und Kuerzen gemessen wie am Geraet
   var kBase = dvFsMitte('sans9', 0, KOPF_H);
   var kopfName = String(dvNlKopfText(colour) || '');
   var links = 5 + 22 + 8, rechts = 320 - RAND_R - uw - 8;
-  kopfName = dvFsKuerzen('sans9', kopfName, rechts - links - 1, false);
-  var tw = dvGeraetBreite('sans9', kopfName);
+  kopfName = dvFsKuerzen('sans9', kopfName, rechts - links - 1, false, true);
+  var tw = dvTftBreite('sans9', kopfName);
   var tx = Math.floor((320 - tw) / 2);
   if (tx < links) tx = links;
   if (tx + tw + 1 > rechts) tx = rechts - tw - 1;
@@ -20919,10 +21043,12 @@ function dvNlHTML(colour, data, rows, previewEl) {
           zeit = dvFsText(lx, dvFsMitte('sans9', 0, rowH), 'sans9', ROT, 'vervalt', '', false);
         }
       } else if (cd === 0 && nullArt === 0) {
-        // o0: die Vorgabe dieses Stils ist das Fahrzeug-Symbol
-        var bh = Math.floor(m.busW / 2);
+        // o0: die Vorgabe dieses Stils ist das Fahrzeug-Symbol. Tram und Metro bekommen
+        // ein Achtel mehr Hoehe, sonst nimmt der Stromabnehmer sie dem Wagenkasten weg.
+        var istTram = dvNlFahrzeugArt(dep) > 0;
+        var bh = Math.floor(m.busW / 2) + (istTram ? Math.floor(m.busW / 8) : 0);
         zeit = dvNlBus(R - m.busW, Math.floor((rowH - bh) / 2), m.busW, bh, TINTE, '#ffffff',
-                       dvNlFahrzeugArt(dep) > 0);
+                       istTram);
         lx = R - m.busW;
       } else {
         // o1 laesst die 0 blinken, o2 nimmt sie weg und laesst das Ziel blinken, o3 still
@@ -20944,6 +21070,10 @@ function dvNlHTML(colour, data, rows, previewEl) {
       if (flaecheAn) {
         var bg = dvLineColorCss(dep.lineColor) || ORANGE;
         var fg = dvLineColorCss(dep.lineTextColor);
+        // Eigene Farbe schlaegt die Feedfarbe. Nur hier drin, also nur bei eingeschalteter
+        // Flaeche: ohne Flaeche steht die Nummer in Tinte da, genau wie am Geraet.
+        var eigen = eigene[String(dep.line)];
+        if (eigen) { bg = eigen.bg; fg = eigen.fg; }
         var c = dvHexRgb(bg);
         if (!fg) fg = (c[0] * 299 + c[1] * 587 + c[2] * 114 > 150000) ? TINTE : '#ffffff';
         var by = Math.floor((rowH - m.flaecheH) / 2);
@@ -22873,7 +23003,7 @@ function buildMasterAndTimeRows(gehwegByStopId) {
     var yPart = '';
     if (_automatikNeu && !e.isTime && lines !== '*' && !/\|[yY]\d/.test(_extra)) yPart = '|y1';
     // Stationsname der NL-Kopfzeile (Feld '#', Firmware 2.6.12). Alle 26 Buchstaben sind
-    // am Geraet belegt, darum das Doppelkreuz. Hoechstens 12 Zeichen, nie '|', ';', ','.
+    // am Geraet belegt, darum das Doppelkreuz. Hoechstens 32 Zeichen, nie '|', ';', ','.
     var nlPart = '';
     if (parseInt(e.colour, 10) === 27) {
       var _nlName = nlKopfWert(27);
@@ -23038,6 +23168,11 @@ function buildDisplaySettings() {
       var _nlk = nlKopfWert(cid);
       if (_nlk) parts.push('#' + _nlk);
     }
+    // Eigene Linienfarben je Linie (grosses P) setzt der Kunde in anzeigen.html. Hier
+    // nicht wegwerfen: dieses Segment entsteht beim Speichern neu, und ohne die Zeile
+    // verlor er seine Farben, sobald er den Konfigurator noch einmal durchlief.
+    var _lpf = (typeof dsByCid !== 'undefined' && dsByCid[cid]) ? dsByCid[cid].P : undefined;
+    if (_lpf) parts.push('P' + _lpf);
     // Zeitfenster: Feintuning offen → Toggle-Zustand; sonst gespeicherten Wert behalten.
     var twToggle = document.getElementById('ftTimeWindow_' + cid);
     if (twToggle) {

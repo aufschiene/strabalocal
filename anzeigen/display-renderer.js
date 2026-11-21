@@ -26,10 +26,12 @@ var DV_DEMO_DATA = {
   16: [{ line: '22', dest: 'Bílá Hora', time: 3 }, { line: '9', dest: 'Sídliště Řepy', time: 6 }, { line: 'A', dest: 'Nemocnice Motol', time: 8 }],
   22: [{ line: 'U3', dest: 'Moosach', time: 3 }, { line: 'U6', dest: 'Klinikum Großhadern', time: 5 }, { line: '12', dest: 'Amalienburgstraße', time: 8 }],
   25: [{ line: 'IR16', dest: 'Bern', time: 7 }, { line: 'IC1', dest: 'Genève-Aéroport', time: 23 }],
-  27: [{ line: '7', dest: 'Zuilen', time: 0, via: 'Utrecht CS', lineColor: '#f5a000', lineTextColor: '#191919' },
-       { line: '65', dest: 'Utrecht CS', time: 8, lineColor: '#f5a000', lineTextColor: '#191919' },
-       { line: '77', dest: 'Bilthoven', time: 9, via: 'Utrecht CS', lineColor: '#2196f3', lineTextColor: '#ffffff' },
-       { line: '74', dest: 'Driebergen-Zeist', time: 14, via: 'Utrecht CS', lineColor: '#f5a000', lineTextColor: '#191919' }],
+  // Die Farben sind die des Feeds, wie der Server sie seit 18.11.2026 liefert: U-OV-Bus
+  // fcd900 mit schwarzer Schrift, die 77 blau. Gelb mit weisser Schrift waere falsch.
+  27: [{ line: '7', dest: 'Zuilen', time: 0, via: 'Utrecht CS', lineColor: '#fcd900', lineTextColor: '#191919' },
+       { line: '65', dest: 'Utrecht CS', time: 8, lineColor: '#fcd900', lineTextColor: '#191919' },
+       { line: '77', dest: 'Bilthoven', time: 9, via: 'Utrecht CS', lineColor: '#00b3ff', lineTextColor: '#ffffff' },
+       { line: '74', dest: 'Driebergen-Zeist', time: 14, via: 'Utrecht CS', lineColor: '#fcd900', lineTextColor: '#191919' }],
   26: [{ line: '12', dest: 'Schaan', time: 4 }, { line: '11', dest: 'Vaduz Post', time: 7 }, { line: 'S2', dest: 'Buchs SG', time: 12 }],
   10: [{ line: 'U1', dest: 'Leopoldau', time: 3, dest2: 'Alaudagasse', time2: 8 }, { line: '31', dest: 'Stammersdorf', time: 5, dest2: 'Schottenring', time2: 12 }],
   101: [{ line: 'U1', dest: 'Leopoldau', time: 3 }, { line: 'U2', dest: 'Seestadt', time: 5 }, { line: '31', dest: 'Stammersdorf', time: 8 }],
@@ -572,10 +574,15 @@ function dvHexRgb(css) {
 }
 // Hintergrund nach Feld t wie setColorVariant der Firmware: 1 Blau, 2 Hellblau, 3 Dunkelblau
 var DV_SBAHN_GRUND = { 1: '#003cb4', 2: '#2878e1', 3: '#001e64' };
-// Eigene Pillenfarben aus c5|P ("Linie:flaeche:schrift", komma-getrennt), wie setPerLineBadgeColors
-function dvSBahnEigeneFarben(colour) {
+// Eigene Linienfarben aus c<stil>|P ("Linie:flaeche:schrift", komma-getrennt), wie
+// setPerLineBadgeColors der Firmware. Die Berliner S-Bahn-Pille und die niederlaendische
+// Flaeche lesen dasselbe Feld, jede aus ihrem eigenen Stil-Segment.
+function dvEigeneLinienFarben(colour) {
+  // dsVal des Konfigurators parst Zahlen und gaebe fuer die Liste nichts zurueck; in
+  // anzeigen.html haelt es sie als Text. Darum zuerst dsStrVal fragen.
+  var roh = (typeof dsStrVal === 'function') ? dsStrVal(colour, 'P') : undefined;
+  if (roh == null && typeof dsVal === 'function') roh = dsVal(colour, 'P');
   var raus = {};
-  var roh = (typeof dsVal === 'function') ? dsVal(colour, 'P') : undefined;
   String(roh == null ? '' : roh).split(',').forEach(function (x) {
     var st = x.split(':');
     var ln = (st[0] || '').trim();
@@ -586,7 +593,7 @@ function dvSBahnEigeneFarben(colour) {
 }
 function dvSBerlinHTML(colour, data, rows, previewEl) {
   var BG = DV_SBAHN_GRUND[dvSetting(colour, 'ftTxtCol_', 't', 1)] || DV_SBAHN_GRUND[1];
-  var eigene = dvSBahnEigeneFarben(colour);
+  var eigene = dvEigeneLinienFarben(colour);
   previewEl.style.background = BG;
   previewEl.style.backgroundImage = 'none';
   var rowH = Math.floor(170 / rows);
@@ -1241,7 +1248,7 @@ function dvFreeColorHTML(colour, data, rows, previewEl, cfg) {
 }
 
 // ---------- NL (display_nl.cpp, colour 27: die Haltestellen-Anzeiger in den Niederlanden) ----------
-// Dunkelblaue Kopfzeile mit Stationsname (Feld '#', bis 12 Zeichen) und Uhr, darunter die
+// Dunkelblaue Kopfzeile mit Stationsname (Feld '#', bis 32 Zeichen, nach Breite gekuerzt) und Uhr, darunter die
 // Spaltenleiste im eingebauten 5x7-Font, dann weisse Zeilen: Linie rechtsbuendig in ihrer
 // Spalte (mit Flaeche in der Linienfarbe, Feld u), das Echtzeit-Zeichen ((o)) oder drei
 // Punkte, das Ziel und darunter klein "via ..." oder "rit 10:56 vervalt", rechts die
@@ -1275,12 +1282,29 @@ function dvFsUnter(schrift, text) {
   });
   return u;
 }
-// Hinten kuerzen wie kuerze() am Geraet, mit Punkt wo das Geraet einen setzt
-function dvFsKuerzen(schrift, text, breite, mitPunkt) {
+// Hinten kuerzen wie kuerze() am Geraet, mit Punkt wo das Geraet einen setzt. tft: messen wie
+// TFT_eSPI (dvTftBreite), fuer Stellen, an denen die Vorschau aufs Pixel stimmen muss.
+function dvFsKuerzen(schrift, text, breite, mitPunkt, tft) {
+  var mass = tft ? dvTftBreite : dvGeraetBreite;
   var t = String(text == null ? '' : text), ende = mitPunkt ? '.' : '';
-  if (dvGeraetBreite(schrift, t) <= breite) return t;
-  while (t.length > 1 && dvGeraetBreite(schrift, t + ende) > breite) t = t.slice(0, -1);
+  if (mass(schrift, t) <= breite) return t;
+  while (t.length > 1 && mass(schrift, t + ende) > breite) t = t.slice(0, -1);
   return t.replace(/\s+$/, '') + ende;
+}
+// Was TFT_eSPI fuer das LETZTE Zeichen misst: nicht den Vorschub, sondern xOffset + Breite
+// der Glyphe (textWidth in TFT_eSPI.cpp, auch bei Ziffern). Wo das Geraet mit textWidth
+// kuerzt oder mittet, passt am Rand darum oft ein Zeichen mehr, als die Vorschub-Summe
+// sagt: die NL-Kopfzeile zeigte "Jaarbeurs", das Geraet "Jaarbeursp" (18.11.2026). Werte aus
+// FreeSansExt9pt7bGlyphs, Aufbau wie DV_GERAET_BREITE (Zeichen - 48).
+var DV_GERAET_LETZT = {
+  sans9: '045:9?;3556:3535969999999933:::9A<;<<;:=<38<:><=;=<;;<;@;<;5547:4998995993393>999968599=8885358'
+};
+function dvTftBreite(schrift, text) {
+  var t = String(text == null ? '' : text), l = DV_GERAET_LETZT[schrift];
+  if (!t || !l) return dvGeraetBreite(schrift, t);
+  var i = t.charCodeAt(t.length - 1) - 32;
+  if (i < 0 || i >= l.length) return dvGeraetBreite(schrift, t);
+  return dvGeraetBreite(schrift, t.slice(0, -1)) + (l.charCodeAt(i) - 48);
 }
 // Ein Text auf der Grundlinie. "fett" zeichnet ihn zweimal um 1 px versetzt: die 9pt gibt
 // es nur mager, und das Geraet macht daraus genauso sein Halbfett.
@@ -1394,6 +1418,8 @@ function dvNlHTML(colour, data, rows, previewEl) {
   var echteZeilen = zeilen.filter(function (d) { return d && d.line && !d.uhr; });
   // Feld u: Flaeche in der Linienfarbe an oder aus. Vorgabe an, wie auf dem Utrecht-Foto.
   var flaecheAn = dvSetting(colour, 'ftWienBadges_', 'u', 1) > 0;
+  // Eigene Farben des Kunden (c27|P). Ohne Eintrag gilt die Farbe aus dem Feed.
+  var eigene = dvEigeneLinienFarben(colour);
   var nullArt = dvSetting(colour, 'ftBlink_', 'o', 0);
 
   // Linienspalte der Seite: so breit wie die laengste Linie, alle Zeilen buendig.
@@ -1424,12 +1450,12 @@ function dvNlHTML(colour, data, rows, previewEl) {
 
   // === Kopfzeile + Spaltenleiste ===
   var uhr = dvClockStr(false);
-  var uw = dvGeraetBreite('sans9', uhr);
+  var uw = dvTftBreite('sans9', uhr);   // Uhr, Name und Kuerzen gemessen wie am Geraet
   var kBase = dvFsMitte('sans9', 0, KOPF_H);
   var kopfName = String(dvNlKopfText(colour) || '');
   var links = 5 + 22 + 8, rechts = 320 - RAND_R - uw - 8;
-  kopfName = dvFsKuerzen('sans9', kopfName, rechts - links - 1, false);
-  var tw = dvGeraetBreite('sans9', kopfName);
+  kopfName = dvFsKuerzen('sans9', kopfName, rechts - links - 1, false, true);
+  var tw = dvTftBreite('sans9', kopfName);
   var tx = Math.floor((320 - tw) / 2);
   if (tx < links) tx = links;
   if (tx + tw + 1 > rechts) tx = rechts - tw - 1;
@@ -1471,10 +1497,12 @@ function dvNlHTML(colour, data, rows, previewEl) {
           zeit = dvFsText(lx, dvFsMitte('sans9', 0, rowH), 'sans9', ROT, 'vervalt', '', false);
         }
       } else if (cd === 0 && nullArt === 0) {
-        // o0: die Vorgabe dieses Stils ist das Fahrzeug-Symbol
-        var bh = Math.floor(m.busW / 2);
+        // o0: die Vorgabe dieses Stils ist das Fahrzeug-Symbol. Tram und Metro bekommen
+        // ein Achtel mehr Hoehe, sonst nimmt der Stromabnehmer sie dem Wagenkasten weg.
+        var istTram = dvNlFahrzeugArt(dep) > 0;
+        var bh = Math.floor(m.busW / 2) + (istTram ? Math.floor(m.busW / 8) : 0);
         zeit = dvNlBus(R - m.busW, Math.floor((rowH - bh) / 2), m.busW, bh, TINTE, '#ffffff',
-                       dvNlFahrzeugArt(dep) > 0);
+                       istTram);
         lx = R - m.busW;
       } else {
         // o1 laesst die 0 blinken, o2 nimmt sie weg und laesst das Ziel blinken, o3 still
@@ -1496,6 +1524,10 @@ function dvNlHTML(colour, data, rows, previewEl) {
       if (flaecheAn) {
         var bg = dvLineColorCss(dep.lineColor) || ORANGE;
         var fg = dvLineColorCss(dep.lineTextColor);
+        // Eigene Farbe schlaegt die Feedfarbe. Nur hier drin, also nur bei eingeschalteter
+        // Flaeche: ohne Flaeche steht die Nummer in Tinte da, genau wie am Geraet.
+        var eigen = eigene[String(dep.line)];
+        if (eigen) { bg = eigen.bg; fg = eigen.fg; }
         var c = dvHexRgb(bg);
         if (!fg) fg = (c[0] * 299 + c[1] * 587 + c[2] * 114 > 150000) ? TINTE : '#ffffff';
         var by = Math.floor((rowH - m.flaecheH) / 2);
