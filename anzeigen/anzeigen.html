@@ -415,6 +415,41 @@
                    font-size: 14px; font-weight: 800; }
   .linienfarbe .wort { flex: 1; min-width: 0; font-size: 13px; color: var(--grau); }
   .linienfarbe .farbfelder { margin: 10px 0 2px; }
+  /* Eigene Linienfarben (DB S-Bahn, NL): die Linien als Kaestchen wie am Display, darunter die
+     Farben der aufgeklappten Linie (Paul 25.11.2026). */
+  .lf-reihe { display: flex; flex-wrap: wrap; gap: 9px; margin: 6px 0 2px; }
+  .lf-chip { position: relative; min-width: 48px; height: 36px; padding: 0 11px; line-height: 1;
+             display: inline-flex; align-items: center; justify-content: center;
+             font-size: 16px; font-weight: 800; box-shadow: 2px 2px 0 var(--tinte); }
+  .lf-chip.offen { outline: 3px solid var(--akzent); outline-offset: 2px; }
+  .lf-chip.eigen::after { content: ''; position: absolute; top: -6px; right: -6px; width: 9px; height: 9px;
+                          border-radius: 50%; background: var(--akzent); border: 2px solid var(--karte); }
+  .lf-editor { margin-top: 14px; padding: 12px 14px 14px; background: #fff; border: 2px solid var(--tinte);
+               border-radius: 12px; box-shadow: 3px 3px 0 var(--tinte); }
+  .lf-kopf { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .lf-titel { font-size: 15px; font-weight: 800; }
+  .lf-stand { font-size: 12px; color: var(--grau); }
+  .lf-zurueck { background: none; border: 0; box-shadow: none; padding: 4px 0; color: var(--akzent);
+                font-size: 12px; font-weight: 700; text-decoration: underline; }
+  .lf-name { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+             color: var(--grau); margin: 12px 0 6px; }
+  .lf-palette { display: flex; flex-wrap: wrap; gap: 8px; }
+  .lf-farbe { position: relative; width: 34px; height: 34px; padding: 0; border-radius: 9px;
+              border: 2px solid rgba(0,0,0,.18); box-shadow: none; cursor: pointer; overflow: hidden; }
+  .lf-farbe.an { border-color: var(--tinte); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--tinte); }
+  .lf-frei { display: inline-block;
+             background: conic-gradient(#ff0010, #fcd900, #4cac48, #00b3ff, #8f3f98, #ff0010); }
+  .lf-frei input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+                   border: 0; padding: 0; }
+  /* Name der NL-Kopfzeile: ein Feld mit Zaehler, darunter die Stationen als Vorschlaege. */
+  .kopfname { position: relative; }
+  .kopfname input { padding-right: 58px; }
+  .kopfname .zaehler { position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+                       font-size: 11px; font-weight: 700; color: var(--grau); pointer-events: none; }
+  .vorschlaege { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+  .vorschlag { font-size: 12px; padding: 5px 12px; border-radius: 999px; background: #fff;
+               color: var(--tinte); box-shadow: 2px 2px 0 var(--tinte); }
+  .vorschlag.an { background: var(--tinte); color: #fff; }
   .minilinien { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   .minilinien i { font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .2px;
                   padding: 2px 6px; border-radius: 5px; line-height: 1.4; }
@@ -2013,12 +2048,9 @@ function fwNl() {
 // Editor waere eine Behauptung, darum liegt er hinter dieser Schranke. Die LISTE selbst
 // schreiben wir trotzdem immer weiter (siehe dsSegment), sonst wuerfe ein altes Geraet die
 // Farben weg, die ein neues schon gesetzt hat.
-// Stand 18.11.2026 (Firmware-Sitzung): die Firmware kann es noch NICHT, main.cpp gibt das
-// P nur bei c == 5 weiter und DisplayNL liest bis heute nur dep.lineColor. 2.6.14 liegt
-// lokal und unreleased (Uhr ohne Sekunden). Kommt c27|P noch vor dem Release dazu, ist es
-// 2.6.14, sonst 2.6.15 - bis zur Entscheidung steht hier die sichere, hoehere Nummer, der
-// Editor bleibt also zu.
-const FW_MIT_NL_FARBEN = '2.6.15';
+// Seit 2.6.14 liest DisplayNL die Liste (setPerLineBadgeColors, main.cpp gibt das P bei c5
+// und c27 weiter; Firmware-Sitzung 25.11.2026, zusammen mit "Uhr ohne Sekunden").
+const FW_MIT_NL_FARBEN = '2.6.14';
 function fwNlFarben() {
   return !!geraetVersion && versionMin(geraetVersion, FW_MIT_NL_FARBEN);
 }
@@ -4539,7 +4571,12 @@ function nlKopfMerken(di, wert) {
 }
 // Beim Tippen nur den Streifen neu zeichnen: allesZeichnen() baut die Karte per innerHTML
 // neu, und dann waere der Fokus nach dem ersten Buchstaben weg (Falle vom 23.10.2026).
-function nlKopfTippt(di, wert) { if (nlKopfMerken(di, wert)) streifenZeichnen(); }
+function nlKopfTippt(di, wert) {
+  if (!nlKopfMerken(di, wert)) return;
+  const z = document.getElementById('nlKopfZaehler');   // Zaehler ohne Neubau, Fokus bleibt
+  if (z) z.textContent = String(wert || '').length + '/' + NL_KOPF_MAX;
+  streifenZeichnen();
+}
 function nlKopfFertig(di, wert) {
   const d = nlKopfMerken(di, wert);
   if (!d) return;
@@ -4550,28 +4587,31 @@ function nlKopfWaehlen(di, wert) {
   if (!wert) return;
   nlKopfFertig(di, wert);
 }
-// Das Feld in der Design-Karte: Vorschlaege aus den Stationen, daneben frei schreibbar.
+// Das Feld in der Design-Karte: EIN Textfeld mit Zaehler, darunter die Stationen dieses
+// Bretts als Vorschlaege zum Antippen. Vorher standen eine Auswahlliste und das Textfeld
+// untereinander und sagten dasselbe zweimal (Paul 25.11.2026: "schoener haben").
 function nlKopfFeld(d, di) {
   const jetzt = nlKopfText(d);
   const namen = nlStationsNamen(d);
-  let h = '<label class="feld" for="nlKopfText">Name in der Kopfzeile</label>';
+  let h = '<label class="feld" for="nlKopfText">Name in der Kopfzeile</label>'
+        + '<div class="kopfname"><input id="nlKopfText" type="text" maxlength="' + NL_KOPF_MAX + '"'
+        + ' placeholder="Kein Name" value="' + escapeHtmlFt(jetzt) + '"'
+        + ' oninput="nlKopfTippt(' + di + ', this.value)"'
+        + ' onchange="nlKopfFertig(' + di + ', this.value)">'
+        + '<span class="zaehler" id="nlKopfZaehler">' + jetzt.length + '/' + NL_KOPF_MAX + '</span></div>';
   if (namen.length) {
-    h += '<select id="nlKopfWahl" onchange="nlKopfWaehlen(' + di + ', this.value)">'
-       + '<option value="">Station übernehmen …</option>';
+    h += '<div class="vorschlaege">';
     namen.forEach(n => {
-      h += '<option value="' + escapeHtmlFt(n) + '"' + (n === jetzt ? ' selected' : '') + '>'
-         + escapeHtmlFt(n) + '</option>';
+      // mousedown ohne Fokuswechsel: sonst baut das onchange des Feldes die Karte neu, bevor
+      // der Klick ankommt, und der Vorschlag greift erst beim zweiten Mal.
+      h += '<button type="button" class="vorschlag' + (n === jetzt ? ' an' : '') + '" onmousedown="event.preventDefault()"'
+         + ' onclick="nlKopfWaehlen(' + di + ',' + escapeHtmlFt(lfArg(n)) + ')">' + escapeHtmlFt(n) + '</button>';
     });
-    h += '</select>';
+    h += '</div>';
   }
-  h += '<input id="nlKopfText" type="text" maxlength="' + NL_KOPF_MAX + '"'
-     + ' placeholder="Kein Name" value="' + escapeHtmlFt(jetzt) + '"'
-     + ' oninput="nlKopfTippt(' + di + ', this.value)"'
-     + ' onchange="nlKopfFertig(' + di + ', this.value)">'
-     + '<div class="hinweis">Höchstens ' + NL_KOPF_MAX + ' Zeichen. Ist der Name breiter als '
-     + 'der Platz zwischen Bus-Symbol und Uhr, kürzt ihn das Display hinten, so wie in der '
-     + 'Vorschau. Leer lassen heißt: kein Name in der Kopfzeile.</div>';
-  return h;
+  return h + '<div class="hinweis">Tippe eine Station an oder schreib selbst, h\u00f6chstens '
+           + NL_KOPF_MAX + ' Zeichen. Was nicht zwischen Bus-Symbol und Uhr passt, k\u00fcrzt das '
+           + 'Display hinten. Leer lassen hei\u00dft: kein Name.</div>';
 }
 
 function designZeichnen() {
@@ -4952,71 +4992,102 @@ function linieFarbenVon(c, ln, dep) {
   }
   return { bg: bg.toLowerCase(), tx: tx.toLowerCase() };
 }
+// Paul 25.11.2026 ("schoener haben"): statt einer langen Liste mit Schalter und zwei breiten
+// Farbbalken je Linie stehen alle Linien als Kaestchen in einer Reihe, so wie sie am Display
+// aussehen. Eine antippen oeffnet darunter ihre Farben: die Flaeche aus einer Palette oder
+// frei gewaehlt, die Schrift Automatisch, Schwarz oder Weiss. Ein roter Punkt am Kaestchen
+// heisst eigene Farbe. Ohne eigene Farbe gilt die offizielle.
+const LF_PALETTE = ['fcd900', 'f5a000', 'ff0010', 'ef5597', '8f3f98', '00205b',
+                    '00b3ff', '009640', '4cac48', '8b5a2b', '1b1b1b', 'ffffff'];
+const lfOffen = {};   // je Stil die Linie, deren Farben gerade aufgeklappt sind
+// Text als JS-Argument in einfachen Anfuehrungszeichen (fuer onclick, danach noch escapeHtmlFt)
+function lfArg(t) { return "'" + String(t).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'"; }
 function linienFarbenHtml(c) {
   const ci = parseInt(c, 10);
   const deps = eigenLinienDeps(ci);
   const linien = Array.from(deps.keys());
-  // Berlin traegt Pillen, die NL-Anzeiger eine eckige Flaeche mit rechtsbuendiger Nummer:
-  // die Probe hier soll aussehen wie das, was hinterher auf dem Display steht.
-  const rund = (ci === 27) ? '3px' : '999px';
-  const wortFlaeche = (ci === 27) ? 'Fläche' : 'Pille';
   if (!linien.length) {
     return '<div class="hinweis" style="margin-top:0">Auf diesem Display liegt noch keine Linie. '
          + 'Sobald eine daliegt, kannst du ihre Farbe hier setzen.</div>';
   }
-  let h = '<div class="hinweis" style="margin-top:0">Ohne eigene Farbe nimmt jede Linie ihre '
-        + 'offizielle Farbe. Die eigenen Farben gelten auf allen Displays mit diesem Design.</div>';
+  // Berlin traegt Pillen, die NL-Anzeiger eine eckige Flaeche: die Kaestchen hier sehen aus
+  // wie das, was hinterher auf dem Display steht.
+  const rund = (ci === 27) ? '4px' : '999px';
+  const eigen = stilFarben(ci);
+  const offen = linien.indexOf(lfOffen[ci]) >= 0 ? lfOffen[ci] : null;
+  let h = '<div class="lf-reihe">';
   linien.forEach(ln => {
-    const an = !!stilFarben(ci)[ln];
     const f = linieFarbenVon(ci, ln, deps.get(ln));
-    const ln2 = escapeHtmlFt(ln);
-    const arg = "'" + String(ln).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-    h += '<div class="linienfarbe" data-stil="' + ci + '" data-linie="' + ln2 + '"><div class="kopf">'
-       + '<b style="background:#' + f.bg + ';color:#' + f.tx + ';border-radius:' + rund + '">' + ln2 + '</b>'
-       + '<span class="wort">' + (an ? 'Eigene Farbe' : 'Offizielle Farbe') + '</span>'
-       + '<button class="schiene' + (an ? ' an' : '') + '" role="switch"'
-       + ' aria-checked="' + (an ? 'true' : 'false') + '"'
-       + ' onclick="linieFarbeSchalten(' + ci + ',' + arg + ')"><span class="kugel"></span></button>'
-       + '</div>';
-    if (an) {
-      h += '<div class="farbfelder">'
-         + [['bg', wortFlaeche], ['tx', 'Schrift']].map(fd =>
-             '<label class="farbfeld"><span>' + fd[1] + '</span>'
-           + '<input type="color" value="#' + f[fd[0]] + '"'
-           + ' oninput="linieFarbeSetzen(' + ci + ',' + arg + ',\'' + fd[0] + '\', this.value, false)"'
-           + ' onchange="linieFarbeSetzen(' + ci + ',' + arg + ',\'' + fd[0] + '\', this.value, true)"></label>'
-           ).join('')
-         + '</div>';
-    }
-    h += '</div>';
+    h += '<button type="button" class="lf-chip' + (ln === offen ? ' offen' : '') + (eigen[ln] ? ' eigen' : '') + '" onmousedown="event.preventDefault()"'
+       + ' data-stil="' + ci + '" data-linie="' + escapeHtmlFt(ln) + '"'
+       + ' style="background:#' + f.bg + ';color:#' + f.tx + ';border-radius:' + rund + '"'
+       + ' title="' + (eigen[ln] ? 'Eigene Farbe' : 'Offizielle Farbe') + '"'
+       + ' onclick="lfOeffnen(' + ci + ',' + escapeHtmlFt(lfArg(ln)) + ')">' + escapeHtmlFt(ln) + '</button>';
   });
-  return h;
+  h += '</div>';
+  if (!offen) {
+    return h + '<div class="hinweis">Tippe eine Linie an, um ihre Farbe zu \u00e4ndern. Der rote Punkt '
+             + 'hei\u00dft: eigene Farbe. Sie gilt auf allen Displays mit diesem Design.</div>';
+  }
+  const f = linieFarbenVon(ci, offen, deps.get(offen));
+  const e = eigen[offen];
+  const arg = escapeHtmlFt(lfArg(offen));
+  h += '<div class="lf-editor"><div class="lf-kopf"><span class="lf-titel">Linie ' + escapeHtmlFt(offen) + '</span>'
+     + (e ? '<button type="button" class="lf-zurueck" onclick="lfOffiziell(' + ci + ',' + arg + ')">Zur offiziellen Farbe</button>'
+          : '<span class="lf-stand">Offizielle Farbe</span>')
+     + '</div><div class="lf-name">' + (ci === 27 ? 'Fl\u00e4che' : 'Pille') + '</div><div class="lf-palette">';
+  LF_PALETTE.forEach(p => {
+    h += '<button type="button" class="lf-farbe' + (e && e.bg === p ? ' an' : '') + '" onmousedown="event.preventDefault()" style="background:#' + p + '"'
+       + ' aria-label="#' + p + '" onclick="lfFlaeche(' + ci + ',' + arg + ',\'' + p + '\', true)"></button>';
+  });
+  const frei = !!e && LF_PALETTE.indexOf(e.bg) < 0;
+  h += '<label class="lf-farbe lf-frei' + (frei ? ' an' : '') + '" title="Freie Farbe"'
+     + (frei ? ' style="background:#' + e.bg + '"' : '') + '>'
+     + '<input type="color" value="#' + f.bg + '"'
+     + ' oninput="lfFlaeche(' + ci + ',' + arg + ', this.value, false)"'
+     + ' onchange="lfFlaeche(' + ci + ',' + arg + ', this.value, true)"></label>'
+     + '</div><div class="lf-name">Schrift</div><div class="schalter">';
+  // Ohne eigene Angabe ist keiner der drei an: dann gilt die offizielle Schriftfarbe.
+  const tx = e ? (e.tx || '') : null;
+  [['', 'Automatisch'], ['000000', 'Schwarz'], ['ffffff', 'Wei\u00df']].forEach(st => {
+    const an = tx !== null && (tx === st[0] || (st[0] === '000000' && tx === '191919'));
+    h += '<button type="button" class="' + (an ? 'an' : '') + '"'
+       + ' onclick="lfSchrift(' + ci + ',' + arg + ',\'' + st[0] + '\')">' + st[1] + '</button>';
+  });
+  return h + '</div></div>';
 }
-// An: die Linie bekommt einen eigenen Eintrag, gleich mit ihrer heutigen Farbe. Aus: wieder
-// die offizielle.
-function linieFarbeSchalten(c, ln) {
-  const farben = stilFarben(c);
-  if (farben[ln]) delete farben[ln];
-  else farben[ln] = linieFarbenVon(c, ln, eigenLinienDeps(c).get(ln));
+function lfOeffnen(c, ln) {
+  c = parseInt(c, 10);
+  lfOffen[c] = (lfOffen[c] === ln) ? null : ln;
   allesZeichnen();
 }
-function linieFarbeSetzen(c, ln, feld, wert, fertig) {
+// Flaeche setzen. Eine neue eigene Farbe faengt mit automatischer Schrift an, dann passt
+// sie sich jeder Flaeche an (am Geraet: Schrift leer = nach Helligkeit).
+function lfFlaeche(c, ln, wert, fertig) {
   const farben = stilFarben(c);
-  if (!farben[ln]) farben[ln] = linieFarbenVon(c, ln, eigenLinienDeps(c).get(ln));
-  farben[ln][feld] = String(wert == null ? '' : wert).replace('#', '').toLowerCase();
-  // Beim Ziehen nur die Vorschau und die Proben hier, nicht den ganzen Editor: sonst fliegt
-  // der offene Farbwaehler aus dem Dokument (wie eigenZiehtFrisch).
+  if (!farben[ln]) farben[ln] = { bg: '', tx: '' };
+  farben[ln].bg = String(wert == null ? '' : wert).replace('#', '').toLowerCase();
   if (fertig) { allesZeichnen(); return; }
+  // Beim Ziehen am Farbwaehler nicht alles neu bauen, sonst fliegt der offene Waehler aus
+  // dem Dokument (wie eigenZiehtFrisch): nur Vorschau, Ausgabe und die Kaestchen hier.
   streifenZeichnen();
   ausgabeZeichnen();
   const deps = eigenLinienDeps(c);
-  document.querySelectorAll('.linienfarbe[data-stil="' + parseInt(c, 10) + '"]').forEach(el => {
-    const name = el.dataset.linie, chip = el.querySelector('b');
-    if (!name || !chip) return;
-    const f = linieFarbenVon(c, name, deps.get(name));
-    chip.style.background = '#' + f.bg;
-    chip.style.color = '#' + f.tx;
+  document.querySelectorAll('.lf-chip[data-stil="' + parseInt(c, 10) + '"]').forEach(el => {
+    const fx = linieFarbenVon(c, el.dataset.linie, deps.get(el.dataset.linie));
+    el.style.background = '#' + fx.bg;
+    el.style.color = '#' + fx.tx;
   });
+}
+function lfSchrift(c, ln, wert) {
+  const farben = stilFarben(c);
+  if (!farben[ln]) farben[ln] = { bg: linieFarbenVon(c, ln, eigenLinienDeps(c).get(ln)).bg, tx: '' };
+  farben[ln].tx = wert;
+  allesZeichnen();
+}
+function lfOffiziell(c, ln) {
+  delete stilFarben(c)[ln];
+  allesZeichnen();
 }
 function grundSetzen(di, v) { einstFuer(displays[di]).b = parseInt(v, 10); allesZeichnen(); }
 function badgeSetzen(di, v) { einstFuer(displays[di]).u = parseInt(v, 10); allesZeichnen(); }

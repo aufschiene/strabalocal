@@ -1463,7 +1463,7 @@ function dvNlHTML(colour, data, rows, previewEl) {
            + ';shape-rendering:crispEdges;" width="320" height="' + TOP + '" viewBox="0 0 320 ' + TOP + '">'
            + '<rect x="0" y="0" width="320" height="' + KOPF_H + '" fill="' + NAVY + '"/>'
            + '<rect x="0" y="' + KOPF_H + '" width="320" height="' + LEISTE_H + '" fill="' + LEISTE + '"/>'
-           + dvNlBus(5, 3, 22, 12, '#ffffff', NAVY, seitenArt === 1 || seitenArt === 2)
+           + dvNlBus(5, 3, 22, 12, '#ffffff', NAVY, false)
            + '<g shape-rendering="auto">'
            + dvFsText(320 - RAND_R - uw - 1, kBase, 'sans9', '#ffffff', uhr, '', true)
            + (kopfName ? dvFsText(tx, kBase, 'sans9', '#ffffff', kopfName, '', true) : '')
@@ -1497,12 +1497,11 @@ function dvNlHTML(colour, data, rows, previewEl) {
           zeit = dvFsText(lx, dvFsMitte('sans9', 0, rowH), 'sans9', ROT, 'vervalt', '', false);
         }
       } else if (cd === 0 && nullArt === 0) {
-        // o0: die Vorgabe dieses Stils ist das Fahrzeug-Symbol. Tram und Metro bekommen
-        // ein Achtel mehr Hoehe, sonst nimmt der Stromabnehmer sie dem Wagenkasten weg.
-        var istTram = dvNlFahrzeugArt(dep) > 0;
-        var bh = Math.floor(m.busW / 2) + (istTram ? Math.floor(m.busW / 8) : 0);
-        zeit = dvNlBus(R - m.busW, Math.floor((rowH - bh) / 2), m.busW, bh, TINTE, '#ffffff',
-                       istTram);
+        // o0: die Vorgabe dieses Stils ist das Fahrzeug-Symbol, fuer alle Fahrzeuge dasselbe.
+        // Die Tram-Fassung mit Stromabnehmer ist am Geraet seit 2.6.14 wieder weg (Paul
+        // 18.11.2026: "furchtbar, wieder weg"), darum auch hier nicht.
+        var bh = Math.floor(m.busW / 2);
+        zeit = dvNlBus(R - m.busW, Math.floor((rowH - bh) / 2), m.busW, bh, TINTE, '#ffffff', false);
         lx = R - m.busW;
       } else {
         // o1 laesst die 0 blinken, o2 nimmt sie weg und laesst das Ziel blinken, o3 still
