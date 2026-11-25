@@ -3243,78 +3243,6 @@
     </div>
   </div>
 
-  <!-- DB Regio, Seite 1: Wohin? (ein Weg pro Seite, der rote Weiter entscheidet selbst) -->
-  <div class="card hidden" id="stepDbrZiel">
-    <button class="back-btn" onclick="goBack('search')">Zurück</button>
-    <h2 id="dbrVonName" style="color:#EC0016;">Bahnhof</h2>
-    <p style="color:#666;font-size:13px;margin-bottom:14px;" id="dbrVonInfo"></p>
-
-    <div class="lines-loading" id="dbrLoading"><div>Lade Ziele &amp; Linien...</div></div>
-    <div id="dbrFehler" class="hidden" style="color:#888;font-size:13px;padding:14px;text-align:center;"></div>
-
-    <div id="dbrZielInhalt" class="hidden">
-      <div class="form-label" style="margin-bottom:6px;">Wohin soll es gehen?</div>
-      <p style="color:#666;font-size:12.5px;line-height:1.5;margin:0 0 12px;" id="dbrZielHinweis">
-        Ohne Ziel zeigt das Display alle Züge des Bahnhofs. Mit Ziel bleiben nur die Züge, die dort auch halten.
-      </p>
-      <div id="dbrBisGewaehlt" class="db-chips" style="margin-bottom:10px;"></div>
-      <div class="search-container" style="margin-bottom:10px;">
-        <input type="text" class="search-input" id="dbrBisSuche" autocomplete="off"
-               placeholder="Ziel suchen, zum Beispiel Köln Hbf" oninput="dbrSucheGeaendert(this.value)">
-      </div>
-      <div id="dbrBisListe" class="db-steig-list"></div>
-
-      <div id="dbrDurchWrap" class="hidden" style="margin-top:18px;">
-        <div class="form-label" style="margin-bottom:6px;">Und weiter über</div>
-        <p style="color:#666;font-size:12.5px;line-height:1.5;margin:0 0 12px;">
-          Zweite Bedingung, falls das erste Ziel nicht genügt: der Zug muss auch hier halten.
-        </p>
-        <div id="dbrDurchGewaehlt" class="db-chips" style="margin-bottom:10px;"></div>
-        <div class="search-container" style="margin-bottom:10px;">
-          <input type="text" class="search-input" id="dbrDurchSuche" autocomplete="off"
-                 placeholder="Halt suchen" oninput="dbrSucheDurchGeaendert(this.value)">
-        </div>
-        <div id="dbrDurchListe" class="db-steig-list"></div>
-      </div>
-
-      <button class="btn btn-primary" id="dbrWeiterBtn" onclick="dbrWeiter()" style="margin-top:16px;">Weiter</button>
-    </div>
-  </div>
-
-  <!-- DB Regio, Seite 2: Zugarten, Richtung, Anzeige -->
-  <div class="card hidden" id="stepDbrFein">
-    <button class="back-btn" onclick="dbrZurueckZumZiel()">Zurück</button>
-    <h2 id="dbrFeinName" style="color:#EC0016;">Bahnhof</h2>
-    <p style="color:#666;font-size:13px;margin-bottom:14px;" id="dbrFeinInfo"></p>
-
-    <div class="form-label" style="margin-bottom:8px;">Zugarten</div>
-    <div id="dbrGattChips" class="db-chips"></div>
-
-    <div id="dbrRichtungWrap" class="hidden" style="margin-top:18px;">
-      <div class="form-label" style="margin-bottom:6px;">Richtung</div>
-      <p style="color:#666;font-size:12.5px;line-height:1.5;margin:0 0 10px;" id="dbrRichtungHinweis">
-        Ohne Auswahl zeigt das Display beide Richtungen.
-      </p>
-      <div id="dbrRichtungListe" class="db-steig-list"></div>
-      <div id="dbrRichtungRest" style="color:#888;font-size:12px;margin-top:8px;"></div>
-    </div>
-
-    <div class="form-label" style="margin:18px 0 8px;">Anzeige</div>
-    <div style="display:flex;background:#f0f0f0;border-radius:10px;padding:4px;margin-bottom:6px;">
-      <button class="toggle-btn active" id="dbrBrettGruppiert" onclick="dbrSetBrett('gruppiert')" style="flex:1;">Nach Linien</button>
-      <button class="toggle-btn" id="dbrBrettTafel" onclick="dbrSetBrett('tafel')" style="flex:1;">Bahnhofstafel</button>
-    </div>
-    <p style="color:#666;font-size:12.5px;line-height:1.5;margin:0 0 14px;" id="dbrBrettHinweis">
-      Nach Linien: jede Linie und Richtung bekommt ihre feste Zeile.
-    </p>
-
-    <div id="dbrProbe" style="font-size:12.5px;color:#555;line-height:1.5;margin:0 0 12px;min-height:18px;"></div>
-
-    <div id="dbrGrenzen" class="hidden" style="background:#f7f7f7;border:1px solid #e2e2e2;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12.5px;color:#555;line-height:1.5;"></div>
-
-    <button class="btn btn-primary" id="dbrAddBtn" onclick="addDbrStation()" style="margin-top:8px;">Station hinzufügen</button>
-  </div>
-
   <!-- Step 5 entfernt - Gruppierung jetzt nur im Feintuning -->
 
   <!-- Added Stations -->
@@ -4121,7 +4049,7 @@ const REGIONS = {
   FI:  { name: 'Finnland',       networks: ['HELSINKI', 'VR'] },
   EE:  { name: 'Estland',        networks: ['PEATUS'] },
   IE:  { name: 'Irland',         networks: ['IRISHRAIL'] },
-  BE:  { name: 'Belgien',        networks: ['SNCB'] },
+  BE:  { name: 'Belgien',        networks: ['BRUSSEL', 'SNCB'] },
   LU:  { name: 'Luxemburg',      networks: ['CFL'] },
   AU:  { name: 'Australien',     networks: ['SYDNEY'] },
   RO:  { name: 'Rumänien',       networks: ['BUCHAREST'] },
@@ -4434,6 +4362,7 @@ const CITY_CAPABILITIES = {
   // Schweiz -> colour 15 (DisplayLiechtenstein / SBB-Renderer).
   LONDON:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   BUDAPEST:   { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
+  BRUSSEL:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 1,  defaultBrightness: 3 },
   TBILISI:    { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   SYDNEY:     { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
   BUCHAREST:  { textColorChangeable: false, showHighFloor: false, showAirCondition: false, gehwegFilter: true, nightMode: true, defaultColour: 23, defaultColorVariant: 3, defaultBrightness: 3 },
@@ -4558,8 +4487,11 @@ const NETWORKS = {
     region: 'DE',
     desc: 'ICE, IC, RE, RB, S-Bahn: ganzer Bahnhof oder nur Züge nach einem Ziel',
     searchType: 'server_proxy',
-    placeholder: 'z.B. München Hbf, Porz (Rhein), Hamburg Hbf...',
-    isJourneyBased: false
+    placeholder: 'Von wo? z.B. Köln Hbf, Porz (Rhein), München Hbf...',
+    isJourneyBased: false,
+    // Gleicher Weg wie die OEBB-Zuege: Von, Nach, Zugarten auf EINER Seite. Die Zugarten
+    // kommen bei der DB pro Bahnhof vom Server (dbrGattungenAktuell), nicht aus einer festen Liste.
+    isPointToPoint: true
   },
   OEBB: {
     name: 'ÖBB',
@@ -4906,6 +4838,7 @@ const NETWORKS = {
   // Stadtnetze:
   LONDON:     { name: 'Transport for London', shortName: 'TfL',  region: 'GB', desc: 'Tube, Overground, DLR, Bus', searchType: 'trainboard', trainboard: { path: '/gb/london' },    placeholder: 'z.B. Oxford Circus, Victoria...',  isJourneyBased: false },
   BUDAPEST:   { name: 'BKK Budapest',          shortName: 'BKK',  region: 'HU', desc: 'Metró, Villamos, Busz',       searchType: 'trainboard', trainboard: { path: '/hu/budapest' },   placeholder: 'z.B. Deák tér, Keleti...',         isJourneyBased: false },
+  BRUSSEL:    { name: 'Brüssel (STIB/MIVB)',   shortName: 'STIB', region: 'BE', desc: 'Metro, Tram, Bus (STIB/MIVB)', searchType: 'trainboard', trainboard: { path: '/be/brussels' },   placeholder: 'z.B. De Brouckère, Schuman, Midi...', isJourneyBased: false },
   TBILISI:    { name: 'TTC Tbilisi',           shortName: 'TTC',  region: 'GE', desc: 'Metro, Bus, Tram',           searchType: 'trainboard', trainboard: { path: '/ge/tbilisi' },    placeholder: 'z.B. Rustaveli, Liberty Square...', isJourneyBased: false },
   SYDNEY:     { name: 'Transport NSW (Sydney)', shortName: 'TfNSW', region: 'AU', desc: 'Train, Metro, Light Rail, Ferry, Bus', searchType: 'trainboard', trainboard: { path: '/au/nsw' },        placeholder: 'z.B. Circular Quay, Wynyard, Central...', isJourneyBased: false },
   BUCHAREST:  { name: 'STB Bukarest',          shortName: 'STB',  region: 'RO', desc: 'Metrou, Tramvai, Bus',     searchType: 'trainboard', trainboard: { path: '/ro/bucuresti' },  placeholder: 'z.B. Unirii, Victoriei...',         isJourneyBased: false },
@@ -6114,7 +6047,8 @@ const NETWORK_HERO = {
   GB_LOCAL: { photo: 'fotos/LONDON .jpg',   title: 'Großbritannien' },
   NVV:    { photo: 'fotos/NVV.jpg',          title: 'Nordhessen' },
   VMT:    { photo: 'fotos/VMT.jpg',          title: 'Mittelthüringen' },
-  SAARVV: { photo: 'fotos/SAARLAND.webp',    title: 'Saarland' }
+  SAARVV: { photo: 'fotos/SAARLAND.webp',    title: 'Saarland' },
+  BRUSSEL: { photo: 'fotos/Bruessel.jpg',    title: 'Brüssel' }
 };
 // Foto pro Bundesland/Sub-Region (überschreibt das Landesfoto, wenn gewählt)
 const SUBREGION_HERO = {
@@ -6172,11 +6106,6 @@ function showStep(step) {
   stepLines.classList.toggle('hidden', step !== 'lines');
   var _dbCard = document.getElementById('stepDbSelect');
   if (_dbCard) _dbCard.classList.toggle('hidden', step !== 'dbSelect');
-  // DB Regio: Ziel-Seite und Fein-Seite (ein Weg pro Seite)
-  var _dbrZ = document.getElementById('stepDbrZiel');
-  if (_dbrZ) _dbrZ.classList.toggle('hidden', step !== 'dbrZiel');
-  var _dbrF = document.getElementById('stepDbrFein');
-  if (_dbrF) _dbrF.classList.toggle('hidden', step !== 'dbrFein');
   if (step === 'search') applyVonNachSearchSkin();
 
   // Grouping Step entfernt - jetzt nur im Feintuning
@@ -6708,7 +6637,8 @@ var NETWORK_BRANDS = {
   DB:            { bg: '#EC0016', fg: '#fff' }, // DB Regio Rot
   DKTRAIN:       { bg: '#B4131F', fg: '#fff' }, // DSB Rot (Züge Dänemark)
   PARIS:         { bg: '#003B80', fg: '#fff' }, // RATP Paris Blau
-  PID:           { bg: '#1E61A0', fg: '#fff' }  // Prag PID Blau
+  PID:           { bg: '#1E61A0', fg: '#fff' }, // Prag PID Blau
+  BRUSSEL:       { bg: '#003E7E', fg: '#fff' }  // Brüssel STIB/MIVB Blau
 };
 
 var DISPLAY_PRESETS = {
@@ -7053,6 +6983,14 @@ DISPLAY_PRESETS.prag = {
   photo: 'fotos/Prag.jpg',
   networks: [
     { id: 'PID', jumpTo: { region: 'CZ' } }
+  ]
+};
+DISPLAY_PRESETS.bruessel = {
+  name: 'Brüssel',
+  parent: 'BE',
+  photo: 'fotos/Bruessel.jpg',
+  networks: [
+    { id: 'BRUSSEL', jumpTo: { region: 'BE' } }
   ]
 };
 
@@ -10008,8 +9946,6 @@ function addDbStation() {
 var DBR_API = 'https://api.straba.at/api/v1/db/destinations';
 var dbrDatenCache = {};   // EVA -> Antwort von /db/destinations
 var dbrNameCache = {};    // EVA -> Bahnhofsname (fuettert auch das Label der Stationskarte)
-var dbrState = { von: null, daten: null, bis: [], durch: [], gatts: [], richtungen: [],
-                 brett: 'gruppiert', suche: '', sucheDurch: '' };
 
 function dbrIstDbrNetz(fullId) { return /^DBR(ALL)?:/i.test(String(fullId || '')); }
 function dbrZielName(id) { return dbrNameCache[String(id)] || String(id); }
@@ -10062,238 +9998,39 @@ function dbrNamenNachladen(vonEva) {
   }).catch(function () {});
 }
 
-async function startDbrSelection(id, name, vorgabe) {
-  dbrState = { von: { id: String(id), name: name }, daten: null, bis: [], durch: [], gatts: [],
-               richtungen: [], brett: 'gruppiert', suche: '', sucheDurch: '' };
-  if (vorgabe) {
-    dbrState.bis = (vorgabe.bis || []).map(String);
-    dbrState.durch = (vorgabe.durch || []).map(String);
-    dbrState.gatts = (vorgabe.gatts || []).slice();
-    dbrState.brett = vorgabe.brett || 'gruppiert';
-    dbrState.richtungen = (vorgabe.richtungen || []).slice();
-  }
-  editingStationIndex = null;   // Dedup laeuft ueber die rbl, wie beim alten DB-Weg
-  document.getElementById('dbrVonName').textContent = name;
-  document.getElementById('dbrVonInfo').textContent = 'DB Regio · EVA ' + id;
-  if (typeof searchResults !== 'undefined' && searchResults) searchResults.classList.remove('show');
-  showStep('dbrZiel');
-  document.getElementById('dbrLoading').classList.remove('hidden');
-  document.getElementById('dbrZielInhalt').classList.add('hidden');
-  document.getElementById('dbrFehler').classList.add('hidden');
-  try {
-    dbrState.daten = await dbrDatenHolen(id);
-    if (dbrState.daten.name) {
-      dbrState.von.name = dbrState.daten.name;
-      document.getElementById('dbrVonName').textContent = dbrState.daten.name;
-    }
-    document.getElementById('dbrLoading').classList.add('hidden');
-    document.getElementById('dbrZielInhalt').classList.remove('hidden');
-    dbrRenderZiel();
-  } catch (e) {
-    document.getElementById('dbrLoading').classList.add('hidden');
-    var err = document.getElementById('dbrFehler');
-    err.textContent = 'Ziele gerade nicht ladbar. Bitte nochmal versuchen.';
-    err.classList.remove('hidden');
-  }
-}
-
-// ---- Seite 1: Wohin? ----
-function dbrSucheGeaendert(v) { dbrState.suche = v; dbrRenderZiel(); }
-function dbrSucheDurchGeaendert(v) { dbrState.sucheDurch = v; dbrRenderZiel(); }
-
-// Endbahnhoefe und viel befahrene Ziele nach oben (Vorgabe aus dem Server-Brief).
-function dbrZieleSortiert(suchtext, ausblenden) {
-  var ds = (dbrState.daten && dbrState.daten.destinations) || [];
-  var q = String(suchtext || '').trim().toLowerCase();
-  var weg = {}; (ausblenden || []).forEach(function (x) { weg[String(x)] = 1; });
-  return ds.filter(function (d) {
-    if (!d || !d.id || weg[String(d.id)]) return false;
-    return !q || String(d.name || '').toLowerCase().indexOf(q) >= 0;
-  }).slice().sort(function (a, b) {
+// Ziele einer Station fuer die Von-Nach-Seite: Namen (wie beim OEBB-Zug-Wizard, p2pDestinations)
+// plus die EVA dahinter, damit die Auswahl ohne zweite Suche zur Id kommt.
+var dbrZielIdByName = {};      // Zielname -> EVA (nur die gerade gewaehlte Station)
+var dbrGattungenAktuell = [];  // Gattungen dieser Station, fuer die Zugarten-Schalter
+async function dbrZieleLaden(eva) {
+  var d = await dbrDatenHolen(eva);
+  dbrZielIdByName = {};
+  var namen = [];
+  // Endbahnhoefe und viel befahrene Ziele oben, wie im Server-Brief gewuenscht.
+  (d.destinations || []).slice().sort(function (a, b) {
     return (b.terminus ? 1 : 0) - (a.terminus ? 1 : 0) || (b.trips || 0) - (a.trips || 0);
+  }).forEach(function (z) {
+    if (!z || !z.id || !z.name || dbrZielIdByName[z.name]) return;
+    dbrZielIdByName[z.name] = String(z.id);
+    namen.push(z.name);
   });
+  dbrGattungenAktuell = (d.gattungen || []).slice();
+  return namen;
 }
-function dbrZielZeile(d, an, handler) {
-  var linien = (d.lines || []).join(', ');
-  return '<div class="db-steig-row ' + (an ? 'on' : '') + '" onclick="' + handler + '">' +
-           '<span class="db-steig-check"></span>' +
-           '<span class="db-steig-num" style="min-width:0;flex:1;">' + dbAttr(d.name) + '</span>' +
-           (linien ? '<span class="db-steig-lines">' + dbAttr(linien) + '</span>' : '') +
-         '</div>';
-}
-function dbrRenderZiel() {
-  if (!dbrState.daten) return;
-  var sel = dbrState.bis, selD = dbrState.durch;
-  document.getElementById('dbrBisGewaehlt').innerHTML = sel.length
-    ? sel.map(function (id) { return dbChip(dbrZielName(id) + ' ×', true, "dbrToggleBis('" + dbEsc(id) + "')"); }).join('')
-    : '';
-  var liste = dbrZieleSortiert(dbrState.suche, sel).slice(0, 40);
-  document.getElementById('dbrBisListe').innerHTML = liste.map(function (d) {
-    return dbrZielZeile(d, false, "dbrToggleBis('" + dbEsc(String(d.id)) + "')");
-  }).join('') || '<div style="color:#888;font-size:13px;padding:10px 2px;">Kein Ziel gefunden.</div>';
-
-  var dw = document.getElementById('dbrDurchWrap');
-  dw.classList.toggle('hidden', sel.length === 0);
-  if (sel.length) {
-    document.getElementById('dbrDurchGewaehlt').innerHTML = selD.length
-      ? selD.map(function (id) { return dbChip(dbrZielName(id) + ' ×', true, "dbrToggleDurch('" + dbEsc(id) + "')"); }).join('')
-      : '';
-    var l2 = dbrZieleSortiert(dbrState.sucheDurch, sel.concat(selD)).slice(0, 25);
-    document.getElementById('dbrDurchListe').innerHTML = l2.map(function (d) {
-      return dbrZielZeile(d, false, "dbrToggleDurch('" + dbEsc(String(d.id)) + "')");
-    }).join('') || '<div style="color:#888;font-size:13px;padding:10px 2px;">Kein Halt gefunden.</div>';
-  }
-  document.getElementById('dbrWeiterBtn').textContent = sel.length ? 'Weiter' : 'Weiter mit dem ganzen Bahnhof';
-}
-function dbrToggleBis(id) {
-  dbToggleIn(dbrState.bis, String(id));
-  if (!dbrState.bis.length) dbrState.durch = [];
-  dbrState.suche = '';
-  var inp = document.getElementById('dbrBisSuche'); if (inp) inp.value = '';
-  dbrRenderZiel();
-}
-function dbrToggleDurch(id) {
-  dbToggleIn(dbrState.durch, String(id));
-  dbrState.sucheDurch = '';
-  var inp = document.getElementById('dbrDurchSuche'); if (inp) inp.value = '';
-  dbrRenderZiel();
-}
-function dbrWeiter() { showStep('dbrFein'); dbrRenderFein(); }
-function dbrZurueckZumZiel() { showStep('dbrZiel'); dbrRenderZiel(); }
-
-// ---- Seite 2: Zugarten, Richtung, Anzeige ----
-// Richtungen gibt es NUR ohne Ziel: mit Ziel steckt die Richtung schon in der rbl und der
-// Server gibt allen Linien dieselbe Id (dbv<bis>), eine Auswahl darueber waere wirkungslos.
-function dbrRichtungenAlle() {
-  var out = [];
-  ((dbrState.daten && dbrState.daten.lines) || []).forEach(function (l) {
-    var g = (l.gattung || dbrGattVonLinie(l.name) || '').toUpperCase();
-    if (dbrState.gatts.length && dbrState.gatts.indexOf(g) < 0 && dbrState.gatts.indexOf(dbrLinienToken(l.name)) < 0) return;
-    (l.richtungen || []).forEach(function (r) {
-      if (!r || !r.rid) return;
-      out.push({ line: l.name, gattung: g, rid: r.rid, halt: r.naechsterHalt || '',
-                 trips: r.trips || 0, ziele: (r.ziele || []).map(function (z) { return z.name; }) });
-    });
+// Token hinter dem '!': reine Buchstaben = Gattung, mit Ziffer = exakte Linie. Am Server STRENG,
+// trifft es nichts, bleibt das Brett leer. Darum nur schreiben, wenn wirklich abgewaehlt wurde.
+function dbrToken(gattungen) {
+  var raus = [], seen = {};
+  (gattungen || []).map(dbrLinienToken).forEach(function (x) {
+    if (x && !seen[x]) { seen[x] = 1; raus.push(x); }
   });
-  return out.sort(function (a, b) { return (b.trips || 0) - (a.trips || 0); });
+  return raus.length ? '!' + raus.join('~') : '';
 }
-function dbrRichtungKey(r) { return r.line + '|' + r.rid; }
-function dbrFehlendeGattungen() {
-  var d = dbrState.daten; if (!d) return [];
-  var inLines = {};
-  (d.lines || []).forEach(function (l) { inLines[(l.gattung || dbrGattVonLinie(l.name) || '').toUpperCase()] = 1; });
-  return (d.gattungen || []).filter(function (g) { return !inLines[String(g).toUpperCase()]; });
-}
-function dbrRenderFein() {
-  var d = dbrState.daten; if (!d) return;
-  document.getElementById('dbrFeinName').textContent = dbrState.von.name;
-  document.getElementById('dbrFeinInfo').textContent = dbrState.bis.length
-    ? ('Nur Züge nach ' + dbrState.bis.map(dbrZielName).join(' oder ')
-       + (dbrState.durch.length ? (', und weiter über ' + dbrState.durch.map(dbrZielName).join(' oder ')) : ''))
-    : 'Alle Züge des Bahnhofs';
-
-  var gatts = d.gattungen || [];
-  document.getElementById('dbrGattChips').innerHTML =
-    dbChip('Alle', dbrState.gatts.length === 0, "dbrToggleGatt('')") +
-    gatts.map(function (g) { return dbChip(g, dbrState.gatts.indexOf(g) >= 0, "dbrToggleGatt('" + dbEsc(g) + "')"); }).join('');
-
-  var rw = document.getElementById('dbrRichtungWrap');
-  var zeigeRichtung = dbrState.bis.length === 0;
-  rw.classList.toggle('hidden', !zeigeRichtung);
-  if (zeigeRichtung) {
-    var alle = dbrRichtungenAlle();
-    var zeig = alle.slice(0, 24);
-    document.getElementById('dbrRichtungListe').innerHTML = zeig.map(function (r) {
-      var k = dbrRichtungKey(r);
-      var zieltext = r.ziele.slice(0, 2).join(', ');
-      return '<div class="db-steig-row ' + (dbrState.richtungen.indexOf(k) >= 0 ? 'on' : '') + '" onclick="dbrToggleRichtung(\'' + dbEsc(k) + '\')">' +
-               '<span class="db-steig-check"></span>' +
-               '<span class="db-steig-num" style="min-width:0;flex:1;">' + dbAttr(r.line + (dbrEn() ? ' towards ' : ' Richtung ') + (r.halt || '?')) + '</span>' +
-               (zieltext ? '<span class="db-steig-lines">' + dbAttr(zieltext) + '</span>' : '') +
-             '</div>';
-    }).join('') || '<div style="color:#888;font-size:13px;padding:10px 2px;">Für diesen Bahnhof kennt die Quelle keine Richtungen. Das Ziel auf der Seite davor grenzt trotzdem ein.</div>';
-    document.getElementById('dbrRichtungRest').textContent =
-      alle.length > zeig.length ? ('Weitere ' + (alle.length - zeig.length) + ' Richtungen gibt es über das Ziel auf der Seite davor.') : '';
-  }
-
-  document.getElementById('dbrBrettGruppiert').classList.toggle('active', dbrState.brett === 'gruppiert');
-  document.getElementById('dbrBrettTafel').classList.toggle('active', dbrState.brett === 'tafel');
-  document.getElementById('dbrBrettHinweis').textContent = dbrState.brett === 'gruppiert'
-    ? 'Nach Linien: jede Linie und Richtung bekommt ihre feste Zeile.'
-    : 'Bahnhofstafel: die zehn nächsten Züge nach Uhrzeit, je Zug eine Zeile.';
-
-  // Grenzen der Quelle, nur wo sie die getroffene Wahl wirklich betreffen.
-  var punkte = [];
-  var fehlt = dbrFehlendeGattungen();
-  if (fehlt.length) punkte.push('Für ' + fehlt.join(', ') + ' kennt die Quelle hier keine Richtungen. Diese Züge stehen auf dem Display, in der Richtungsliste fehlen sie.');
-  if (dbrState.bis.length) {
-    if (gatts.some(function (g) { return /^(ICE|IC|EC|FLX|NJ|EN|RJ|RJX)$/.test(String(g).toUpperCase()); }))
-      punkte.push('Bei Fernzügen steht die Haltefolge erst rund zwei Stunden vor der Abfahrt fest. Vorher kann ein Zug fehlen, obwohl er später an Ihrem Ziel hält.');
-    punkte.push('Schienenersatzbusse erscheinen nicht.');
-  }
-  var gb = document.getElementById('dbrGrenzen');
-  gb.innerHTML = punkte.map(function (t) { return '<div style="margin:2px 0;">' + dbAttr(t) + '</div>'; }).join('');
-  gb.classList.toggle('hidden', punkte.length === 0);
-  dbrProbeStarten();
-}
-// LEBENDE PROBE: die Grammatik hinter '>' und '!' ist am Server streng, eine Auswahl kann
-// also voellig leer sein (Porz nach Koeln Hbf UND ueber Troisdorf liegt in zwei Richtungen,
-// gemessen 25.11.2026: kein einziger Zug). Statt den Kunden das am Geraet merken zu lassen,
-// fragen wir das Brett einmal ab und sagen, was gerade darauf steht. Blockiert nie.
-var dbrProbeGen = 0, dbrProbeTimer = null;
-function dbrEn() { return document.documentElement.lang === 'en'; }
-function dbrProbeStarten() {
-  var feld = document.getElementById('dbrProbe');
-  if (!feld || !dbrState.von) return;
-  var gen = ++dbrProbeGen;
-  var rbl = dbrFullId();
-  feld.textContent = dbrEn() ? 'Checking this selection …' : 'Auswahl wird geprüft …';
-  if (dbrProbeTimer) clearTimeout(dbrProbeTimer);
-  dbrProbeTimer = setTimeout(function () {
-    fetchDeparturesUnified(rbl).then(function (d) {
-      if (gen !== dbrProbeGen) return;   // inzwischen weitergeklickt
-      var n = 0;
-      ((d && d.data && d.data.monitors) || []).forEach(function (m) {
-        (m.lines || []).forEach(function (l) { n += (((l.departures || {}).departure) || []).length; });
-      });
-      feld.textContent = n
-        ? (dbrEn() ? ('Right now ' + n + ' departures match this selection.')
-                   : ('Gerade stehen ' + n + ' Abfahrten auf dieser Auswahl.'))
-        : (dbrEn() ? 'Right now nothing matches this selection. At night that is normal. Otherwise destination and stopover do not fit together, or this train type does not run here.'
-                   : 'Gerade steht nichts auf dieser Auswahl. Nachts ist das normal. Sonst passen Ziel und Zwischenhalt nicht zusammen, oder die Zugart fährt hier nicht.');
-    }).catch(function () { if (gen === dbrProbeGen) feld.textContent = ''; });
-  }, 400);
+// Mit Ziel das gruppierte Brett (DBR), ohne Ziel die flache Bahnhofstafel (DBRALL).
+function dbrRbl(vonId, bisId, gattungen) {
+  return (bisId ? 'DBR' : 'DBRALL') + ':' + vonId + (bisId ? ('>' + bisId) : '') + dbrToken(gattungen);
 }
 
-function dbrToggleGatt(g) {
-  if (!g) dbrState.gatts = []; else dbToggleIn(dbrState.gatts, g);
-  // Richtungen, die zur neuen Gattungswahl nicht mehr passen, fallen raus
-  var erlaubt = {}; dbrRichtungenAlle().forEach(function (r) { erlaubt[dbrRichtungKey(r)] = 1; });
-  dbrState.richtungen = dbrState.richtungen.filter(function (k) { return erlaubt[k]; });
-  dbrRenderFein();
-}
-function dbrToggleRichtung(k) { dbToggleIn(dbrState.richtungen, k); dbrRenderFein(); }
-function dbrSetBrett(v) { dbrState.brett = v; dbrRenderFein(); }
-
-// ---- Speichern ----
-// Token: die gewaehlten Gattungen, sonst die Linien der gewaehlten Richtungen (dann liefert
-// der Server je Linie mehr Abfahrten, statt das ganze Brett zu deckeln).
-function dbrToken() {
-  var t = [];
-  function add(x) { x = String(x || '').trim(); if (x && t.indexOf(x) < 0) t.push(x); }
-  dbrState.gatts.forEach(add);
-  if (!t.length) dbrState.richtungen.forEach(function (k) { add(dbrLinienToken(k.split('|')[0])); });
-  return t.length ? '!' + t.join('~') : '';
-}
-function dbrFullId() {
-  var pfx = (dbrState.brett === 'tafel') ? 'DBRALL' : 'DBR';
-  var id = pfx + ':' + dbrState.von.id;
-  if (dbrState.bis.length) {
-    id += '>' + dbrState.bis.join('~');
-    if (dbrState.durch.length) id += '>' + dbrState.durch.join('~');
-  }
-  return id + dbrToken();
-}
 // Untertitel der Stationskarte, immer aus der rbl gelesen (nie "Alle Abfahrten" behaupten).
 function dbrAuswahlLabel(fullId) {
   var voll = String(fullId || '');
@@ -10307,42 +10044,8 @@ function dbrAuswahlLabel(fullId) {
   if (stufen[1]) teile.push('nach ' + stufen[1].split('~').filter(Boolean).map(dbrZielName).join(' oder '));
   if (stufen[2]) teile.push('über ' + stufen[2].split('~').filter(Boolean).map(dbrZielName).join(' oder '));
   if (tok) teile.push('nur ' + tok.split('~').filter(Boolean).join(', '));
-  if (netz === 'DBRALL') teile.push('Bahnhofstafel');
+  if (netz === 'DBRALL') teile.push(teile.length ? 'Bahnhofstafel' : 'Alle Abfahrten');
   return teile.length ? teile.join(', ') : 'Alle Züge';
-}
-function addDbrStation() {
-  if (!dbrState.von || !dbrState.von.id) return;
-  var rbl = dbrFullId();
-  if (stations.some(function (s) { return s.fullId === rbl; })) { alert('Diese Auswahl ist bereits hinzugefügt!'); return; }
-  var bare = rbl.slice(rbl.indexOf(':') + 1);
-  // Richtungen nur ohne Ziel: mit Ziel steckt die Richtung in der rbl, und die masterrow
-  // schreibt dann ohnehin nur den Liniennamen (sid enthaelt '>').
-  var dirs = [];
-  if (!dbrState.bis.length && dbrState.richtungen.length) {
-    var byKey = {}; dbrRichtungenAlle().forEach(function (r) { byKey[dbrRichtungKey(r)] = r; });
-    dbrState.richtungen.forEach(function (k) {
-      var r = byKey[k]; if (!r) return;
-      dirs.push({ line: r.line, towards: r.ziele[0] || r.halt || '', type: dbrTypVonGattung(r.gattung),
-                  richtungsId: r.rid, stopId: bare });
-    });
-  }
-  var label = dbrAuswahlLabel(rbl);
-  stations.push({
-    network: 'DB', networkName: 'DB Regio',
-    stopId: dbrState.von.id, stopName: dbrState.von.name + ' · ' + label, dbBaseName: dbrState.von.name,
-    filter: dirs.length ? dirs.map(function (d) { return d.line; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(',') : '',
-    fullId: rbl, isExisting: false,
-    directions: dirs,
-    allDepartures: dirs.length === 0,
-    dbrBis: dbrState.bis.slice(), dbrDurch: dbrState.durch.slice(),
-    dbrGatts: dbrState.gatts.slice(), dbrBrett: dbrState.brett,
-    dbrRichtungen: dbrState.richtungen.slice()
-  });
-  if (typeof resetFinetuningData === 'function') resetFinetuningData();
-  dbrState = { von: null, daten: null, bis: [], durch: [], gatts: [], richtungen: [],
-               brett: 'gruppiert', suche: '', sucheDurch: '' };
-  if (typeof showAddedStationsStep === 'function') showAddedStationsStep();
-  else { updateStationsList(); showStep('added'); }
 }
 // Bestandsstation (DBALL/DBSTEIG) auf die neue Anbindung heben: die alte Id ist eine
 // /global-Id, keine EVA. Darum ueber den NAMEN in die DBR-Suche, wie im Server-Brief.
@@ -10361,9 +10064,8 @@ function dbrUmstellen() {
 // ==================== STOP SELECTION ====================
 async function selectStop(id, name) {
   // DB hat kein /lines → eigener Auswahl-Flow (Gattung / Bahnsteig, planmäßig).
-  // DB Regio: neuer Ablauf (Von, Ziel, Zugarten) auf den Server-Netzen DBR/DBRALL.
-  // Daenemark bleibt beim alten Gattungs-/Bahnsteig-Wizard.
-  if (selectedNetwork === 'DB') { await startDbrSelection(id, name); return; }
+  // Daenemark bleibt beim alten Gattungs-/Bahnsteig-Wizard. DB Regio laeuft seit 25.11.2026
+  // ueber den GLEICHEN Von-Nach-Weg wie die OEBB-Zuege (isPointToPoint), siehe unten.
   if (selectedNetwork === 'DKTRAIN') { dbWizardNet = selectedNetwork; await startDbSelection(id, name); return; }
   const fullId = `${selectedNetwork}:${id}`;
 
@@ -10401,6 +10103,22 @@ async function selectStop(id, name) {
     showStep('lines');
     linesLoading.classList.remove('hidden');
     linesContainer.classList.add('hidden');
+
+    // DB Regio: die Ziele kommen aus /db/destinations (echte Haltefolgen des ganzen Tages),
+    // nicht aus dem aktuellen Abfahrtsfenster. Sonst fehlte abends die halbe Strecke.
+    if (selectedNetwork === 'DB') {
+      try {
+        p2pDestinations = await dbrZieleLaden(id);
+      } catch (e) {
+        console.error('[DB Regio] Ziele nicht ladbar:', e);
+        p2pDestinations = []; dbrGattungenAktuell = [];
+      }
+      if (_gen !== _pickerGen) return;
+      linesLoading.classList.add('hidden');
+      linesContainer.classList.remove('hidden');
+      renderPointToPointConfig();
+      return;
+    }
 
     // Lade Abfahrten um erreichbare Ziele zu sammeln (via unified-Fetch)
     try {
@@ -12684,15 +12402,21 @@ function renderPointToPointConfig() {
   const stationName = selectedStop?.name || '';
 
   // Header anpassen
-  document.querySelector('#linesContainer .lines-header h3').textContent = 'Fernverkehr konfigurieren';
+  var _istDb = (selectedNetwork === 'DB');
+  document.querySelector('#linesContainer .lines-header h3').textContent =
+    _istDb ? 'DB Regio einrichten' : 'Fernverkehr konfigurieren';
   document.getElementById('selectAllBtn').style.display = 'none';
+  // "Alle Abfahrten" laeuft bei der DB wie bei der OEBB ueber den Umschalter oben
+  // (departureModeToggle -> showGroupingStep -> addStationAllDepartures -> DBRALL).
   document.getElementById('allDeparturesBtn').style.display = 'none';
   addStationBtn.style.display = 'none';  // Versteckt — alles über fixierten saveBtn
   addStationBtn.disabled = !oebb_toStop;
   addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
   addStationBtn.onclick = function() { addStationFromOebb(); };
 
-  const gattungen = NETWORKS[selectedNetwork]?.defaultGattungen || OEBB_GATTUNGEN;
+  // Zugarten: bei der DB liefert sie der Server pro Bahnhof (RE, RB, S, ICE …), sonst die feste Liste.
+  const gattungen = _istDb ? (dbrGattungenAktuell || [])
+                           : (NETWORKS[selectedNetwork]?.defaultGattungen || OEBB_GATTUNGEN);
 
   let html = '';
 
@@ -12709,7 +12433,8 @@ function renderPointToPointConfig() {
     html += `<div class="p2p-station">${oebb_toStop.name} <span class="p2p-change" onclick="clearOebbDest()">ändern</span></div>`;
   } else {
     html += `<div class="p2p-search-wrap">`;
-    html += `<input type="text" id="p2pSearchInput" class="search-input" placeholder="Wohin? z.B. Linz Hbf, Salzburg..." oninput="searchP2PDest(this.value)" onfocus="searchP2PDest(this.value)">`;
+    const _zielPlatz = _istDb ? 'Wohin? z.B. Köln Hbf, Troisdorf...' : 'Wohin? z.B. Linz Hbf, Salzburg...';
+    html += `<input type="text" id="p2pSearchInput" class="search-input" placeholder="${_zielPlatz}" oninput="searchP2PDest(this.value)" onfocus="searchP2PDest(this.value)">`;
     html += `<div id="p2pSearchResults" class="search-results"></div>`;
     html += `</div>`;
   }
@@ -12775,6 +12500,11 @@ function searchP2PDest(query) {
 }
 
 function selectP2PDestByName(name) {
+  // DB Regio: die EVA des Ziels steht schon in der geladenen Zielliste, keine zweite Suche noetig.
+  if (selectedNetwork === 'DB' && dbrZielIdByName[name]) {
+    selectP2PDest(dbrZielIdByName[name], name);
+    return;
+  }
   // Für GTFS Via-Filter brauchen wir die Stop-ID des Ziels
   // Suche per API nach dem Namen um die ID zu bekommen
   (async () => {
@@ -12819,7 +12549,47 @@ function toggleOebbGattung(g) {
   renderPointToPointConfig();
 }
 
+// DB Regio speichert wie der OEBB-Zug-Wizard, nur traegt die rbl die DBR-Grammatik:
+// mit Ziel "DBR:<von>><bis>", ohne Ziel das flache Bahnhofsbrett "DBRALL:<von>", dahinter
+// optional die abgewaehlten Zugarten als "!RE~S". Richtungen braucht es hier nicht: mit Ziel
+// steckt die Richtung schon in der rbl, und der Server gibt allen Linien dieselbe Id.
+function addStationDbRegio(ohneZiel) {
+  if (!selectedStop) return;
+  var alle = dbrGattungenAktuell || [];
+  var aktiv = alle.filter(function (g) { return !oebb_deselectedGattungen.has(g); });
+  if (alle.length && !aktiv.length) { alert('Bitte mindestens eine Zugart auswählen!'); return; }
+  // Alles an = kein Token. Hinter dem '!' ist der Server streng, ein unnoetiges Token
+  // koennte ein Brett leer machen, sobald der Bahnhof eine Gattung mehr bekommt.
+  var gatts = (aktiv.length === alle.length) ? [] : aktiv;
+  var bis = (!ohneZiel && oebb_toStop) ? String(oebb_toStop.id) : '';
+  if (bis && oebb_toStop && oebb_toStop.name) dbrNameCache[bis] = oebb_toStop.name;
+  var rbl = dbrRbl(String(selectedStop.id), bis, gatts);
+  if (stations.some(function (st) { return st.fullId === rbl; })) {
+    alert('Diese Auswahl ist bereits hinzugefügt!');
+    return;
+  }
+  var label = dbrAuswahlLabel(rbl);
+  stations.push({
+    network: 'DB', networkName: 'DB Regio',
+    stopId: String(selectedStop.id),
+    stopName: selectedStop.name + (label ? (' · ' + label) : ''),
+    dbBaseName: selectedStop.name,
+    filter: '', fullId: rbl, isExisting: false,
+    directions: [], allDepartures: true,
+    dbrBis: bis ? [bis] : [], dbrDurch: [], dbrGatts: gatts.slice(),
+    dbrBrett: bis ? 'gruppiert' : 'tafel'
+  });
+  if (typeof resetFinetuningData === 'function') resetFinetuningData();
+  selectedStop = null;
+  oebb_toStop = null;
+  oebb_deselectedGattungen = new Set();
+  selectedLines = new Set();
+  selectedVias = new Map();
+  showAddedStationsStep();
+}
+
 function addStationFromOebb() {
+  if (selectedNetwork === 'DB') return addStationDbRegio(false);
   if (!selectedStop || !oebb_toStop) return;
 
   // Aktive Gattungen
@@ -12970,6 +12740,8 @@ function setDepartureMode(mode) {
 function addStationAllDepartures() {
   // Alle Abfahrten ohne Filter — zeigt die nächsten N Züge chronologisch
   if (!selectedNetwork || !selectedStop) return;
+  // DB Regio: der ganze Bahnhof ist ein eigenes Netz (DBRALL), kein allDepartures-Flag am alten rbl.
+  if (selectedNetwork === 'DB') return addStationDbRegio(true);
 
   // NL: Mehrere Perrons (31001073,31001084) → jede ID einzeln prefixen
   const apiNetwork = mapNetworkForApi(selectedNetwork);
@@ -13922,13 +13694,33 @@ async function editStation(idx) {
     editingStationIndex = null;  // DB-Add dedupt über die rbl selbst
     var baseName = station.dbBaseName || String(station.stopName || '').split(' · ')[0];
     var warDbr = (typeof dbrIstDbrNetz === 'function') && dbrIstDbrNetz(station.fullId);
-    var vorgabe = warDbr ? { bis: station.dbrBis || [], durch: station.dbrDurch || [],
-                             gatts: station.dbrGatts || [], brett: station.dbrBrett || 'gruppiert',
-                             richtungen: station.dbrRichtungen || [] } : null;
-    var evaVon = warDbr ? String(station.stopId || '').split('>')[0].split('!')[0] : station.stopId;
+    if (warDbr) {
+      // Zurueck auf die Von-Nach-Seite, mit der gespeicherten Wahl schon gesetzt.
+      var evaVon = String(station.stopId || '').split('>')[0].split('!')[0];
+      var bisAlt = (station.dbrBis || [])[0] || '';
+      var gattsAlt = station.dbrGatts || [];
+      if (typeof removeStation === 'function') removeStation(idx);
+      selectedNetwork = 'DB';
+      selectedStop = { id: evaVon, name: baseName };
+      oebb_toStop = null;
+      oebb_deselectedGattungen = new Set();
+      p2pDestinations = [];
+      showStep('lines');
+      linesLoading.classList.remove('hidden');
+      linesContainer.classList.add('hidden');
+      try { p2pDestinations = await dbrZieleLaden(evaVon); } catch (e) { p2pDestinations = []; }
+      if (bisAlt) oebb_toStop = { id: bisAlt, name: dbrZielName(bisAlt) };
+      // Gespeicherte Zugarten sind die GEWAEHLTEN, die Seite fuehrt die abgewaehlten.
+      if (gattsAlt.length) (dbrGattungenAktuell || []).forEach(function (g) {
+        if (gattsAlt.indexOf(g) < 0) oebb_deselectedGattungen.add(g);
+      });
+      linesLoading.classList.add('hidden');
+      linesContainer.classList.remove('hidden');
+      renderPointToPointConfig();
+      return;
+    }
     if (typeof removeStation === 'function') removeStation(idx);  // alte Auswahl raus, dann neu wählen
-    if (warDbr) await startDbrSelection(evaVon, baseName, vorgabe);
-    else await startDbSelection(station.stopId, baseName);
+    await startDbSelection(station.stopId, baseName);
     return;
   }
 
@@ -27475,6 +27267,9 @@ window.addEventListener('DOMContentLoaded', () => {
     'Weiter mit dem ganzen Bahnhof': 'Continue with the whole station',
     'Kein Ziel gefunden.': 'No destination found.', 'Kein Halt gefunden.': 'No stop found.',
     'Zugarten': 'Train types', 'Richtung': 'Direction',
+    'DB Regio einrichten': 'Set up DB Regio',
+    'Wohin? z.B. Köln Hbf, Troisdorf...': 'Where to? e.g. Köln Hbf, Troisdorf...',
+    'Bitte mindestens eine Zugart auswählen!': 'Please pick at least one train type!',
     'Ohne Auswahl zeigt das Display beide Richtungen.': 'With nothing ticked the display shows both directions.',
     'Für diesen Bahnhof kennt die Quelle keine Richtungen. Das Ziel auf der Seite davor grenzt trotzdem ein.':
       'The source knows no directions for this station. The destination on the previous page still narrows it down.',
