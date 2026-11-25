@@ -9626,6 +9626,11 @@ function entdoppelOrt(name) {
 
 // Stand der letzten Proxy-Suche: true, wenn der Server leer UND sofort geantwortet hat.
 var _sucheGedrosselt = false;
+// Der Server antwortet auf Fehler mit HTTP 200 und {error:'…', stops:[]} (z.B. „Unknown
+// network", Upstream weg). Das sah fuer die Oberflaeche aus wie „nichts gefunden" und der
+// Kunde suchte den Fehler bei sich (Paul 25.11.2026: „so als ob er gleich aufgibt, wenn er
+// was schlechtes zurueckbekommt"). Darum getrennt merken und getrennt melden.
+var _sucheFehler = '';
 
 async function searchViaProxy(network, query) {
   const params = new URLSearchParams({ network: mapNetworkForApi(network), q: query });
@@ -9642,18 +9647,37 @@ async function searchViaProxy(network, query) {
   const WARTEN = [0, 700, 1500, 2500];
   let data = { stops: [] };
   let gedrosselt = false;
+  let letzterFehler = '';
+  let letzteAntwortEcht = false;
   for (let versuch = 0; versuch < WARTEN.length; versuch++) {
     if (WARTEN[versuch]) await new Promise(function(r) { setTimeout(r, WARTEN[versuch]); });
     const t0 = Date.now();
+    let fehler = '';
     try {
-      data = await (await fetch(`${SEARCH_API}?${params}`)).json();
-    } catch (e) { data = { stops: [] }; }
+      const antwort = await fetch(`${SEARCH_API}?${params}`);
+      data = await antwort.json();
+      if (!antwort.ok) fehler = 'HTTP ' + antwort.status;
+      else if (data && data.error) fehler = String(data.error);
+    } catch (e) { data = { stops: [] }; fehler = String((e && e.message) || e); }
     const leer = !(data.stops || []).length;
-    if (!leer) { gedrosselt = false; break; }
-    gedrosselt = (Date.now() - t0) < 1500;   // leer UND schnell = abgewiesen
-    if (!gedrosselt) break;                  // leer UND langsam = es gibt wirklich nichts
+    // Eine ECHTE Antwort erkennt man daran, dass der Server Netz und Suchwort zurueckspiegelt
+    // ({network, query, stops}). Eine abgewiesene traegt nur {error, stops:[]} oder gar kein JSON.
+    const echteAntwort = !!(data && typeof data === 'object' && Array.isArray(data.stops)
+                            && !data.error && data.network !== undefined);
+    if (!leer) { gedrosselt = false; letzterFehler = ''; break; }
+    letzterFehler = fehler;
+    gedrosselt = !echteAntwort && (Date.now() - t0) < 1500;   // leer UND schnell UND keine echte Antwort
+    // Ein FEHLER ist nie eine Antwort: immer nachfassen. Leer UND langsam heisst meistens
+    // wirklich nichts, kann aber auch eine Zeitueberschreitung oben sein: dafuer EIN
+    // zweiter Versuch, danach glauben wir es.
+    if (!gedrosselt && !fehler && versuch >= 1) break;
+    letzteAntwortEcht = echteAntwort;
   }
-  _sucheGedrosselt = gedrosselt;
+  // Nach vier Versuchen in rund fuenf Sekunden ist eine Drossel normalerweise vorbei. Kommt
+  // dann IMMER NOCH eine saubere leere Antwort, gibt es die Station in diesem Netz wirklich
+  // nicht, und „ueberlastet" waere gelogen (Paul 25.11.2026, Bruessel und „muenchen").
+  _sucheGedrosselt = gedrosselt && !letzterFehler && !letzteAntwortEcht;
+  _sucheFehler = letzterFehler;
   return (data.stops || []).map(s => ({
     id: s.id, name: entdoppelOrt(s.name), info: s.info || '',
     // Seit 03.10.2026 sagt der Server pro Treffer, ob es ein Bahnhof ist: true/false/null
@@ -9671,7 +9695,11 @@ function displaySearchResults(results) {
   // wie der WESTBAHN-Von→Nach-Wizard (FV_AT_STATIONS + normFvName, siehe performSearch).
   // Duplikate (Cluster- + Hafas-Id mit gleichem Namen) einmal zeigen.
   let filtered = results;
-  if (NETWORKS[selectedNetwork]?.isPointToPoint) {
+  // NUR der OEBB-Fernverkehr: seine Ziele stehen in einer festen Liste (FV_AT_STATIONS).
+  // Die DB-Kachel geht seit 25.11.2026 denselben Von-Nach-Weg, hat aber natuerlich keine
+  // oesterreichische FV-Liste: ungefiltert gelassen, sonst verschwand jeder deutsche
+  // Bahnhof aus den Treffern ("muenchen" fand nichts, Paul 25.11.2026).
+  if (NETWORKS[selectedNetwork]?.isPointToPoint && selectedNetwork !== 'DB') {
     const seenNames = new Set();
     filtered = results.filter(r => {
       const key = fvWhitelistKey(r.name);   // tolerant ("Linz/Donau Hbf" ↔ "Linz Hbf")
@@ -9700,9 +9728,17 @@ function displaySearchResults(results) {
   }
 
   if (filtered.length === 0) {
+    // Drei verschiedene Gruende, drei verschiedene Saetze. Vorher stand ueberall
+    // "Keine Stationen gefunden", auch wenn der Server gar nicht geantwortet hatte.
+    var _netzTxt = (NETWORKS[selectedNetwork] && NETWORKS[selectedNetwork].name) || '';
     searchResults.innerHTML = _sucheGedrosselt
       ? '<div class="no-results">Die Suche ist gerade überlastet. Bitte gleich nochmal versuchen.</div>'
-      : '<div class="no-results">Keine Stationen gefunden</div>';
+      : _sucheFehler
+        ? '<div class="no-results">Die Suche hat gerade nicht geantwortet. Bitte gleich nochmal versuchen.</div>'
+        : ('<div class="no-results">Keine Stationen gefunden'
+           + (_netzTxt ? ('<br><span style="font-size:12px;color:#888;">Gesucht wurde in: ' + dbAttr(_netzTxt)
+                          + '. Liegt die Station in einem anderen Netz, oben auf Zurück.</span>') : '')
+           + '</div>');
   } else {
     searchResults.innerHTML = filtered.map(r => `
       <div class="search-result-item" onclick="selectStop('${r.id}', '${r.name.replace(/'/g, "\\'")}')">
@@ -27214,6 +27250,8 @@ window.addEventListener('DOMContentLoaded', () => {
     '+ Weitere Station hinzufügen': '+ Add another station', 'Weitere Station hinzufügen': 'Add another station',
     'Noch keine Stationen hinzugefügt': 'No stations added yet', 'Keine Stationen': 'No stations',
     'Keine Station gefunden': 'No station found', 'Keine Stationen gefunden': 'No stations found',
+    'Die Suche hat gerade nicht geantwortet. Bitte gleich nochmal versuchen.':
+      'The search did not answer just now. Please try again in a moment.',
     'Die Suche ist gerade überlastet. Bitte gleich nochmal versuchen.':
       'The search is busy right now. Please try again in a moment.',
     'Diese Station ist bereits hinzugefügt!': 'This station has already been added!',
