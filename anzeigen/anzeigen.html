@@ -591,7 +591,7 @@
 <script src="renderer-host.js?v=3"></script>
 <!-- Die Versionsnummer bei jeder Aenderung am Renderer hochzaehlen: GitHub Pages
      liefert die Datei sonst bis zu zehn Minuten aus dem Cache weiter. -->
-<script src="display-renderer.js?v=7"></script>
+<script src="display-renderer.js?v=8"></script>
 <script>
 const DEP_API  = 'https://api.straba.at/api/v1/wl/departures';
 const SUCH_API = 'https://api.straba.at/api/v1/stops/search';
@@ -704,6 +704,10 @@ const STIL_KANN = {
   // die Kopfzeile traegt einen frei waehlbaren Stationsnamen (Feld '#').
   27: { badges: true, badgesEinfach: true, kopfName: true, blinken: 'bus',
         linienFarben: true },
+  // Vollfarbig (Wien-Renderer im Modus vollfarbig, Firmware 2.6.14): jede Zeile ganz in der
+  // Linienfarbe, darum kein Badge-Schalter. Bei 0 das Wiener Quadrat. minEinheit: "Min"
+  // hinter der Zahl (ds m3).
+  28: { blinken: 'quadrat', linienFarben: true, minEinheit: true },
   101: { blinken: 'quadrat' },
   102: { blinken: 'quadrat' },
   103: { blinken: 'quadrat' }
@@ -981,6 +985,8 @@ function dsSegment(c, zeilenZahl, fenster, sortierung, d) {
     const liste = pListeVon(c);
     if (liste) seg += '|P' + liste;
   }
+  // "Min" hinter der Zahl: Zeit-Anzeige m3 (am Geraet nur Vollfarbig, die anderen bleiben bei 0)
+  if (k.minEinheit && minNachStil[parseInt(c, 10)]) seg += '|m3';
   return seg;
 }
 function maxZeilen(c) { return STIL_ZEILEN[parseInt(c, 10)] || ZEILEN_VORGABE; }
@@ -1215,7 +1221,8 @@ const NETZ_STILE = {
   RET:      [27, 23, 24, 1]
 };
 // Stile, die ueberall gehen und darum immer angeboten werden.
-const STILE_UNIVERSELL = [23, 21, 24];
+// Vollfarbig (28) passt zu jedem Netz: jede Linie bringt ihre Farbe mit (Paul 25.11.2026).
+const STILE_UNIVERSELL = [23, 21, 24, 28];
 
 // Aufklappliste eines Displays: erst was zu seinen Netzen passt, dann der Rest,
 // am Ende der Weg zum eigenen Design.
@@ -1349,12 +1356,16 @@ const STILE = [
   { id: 24, name: 'Paper White' },
   { id: 25, name: 'SBB' },
   { id: 26, name: 'CH/LI' },
-  { id: 27, name: 'Niederlande (DRIS)' }
+  { id: 27, name: 'Niederlande (DRIS)' },
+  { id: 28, name: 'Vollfarbig' }
 ];
 // Stile, die nur neue Geraete zeichnen koennen. Sie stehen nur dann zur Wahl, sonst
 // verspricht die Liste etwas, das am Geraet anders aussieht (der NL-Screen fiele auf das
 // Wiener Display zurueck). Was schon eingestellt IST, bleibt sichtbar.
-function stilBrauchtFirmware(id) { return parseInt(id, 10) === 27 && !fwNl(); }
+function stilBrauchtFirmware(id) {
+  const n = parseInt(id, 10);
+  return (n === 27 && !fwNl()) || (n === 28 && !fwVollfarbig());
+}
 
 // ---- Beispieldaten -------------------------------------------------------------------
 // Nachts steht an vielen Stationen gar nichts mehr an. Statt leerer Karten zeigt die
@@ -2054,13 +2065,19 @@ const FW_MIT_NL_FARBEN = '2.6.14';
 function fwNlFarben() {
   return !!geraetVersion && versionMin(geraetVersion, FW_MIT_NL_FARBEN);
 }
+// Ab dieser Firmware gibt es den Stil Vollfarbig (colour 28). Aeltere Geraete kennen die 28
+// nicht und zeichnen das Wiener Display in Gelb, darum steht er erst dann zur Wahl.
+const FW_MIT_VOLLFARBIG = '2.6.14';
+function fwVollfarbig() {
+  return !!geraetVersion && versionMin(geraetVersion, FW_MIT_VOLLFARBIG);
+}
 // Darf der Kunde die Linienfarben dieses Stils selbst setzen? Der Stil muss es koennen
 // UND das Geraet. Bei der DB-S-Bahn fragt niemand nach der Version: dort gibt es die
 // Farben seit der Firmware, die auch den Stil mitbrachte.
 function kannLinienFarben(c) {
   c = parseInt(c, 10);
   if (!(STIL_KANN[c] || {}).linienFarben) return false;
-  return (c === 27) ? fwNlFarben() : true;
+  return (c === 27 || c === 28) ? fwNlFarben() : true;
 }
 function fwNeu() {
   if (dFeldVonAussen != null) return !!dFeldVonAussen;
@@ -3278,6 +3295,14 @@ function ridIstRichtung(rid, st) {
 function richtungsRef(r) {
   const dep = r && r.dep;
   if (!dep) return '';
+  // DB Regio mit Ziel ("DBR:8004869>8000207"): die Richtung steckt schon in der rbl, und der
+  // Server gibt allen Linien dieselbe Id (dbv<ziel>). Ein Zeilen-Token waere hier ENGER als
+  // die Richtung: Zuege, die vor dem Ziel wenden oder darueber hinausfahren, haben ein
+  // anderes Endziel und fielen raus. Der Konfigurator schreibt an solchen rbls ebenfalls nur
+  // den Liniennamen (buildMasterAndTimeRows, Zweig sid.indexOf('>')), beide Oberflaechen
+  // bauen damit dieselbe Zeile.
+  const _rbl = String((r.station && r.station.rbl) || '');
+  if (/^DBR(ALL)?:/i.test(_rbl) && _rbl.indexOf('>') >= 0) return '';
   return ridIstRichtung(dep.rid, r.station) ? zielRef(dep.rid) : zielRef(dep.dest);
 }
 
@@ -4651,7 +4676,8 @@ function designZeichnen() {
   // Features-Karte, nicht hier. Ein Stil, der nur sie kann (OEBB kann genau das), lief
   // darum am Hinweis vorbei und zeichnete danach nichts: die Karte stand leer da
   // (Paul 27.10.2026, mit seinem OeBB-Display gesehen).
-  if (!k.schrift && !k.grund && !k.badges && !k.matrixSchrift) {
+  // Linienfarben und "Min" zaehlen auch: Vollfarbig hat nur diese beiden (25.11.2026).
+  if (!k.schrift && !k.grund && !k.badges && !k.matrixSchrift && !kannLinienFarben(c) && !k.minEinheit) {
     h += '<div class="hinweis">' + escapeHtmlFt(stilName)
        + ' bringt seine Farben fest mit, daran gibt es nichts einzustellen. '
        + 'Wiener Linien, DB S-Bahn, Matrix und Paper White lassen sich f\u00e4rben.</div>';
@@ -4717,6 +4743,14 @@ function designZeichnen() {
 
   if (kannLinienFarben(c)) {
     h += '<label class="feld">Linienfarben</label>' + linienFarbenHtml(c);
+  }
+  if (k.minEinheit) {
+    const mit = !!minNachStil[parseInt(c, 10)];
+    h += '<label class="feld">Minuten</label><div class="schalter">'
+       + '<button class="' + (mit ? '' : 'an') + '" onclick="minSetzen(' + parseInt(c, 10) + ', false)">3</button>'
+       + '<button class="' + (mit ? 'an' : '') + '" onclick="minSetzen(' + parseInt(c, 10) + ', true)">3 Min</button>'
+       + '</div><div class="hinweis">Mit \u201eMin\u201c hinter der Zahl, wie auf den Anzeigern in Mainz. '
+       + 'Gilt f\u00fcr alle Displays mit diesem Design.</div>';
   }
 
   // Die Schalter stehen in JEDEM Eintrag und gelten darum je Brett: die Firmware liest
@@ -4948,6 +4982,10 @@ function schriftSetzen(di, v) { einstFuer(displays[di]).t = parseInt(v, 10); all
 // JE STIL eine eigene Liste: die Berliner Pille und die niederlaendische Flaeche teilen
 // sich das Feld nicht, sonst faerbte das eine Display das andere mit.
 const linienFarbenNachStil = {};
+// "Min" hinter der Zahl je Stil (ds m3), Vollfarbig (Paul 25.11.2026: "die 1 danach Min oder
+// nicht, das waehlbar").
+const minNachStil = {};
+function minSetzen(c, an) { minNachStil[parseInt(c, 10)] = !!an; allesZeichnen(); }
 function stilFarben(c) {
   c = parseInt(c, 10);
   if (!linienFarbenNachStil[c]) linienFarbenNachStil[c] = {};
@@ -4977,6 +5015,7 @@ function pLesen(c, wert) {
 // (ORANGE in dvNlHTML, dieselbe Farbe wie am Geraet).
 function stilErsatzfarbe(c, ln) {
   if (parseInt(c, 10) === 27) return 'f5a000';
+  if (parseInt(c, 10) === 28) return '5a6470';   // Vollfarbig: Schiefergrau wie am Geraet
   return (typeof dvSBahnErsatzfarbe === 'function' ? dvSBahnErsatzfarbe(ln) : '#009640').replace('#', '');
 }
 // Was fuer eine Linie gerade gilt: eigene Farbe, sonst die vom Server, sonst die Tabelle
@@ -5012,7 +5051,7 @@ function linienFarbenHtml(c) {
   }
   // Berlin traegt Pillen, die NL-Anzeiger eine eckige Flaeche: die Kaestchen hier sehen aus
   // wie das, was hinterher auf dem Display steht.
-  const rund = (ci === 27) ? '4px' : '999px';
+  const rund = (ci === 27 || ci === 28) ? '4px' : '999px';
   const eigen = stilFarben(ci);
   const offen = linien.indexOf(lfOffen[ci]) >= 0 ? lfOffen[ci] : null;
   let h = '<div class="lf-reihe">';
@@ -5035,7 +5074,7 @@ function linienFarbenHtml(c) {
   h += '<div class="lf-editor"><div class="lf-kopf"><span class="lf-titel">Linie ' + escapeHtmlFt(offen) + '</span>'
      + (e ? '<button type="button" class="lf-zurueck" onclick="lfOffiziell(' + ci + ',' + arg + ')">Zur offiziellen Farbe</button>'
           : '<span class="lf-stand">Offizielle Farbe</span>')
-     + '</div><div class="lf-name">' + (ci === 27 ? 'Fl\u00e4che' : 'Pille') + '</div><div class="lf-palette">';
+     + '</div><div class="lf-name">' + (ci === 27 || ci === 28 ? 'Fl\u00e4che' : 'Pille') + '</div><div class="lf-palette">';
   LF_PALETTE.forEach(p => {
     h += '<button type="button" class="lf-farbe' + (e && e.bg === p ? ' an' : '') + '" onmousedown="event.preventDefault()" style="background:#' + p + '"'
        + ' aria-label="#' + p + '" onclick="lfFlaeche(' + ci + ',' + arg + ',\'' + p + '\', true)"></button>';
@@ -5420,7 +5459,11 @@ function automatikAus(di) {
       const n = { richtungen: flach(st), vomNutzer: false, auto: false,
                   stil: d.stil, einst: Object.assign({}, einstFuer(d)),
                   gruppen: gruppen.map(g => g.slice()) };
-      if (d.fenster) n.fenster = d.fenster;
+      // Eine KOPIE des Fensters, nicht dasselbe Objekt: sonst stellte das Fenster der
+      // abgespaltenen Seite (etwa der Uhr fuer die Nacht) das Original-Display mit um. Genau
+      // so stand bei Kunde Andreas Display 1 auf 3 bis 7 Uhr und blieb tagsueber dunkel
+      // (18.11.2026, am 25.11. nachgestellt).
+      if (d.fenster) n.fenster = Object.assign({}, d.fenster);
       if (d.zeilen != null) n.zeilen = d.zeilen;
       if (d.sortierung) n.sortierung = d.sortierung;
       gruppenPruefen(n);
@@ -6021,7 +6064,10 @@ function rblTeile(rbl) {
   // Wer das hier abschneidet, schreibt die Station als "alle Abfahrten" ins Geraet, und
   // der Kunde sieht trotz "nur Gleis 1" beide Gleise (Lena, Pfaffenhofen (Ilm), und ein
   // Kunde in Hessen, 04.11.2026). Die Auswahl bleibt Teil der rbl.
-  if (/^(DBALL|DBSTEIG|DKALL|DKSTEIG):/i.test(r)) return { kahl: r, nur: null };
+  // DBR/DBRALL (neue DB-Anbindung, 25.11.2026) genauso: dort steht hinter dem '!' die
+  // Gattungs- oder Linienauswahl und davor koennen Ziel-Stufen mit '>' stehen. Wer das
+  // abschneidet, schickt "ganzer Bahnhof" ans Geraet.
+  if (/^(DBALL|DBSTEIG|DKALL|DKSTEIG|DBR|DBRALL):/i.test(r)) return { kahl: r, nur: null };
   const nur = r.slice(i + 1).split('~').map(x => x.trim().toUpperCase()).filter(Boolean);
   return { kahl: r.slice(0, i), nur: nur.length ? nur : null };
 }
@@ -6090,8 +6136,8 @@ function gehoertDazu(nur, linie) {
 // Daenemark stehen dort Gattung, Steig oder Linie: ein zweites Token zerlegt ihre
 // Auswahl. Wien und Linz brauchen keines, dort hat jede Station ihren eigenen Eintrag.
 // Liste aus dem Konfigurator (lineSelToken), geprueft gegen den Netznamen im rbl.
-const OHNE_LINIENTOKEN = ['WL', 'WLB', 'TEST', 'DB', 'DBALL', 'DBSTEIG', 'DBIRIS',
-                          'DKTRAIN', 'DKALL', 'DKSTEIG', 'WESTBAHN', 'LINZ',
+const OHNE_LINIENTOKEN = ['WL', 'WLB', 'TEST', 'DB', 'DBR', 'DBRALL', 'DBALL', 'DBSTEIG',
+                          'DBIRIS', 'DKTRAIN', 'DKALL', 'DKSTEIG', 'WESTBAHN', 'LINZ',
                           'LIEMOBIL', 'RET', 'OVAPI', 'BODO'];
 function netzKuerzel(st) {
   const rbl = String((st && st.rbl) || '');
@@ -6350,6 +6396,16 @@ function uebergabeHolen() {
   }
   // Eigene Linienfarben: zuerst das Geraet, denn nur dort stehen sie. Je Stil getrennt
   // lesen, sonst faerbte die Berliner Pille die niederlaendische Flaeche mit.
+  // "Min" hinter der Zahl (m3) je Stil, wie die Linienfarben aus dem Stil-Segment
+  Object.keys(STIL_KANN).filter(c => (STIL_KANN[c] || {}).minEinheit).forEach(c => {
+    const re = new RegExp('^c' + parseInt(c, 10) + '\\|');
+    [(roh.geraet && roh.geraet.displaysettings) || '', roh.displaysettings || ''].some(z => {
+      const seg = String(z).split(';').map(x => x.trim()).find(x => re.test(x));
+      if (!seg) return false;
+      minNachStil[parseInt(c, 10)] = seg.split('|').map(x => x.trim()).indexOf('m3') >= 0;
+      return true;
+    });
+  });
   Object.keys(STIL_KANN).filter(c => (STIL_KANN[c] || {}).linienFarben).forEach(c => {
     const re = new RegExp('^c' + parseInt(c, 10) + '\\|');
     [(roh.geraet && roh.geraet.displaysettings) || '', roh.displaysettings || ''].some(z => {

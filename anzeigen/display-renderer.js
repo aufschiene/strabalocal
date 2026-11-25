@@ -329,6 +329,49 @@ function dvWienHTML(colour, data, rows, previewEl, fixed) {
   return dvWrap(html, DV_POPPINS);
 }
 
+// ---------- Vollfarbig (display_wien.cpp im Modus vollfarbig, colour 28, Firmware 2.6.14) ----------
+// Jede Zeile ganz in ihrer Linienfarbe, wie die Anzeiger in Mainz (Paul 25.11.2026). Flaeche:
+// eigene Farbe (c28|P), sonst vom Server, sonst die Wiener U-Bahn-Tabelle, sonst Schiefergrau.
+// Schrift: eigene, sonst vom Server, sonst nach Helligkeit (Hellgruen bekommt dunkle Schrift).
+// Schwarze Fuge zwischen den Zeilen, Luft zwischen Nummer und Ziel, "Min" hinter der Zahl mit m3.
+function dvVollfarbigHTML(colour, data, rows, previewEl) {
+  var WIEN_BADGE = { U1: '#e2001a', U2: '#a862a4', U3: '#f39200', U4: '#008d3d', U5: '#00b8aa', U6: '#944210' };
+  var eigene = dvEigeneLinienFarben(colour);
+  var mitMin = ((typeof dsVal === 'function' ? dsVal(colour, 'm') : 0) || 0) === 3;
+  previewEl.style.background = '#000000';
+  previewEl.style.backgroundImage = 'none';
+  var rowH = Math.floor(170 / rows);
+  var margin = 8, lineFs = 34, destFs = 14, cdFs = 34, minFs = 15;
+  var lineW = Math.max.apply(null, data.map(function (d) {
+    return Math.ceil(String(d.line || '').length * lineFs * 0.62);
+  }).concat([42]));
+  var destX = margin + lineW + 6 + 14;
+  var destW = 320 - destX - 50 - (mitMin ? 36 : 0);
+  var html = data.map(function (dep, i) {
+    var ln = String(dep.line || '');
+    var eigen = eigene[ln];
+    var bg = (eigen && eigen.bg) || dvLineColorCss(dep.lineColor) || WIEN_BADGE[ln.toUpperCase()] || '#5a6470';
+    var fg = eigen ? eigen.fg : dvLineColorCss(dep.lineTextColor);
+    if (!fg) {
+      var c = dvHexRgb(bg);
+      fg = (c[0] * 299 + c[1] * 587 + c[2] * 114 > 150000) ? '#1b1b1b' : '#ffffff';
+    }
+    var zahl = /^\d+$/.test(String(dep.time)) && String(dep.time) !== '0';
+    var d2 = dvDest2(destX, rowH, destW, 20, 4, destFs, fg, 700);
+    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;'
+      + 'box-sizing:border-box;background:' + bg + ';' + (i > 0 ? 'border-top:2px solid #000;' : '') + '">'
+      + '<div style="position:absolute;left:' + (margin + 4) + 'px;top:0;height:100%;display:flex;align-items:center;'
+      + 'color:' + fg + ';font-weight:700;font-size:' + lineFs + 'px;">' + escapeHtmlFt(ln) + '</div>'
+      + d2.open + escapeHtmlFt(dep.dest) + d2.close
+      + '<div style="position:absolute;right:' + margin + 'px;top:0;height:100%;display:flex;align-items:center;color:' + fg + ';">'
+      + '<span style="display:inline-flex;align-items:baseline;gap:3px;font-weight:700;">'
+      + '<span style="font-size:' + cdFs + 'px;">' + dep.time + '</span>'
+      + ((mitMin && zahl) ? '<span style="font-size:' + minFs + 'px;font-weight:600;">Min</span>' : '')
+      + '</span></div></div>';
+  }).join('');
+  return dvWrap(html, DV_POPPINS);
+}
+
 // ---------- ÖBB S-Bahn/Regional/Fern (display_oebb_sbahn.cpp) ----------
 function dvOebbHTML(colour, data, rows, previewEl) {
   var BG = '#000094', BGC = '#1e0060', DIM = '#bed2f0';
@@ -1615,6 +1658,8 @@ function dvPreviewHTML(colour, data, rows, previewEl, cfg) {
       return dvChliHTML(colour, data, rows, previewEl);
     case 27:
       return dvNlHTML(colour, data, rows, previewEl);
+    case 28:
+      return dvVollfarbigHTML(colour, data, rows, previewEl);
     case 5:
       return dvSBerlinHTML(colour, data, rows, previewEl);
     case 6:
