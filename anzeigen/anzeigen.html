@@ -1729,8 +1729,19 @@ function zugZiele(st) {
     const n = String((st && st.name) || '');
     const pf = n.search(/[\u2192>]/);
     if (pf > 0) namen = n.slice(pf + 1).split(',').map(x => x.trim()).filter(Boolean);
+    // DB Regio schreibt den Titel anders: "München Hbf · nach Kissing, nur S". Daraus den
+    // Zielnamen lesen, sonst steht in Zeilen aus der Zeit vor dem 25.11.2026 die nackte EVA.
+    if (!namen.length) {
+      const m = n.match(/·\s*nach\s+(.+?)\s*(?:,\s*(?:nur|über|ueber)\b.*)?$/i);
+      if (m && m[1]) namen = m[1].split(' oder ').map(x => x.trim()).filter(Boolean);
+    }
   }
-  return kahl.slice(i + 1).split('~').map(x => x.trim()).filter(Boolean)
+  // Bei DB Regio steht hinter dem letzten Ziel noch die Auswahl ("…>8003299!S"). Die ist
+  // kein Teil der Ziel-Id und darf auch nicht als Zielname auftauchen.
+  let hinten = kahl.slice(i + 1);
+  const bang = hinten.indexOf('!');
+  if (bang >= 0) hinten = hinten.slice(0, bang);
+  return hinten.split('~').map(x => x.trim()).filter(Boolean)
     .map((id, n) => ({ id: id, name: String(namen[n] || '').trim() || id }));
 }
 function istZugStation(st) { return zugZiele(st).length > 0; }

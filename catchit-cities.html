@@ -8201,7 +8201,13 @@ function uebergabeZiele(st) {
   var fid = String(st.fullId || '');
   var pfeil = fid.indexOf('>');
   if (pfeil < 0) return [];
-  var ids = fid.substring(pfeil + 1).split('~').map(function (x) { return String(x || '').trim(); })
+  // Hinter dem letzten Ziel kann die Auswahl stehen ("DBR:8000261>8003299!S"). Sie gehoert
+  // NICHT in die Ziel-Id, sonst steht sie in der Anzeigen-Oberflaeche als Zielname
+  // ("8003299!S" statt "Kissing", Paul 25.11.2026).
+  var nachPfeil = fid.substring(pfeil + 1);
+  var bang = nachPfeil.indexOf('!');
+  if (bang >= 0) nachPfeil = nachPfeil.substring(0, bang);
+  var ids = nachPfeil.split('~').map(function (x) { return String(x || '').trim(); })
               .filter(Boolean);
   if (!ids.length) return [];
   var vonAuswahl = {};
@@ -12612,6 +12618,9 @@ function addStationDbRegio(ohneZiel) {
     dbBaseName: selectedStop.name,
     filter: '', fullId: rbl, isExisting: false,
     directions: [], allDepartures: true,
+    // Zielname fuer die Uebergabe an die Anzeigen-Oberflaeche (uebergabeZiele liest fvDests),
+    // sonst steht dort die nackte EVA.
+    fvDests: (bis && oebb_toStop) ? [{ id: bis, name: oebb_toStop.name }] : [],
     dbrBis: bis ? [bis] : [], dbrDurch: [], dbrGatts: gatts.slice(),
     dbrBrett: bis ? 'gruppiert' : 'tafel'
   });
@@ -25202,6 +25211,7 @@ async function _loadExistingConfigImpl(rbl, filter, linefilterdestination, rowor
       var _basisR = String(stopName || '').split(' · ')[0].split(' → ')[0].trim() || stopName;
       station.dbBaseName = _basisR;
       if (typeof dbrNamenNachladen === 'function') dbrNamenNachladen(_stufen[0]);
+      station.fvDests = station.dbrBis.map(function (id) { return { id: id, name: dbrZielName(id) }; });
       var _lblR = (typeof dbrAuswahlLabel === 'function') ? dbrAuswahlLabel(fullId) : '';
       station.stopName = _basisR + (_lblR ? (' · ' + _lblR) : '');
       stations.push(station);
