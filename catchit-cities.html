@@ -4095,7 +4095,10 @@ const CITY_CAPABILITIES = {
     showAirCondition: false,
     gehwegFilter: true,
     nightMode: true,
-    defaultColour: 6,             // DB Fernverkehr
+    // Standard ist der S-Bahn-Schirm, nicht der Fernverkehrs-Schirm (Paul 26.11.2026:
+    // "koppel es standardmaessig mit DB S-Bahn und nicht DB Fernverkehr"). Der
+    // Fernverkehrs-Stil bleibt im Feintuning waehlbar.
+    defaultColour: 5,             // DB S-Bahn
     defaultBrightness: 3
   },
   BERLIN: {
@@ -11514,29 +11517,6 @@ function fvCatGroups() {
 function toggleFvGroup(key) {
   var gr = fvCatGroups().filter(function(g) { return g.key === key; })[0];
   if (!gr) return;
-  // DB: nach der Zielwahl sind BEIDE Gruppen an, es wird also nichts gefiltert. Ein Klick auf
-  // "Fernverkehr" soll dann heissen "nur Fernverkehr" und nicht "Fernverkehr aus" (Paul
-  // 26.11.2026: "habe nur Fernverkehr ausgewaehlt im Picker, nur wird RB immer noch
-  // angezeigt" — in seiner Geraete-Zeile stand gar kein Token). Erst der zweite Klick auf
-  // dieselbe Gruppe schaltet wieder alles an. Bei den OEBB bleibt es beim reinen Umschalter.
-  if (istDbZugWizard()) {
-    var _gruppen = fvCatGroups();
-    var _allesAn = _gruppen.every(function (g) {
-      return !g.cats.length || g.cats.every(function (c) { return fvActiveCats.has(c); });
-    });
-    var _nurDiese = gr.cats.length && gr.cats.every(function (c) { return fvActiveCats.has(c); })
-      && _gruppen.every(function (g) {
-        return g.key === key || !g.cats.some(function (c) { return fvActiveCats.has(c); });
-      });
-    if (_allesAn || _nurDiese) {
-      fvActiveCats = new Set();
-      if (_allesAn) gr.cats.forEach(function (c) { fvActiveCats.add(c); });
-      else _gruppen.forEach(function (g) { g.cats.forEach(function (c) { fvActiveCats.add(c); }); });
-      renderLines();
-      updateAddButton();
-      return;
-    }
-  }
   var warNv = fvHasNvCats();
   var alleAn = gr.cats.every(function(c) { return fvActiveCats.has(c); });
   gr.cats.forEach(function(c) { if (alleAn) fvActiveCats.delete(c); else fvActiveCats.add(c); });
@@ -12696,8 +12676,16 @@ function addStationDbZug() {
   gruppen.forEach(function (gr) { gr.cats.forEach(function (c) { if (alleCats.indexOf(c) < 0) alleCats.push(c); }); });
   var aktiv = alleCats.filter(function (c) { return fvActiveCats.has(c); });
   if (!aktiv.length) { alert('Bitte mindestens eine Zugart auswählen!'); return; }
-  // Alles an = kein Token (der Server ist hinter dem '!' streng).
-  var gatts = (aktiv.length === alleCats.length) ? [] : aktiv;
+  // Kein Token nur, wenn WIRKLICH alles an ist: jede Gruppe muss Gattungen haben UND
+  // vollstaendig angehakt sein. Der Vergleich ueber die blosse Anzahl log, sobald eine
+  // Gruppe LEER war: meldet /db/destinations fuer den Bahnhof keine Nahverkehrs-Gattung
+  // (oder kam die Antwort gar nicht), dann war "Fernverkehr an, Nahverkehr aus"
+  // rechnerisch "alles an", und die Geraete-Zeile bekam KEINEN Filter. Genau so stand sie
+  // bei Paul: "DBR:8000261>8000284|*|…" und das Display zeigte die RB16 mit (26.11.2026).
+  var alleGruppenVoll = gruppen.every(function (gr) {
+    return gr.cats.length && gr.cats.every(function (c) { return fvActiveCats.has(c); });
+  });
+  var gatts = alleGruppenVoll ? [] : aktiv;
   var ziele = fvAll ? [] : fvDests.map(function (d) { return String(d.id); }).filter(Boolean);
   fvDests.forEach(function (d) { if (d && d.id && d.name) dbrNameCache[String(d.id)] = d.name; });
   var rbl = dbrRbl(String(selectedStop.id), ziele.join('~'), gatts);
