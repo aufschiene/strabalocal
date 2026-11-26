@@ -5637,7 +5637,20 @@ const NV_CAT_COLOR = { REX: '#0066B3', R: '#4a7fb5', S: '#1a73b7', CJX: '#00497a
 const ALL_CATS = FV_CATS.concat(NV_CATS);
 function catIsNv(cat) { return NV_CATS.indexOf(cat) >= 0; }
 function catGattungen(cat) { return FV_CAT_GATTUNGEN[cat] || NV_CAT_GATTUNGEN[cat] || [cat]; }
-function catLabel(cat) { return FV_CAT_LABEL[cat] || NV_CAT_LABEL[cat] || cat; }
+// Beschriftung der DB-Gattungen aus der Zuggattungs-Tabelle der DB (Paul 26.11.2026). Ohne
+// sie stand in der DB-Liste OEBB-Sprache ("Intercity / EC" fuer IC) oder nur das Kuerzel.
+var DB_CAT_LABEL = {
+  ICE: 'ICE', ECE: 'EuroCity-Express (ECE)', EC: 'EuroCity (EC)', IC: 'Intercity (IC)',
+  RJX: 'Railjet Xpress (RJX)', RJ: 'Railjet (RJ)', TGV: 'TGV', FLX: 'FlixTrain (FLX)',
+  WB: 'Westbahn (WB)', NJ: 'Nightjet (NJ)', EN: 'EuroNight (EN)', ES: 'European Sleeper (ES)',
+  D: 'Schnellzug (D)', EST: 'Eurostar (EST)', NEX: 'Nachtexpress (NEX)', HBX: 'Harz-Berlin-Express (HBX)',
+  RE: 'Regional-Express (RE)', RB: 'Regionalbahn (RB)', S: 'S-Bahn',
+  MEX: 'Metropolexpress (MEX)', FEX: 'Flughafen-Express (FEX)', IRE: 'Interregio-Express (IRE)'
+};
+function catLabel(cat) {
+  if (typeof istDbZugWizard === 'function' && istDbZugWizard() && DB_CAT_LABEL[cat]) return DB_CAT_LABEL[cat];
+  return FV_CAT_LABEL[cat] || NV_CAT_LABEL[cat] || cat;
+}
 function catColor(cat) { return FV_CAT_COLOR[cat] || NV_CAT_COLOR[cat] || '#555'; }
 // Ist mindestens eine Nahverkehrs-Gattung gewaehlt? Dann muss die Station ueber OEBBREG laufen.
 function fvHasNvCats() { return NV_CATS.some(function(c) { return fvActiveCats.has(c); }); }
@@ -6826,7 +6839,7 @@ DISPLAY_PRESETS.bw = {
   networks: [
     { id: 'BWEGT', label: 'Tram/Bus/S-Bahn',    desc: 'Stuttgart, Karlsruhe, Freiburg, Bodensee …', jumpTo: { region: 'DE' } },
     { id: 'VRN',   label: 'Rhein-Neckar (VRN)', desc: 'Mannheim, Heidelberg …',                     jumpTo: { region: 'DE' } },
-    { id: 'DB',    label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                              jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',    label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                              jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.bayern = {
@@ -6835,7 +6848,7 @@ DISPLAY_PRESETS.bayern = {
   photo: 'fotos/München.jpg',
   networks: [
     { id: 'BAYERN', label: 'Nahverkehr', desc: 'U-Bahn, Tram, Bus, S-Bahn', jumpTo: { region: 'DE' } },
-    { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',             jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',             jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.berlin = {
@@ -6850,7 +6863,7 @@ DISPLAY_PRESETS.berlin = {
     { id: 'BERLIN', label: 'U-Bahn, Tram, Bus', desc: 'BVG-Nahverkehr',     jumpTo: { region: 'DE' }, berlinMode: 'nah' },
     { id: 'BERLIN', label: 'S-Bahn und Regio',  desc: 'S-Bahn, RE, RB',     jumpTo: { region: 'DE' }, berlinMode: 'sbahn',
       color: { bg: '#008D4F', fg: '#fff' } },
-    { id: 'DB',     label: 'DB Fernverkehr',    desc: 'ICE, IC, EC',        jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'fern',     label: 'DB Fernverkehr',    desc: 'ICE, IC, EC',        jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.hamburg = {
@@ -6859,7 +6872,7 @@ DISPLAY_PRESETS.hamburg = {
   photo: 'fotos/hamburg.webp',
   networks: [
     { id: 'HAMBURG', label: 'Nahverkehr', desc: 'U-Bahn, S-Bahn, Bus, Fähre', jumpTo: { region: 'DE' } },
-    { id: 'DB',      label: 'DB Regio',  desc: 'RE, RB, S-Bahn',              jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',      label: 'DB Regio',  desc: 'RE, RB, S-Bahn',              jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.hessen = {
@@ -6869,7 +6882,7 @@ DISPLAY_PRESETS.hessen = {
   networks: [
     { id: 'RMV', label: 'Rhein-Main (RMV)',  desc: 'S-Bahn, U-Bahn, Tram, Bus (Frankfurt …)', jumpTo: { region: 'DE' } },
     { id: 'NVV', label: 'Nordhessen (NVV)',  desc: 'Bus, Tram, Bahn (Kassel …)',              jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',          desc: 'RE, RB, S-Bahn',                           jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',  label: 'DB Regio',          desc: 'RE, RB, S-Bahn',                           jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.rostock = {
@@ -6878,7 +6891,7 @@ DISPLAY_PRESETS.rostock = {
   photo: 'fotos/Rostock.jpg',
   networks: [
     { id: 'ROSTOCK', label: 'Rostock (RSAG)', desc: 'Tram, Bus, S-Bahn', jumpTo: { region: 'DE' } },
-    { id: 'DB',      label: 'DB Regio',       desc: 'RE, RB, S-Bahn',    jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',      label: 'DB Regio',       desc: 'RE, RB, S-Bahn',    jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.niedersachsen = {
@@ -6889,7 +6902,7 @@ DISPLAY_PRESETS.niedersachsen = {
     { id: 'VBN', label: 'Hannover, Nordwest & Bremen',  desc: 'Stadtbahn Hannover, Bus, Tram, Bahn (VBN, GVH, Ems-Jade)', jumpTo: { region: 'DE' } },
     { id: 'VOS', label: 'Osnabrück',           desc: 'Bus, Bahn (VOS)',                 jumpTo: { region: 'DE' } },
     { id: 'VSN', label: 'Süd-Niedersachsen',   desc: 'Bus, Bahn (Göttingen, VSN)',      jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
   ]
 };
 // Köln-Kachel entfernt: KVB Köln (Netz KOELN, colour 19) hatte instabile Bus-Richtungen
@@ -6904,7 +6917,7 @@ DISPLAY_PRESETS.nrw = {
   networks: [
     { id: 'NRW',    label: 'Nahverkehr', desc: 'Bus, Tram, Stadtbahn, U-Bahn', jumpTo: { region: 'DE' } },
     { id: 'AACHEN', jumpTo: { region: 'DE' } },
-    { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',               jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',               jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.vrn = {
@@ -6915,7 +6928,7 @@ DISPLAY_PRESETS.vrn = {
     { id: 'RLP', label: 'Trier & Koblenz',    desc: 'Bus, Bahn (auch Eifel, Hunsrück, Westerwald)', jumpTo: { region: 'DE' } },
     { id: 'VRN', label: 'Rhein-Neckar (VRN)', desc: 'Ludwigshafen, Kaiserslautern …', jumpTo: { region: 'DE' } },
     { id: 'RMV', label: 'Rhein-Main (RMV)',   desc: 'Mainz, Worms …',                 jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',  label: 'DB Regio',           desc: 'RE, RB, S-Bahn',                  jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.saarvv = {
@@ -6924,7 +6937,7 @@ DISPLAY_PRESETS.saarvv = {
   photo: 'fotos/SAARLAND.webp',
   networks: [
     { id: 'SAARVV', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Saarbrücken …)', jumpTo: { region: 'DE' } },
-    { id: 'DB',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                    jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',     label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                    jumpTo: { region: 'DE' } }
   ]
 };
 // Sachsen: drei Verbund-Buttons — Leipzig läuft über den INSA-Feed (MDV-Redirect, /global-DELFI
@@ -6937,7 +6950,7 @@ DISPLAY_PRESETS.sachsen = {
     { id: 'MDV',     label: 'Leipzig & Halle (MDV)', desc: 'Tram, Bus (LVB, Leipzig, Halle)', jumpTo: { region: 'DE' } },
     { id: 'VVO',     label: 'Dresden (VVO)',         desc: 'S-Bahn, Tram, Bus',               jumpTo: { region: 'DE' } },
     { id: 'SACHSEN', label: 'Chemnitz & Region',     desc: 'Tram, Bus (CVAG …)',              jumpTo: { region: 'DE' } },
-    { id: 'DB',      label: 'DB Regio',              desc: 'RE, RB, S-Bahn',                   jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',      label: 'DB Regio',              desc: 'RE, RB, S-Bahn',                   jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.insa = {
@@ -6946,7 +6959,7 @@ DISPLAY_PRESETS.insa = {
   photo: 'fotos/INSA.jpg',
   networks: [
     { id: 'INSA', label: 'Nahverkehr', desc: 'Bus, Tram, Bahn (Magdeburg, Halle …)', jumpTo: { region: 'DE' } },
-    { id: 'DB',   label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                        jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',   label: 'DB Regio',  desc: 'RE, RB, S-Bahn',                        jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.nahsh = {
@@ -6955,7 +6968,7 @@ DISPLAY_PRESETS.nahsh = {
   photo: 'fotos/Schleswig.jpg',
   networks: [
     { id: 'NAHSH', label: 'Nahverkehr', desc: 'Bus, Bahn (NAH.SH)', jumpTo: { region: 'DE' } },
-    { id: 'DB',    label: 'DB Regio',  desc: 'RE, RB, S-Bahn',      jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',    label: 'DB Regio',  desc: 'RE, RB, S-Bahn',      jumpTo: { region: 'DE' } }
   ]
 };
 DISPLAY_PRESETS.vmt = {
@@ -6964,7 +6977,7 @@ DISPLAY_PRESETS.vmt = {
   photo: 'fotos/VMT.jpg',
   networks: [
     { id: 'VMT', label: 'Mittelthüringen (VMT)', desc: 'Bus, Tram, Bahn (Erfurt, Weimar, Jena …)', jumpTo: { region: 'DE' } },
-    { id: 'DB',  label: 'DB Regio',              desc: 'RE, RB, S-Bahn',                            jumpTo: { region: 'DE' } }
+    { id: 'DB', dbKat: 'nah',  label: 'DB Regio',              desc: 'RE, RB, S-Bahn',                            jumpTo: { region: 'DE' } }
   ]
 };
 
@@ -7084,7 +7097,7 @@ function renderDisplayPreset(displayKey) {
       var desc  = entry.desc != null ? entry.desc : (net.desc || '');
       // Zwei Kacheln koennen dasselbe Netz meinen und sich nur im Modus unterscheiden
       // (Berlin: Nahverkehr gegen S-Bahn). Der Modus geht als drittes Argument mit.
-      var modusArg = entry.berlinMode ? (", '" + entry.berlinMode + "'") : '';
+      var modusArg = (entry.berlinMode || entry.dbKat) ? (", '" + (entry.berlinMode || entry.dbKat) + "'") : '';
       return '<button class="selection-btn' + brandCls + '"' + styleAttr +
         ' onclick="jumpToPresetNetwork(\'' + entry.id + '\', JSON.parse(this.dataset.jump)' + modusArg + ')" data-jump="' + jumpJson + '">' +
         '<div class="name">' + label + '</div>' +
@@ -7106,6 +7119,11 @@ function renderDisplayPreset(displayKey) {
 function jumpToPresetNetwork(networkId, jumpTo, modus) {
   // Berlin: die Kachel entscheidet, ob Nahverkehr oder S-Bahn und Regio gezeigt werden.
   if (typeof berlinMode !== 'undefined') { berlinMode = modus || 'nah'; _berlinRohLinien = null; }
+  // DB: dieselbe Mechanik fuer Fernverkehr gegen Nahverkehr. Ohne Kachel (Weg ueber
+  // Deutschland) bleibt es bei allen Gattungen.
+  if (typeof dbKategorie !== 'undefined') {
+    dbKategorie = (networkId === 'DB' && (modus === 'fern' || modus === 'nah')) ? modus : null;
+  }
   // Setze die globalen Selectors so, als hätte der User sich durch den Flow geklickt
   if (typeof selectedRegion !== 'undefined') selectedRegion = jumpTo.region || null;
   if (typeof selectedVerkehrsart !== 'undefined') selectedVerkehrsart = jumpTo.verkehrsart || null;
@@ -9986,6 +10004,56 @@ function addDbStation() {
 // das Geraet haengt also kein zweites Token an. /stops/lines ist fuer DBR leer, die ganze
 // Oberflaeche haengt an /api/v1/db/destinations.
 var DBR_API = 'https://api.straba.at/api/v1/db/destinations';
+// Fern gegen Nah, wie bei den OEBB-Kacheln. Die Liste der FERNVERKEHRS-Gattungen stammt aus
+// der Zuggattungs-Tabelle der DB (Paul 26.11.2026: "mach so wie bei oebb fern und nahverkehr",
+// nachdem eine Kachel "DB Fernverkehr" auch RE zeigte). Alles, was NICHT hier steht, gilt als
+// Nahverkehr: unbekannte Gattungen (Privatbahnen wie ALX, DRF) bleiben damit im Nahverkehr
+// sichtbar, statt stillschweigend zu verschwinden.
+var DB_FERN_GATTUNGEN = ['ICE','ECE','EC','IC','RJ','RJX','TGV','EST','THA','FLX','WB','NJ',
+                         'EN','ES','D','DN','NEX','HBX','GV','SNH','RJN'];
+var dbKategorie = null;   // 'fern' | 'nah' | null (null = alles, generischer Weg ueber Deutschland)
+// Was "Nur Fernverkehr" ins Token schreibt. NICHT nur die Gattungen, die der Bahnhof heute
+// meldet: /db/destinations kennt an Muenchen Hbf nur DRF, ICE, RB, RE und S, ein EC am Abend
+// faellt sonst durchs Raster (Paul 26.11.2026: "was ist mit D EC IC und so"). Kuerzer als die
+// ganze Gattungstabelle, weil das Token in die Geraete-Zeile passen muss.
+var DB_FERN_TOKEN = ['ICE','ECE','EC','IC','RJX','RJ','TGV','FLX','WB','NJ','EN','ES','D','EST'];
+var dbChipsBeruehrt = false;   // hat der Kunde die Zugarten selbst umgestellt?
+function dbIstFernGattung(g) { return DB_FERN_GATTUNGEN.indexOf(String(g || '').toUpperCase()) >= 0; }
+// Gattungen ausserhalb der gewaehlten Klasse abwaehlen. Sie bleiben sichtbar und koennen
+// einzeln dazugenommen werden, sie sind nur nicht mehr stillschweigend dabei.
+function dbKategorieAnwenden() {
+  dbChipsBeruehrt = false;
+  oebb_deselectedGattungen = new Set();
+  var vorab = dbVorauswahl(dbrGattungenAktuell);
+  (dbrGattungenAktuell || []).forEach(function (g) {
+    if (vorab.indexOf(g) < 0) oebb_deselectedGattungen.add(g);
+  });
+}
+// Die drei Knoepfe (Alle / Nur Nahverkehr / Nur Fernverkehr) nur markieren, ohne Nebenwirkung.
+// Zugtypen vorwaehlen, passend zur angeklickten Kachel. Ohne Kachel ist alles an.
+function dbFvCatsVorwaehlen() {
+  var gruppen = fvCatGroups();
+  fvActiveCats = new Set();
+  gruppen.forEach(function (gr) {
+    var nehmen = (dbKategorie === 'fern') ? (gr.key === 'FV')
+               : (dbKategorie === 'nah')  ? (gr.key === 'NV')
+               : true;
+    if (nehmen) gr.cats.forEach(function (c) { fvActiveCats.add(c); });
+  });
+}
+function dbKatKnoepfeMarkieren(cat) {
+  [['btnCatAll', 'all'], ['btnCatReg', 'reg'], ['btnCatFern', 'fern']].forEach(function (pp) {
+    var b = document.getElementById(pp[0]);
+    if (b) b.classList.toggle('active', cat === pp[1]);
+  });
+}
+// Welche Gattungen dieses Bahnhofs sollen VORAB angehakt sein?
+function dbVorauswahl(gattungen) {
+  var alle = (gattungen || []).slice();
+  if (dbKategorie === 'fern') return alle.filter(dbIstFernGattung);
+  if (dbKategorie === 'nah') return alle.filter(function (g) { return !dbIstFernGattung(g); });
+  return alle;
+}
 var dbrDatenCache = {};   // EVA -> Antwort von /db/destinations
 var dbrNameCache = {};    // EVA -> Bahnhofsname (fuettert auch das Label der Stationskarte)
 
@@ -10085,7 +10153,17 @@ function dbrAuswahlLabel(fullId) {
   var teile = [];
   if (stufen[1]) teile.push('nach ' + stufen[1].split('~').filter(Boolean).map(dbrZielName).join(' oder '));
   if (stufen[2]) teile.push('über ' + stufen[2].split('~').filter(Boolean).map(dbrZielName).join(' oder '));
-  if (tok) teile.push('nur ' + tok.split('~').filter(Boolean).join(', '));
+  if (tok) {
+    // Die ganze Fernverkehrs-Klasse nicht als vierzehn Kuerzel hinschreiben, sonst steht im
+    // Titel "nur ICE, ECE, EC, IC, RJX, RJ, TGV, FLX, WB, NJ, EN, ES, D, EST".
+    var _liste = tok.split('~').filter(Boolean);
+    var _klasse = _liste.length >= 6 && _liste.every(function (g) {
+      return (typeof dbIstFernGattung === 'function') && dbIstFernGattung(g);
+    });
+    teile.push(_klasse ? 'nur Fernverkehr'
+      : _liste.length > 5 ? ('nur ' + _liste.slice(0, 3).join(', ') + ' und ' + (_liste.length - 3) + ' weitere')
+      : ('nur ' + _liste.join(', ')));
+  }
   if (netz === 'DBRALL') teile.push(teile.length ? 'Bahnhofstafel' : 'Alle Abfahrten');
   return teile.length ? teile.join(', ') : 'Alle Züge';
 }
@@ -10137,6 +10215,22 @@ async function selectStop(id, name) {
 
   searchResults.classList.remove('show');
 
+  // DB Regio: derselbe Zug-Wizard wie die OEBB-Zuege (Von, Ziele, Zugtypen in einer Box).
+  if (istDbZugWizard()) {
+    fvDests = []; fvAll = false; fvDestQuery = ''; fvDestFeldOffen = false;
+    fvReachable = []; fvReachableFor = null; fvReachableLoading = false;
+    dbrGattungenAktuell = [];
+    fvActiveCats = new Set();
+    showStep('lines');
+    linesLoading.classList.add('hidden');
+    linesContainer.classList.remove('hidden');
+    await loadFvReachable(id);
+    if (_gen !== _pickerGen) return;
+    renderLines();
+    updateAddButton();
+    return;
+  }
+
   // Point-to-Point Modus (ÖBB Fernverkehr: Von → Nach)
   if (NETWORKS[selectedNetwork]?.isPointToPoint) {
     oebb_toStop = null;
@@ -10151,6 +10245,7 @@ async function selectStop(id, name) {
     if (selectedNetwork === 'DB') {
       try {
         p2pDestinations = await dbrZieleLaden(id);
+        dbKategorieAnwenden();
       } catch (e) {
         console.error('[DB Regio] Ziele nicht ladbar:', e);
         p2pDestinations = []; dbrGattungenAktuell = [];
@@ -10652,9 +10747,10 @@ function renderLines() {
   // (zum Ankreuzen) + darunter ein Zugtyp-FEATURE-FILTER (Railjet/Westbahn/IC/NJ
   // an/aus, gilt für beide Richtungen). selectedLines wird aus (Richtungen × Typen)
   // berechnet (recomputeFvSelection). ===
-  if (selectedNetwork === 'WESTBAHN') {
-    // Direction-Labels = echte Termini (z.B. "Richtung Wien Westbf / Wien Hbf")
-    const fvTermNames = fvCollectTermNames();
+  if (selectedNetwork === 'WESTBAHN' || istDbZugWizard()) {
+    // Direction-Labels = echte Termini (z.B. "Richtung Wien Westbf / Wien Hbf").
+    // Die DB hat keine availableLines (kein /stops/lines), dort bleibt die Liste leer.
+    const fvTermNames = istDbZugWizard() ? [] : fvCollectTermNames();
     // FV nutzt eigenen Modus-Toggle → generischen "Alle Abfahrten/Linien"-Toggle + Header ausblenden.
     const _depT = document.getElementById('departureModeToggle');
     if (_depT) _depT.style.display = 'none';
@@ -11455,6 +11551,18 @@ function toggleFvCat(cat) {
 }
 // Die beiden Gruppen des Zug-Wizards. Fernverkehr ohne Westbahn auf ÖBB-Geräten (wie bisher).
 function fvCatGroups() {
+  if (typeof istDbZugWizard === 'function' && istDbZugWizard()) {
+    var alleDb = (typeof dbrGattungenAktuell !== 'undefined' ? dbrGattungenAktuell : []) || [];
+    // Fernverkehr: was der Bahnhof meldet PLUS die ganze Klasse, damit IC, EC, D und FLX
+    // auch dann waehlbar sind, wenn sie heute nicht im Index stehen.
+    var fvDb = alleDb.filter(dbIstFernGattung);
+    DB_FERN_TOKEN.forEach(function (g) { if (fvDb.indexOf(g) < 0) fvDb.push(g); });
+    var nvDb = alleDb.filter(function (g) { return !dbIstFernGattung(g); });
+    return [
+      { key: 'FV', name: 'Fernverkehr', sub: 'ICE, IC/EC, Railjet, Nightjet …', cats: fvDb, color: '#E2002A' },
+      { key: 'NV', name: 'Nahverkehr',  sub: 'RE, RB, S-Bahn',                  cats: nvDb, color: '#0066B3' }
+    ];
+  }
   var fv = FV_CATS.slice();
   if (typeof isOebbDevice === 'function' && isOebbDevice()) {
     fv = fv.filter(function(c) { return c !== 'WB'; });
@@ -11568,6 +11676,10 @@ function fvDefaultCats() {
 // auf. Vorher waren nur die Haupttypen vorgewählt, der Rest blieb leer.
 function recomputeFvCats() {
   if (!fvAll && !fvDests.length) { fvActiveCats = new Set(); return; }
+  // DB: eigene Gattungen. Ohne Kachel ist ebenfalls alles angehakt, mit Kachel nur die
+  // passende Klasse. Vorher setzte diese Zeile die OEBB-Listen (REX, CJX …) auf eine
+  // DB-Station, und die Gruppen-Knoepfe standen auf "5 von 14".
+  if (istDbZugWizard()) { dbFvCatsVorwaehlen(); return; }
   fvActiveCats = new Set(FV_CATS.concat(NV_CATS));
 }
 
@@ -11575,8 +11687,14 @@ function recomputeFvCats() {
 // Regio + FV teilen denselben vertikalen Aufbau: Von ↓ Nach ↓ Linien, mit Pfeil + hervorgehobenem
 // aktivem Schritt. Beginnt schon beim Such-Step (Von) → kein Bruch zwischen „alt" und „neu".
 function isVonNachNetwork() {
-  return selectedNetwork === 'WESTBAHN' || (isRegionalOebbNetwork());
+  return selectedNetwork === 'WESTBAHN' || selectedNetwork === 'DB' || (isRegionalOebbNetwork());
 }
+// Die DB laeuft seit 26.11.2026 durch DENSELBEN Zug-Wizard wie die OEBB-Zuege (Paul:
+// "kopier einfach das, also nehme das gleiche Code, nur DB-Schnittstelle"): gleiche
+// Von/Nach-Box, gleicher Ziel-Picker mit mehreren Zielen, gleiche Knoepfe Fernverkehr und
+// Nahverkehr samt "Gattungen bearbeiten". Anders sind nur die Datenquelle (/db/destinations
+// statt /oebb/destinations) und die rbl-Grammatik beim Speichern (DBR/DBRALL).
+function istDbZugWizard() { return selectedNetwork === 'DB'; }
 function vnArrow() { return '<div class="vn-arrow">↓</div>'; }
 // Route-Bestätigung (wie im Entwurf): erklärt, dass nur passende Abfahrten gezeigt werden.
 function vnRouteNote() {
@@ -11836,6 +11954,32 @@ async function holeZiele(stopId, netz) {
 
 async function loadFvReachable(stopId) {
   if (!stopId) { fvReachable = []; fvReachableFor = null; fvReachableLoading = false; return; }
+  // DB: eigene Quelle, dieselbe Form ({id, name, lines}) — der Picker merkt keinen Unterschied.
+  if (istDbZugWizard()) {
+    const _kkey = stopId + '|DBR';
+    if (fvReachableFor === _kkey && fvReachable.length) { fvReachableLoading = false; enrichFvDests(); return; }
+    fvReachableFor = _kkey;
+    fvReachable = [];
+    fvReachableLoading = true;
+    if (typeof renderLines === 'function') renderLines();
+    try {
+      const d = await dbrDatenHolen(stopId);
+      if (fvReachableFor !== _kkey) return;
+      fvReachable = (d.destinations || []).slice().sort(function (x, y) {
+        return (y.terminus ? 1 : 0) - (x.terminus ? 1 : 0) || (y.trips || 0) - (x.trips || 0);
+      }).map(function (z) { return { id: String(z.id), name: z.name, lines: z.lines || [] }; });
+      dbrGattungenAktuell = (d.gattungen || []).slice();
+      dbFvCatsVorwaehlen();
+    } catch (e) {
+      if (fvReachableFor !== _kkey) return;
+      fvReachable = []; dbrGattungenAktuell = [];
+      console.error('[DB Regio] Ziele nicht ladbar:', e);
+    }
+    fvReachableLoading = false;
+    enrichFvDests();
+    if (typeof renderLines === 'function') renderLines();
+    return;
+  }
   const _dnet = 'OEBBREG';
   const _dkey = stopId + '|' + _dnet;
   if (fvReachableFor === _dkey && fvReachable.length) { fvReachableLoading = false; enrichFvDests(); return; }
@@ -12445,8 +12589,10 @@ function renderPointToPointConfig() {
 
   // Header anpassen
   var _istDb = (selectedNetwork === 'DB');
-  document.querySelector('#linesContainer .lines-header h3').textContent =
-    _istDb ? 'DB Regio einrichten' : 'Fernverkehr konfigurieren';
+  document.querySelector('#linesContainer .lines-header h3').textContent = _istDb
+    ? (dbKategorie === 'fern' ? 'DB Fernverkehr einrichten'
+       : dbKategorie === 'nah' ? 'DB Nahverkehr einrichten' : 'DB Regio einrichten')
+    : 'Fernverkehr konfigurieren';
   document.getElementById('selectAllBtn').style.display = 'none';
   // "Alle Abfahrten" laeuft bei der DB wie bei der OEBB ueber den Umschalter oben
   // (departureModeToggle -> showGroupingStep -> addStationAllDepartures -> DBRALL).
@@ -12456,6 +12602,18 @@ function renderPointToPointConfig() {
   addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
   addStationBtn.onclick = function() { addStationFromOebb(); };
 
+  if (_istDb) {
+    // Umschalter sichtbar machen und auf die aktuelle Klasse stellen. Beschriftung passend:
+    // bei der DB heisst die Mitte "Nur Nahverkehr", bei den OEBB "Nur Regional".
+    var _kt = document.getElementById('oebbAllCatToggle');
+    if (_kt) _kt.style.display = 'flex';
+    var _bReg = document.getElementById('btnCatReg');
+    if (_bReg) _bReg.textContent = 'Nur Nahverkehr';
+    dbKatKnoepfeMarkieren(dbKategorie === 'fern' ? 'fern' : dbKategorie === 'nah' ? 'reg' : 'all');
+  } else {
+    var _bReg2 = document.getElementById('btnCatReg');
+    if (_bReg2) _bReg2.textContent = 'Nur Regional';
+  }
   // Zugarten: bei der DB liefert sie der Server pro Bahnhof (RE, RB, S, ICE …), sonst die feste Liste.
   const gattungen = _istDb ? (dbrGattungenAktuell || [])
                            : (NETWORKS[selectedNetwork]?.defaultGattungen || OEBB_GATTUNGEN);
@@ -12491,6 +12649,11 @@ function renderPointToPointConfig() {
     html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleOebbGattung('${g}')">${g}</span>`;
   }
   html += `</div>`;
+  if (_istDb && dbKategorie === 'fern') {
+    html += `<div style="color:#666;font-size:12px;line-height:1.5;margin-top:8px;">`
+         +  `Gezeigt sind die Zugarten, die dieser Bahnhof heute meldet. Gespeichert wird der ganze Fernverkehr, also auch IC, EC, D und FLX, falls später einer fährt.`
+         +  `</div>`;
+  }
   html += `</div>`;
 
   linesList.innerHTML = html;
@@ -12582,6 +12745,8 @@ function clearOebbDest() {
 }
 
 function toggleOebbGattung(g) {
+  // Ab jetzt zaehlt die Chip-Auswahl genau so, wie sie dasteht, nicht mehr die Klasse.
+  if (selectedNetwork === 'DB') dbChipsBeruehrt = true;
   if (oebb_deselectedGattungen.has(g)) {
     oebb_deselectedGattungen.delete(g);
   } else {
@@ -12603,6 +12768,15 @@ function addStationDbRegio(ohneZiel) {
   // Alles an = kein Token. Hinter dem '!' ist der Server streng, ein unnoetiges Token
   // koennte ein Brett leer machen, sobald der Bahnhof eine Gattung mehr bekommt.
   var gatts = (aktiv.length === alle.length) ? [] : aktiv;
+  // Steht "Nur Fernverkehr" und hat der Kunde die Chips nicht angefasst, zaehlt die KLASSE,
+  // nicht die Tagesauswahl des Bahnhofs: IC, EC, D oder FLX sollen auch dann durch, wenn sie
+  // gerade nicht im Index stehen. Beim Nahverkehr bleibt es bei den Gattungen des Bahnhofs,
+  // denn dort gehoeren auch unbekannte Privatbahnen dazu, die keine Liste kennt.
+  if (dbKategorie === 'fern' && !dbChipsBeruehrt) {
+    var fern = DB_FERN_TOKEN.slice();
+    alle.forEach(function (g) { if (dbIstFernGattung(g) && fern.indexOf(g) < 0) fern.push(g); });
+    gatts = fern;
+  }
   var bis = (!ohneZiel && oebb_toStop) ? String(oebb_toStop.id) : '';
   if (bis && oebb_toStop && oebb_toStop.name) dbrNameCache[bis] = oebb_toStop.name;
   var rbl = dbrRbl(String(selectedStop.id), bis, gatts);
@@ -12628,6 +12802,44 @@ function addStationDbRegio(ohneZiel) {
   selectedStop = null;
   oebb_toStop = null;
   oebb_deselectedGattungen = new Set();
+  selectedLines = new Set();
+  selectedVias = new Map();
+  showAddedStationsStep();
+}
+
+// Speichern aus dem Zug-Wizard, aber in die DBR-Grammatik: Ziele mit '~' verodert,
+// Zugtypen hinter '!'. Ohne Ziel das flache Bahnhofsbrett (DBRALL).
+function addStationDbZug() {
+  if (!selectedStop) return;
+  var gruppen = fvCatGroups();
+  var alleCats = [];
+  gruppen.forEach(function (gr) { gr.cats.forEach(function (c) { if (alleCats.indexOf(c) < 0) alleCats.push(c); }); });
+  var aktiv = alleCats.filter(function (c) { return fvActiveCats.has(c); });
+  if (!aktiv.length) { alert('Bitte mindestens eine Zugart auswählen!'); return; }
+  // Alles an = kein Token (der Server ist hinter dem '!' streng).
+  var gatts = (aktiv.length === alleCats.length) ? [] : aktiv;
+  var ziele = fvAll ? [] : fvDests.map(function (d) { return String(d.id); }).filter(Boolean);
+  fvDests.forEach(function (d) { if (d && d.id && d.name) dbrNameCache[String(d.id)] = d.name; });
+  var rbl = dbrRbl(String(selectedStop.id), ziele.join('~'), gatts);
+  if (stations.some(function (st) { return st.fullId === rbl; })) {
+    alert('Diese Auswahl ist bereits hinzugefügt!');
+    return;
+  }
+  var label = dbrAuswahlLabel(rbl);
+  stations.push({
+    network: 'DB', networkName: 'DB Regio',
+    stopId: String(selectedStop.id),
+    stopName: selectedStop.name + (label ? (' · ' + label) : ''),
+    dbBaseName: selectedStop.name,
+    filter: '', fullId: rbl, isExisting: false,
+    directions: [], allDepartures: true,
+    fvDests: fvDests.map(function (d) { return { id: String(d.id), name: d.name }; }),
+    dbrBis: ziele.slice(), dbrDurch: [], dbrGatts: gatts.slice(),
+    dbrBrett: ziele.length ? 'gruppiert' : 'tafel'
+  });
+  if (typeof resetFinetuningData === 'function') resetFinetuningData();
+  selectedStop = null;
+  fvDests = []; fvAll = false; fvActiveCats = new Set(); fvDestFeldOffen = false;
   selectedLines = new Set();
   selectedVias = new Map();
   showAddedStationsStep();
@@ -12713,7 +12925,8 @@ function updateAddButton() {
   // P2P: oebb_toStop; Fernverkehr (WESTBAHN): Richtungen×Zugtypen; sonst selectedLines
   const isP2P = NETWORKS[selectedNetwork]?.isPointToPoint;
   let enabled;
-  if (isP2P) enabled = !!oebb_toStop;
+  if (istDbZugWizard()) enabled = (fvActiveCats.size > 0 && (fvDests.length > 0 || fvAll));
+  else if (isP2P) enabled = !!oebb_toStop;
   else if (selectedNetwork === 'WESTBAHN') enabled = (fvActiveCats.size > 0 && (fvDests.length > 0 || fvAll));
   else if (isRegionalOebbNetwork()) enabled = (regLines.size > 0 && (regDests.length > 0 || regAll));
   else enabled = selectedLines.size > 0;
@@ -12744,16 +12957,24 @@ let allDepCat = 'all';        // ÖBB "Alle Abfahrten" Gattung: 'all' | 'reg' | 
 function updateOebbAllCatToggle() {
   const t = document.getElementById('oebbAllCatToggle');
   if (!t) return;
+  // Die DB fuehrt Fernverkehr gegen Nahverkehr seit 26.11.2026 ueber die Gruppen-Knoepfe im
+  // Zug-Wizard (fvCatGroups), nicht mehr ueber diesen Umschalter.
   const show = (departureMode === 'all') && /^OEBB/.test(selectedNetwork || '');
   t.style.display = show ? 'flex' : 'none';
 }
 
 function setAllDepCat(cat) {
   allDepCat = cat;
-  [['btnCatAll', 'all'], ['btnCatReg', 'reg'], ['btnCatFern', 'fern']].forEach(function(p) {
-    const b = document.getElementById(p[0]);
-    if (b) b.classList.toggle('active', cat === p[1]);
-  });
+  dbKatKnoepfeMarkieren(cat);
+  // DB: dieselben drei Knoepfe schalten zwischen allen Gattungen, nur Nahverkehr und nur
+  // Fernverkehr. Die Chips darunter zeigen danach, was wirklich angehakt ist.
+  if (selectedNetwork === 'DB' && typeof dbKategorie !== 'undefined') {
+    dbKategorie = (cat === 'fern') ? 'fern' : (cat === 'reg') ? 'nah' : null;
+    dbKategorieAnwenden();
+    // Neu zeichnen, solange eine Station offen ist. Die Abfrage auf currentStep war zu eng:
+    // nach einem Klick anderswo stand dort 'region', und die Chips zeigten weiter den alten Stand.
+    if (typeof renderPointToPointConfig === 'function' && selectedStop) renderPointToPointConfig();
+  }
 }
 
 function setDepartureMode(mode) {
@@ -12829,6 +13050,8 @@ function addStationAllDepartures() {
 }
 
 function addStation() {
+  // DB Regio: Zug-Wizard (Ziele + Zugtypen) -> DBR/DBRALL
+  if (istDbZugWizard() && (fvDests.length || fvAll)) return addStationDbZug();
   // OEBB Von-Nach Modus (OEBB_FERN oder OEBB mit Ziel)
   if ((NETWORKS[selectedNetwork]?.isPointToPoint || selectedNetwork === 'OEBB') && oebb_toStop) {
     return addStationFromOebb();
@@ -27316,6 +27539,11 @@ window.addEventListener('DOMContentLoaded', () => {
     'Kein Ziel gefunden.': 'No destination found.', 'Kein Halt gefunden.': 'No stop found.',
     'Zugarten': 'Train types', 'Richtung': 'Direction',
     'DB Regio einrichten': 'Set up DB Regio',
+    'DB Fernverkehr einrichten': 'Set up DB long distance',
+    'DB Nahverkehr einrichten': 'Set up DB local trains',
+    'Nur Nahverkehr': 'Local trains only',
+    'Gezeigt sind die Zugarten, die dieser Bahnhof heute meldet. Gespeichert wird der ganze Fernverkehr, also auch IC, EC, D und FLX, falls später einer fährt.':
+      'Shown are the train types this station reports today. Saved is all long distance traffic, including IC, EC, D and FLX, in case one runs later.',
     'Wohin? z.B. Köln Hbf, Troisdorf...': 'Where to? e.g. Köln Hbf, Troisdorf...',
     'Bitte mindestens eine Zugart auswählen!': 'Please pick at least one train type!',
     'Ohne Auswahl zeigt das Display beide Richtungen.': 'With nothing ticked the display shows both directions.',
