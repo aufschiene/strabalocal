@@ -11576,6 +11576,29 @@ function fvCatGroups() {
 function toggleFvGroup(key) {
   var gr = fvCatGroups().filter(function(g) { return g.key === key; })[0];
   if (!gr) return;
+  // DB: nach der Zielwahl sind BEIDE Gruppen an, es wird also nichts gefiltert. Ein Klick auf
+  // "Fernverkehr" soll dann heissen "nur Fernverkehr" und nicht "Fernverkehr aus" (Paul
+  // 26.11.2026: "habe nur Fernverkehr ausgewaehlt im Picker, nur wird RB immer noch
+  // angezeigt" — in seiner Geraete-Zeile stand gar kein Token). Erst der zweite Klick auf
+  // dieselbe Gruppe schaltet wieder alles an. Bei den OEBB bleibt es beim reinen Umschalter.
+  if (istDbZugWizard()) {
+    var _gruppen = fvCatGroups();
+    var _allesAn = _gruppen.every(function (g) {
+      return !g.cats.length || g.cats.every(function (c) { return fvActiveCats.has(c); });
+    });
+    var _nurDiese = gr.cats.length && gr.cats.every(function (c) { return fvActiveCats.has(c); })
+      && _gruppen.every(function (g) {
+        return g.key === key || !g.cats.some(function (c) { return fvActiveCats.has(c); });
+      });
+    if (_allesAn || _nurDiese) {
+      fvActiveCats = new Set();
+      if (_allesAn) gr.cats.forEach(function (c) { fvActiveCats.add(c); });
+      else _gruppen.forEach(function (g) { g.cats.forEach(function (c) { fvActiveCats.add(c); }); });
+      renderLines();
+      updateAddButton();
+      return;
+    }
+  }
   var warNv = fvHasNvCats();
   var alleAn = gr.cats.every(function(c) { return fvActiveCats.has(c); });
   gr.cats.forEach(function(c) { if (alleAn) fvActiveCats.delete(c); else fvActiveCats.add(c); });
