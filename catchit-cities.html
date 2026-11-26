@@ -6119,6 +6119,11 @@ function showStep(step) {
   stepLines.classList.toggle('hidden', step !== 'lines');
   var _dbCard = document.getElementById('stepDbSelect');
   if (_dbCard) _dbCard.classList.toggle('hidden', step !== 'dbSelect');
+  // Die Bundeslaender-/Staedte-Kacheln gehoeren nur zum Einstieg. Beim Bearbeiten stand die
+  // ganze Karte ueber dem Picker (Paul 26.11.2026: "erstens oben Oe-Laenderauswahl").
+  // Bei step 'region' NICHT anfassen: jumpToPresetNetwork zeigt sie direkt danach wieder.
+  var _prsCard = document.getElementById('stepDisplayPreset');
+  if (_prsCard && step !== 'region') _prsCard.classList.add('hidden');
   if (step === 'search') applyVonNachSearchSkin();
 
   // Grouping Step entfernt - jetzt nur im Feintuning
@@ -10018,54 +10023,12 @@ var dbKategorie = null;   // 'fern' | 'nah' | null (null = alles, generischer We
 // ganze Gattungstabelle, weil das Token in die Geraete-Zeile passen muss.
 var DB_FERN_TOKEN = ['ICE','ECE','EC','IC','RJX','RJ','TGV','FLX','WB','NJ','EN','ES','D','EST'];
 var dbChipsBeruehrt = false;   // hat der Kunde die Zugarten selbst umgestellt?
-function dbIstFernGattung(g) { return DB_FERN_GATTUNGEN.indexOf(String(g || '').toUpperCase()) >= 0; }
-// Gattungen ausserhalb der gewaehlten Klasse abwaehlen. Sie bleiben sichtbar und koennen
-// einzeln dazugenommen werden, sie sind nur nicht mehr stillschweigend dabei.
-function dbKategorieAnwenden() {
-  dbChipsBeruehrt = false;
-  oebb_deselectedGattungen = new Set();
-  var vorab = dbVorauswahl(dbrGattungenAktuell);
-  (dbrGattungenAktuell || []).forEach(function (g) {
-    if (vorab.indexOf(g) < 0) oebb_deselectedGattungen.add(g);
-  });
-}
-// Die drei Knoepfe (Alle / Nur Nahverkehr / Nur Fernverkehr) nur markieren, ohne Nebenwirkung.
-// Zugtypen vorwaehlen, passend zur angeklickten Kachel. Ohne Kachel ist alles an.
-function dbFvCatsVorwaehlen() {
-  var gruppen = fvCatGroups();
-  fvActiveCats = new Set();
-  gruppen.forEach(function (gr) {
-    var nehmen = (dbKategorie === 'fern') ? (gr.key === 'FV')
-               : (dbKategorie === 'nah')  ? (gr.key === 'NV')
-               : true;
-    if (nehmen) gr.cats.forEach(function (c) { fvActiveCats.add(c); });
-  });
-}
-function dbKatKnoepfeMarkieren(cat) {
-  [['btnCatAll', 'all'], ['btnCatReg', 'reg'], ['btnCatFern', 'fern']].forEach(function (pp) {
-    var b = document.getElementById(pp[0]);
-    if (b) b.classList.toggle('active', cat === pp[1]);
-  });
-}
-// Welche Gattungen dieses Bahnhofs sollen VORAB angehakt sein?
-function dbVorauswahl(gattungen) {
-  var alle = (gattungen || []).slice();
-  if (dbKategorie === 'fern') return alle.filter(dbIstFernGattung);
-  if (dbKategorie === 'nah') return alle.filter(function (g) { return !dbIstFernGattung(g); });
-  return alle;
-}
-var dbrDatenCache = {};   // EVA -> Antwort von /db/destinations
-var dbrNameCache = {};    // EVA -> Bahnhofsname (fuettert auch das Label der Stationskarte)
-
+var dbrGattungenAktuell = [];  // Gattungen, die dieser Bahnhof meldet (aus /db/destinations)
+var dbrDatenCache = {};        // EVA -> Antwort von /db/destinations
+var dbrNameCache = {};         // EVA -> Bahnhofsname (fuettert auch das Label der Stationskarte)
 function dbrIstDbrNetz(fullId) { return /^DBR(ALL)?:/i.test(String(fullId || '')); }
 function dbrZielName(id) { return dbrNameCache[String(id)] || String(id); }
-function dbrTypVonGattung(g) {
-  g = String(g || '').toUpperCase();
-  if (g === 'S') return 'ptTrainS';
-  if (/^(RE|RB|R|IRE|MEX|TER)$/.test(g)) return 'ptTrainR';
-  return 'ptTrain';
-}
-// Gattung einer Linie: "RE9" -> "RE", "ICE 1659" -> "ICE" (wie oebbGattung beim ÖBB-Wizard).
+// Gattung einer Linie: "RE9" -> "RE", "ICE 1659" -> "ICE".
 function dbrGattVonLinie(name) {
   var m = String(name || '').trim().match(/^([A-Za-zÄÖÜ]+)/);
   return m ? m[1].toUpperCase() : '';
@@ -10078,7 +10041,18 @@ function dbrLinienToken(name) {
   if (/\s/.test(n) || !/\d/.test(n)) return dbrGattVonLinie(n);
   return n;
 }
-
+function dbIstFernGattung(g) { return DB_FERN_GATTUNGEN.indexOf(String(g || '').toUpperCase()) >= 0; }
+// Zugtypen vorwaehlen, passend zur angeklickten Kachel. Ohne Kachel ist alles an.
+function dbFvCatsVorwaehlen() {
+  var gruppen = fvCatGroups();
+  fvActiveCats = new Set();
+  gruppen.forEach(function (gr) {
+    var nehmen = (dbKategorie === 'fern') ? (gr.key === 'FV')
+               : (dbKategorie === 'nah')  ? (gr.key === 'NV')
+               : true;
+    if (nehmen) gr.cats.forEach(function (c) { fvActiveCats.add(c); });
+  });
+}
 async function dbrDatenHolen(eva) {
   var key = String(eva);
   if (dbrDatenCache[key]) return dbrDatenCache[key];
@@ -10108,25 +10082,6 @@ function dbrNamenNachladen(vonEva) {
   }).catch(function () {});
 }
 
-// Ziele einer Station fuer die Von-Nach-Seite: Namen (wie beim OEBB-Zug-Wizard, p2pDestinations)
-// plus die EVA dahinter, damit die Auswahl ohne zweite Suche zur Id kommt.
-var dbrZielIdByName = {};      // Zielname -> EVA (nur die gerade gewaehlte Station)
-var dbrGattungenAktuell = [];  // Gattungen dieser Station, fuer die Zugarten-Schalter
-async function dbrZieleLaden(eva) {
-  var d = await dbrDatenHolen(eva);
-  dbrZielIdByName = {};
-  var namen = [];
-  // Endbahnhoefe und viel befahrene Ziele oben, wie im Server-Brief gewuenscht.
-  (d.destinations || []).slice().sort(function (a, b) {
-    return (b.terminus ? 1 : 0) - (a.terminus ? 1 : 0) || (b.trips || 0) - (a.trips || 0);
-  }).forEach(function (z) {
-    if (!z || !z.id || !z.name || dbrZielIdByName[z.name]) return;
-    dbrZielIdByName[z.name] = String(z.id);
-    namen.push(z.name);
-  });
-  dbrGattungenAktuell = (d.gattungen || []).slice();
-  return namen;
-}
 // Token hinter dem '!': reine Buchstaben = Gattung, mit Ziffer = exakte Linie. Am Server STRENG,
 // trifft es nichts, bleibt das Brett leer. Darum nur schreiben, wenn wirklich abgewaehlt wurde.
 function dbrToken(gattungen) {
@@ -10239,23 +10194,6 @@ async function selectStop(id, name) {
     showStep('lines');
     linesLoading.classList.remove('hidden');
     linesContainer.classList.add('hidden');
-
-    // DB Regio: die Ziele kommen aus /db/destinations (echte Haltefolgen des ganzen Tages),
-    // nicht aus dem aktuellen Abfahrtsfenster. Sonst fehlte abends die halbe Strecke.
-    if (selectedNetwork === 'DB') {
-      try {
-        p2pDestinations = await dbrZieleLaden(id);
-        dbKategorieAnwenden();
-      } catch (e) {
-        console.error('[DB Regio] Ziele nicht ladbar:', e);
-        p2pDestinations = []; dbrGattungenAktuell = [];
-      }
-      if (_gen !== _pickerGen) return;
-      linesLoading.classList.add('hidden');
-      linesContainer.classList.remove('hidden');
-      renderPointToPointConfig();
-      return;
-    }
 
     // Lade Abfahrten um erreichbare Ziele zu sammeln (via unified-Fetch)
     try {
@@ -12611,35 +12549,15 @@ function renderPointToPointConfig() {
   const stationName = selectedStop?.name || '';
 
   // Header anpassen
-  var _istDb = (selectedNetwork === 'DB');
-  document.querySelector('#linesContainer .lines-header h3').textContent = _istDb
-    ? (dbKategorie === 'fern' ? 'DB Fernverkehr einrichten'
-       : dbKategorie === 'nah' ? 'DB Nahverkehr einrichten' : 'DB Regio einrichten')
-    : 'Fernverkehr konfigurieren';
+  document.querySelector('#linesContainer .lines-header h3').textContent = 'Fernverkehr konfigurieren';
   document.getElementById('selectAllBtn').style.display = 'none';
-  // "Alle Abfahrten" laeuft bei der DB wie bei der OEBB ueber den Umschalter oben
-  // (departureModeToggle -> showGroupingStep -> addStationAllDepartures -> DBRALL).
   document.getElementById('allDeparturesBtn').style.display = 'none';
   addStationBtn.style.display = 'none';  // Versteckt — alles über fixierten saveBtn
   addStationBtn.disabled = !oebb_toStop;
   addStationBtn.textContent = editingStationIndex !== null ? 'Aktualisieren' : 'Station hinzufügen';
   addStationBtn.onclick = function() { addStationFromOebb(); };
 
-  if (_istDb) {
-    // Umschalter sichtbar machen und auf die aktuelle Klasse stellen. Beschriftung passend:
-    // bei der DB heisst die Mitte "Nur Nahverkehr", bei den OEBB "Nur Regional".
-    var _kt = document.getElementById('oebbAllCatToggle');
-    if (_kt) _kt.style.display = 'flex';
-    var _bReg = document.getElementById('btnCatReg');
-    if (_bReg) _bReg.textContent = 'Nur Nahverkehr';
-    dbKatKnoepfeMarkieren(dbKategorie === 'fern' ? 'fern' : dbKategorie === 'nah' ? 'reg' : 'all');
-  } else {
-    var _bReg2 = document.getElementById('btnCatReg');
-    if (_bReg2) _bReg2.textContent = 'Nur Regional';
-  }
-  // Zugarten: bei der DB liefert sie der Server pro Bahnhof (RE, RB, S, ICE …), sonst die feste Liste.
-  const gattungen = _istDb ? (dbrGattungenAktuell || [])
-                           : (NETWORKS[selectedNetwork]?.defaultGattungen || OEBB_GATTUNGEN);
+  const gattungen = NETWORKS[selectedNetwork]?.defaultGattungen || OEBB_GATTUNGEN;
 
   let html = '';
 
@@ -12656,8 +12574,7 @@ function renderPointToPointConfig() {
     html += `<div class="p2p-station">${oebb_toStop.name} <span class="p2p-change" onclick="clearOebbDest()">ändern</span></div>`;
   } else {
     html += `<div class="p2p-search-wrap">`;
-    const _zielPlatz = _istDb ? 'Wohin? z.B. Köln Hbf, Troisdorf...' : 'Wohin? z.B. Linz Hbf, Salzburg...';
-    html += `<input type="text" id="p2pSearchInput" class="search-input" placeholder="${_zielPlatz}" oninput="searchP2PDest(this.value)" onfocus="searchP2PDest(this.value)">`;
+    html += `<input type="text" id="p2pSearchInput" class="search-input" placeholder="Wohin? z.B. Linz Hbf, Salzburg..." oninput="searchP2PDest(this.value)" onfocus="searchP2PDest(this.value)">`;
     html += `<div id="p2pSearchResults" class="search-results"></div>`;
     html += `</div>`;
   }
@@ -12672,11 +12589,6 @@ function renderPointToPointConfig() {
     html += `<span class="gattung-chip ${isOn ? 'on' : 'off'}" onclick="toggleOebbGattung('${g}')">${g}</span>`;
   }
   html += `</div>`;
-  if (_istDb && dbKategorie === 'fern') {
-    html += `<div style="color:#666;font-size:12px;line-height:1.5;margin-top:8px;">`
-         +  `Gezeigt sind die Zugarten, die dieser Bahnhof heute meldet. Gespeichert wird der ganze Fernverkehr, also auch IC, EC, D und FLX, falls später einer fährt.`
-         +  `</div>`;
-  }
   html += `</div>`;
 
   linesList.innerHTML = html;
@@ -12728,11 +12640,6 @@ function searchP2PDest(query) {
 }
 
 function selectP2PDestByName(name) {
-  // DB Regio: die EVA des Ziels steht schon in der geladenen Zielliste, keine zweite Suche noetig.
-  if (selectedNetwork === 'DB' && dbrZielIdByName[name]) {
-    selectP2PDest(dbrZielIdByName[name], name);
-    return;
-  }
   // Für GTFS Via-Filter brauchen wir die Stop-ID des Ziels
   // Suche per API nach dem Namen um die ID zu bekommen
   (async () => {
@@ -12779,59 +12686,9 @@ function toggleOebbGattung(g) {
   renderPointToPointConfig();
 }
 
-// DB Regio speichert wie der OEBB-Zug-Wizard, nur traegt die rbl die DBR-Grammatik:
-// mit Ziel "DBR:<von>><bis>", ohne Ziel das flache Bahnhofsbrett "DBRALL:<von>", dahinter
-// optional die abgewaehlten Zugarten als "!RE~S". Richtungen braucht es hier nicht: mit Ziel
-// steckt die Richtung schon in der rbl, und der Server gibt allen Linien dieselbe Id.
-function addStationDbRegio(ohneZiel) {
-  if (!selectedStop) return;
-  var alle = dbrGattungenAktuell || [];
-  var aktiv = alle.filter(function (g) { return !oebb_deselectedGattungen.has(g); });
-  if (alle.length && !aktiv.length) { alert('Bitte mindestens eine Zugart auswählen!'); return; }
-  // Alles an = kein Token. Hinter dem '!' ist der Server streng, ein unnoetiges Token
-  // koennte ein Brett leer machen, sobald der Bahnhof eine Gattung mehr bekommt.
-  var gatts = (aktiv.length === alle.length) ? [] : aktiv;
-  // Steht "Nur Fernverkehr" und hat der Kunde die Chips nicht angefasst, zaehlt die KLASSE,
-  // nicht die Tagesauswahl des Bahnhofs: IC, EC, D oder FLX sollen auch dann durch, wenn sie
-  // gerade nicht im Index stehen. Beim Nahverkehr bleibt es bei den Gattungen des Bahnhofs,
-  // denn dort gehoeren auch unbekannte Privatbahnen dazu, die keine Liste kennt.
-  if (dbKategorie === 'fern' && !dbChipsBeruehrt) {
-    var fern = DB_FERN_TOKEN.slice();
-    alle.forEach(function (g) { if (dbIstFernGattung(g) && fern.indexOf(g) < 0) fern.push(g); });
-    gatts = fern;
-  }
-  var bis = (!ohneZiel && oebb_toStop) ? String(oebb_toStop.id) : '';
-  if (bis && oebb_toStop && oebb_toStop.name) dbrNameCache[bis] = oebb_toStop.name;
-  var rbl = dbrRbl(String(selectedStop.id), bis, gatts);
-  if (stations.some(function (st) { return st.fullId === rbl; })) {
-    alert('Diese Auswahl ist bereits hinzugefügt!');
-    return;
-  }
-  var label = dbrAuswahlLabel(rbl);
-  stations.push({
-    network: 'DB', networkName: 'DB Regio',
-    stopId: String(selectedStop.id),
-    stopName: selectedStop.name + (label ? (' · ' + label) : ''),
-    dbBaseName: selectedStop.name,
-    filter: '', fullId: rbl, isExisting: false,
-    directions: [], allDepartures: true,
-    // Zielname fuer die Uebergabe an die Anzeigen-Oberflaeche (uebergabeZiele liest fvDests),
-    // sonst steht dort die nackte EVA.
-    fvDests: (bis && oebb_toStop) ? [{ id: bis, name: oebb_toStop.name }] : [],
-    dbrBis: bis ? [bis] : [], dbrDurch: [], dbrGatts: gatts.slice(),
-    dbrBrett: bis ? 'gruppiert' : 'tafel'
-  });
-  if (typeof resetFinetuningData === 'function') resetFinetuningData();
-  selectedStop = null;
-  oebb_toStop = null;
-  oebb_deselectedGattungen = new Set();
-  selectedLines = new Set();
-  selectedVias = new Map();
-  showAddedStationsStep();
-}
-
 // Speichern aus dem Zug-Wizard, aber in die DBR-Grammatik: Ziele mit '~' verodert,
-// Zugtypen hinter '!'. Ohne Ziel das flache Bahnhofsbrett (DBRALL).
+// Zugtypen hinter '!'. Ohne Ziel das flache Bahnhofsbrett (DBRALL). Richtungen braucht es
+// hier nicht: mit Ziel steckt die Richtung schon in der rbl.
 function addStationDbZug() {
   if (!selectedStop) return;
   var gruppen = fvCatGroups();
@@ -12869,7 +12726,7 @@ function addStationDbZug() {
 }
 
 function addStationFromOebb() {
-  if (selectedNetwork === 'DB') return addStationDbRegio(false);
+  if (istDbZugWizard()) return addStationDbZug();
   if (!selectedStop || !oebb_toStop) return;
 
   // Aktive Gattungen
@@ -12988,16 +12845,10 @@ function updateOebbAllCatToggle() {
 
 function setAllDepCat(cat) {
   allDepCat = cat;
-  dbKatKnoepfeMarkieren(cat);
-  // DB: dieselben drei Knoepfe schalten zwischen allen Gattungen, nur Nahverkehr und nur
-  // Fernverkehr. Die Chips darunter zeigen danach, was wirklich angehakt ist.
-  if (selectedNetwork === 'DB' && typeof dbKategorie !== 'undefined') {
-    dbKategorie = (cat === 'fern') ? 'fern' : (cat === 'reg') ? 'nah' : null;
-    dbKategorieAnwenden();
-    // Neu zeichnen, solange eine Station offen ist. Die Abfrage auf currentStep war zu eng:
-    // nach einem Klick anderswo stand dort 'region', und die Chips zeigten weiter den alten Stand.
-    if (typeof renderPointToPointConfig === 'function' && selectedStop) renderPointToPointConfig();
-  }
+  [['btnCatAll', 'all'], ['btnCatReg', 'reg'], ['btnCatFern', 'fern']].forEach(function(p) {
+    const b = document.getElementById(p[0]);
+    if (b) b.classList.toggle('active', cat === p[1]);
+  });
 }
 
 function setDepartureMode(mode) {
@@ -13030,7 +12881,7 @@ function addStationAllDepartures() {
   // Alle Abfahrten ohne Filter — zeigt die nächsten N Züge chronologisch
   if (!selectedNetwork || !selectedStop) return;
   // DB Regio: der ganze Bahnhof ist ein eigenes Netz (DBRALL), kein allDepartures-Flag am alten rbl.
-  if (selectedNetwork === 'DB') return addStationDbRegio(true);
+  if (istDbZugWizard()) { fvAll = true; fvDests = []; return addStationDbZug(); }
 
   // NL: Mehrere Perrons (31001073,31001084) → jede ID einzeln prefixen
   const apiNetwork = mapNetworkForApi(selectedNetwork);
@@ -13986,28 +13837,30 @@ async function editStation(idx) {
     var baseName = station.dbBaseName || String(station.stopName || '').split(' · ')[0];
     var warDbr = (typeof dbrIstDbrNetz === 'function') && dbrIstDbrNetz(station.fullId);
     if (warDbr) {
-      // Zurueck auf die Von-Nach-Seite, mit der gespeicherten Wahl schon gesetzt.
+      // Zurueck in den Zug-Wizard, mit der gespeicherten Wahl schon gesetzt.
       var evaVon = String(station.stopId || '').split('>')[0].split('!')[0];
-      var bisAlt = (station.dbrBis || [])[0] || '';
+      var bisAlt = (station.dbrBis || []).map(String);
       var gattsAlt = station.dbrGatts || [];
+      var namenAlt = {};
+      (station.fvDests || []).forEach(function (d) { if (d && d.id) namenAlt[String(d.id)] = d.name; });
       if (typeof removeStation === 'function') removeStation(idx);
       selectedNetwork = 'DB';
       selectedStop = { id: evaVon, name: baseName };
-      oebb_toStop = null;
-      oebb_deselectedGattungen = new Set();
-      p2pDestinations = [];
+      dbKategorie = null;
+      fvDests = bisAlt.map(function (id) { return { id: id, name: namenAlt[id] || dbrZielName(id) }; });
+      fvAll = (bisAlt.length === 0);
+      fvDestQuery = ''; fvDestFeldOffen = false;
+      fvReachable = []; fvReachableFor = null; fvReachableLoading = false;
+      dbrGattungenAktuell = [];
+      fvActiveCats = new Set();
       showStep('lines');
-      linesLoading.classList.remove('hidden');
-      linesContainer.classList.add('hidden');
-      try { p2pDestinations = await dbrZieleLaden(evaVon); } catch (e) { p2pDestinations = []; }
-      if (bisAlt) oebb_toStop = { id: bisAlt, name: dbrZielName(bisAlt) };
-      // Gespeicherte Zugarten sind die GEWAEHLTEN, die Seite fuehrt die abgewaehlten.
-      if (gattsAlt.length) (dbrGattungenAktuell || []).forEach(function (g) {
-        if (gattsAlt.indexOf(g) < 0) oebb_deselectedGattungen.add(g);
-      });
       linesLoading.classList.add('hidden');
       linesContainer.classList.remove('hidden');
-      renderPointToPointConfig();
+      await loadFvReachable(evaVon);     // holt Ziele + Gattungen und waehlt vor
+      // Gespeicherte Zugarten gewinnen ueber die Vorauswahl.
+      if (gattsAlt.length) { fvActiveCats = new Set(); gattsAlt.forEach(function (g) { fvActiveCats.add(g); }); }
+      renderLines();
+      updateAddButton();
       return;
     }
     if (typeof removeStation === 'function') removeStation(idx);  // alte Auswahl raus, dann neu wählen
