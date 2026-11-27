@@ -474,12 +474,22 @@ function dvMatrixHTML(colour, data, rows, previewEl) {
   previewEl.style.background = C.bg;
   previewEl.style.backgroundImage = 'radial-gradient(circle, ' + C.grid + ' 1.5px, transparent 1.5px)';
   previewEl.style.backgroundSize = '5px 5px';
-  var rowH = Math.floor(170 / rows);
+  var kopf = dvKopfHoehe(colour);
+  var rowH = Math.floor((170 - kopf) / rows);
   var big = (rows <= 3);
   // Echte LED-Schrift: der eingebaute GLCD-Font als Pixel-SVG (dvLedTextSvg), groß =
   // setTextSize(4) (4px-Pixel), klein = setTextSize(2). Glow wie die leuchtenden LEDs.
-  var html = data.map(function(dep, i) {
-    var top = i * rowH;
+  var html = '';
+  if (kopf) {
+    // LED-Schrift in Groesse 2 (12x16 px je Zeichen), hart gekuerzt auf die Breite.
+    var kText = dvKopfText(colour);
+    while (kText && dvLedWidth(kText, 2) > 320 - 16) kText = kText.slice(0, -1);
+    html += '<div style="position:absolute;left:0;top:0;width:320px;height:' + DV_KOPF_H + 'px;'
+          + 'background:' + C.led + ';display:flex;align-items:center;padding:0 8px;overflow:hidden;">'
+          + dvLedTextSvg(kText, 2, C.bg, false) + '</div>';
+  }
+  html += data.map(function(dep, i) {
+    var top = kopf + i * rowH;
     if (big) {
       // Groß: Linie size4 links, Ziel size2 mittig (Matrix ZENTRIERT den Ziel-Block
       // auch einzeilig, display_matrix.cpp: destY = (height - totalDestH) / 2), Zahl
@@ -553,9 +563,11 @@ function dvChliHTML(colour, data, rows, previewEl) {
   var BG = '#09163a', ALT = '#182e68';
   previewEl.style.background = BG;
   previewEl.style.backgroundImage = 'none';
-  var rowH = Math.floor(170 / rows);
+  var kopf = dvKopfHoehe(colour);
+  var rowH = Math.floor((170 - kopf) / rows);
   var big = (rows <= 3);
-  var html = data.map(function(dep, i) {
+  var html = kopf ? dvKopfBalkenHTML(dvKopfText(colour), '#ffffff', BG, DV_POPPINS, 14, 600) : '';
+  html += data.map(function(dep, i) {
     var rowBg = (i % 2 === 1) ? ALT : BG;
     var l = String(dep.line || '');
     var bBg = '#1c5abe', bFg = '#fff';
@@ -563,7 +575,7 @@ function dvChliHTML(colour, data, rows, previewEl) {
     else if (l === '11') { bBg = '#ffcc00'; bFg = '#000'; }
     var badgeH = big ? 30 : 22, badgeFs = big ? 15 : 12;
     var destFs = big ? 15 : 10, cdFs = big ? 24 : 12;
-    return '<div style="position:absolute;left:0;top:' + (i * rowH) + 'px;width:320px;height:' + rowH + 'px;background:' + rowBg + ';display:flex;align-items:center;padding:0 8px;gap:8px;color:#fff;">'
+    return '<div style="position:absolute;left:0;top:' + (kopf + i * rowH) + 'px;width:320px;height:' + rowH + 'px;background:' + rowBg + ';display:flex;align-items:center;padding:0 8px;gap:8px;color:#fff;">'
       + '<span style="background:' + bBg + ';color:' + bFg + ';border:1px solid #fff;border-radius:' + (big ? 6 : 5) + 'px;height:' + badgeH + 'px;min-width:' + (big ? 40 : 30) + 'px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;font-weight:700;font-size:' + badgeFs + 'px;">' + escapeHtmlFt(dep.line) + '</span>'
       + '<span style="flex:1;overflow:hidden;white-space:nowrap;font-weight:' + (big ? 600 : 400) + ';font-size:' + destFs + 'px;">' + escapeHtmlFt(dep.dest) + '</span>'
       + '<span style="font-weight:700;font-size:' + cdFs + 'px;">' + dep.time + "'" + '</span></div>';
@@ -639,7 +651,8 @@ function dvSBerlinHTML(colour, data, rows, previewEl) {
   var eigene = dvEigeneLinienFarben(colour);
   previewEl.style.background = BG;
   previewEl.style.backgroundImage = 'none';
-  var rowH = Math.floor(170 / rows);
+  var kopf = dvKopfHoehe(colour);
+  var rowH = Math.floor((170 - kopf) / rows);
   var M = rowH < 40
     ? { pille: 'asap16', ziel: 'asap20', zielKlein: 'asap16', zeit: 'asap20', pillH: 22 }
     : { pille: 'asap20', ziel: 'asap24', zielKlein: 'asap20', zeit: 'asap24', pillH: rowH >= 50 ? 30 : 28 };
@@ -693,13 +706,15 @@ function dvSBerlinHTML(colour, data, rows, previewEl) {
     ziel = dvAsapKuerzen(zf, ziel, platz);
     // Reihenfolge der Kinder: Pille, Ziel, (+X), Zeit. Die Null-Darstellung der Vorschau
     // (nullBlinken) nimmt das zweite als Ziel und das letzte als Zahl.
-    return '<svg style="position:absolute;left:0;top:' + (i * rowH) + 'px;font-family:' + DV_ASAP + ';" width="320" height="' + rowH + '" viewBox="0 0 320 ' + rowH + '">'
+    return '<svg style="position:absolute;left:0;top:' + (kopf + i * rowH) + 'px;font-family:' + DV_ASAP + ';" width="320" height="' + rowH + '" viewBox="0 0 320 ' + rowH + '">'
       + pille
       + dvAsapText(zielX, dvAsapMitte(zf, 0, rowH), zf, '#ffffff', ziel, '')
       + plus
       + dvAsapText(rechts, base, M.zeit, zeitFarbe, zeit, 'end')
       + '</svg>';
   }).join('');
+  // Weisser Balken, Text im Blau der Variante (invertiert), Asap Condensed Medium.
+  if (kopf) html = dvKopfBalkenHTML(dvKopfText(colour), '#ffffff', BG, DV_ASAP, 17, 500) + html;
   return dvWrap(html, DV_ASAP);
 }
 
@@ -1446,6 +1461,21 @@ function dvNlKopfText(colour) {
   }
   var v = (typeof dsStrVal === 'function') ? dsStrVal(colour, '#') : undefined;
   return (v == null) ? '' : String(v);
+}
+
+// ---------- Stationszeile ueber den Abfahrten (Firmware 2.6.14, Stile 26, 23 und 5) ----------
+// Immer invertiert: der Balken traegt die Schriftfarbe des Displays, der Text die Grundfarbe.
+// 24 px hoch, volle Breite, Text links bei x=8, zu Langes hart gekuerzt (ohne Punkt).
+// Die Zeilen darunter beginnen bei y=24 und teilen sich die restlichen 146 px.
+var DV_KOPF_H = 24;
+function dvKopfText(colour) { return String(dvNlKopfText(colour) || '').trim(); }
+function dvKopfHoehe(colour) { return dvKopfText(colour) ? DV_KOPF_H : 0; }
+// Balken mit normaler Schrift (CH/LI in Poppins, DB S-Bahn in Asap Condensed).
+function dvKopfBalkenHTML(text, balkenFarbe, textFarbe, font, groesse, gewicht) {
+  return '<div style="position:absolute;left:0;top:0;width:320px;height:' + DV_KOPF_H + 'px;'
+    + 'background:' + balkenFarbe + ';color:' + textFarbe + ';display:flex;align-items:center;'
+    + 'padding:0 8px;overflow:hidden;white-space:nowrap;font-family:' + font + ';'
+    + 'font-size:' + groesse + 'px;font-weight:' + gewicht + ';">' + escapeHtmlFt(text) + '</div>';
 }
 
 function dvNlHTML(colour, data, rows, previewEl) {

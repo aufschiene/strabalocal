@@ -690,15 +690,15 @@ const STIL_KANN = {
   15: { blinken: 'still', verspaetung: true },
   18: { blinken: 'still', verspaetung: true },
   21: { blinken: 'still', verspaetung: true },
-  23: { schrift: 'matrix', matrixSchrift: true, blinken: 'still', verspaetung: true },
+  23: { schrift: 'matrix', matrixSchrift: true, blinken: 'still', verspaetung: true, kopfName: true, kopfOptional: true },
   24: { schrift: 'papier', blinken: 'still' },
-  5:  { blinken: 'stern', schrift: 'sbahn', linienFarben: true },
+  5:  { blinken: 'stern', schrift: 'sbahn', linienFarben: true, kopfName: true, kopfOptional: true },
   6:  { blinken: 'still' },
   7:  { blinken: 'quadrat' },
   9:  { blinken: 'blinkt' },
   14: { blinken: 'stern' },
   22: { blinken: 'still' },
-  26: { blinken: 'still' },
+  26: { blinken: 'still', kopfName: true, kopfOptional: true },
   // NL: Flaeche in der Linienfarbe (Feld u) kennt nur an und aus, eine Fahrzeugauswahl
   // wertet DisplayNL nicht aus. Bei 0 zeigt der Stil von Haus aus das Bus-Symbol, und
   // die Kopfzeile traegt einen frei waehlbaren Stationsnamen (Feld '#').
@@ -934,7 +934,7 @@ function designTeil(d) {
   // Stationsname der NL-Kopfzeile. Alle 26 Buchstaben sind am Geraet belegt, darum '#'.
   // Immer schreiben, auch leer: so bleibt "kein Name" beim naechsten Oeffnen erhalten.
   // Das Geraet ueberliest ein leeres Feld ohnehin (entryField verlangt Laenge > 1).
-  if (k.kopfName) aus += '|#' + nlKopfText(d);
+  if (k.kopfName && (!k.kopfOptional || fwNlFarben())) aus += '|#' + nlKopfText(d);
   aus += '|a' + (e.a === 0 ? 0 : 1);
   aus += '|j' + (e.x || 0) + '-' + (e.y || 0);
   aus += '|i' + standzeitVon(e, zeigtUhr(d));
@@ -967,7 +967,7 @@ function dsSegment(c, zeilenZahl, fenster, sortierung, d) {
   // trotzdem, denn die Vorschau dieser Seite liest ihre Werte aus genau dieser Zeile.
   // Ohne Display (displaysettingsBauen ruft je STIL auf) gilt das erste Display dieses
   // Stils, dieselbe Regel wie bei einstVon. Sonst stuende die Zeile ohne Namen da.
-  if (k.kopfName) {
+  if (k.kopfName && (!k.kopfOptional || fwNlFarben())) {
     const dKopf = d || displays.find(x => stilVon(x) === parseInt(c, 10));
     const kn = dKopf ? nlKopfText(dKopf) : '';
     if (kn) seg += '|#' + kn;
@@ -1053,10 +1053,18 @@ function nurBloeckeAuf(d) {
 // Geraet liest r aus dem Eintrag der Anzeige, zwei Anzeigen mit verschiedenen Designs
 // haben darum auch verschiedene Zeilenzahlen (Paul 27.10.2026).
 function zeilenSelbst(d) {
-  const max = maxZeilen(stilVon(d));
+  const max = maxZeilenHier(d);
   const min = minZeilen(stilVon(d));
   if (d && d.zeilen != null) return Math.max(min, Math.min(max, d.zeilen));
-  return Math.max(min, zeilenAuto(d));
+  return Math.max(min, Math.min(max, zeilenAuto(d)));
+}
+// Wie viele Zeilen dieses Display hoechstens darf. Mit Stationszeile bleiben vier
+// (Paul: "wenn an, dann 4 Zeilen"); die Firmware deckelt Matrix und CH/LI selbst, die
+// Vorschau soll dasselbe zeigen. Ohne Kopfzeile bleibt es beim Maximum des Stils.
+function maxZeilenHier(d) {
+  const max = maxZeilen(stilVon(d));
+  if (kopfVollerName(stilVon(d)) && nlKopfText(d)) return Math.min(max, 4);
+  return max;
 }
 // Was ohne Zutun herauskommt.
 function zeilenAuto(d) {
@@ -2524,7 +2532,7 @@ function streifenZeichnen() {
       const gross = (istZeitTyp(stilHier) || matrixSeiteGross(stilHier, eigene) || parseInt(stilHier, 10) === 6)
                     ? eigene : Math.max(eigene, zeilenDesStils(stilHier));
       // MVG traegt oben die Min-Leiste (18), NL die Kopfzeile samt Spaltenleiste (18 + 11).
-      const kopf = nlKopfHoehe(stilHier);
+      const kopf = nlKopfHoehe(stilHier, s.display);
       const hoehe = Math.floor((170 - kopf) / gross);
       const fach = Math.floor((170 - kopf) / eigene);
       const html = zeigtUhr(s.display)
@@ -2990,8 +2998,8 @@ function zeilenzahlFeld() {
   const sHier = schirme[zeiger];
   const d = sHier && sHier.display;
   if (!d || zeigtUhr(d)) return '';   // Ein Uhr-Brett hat keine Abfahrtszeilen
-  const max = maxZeilen(stilVon(d));
-  const auto = zeilenAuto(d);
+  const max = maxZeilenHier(d);
+  const auto = zeilenVon(d) === zeilenAuto(d) ? zeilenAuto(d) : Math.min(max, zeilenAuto(d));
   if (parseInt(stilVon(d), 10) === 6) {
     // DB Fernverkehr: die Zeilen sind hier die Ansicht. 1 = ein Zug ueber den ganzen Schirm,
     // 2 = Doppelscreen, zwei Zuege nebeneinander wie am Bahnsteig (Paul 08.11.2026).
@@ -4151,7 +4159,7 @@ function uhrZeileHTML(colour, daten, zeilen, d) {
   const i = daten.findIndex(x => x && x.uhr);
   if (i < 0) return '';
   const look = uhrLook(colour, d) || { bg: '#000', fg: '#fff' };
-  const kopf = nlKopfHoehe(colour);   // MVG 18, NL 29, sonst nichts ueber den Zeilen
+  const kopf = nlKopfHoehe(colour, d);   // MVG 18, NL 29, CH/Matrix/S-Bahn 24 mit Name
   const rowH = Math.floor((170 - kopf) / zeilen);
   const oben = kopf + i * rowH;
   const klein = zeilen >= 4;
@@ -4525,9 +4533,20 @@ function schalterZeile(titel, text, an, klick) {
 // Wie viel ueber den Abfahrtszeilen steht: MVG seine Min-Leiste (18), NL die Kopfzeile
 // samt Spaltenleiste (18 + 11 = 29, rowsTop() der Firmware), sonst nichts. Die Zeilen-
 // hoehe rechnet sich davon ab, darum steht die Zahl an genau einer Stelle.
-function nlKopfHoehe(c) {
+// Schweiz/Liechtenstein (26), Matrix (23) und DB S-Bahn (5) haben seit Firmware 2.6.14
+// dieselbe Stationszeile wie die Niederlande, mit drei Unterschieden: sie ist ABSCHALTBAR,
+// sie zeigt den VOLLEN Stationsnamen ("Lugano, Via Olgiati") und darf darum auch ein Komma
+// tragen. Der Balken ist 24 px hoch und immer invertiert (Firmware-Sitzung 27.11.2026).
+const KOPF_STILE_VOLL = [5, 23, 26];
+function kopfVollerName(c) { return KOPF_STILE_VOLL.indexOf(parseInt(c, 10)) >= 0; }
+// Hoehe des Kopfbalkens ueber den Zeilen. Bei den drei neuen Stilen nur, wenn wirklich ein
+// Name dasteht: ohne Text gibt es keinen Balken und die Zeilen fangen wieder bei 0 an.
+function nlKopfHoehe(c, d) {
   const ci = parseInt(c, 10);
-  return (ci === 22) ? 18 : (ci === 27 ? 29 : 0);
+  if (ci === 22) return 18;
+  if (ci === 27) return 29;
+  if (kopfVollerName(ci)) return (d && nlKopfText(d)) ? 24 : 0;
+  return 0;
 }
 // Hoechstens 32 Zeichen, nie '|', ';' oder ',': die drei trennen im Geraeteformat die
 // Felder, die Linien und die Eintraege. Was nicht zwischen Bus und Uhr passt (226 px in
@@ -4538,8 +4557,11 @@ function nlKopfHoehe(c) {
 // waehrend der Eingabe (dieselbe Falle wie beim Namen eines eigenen Designs, Kunde Rostock
 // 27.10.2026).
 const NL_KOPF_MAX = 32;
-function nlKopfKurz(t) {
-  return String(t == null ? '' : t).replace(/[|;,]/g, ' ').slice(0, NL_KOPF_MAX);
+function nlKopfKurz(t, c) {
+  // Das Komma trennt nur in der NL-Kopfzeile; bei 26/23/5 gehoert es zum Namen
+  // ("Lugano, Via Olgiati"). '|' und ';' trennen im Geraeteformat immer.
+  const weg = kopfVollerName(c) ? /[|;]/g : /[|;,]/g;
+  return String(t == null ? '' : t).replace(weg, ' ').slice(0, NL_KOPF_MAX);
 }
 // Gespeichert ist vielleicht noch der alte Schnitt nach 12 Zeichen. Steht im Feld GENAU der
 // Anfang eines Stationsnamens dieses Bretts, wie ihn die alte Grenze abgeschnitten hat,
@@ -4570,6 +4592,14 @@ function nlKopfHeilen(kopf, d) {
 // Vorschlag: die erste Station dieses Bretts, Teil nach dem letzten Komma
 // ("Utrecht, Janskerkhof" wird "Janskerkhof"), auf 32 Zeichen gekuerzt.
 function nlKopfVorgabe(d) {
+  const c = d ? stilVon(d) : 0;
+  // 26/23/5, Pauls Regel: "Eine Haltestelle? Name an erster Zeile. Viele Haltestellen?
+  // Kein Name, selber schuld." Also nur bei genau einer Station etwas vorschlagen, dann
+  // aber den vollen Namen.
+  if (kopfVollerName(c)) {
+    const namen = nlStationsNamenVoll(d);
+    return namen.length === 1 ? nlKopfKurz(namen[0], c).trim() : '';
+  }
   let name = '';
   ((d && d.richtungen) || []).forEach(k => {
     if (name) return;
@@ -4579,14 +4609,28 @@ function nlKopfVorgabe(d) {
   const i = name.lastIndexOf(',');
   return nlKopfKurz((i >= 0 ? name.slice(i + 1) : name).trim()).trim();
 }
+// Die vollen Stationsnamen dieses Bretts, ohne Dubletten.
+function nlStationsNamenVoll(d) {
+  const raus = [];
+  ((d && d.richtungen) || []).forEach(k => {
+    const r = richtungFinden(k);
+    if (!r || !r.station) return;
+    const voll = String(r.station.name || '').trim();
+    if (voll && raus.indexOf(voll) < 0) raus.push(voll);
+  });
+  return raus;
+}
 // Was in der Kopfzeile steht: die eigene Eingabe, sonst der Vorschlag. Ein LEERER Text
 // ist eine Entscheidung ("kein Name"), kein fehlender Wert, darum die Pruefung auf null.
 function nlKopfText(d) {
   const e = einstFuer(d);
-  return (e.kopf == null) ? nlKopfVorgabe(d) : nlKopfKurz(e.kopf).trim();
+  return (e.kopf == null) ? nlKopfVorgabe(d) : nlKopfKurz(e.kopf, d ? stilVon(d) : 0).trim();
 }
 // Die Stationen dieses Bretts als Vorschlaege, je Station der gekuerzte Name.
 function nlStationsNamen(d) {
+  if (kopfVollerName(d ? stilVon(d) : 0)) {
+    return nlStationsNamenVoll(d).map(x => nlKopfKurz(x, stilVon(d)).trim()).filter(Boolean);
+  }
   const raus = [];
   ((d && d.richtungen) || []).forEach(k => {
     const r = richtungFinden(k);
@@ -4602,7 +4646,7 @@ function nlKopfMerken(di, wert) {
   const d = displays[di];
   if (!d) return null;
   if (!d.einst) d.einst = einstFuer(d);   // ohne Linien gibt einstFuer nur eine Kopie heraus
-  d.einst.kopf = nlKopfKurz(wert);
+  d.einst.kopf = nlKopfKurz(wert, stilVon(d));
   return d;
 }
 // Beim Tippen nur den Streifen neu zeichnen: allesZeichnen() baut die Karte per innerHTML
@@ -4626,10 +4670,71 @@ function nlKopfWaehlen(di, wert) {
 // Das Feld in der Design-Karte: EIN Textfeld mit Zaehler, darunter die Stationen dieses
 // Bretts als Vorschlaege zum Antippen. Vorher standen eine Auswahlliste und das Textfeld
 // untereinander und sagten dasselbe zweimal (Paul 25.11.2026: "schoener haben").
+// An- und Ausschalten der Stationszeile (nur 26/23/5, die NL-Kopfzeile bleibt Pflicht).
+// Aus heisst: leerer Text. Der bleibt gespeichert, sonst schlueg beim naechsten Oeffnen
+// wieder die Vorgabe zu (dieselbe Regel wie bei NL: leer ist eine Entscheidung).
+// Mit Stationszeile bleiben vier Zeilen. Hat das Display mehr EIGENE Zeilen, muss eine
+// weg, und das soll der Kunde entscheiden (Paul 27.11.2026). Ein Stations-Block zaehlt als
+// EINE Zeile: liegt nur eine Station darauf, sind es danach schlicht die naechsten vier
+// Abfahrten, ohne Rueckfrage.
+function kopfZeilenName(teil) {
+  return (teil || []).map(k => {
+    if (istUhrKey(k)) return 'Uhrzeit';
+    const r = richtungFinden(k);
+    if (!r || !r.dep) return String(k);
+    const ziel = String(r.dep.dest || '').trim();
+    return String(r.dep.line || '').trim() + (ziel ? (' \u2192 ' + ziel) : '');
+  }).join(' + ');
+}
+function kopfZuVieleZeilen(di, einheiten) {
+  const liste = einheiten.map((teil, i) =>
+    '<button type="button" class="vorschlag" onclick="kopfZeileWegDann(' + di + ',' + i + ')">'
+    + escapeHtmlFt(kopfZeilenName(teil)) + '</button>').join('');
+  dialogZeigen('Eine Zeile zu viel',
+    'Mit Stationszeile passen nur vier Zeilen auf das Display, du hast ' + einheiten.length
+    + '. Welche soll weg?',
+    [{ text: 'Doch nicht', still: true }], 'warnung',
+    '<div class="vorschlaege">' + liste + '</div>');
+}
+function kopfZeileWegDann(di, i) {
+  const schleier = document.getElementById('schleier');
+  if (schleier) schleier.classList.remove('an');
+  zeileWeg(di, i);
+  kopfSchalten(di, true);   // noch zu viele? dann fragt es gleich noch einmal
+}
+function kopfSchalten(di, an) {
+  const d = displays[di];
+  if (!d) return;
+  if (!d.einst) d.einst = einstFuer(d);
+  if (an) {
+    const einheiten = zeilenEinheiten(d);
+    if (einheiten.length > 4) { kopfZuVieleZeilen(di, einheiten); return; }
+    d.einst.kopf = d.einst.kopfLetzt || nlKopfVorgabe(d) || (nlStationsNamen(d)[0] || '');
+    if (!d.einst.kopf) d.einst.kopf = null;   // nichts zu holen -> wieder Vorgabe fragen
+  } else {
+    if (nlKopfText(d)) d.einst.kopfLetzt = nlKopfText(d);
+    d.einst.kopf = '';
+  }
+  allesZeichnen();
+}
 function nlKopfFeld(d, di) {
   const jetzt = nlKopfText(d);
   const namen = nlStationsNamen(d);
-  let h = '<label class="feld" for="nlKopfText">Name in der Kopfzeile</label>'
+  const k = STIL_KANN[parseInt(stilVon(d), 10)] || {};
+  let h = '';
+  if (k.kopfOptional) {
+    const an = !!jetzt;
+    h += '<label class="feld">Stationszeile</label><div class="schalter">'
+       + '<button class="' + (an ? '' : 'an') + '" onclick="kopfSchalten(' + di + ', false)">Aus</button>'
+       + '<button class="' + (an ? 'an' : '') + '" onclick="kopfSchalten(' + di + ', true)">An</button>'
+       + '</div>';
+    if (!an) {
+      return h + '<div class="hinweis">Mit Stationszeile steht der Name invertiert \u00fcber den '
+               + 'Abfahrten, und es bleiben h\u00f6chstens vier Zeilen. Bei mehreren Stationen auf '
+               + 'einem Display ist sie von Haus aus aus.</div>';
+    }
+  }
+  h += '<label class="feld" for="nlKopfText">Name in der Kopfzeile</label>'
         + '<div class="kopfname"><input id="nlKopfText" type="text" maxlength="' + NL_KOPF_MAX + '"'
         + ' placeholder="Kein Name" value="' + escapeHtmlFt(jetzt) + '"'
         + ' oninput="nlKopfTippt(' + di + ', this.value)"'
@@ -4644,6 +4749,12 @@ function nlKopfFeld(d, di) {
          + ' onclick="nlKopfWaehlen(' + di + ',' + escapeHtmlFt(lfArg(n)) + ')">' + escapeHtmlFt(n) + '</button>';
     });
     h += '</div>';
+  }
+  if (k.kopfOptional) {
+    return h + '<div class="hinweis">Tippe eine Station an oder schreib selbst, h\u00f6chstens '
+             + NL_KOPF_MAX + ' Zeichen, Komma erlaubt. Der Name steht invertiert \u00fcber den '
+             + 'Abfahrten, zu Langes k\u00fcrzt das Display hinten. Mit Stationszeile bleiben '
+             + 'h\u00f6chstens vier Zeilen.</div>';
   }
   return h + '<div class="hinweis">Tippe eine Station an oder schreib selbst, h\u00f6chstens '
            + NL_KOPF_MAX + ' Zeichen. Was nicht zwischen Bus-Symbol und Uhr passt, k\u00fcrzt das '
@@ -4667,7 +4778,7 @@ function designZeichnen() {
   let h = zeilenzahlFeld();
   // Der Stationsname in der Kopfzeile gehoert zum Aussehen DIESES Bretts und steht darum
   // hier, gleich neben der Zeilenzahl (nur der NL-Screen hat eine Kopfzeile dafuer).
-  if (k.kopfName) h += nlKopfFeld(d, di);
+  if (k.kopfName && (!k.kopfOptional || fwNlFarben())) h += nlKopfFeld(d, di);
 
   // Eigenes Display: der Baukasten steht im Pop-up und geht Schritt fuer Schritt, wie im
   // alten Konfigurator. Alles auf einmal in der Karte war zu viel auf einmal
