@@ -8757,8 +8757,38 @@ function normalizeStationName(name) {
 }
 
 // Station-Dropdown anzeigen
+// Gehoeren alle Namen einer divaNr zum selben Halt? Ja, wenn die Woerter des kuerzeren
+// Namens im laengeren vorkommen ("Nußdorfer Straße" in "Nußdorfer Straße / Alserbachstraße",
+// "Enkplatz, Grillgasse" in "Enkplatz U, Grillgasse"). Nein bei fremden Namen unter einer
+// divaNr (3A: Himmelpfortgasse gegen Stubenbastei) — die bleiben getrennte Eintraege.
+var _wienDivaOk = {};
+function wienDivaNamenPruefen(line) {
+  _wienDivaOk = {};
+  var proDiva = {};
+  (line && line.lineStation || []).forEach(function (it) {
+    var st = it.station;
+    if (!st || !st.divaNr || !st.stationName) return;
+    (proDiva[st.divaNr] = proDiva[st.divaNr] || {})[normalizeStationName(st.stationName)] = 1;
+  });
+  Object.keys(proDiva).forEach(function (diva) {
+    var namen = Object.keys(proDiva[diva]);
+    var laengster = namen.slice().sort(function (a, b) { return b.length - a.length; })[0] || '';
+    var gross = laengster.split(' ').filter(Boolean);
+    // Zweiter Weg fuer reine Schreibweisen: ohne Leerzeichen verglichen ist
+    // "Süßenbrunner Straße" dasselbe wie "Süßenbrunnerstraße".
+    var ohneLeer = function (t) { return String(t).replace(/\s+/g, ''); };
+    var langKompakt = ohneLeer(laengster);
+    _wienDivaOk[diva] = namen.every(function (n) {
+      var woerter = n.split(' ').filter(Boolean).every(function (w) { return gross.indexOf(w) >= 0; });
+      return woerter || langKompakt.indexOf(ohneLeer(n)) >= 0;
+    });
+  });
+}
+function wienDivaKeyOk(diva) { return !!(diva && _wienDivaOk[diva]); }
+
 function showWienStationDropdown(inputValue) {
   if (!wienSelectedLine) return;
+  wienDivaNamenPruefen(wienSelectedLine);
   const query = inputValue.toLowerCase().trim();
 
   // Gruppiere Stationen nach normalisiertem Namen
@@ -8769,16 +8799,26 @@ function showWienStationDropdown(inputValue) {
       const station = item.station;
       if (station && station.stationName && station.stationID) {
         const normalizedName = normalizeStationName(station.stationName);
+        // Zwei Bahnsteige DESSELBEN Halts heissen in den Wiener Daten nicht immer gleich:
+        // die 5 steht an divaNr 60200029 einmal als "Nußdorfer Straße" (Richtung
+        // Westbahnhof) und einmal als "Nußdorfer Straße / Alserbachstraße" (Richtung
+        // Praterstern). Nach dem NAMEN gruppiert zerfiel der Halt in zwei Eintraege mit je
+        // einer Richtung, und die zweite war gar nicht waehlbar (Kunde 27.11.2026).
+        // Zusammengefasst wird ueber die divaNr (den physischen Halt), aber NUR wenn die
+        // Namen auch zusammenpassen: beim 3A liegen unter einer divaNr vier verschiedene
+        // Gassen (Himmelpfortgasse, Stubenbastei …), die niemand als einen Halt sucht.
+        const gruppenKey = wienDivaKeyOk(station.divaNr) ? ('diva' + station.divaNr) : normalizedName;
 
-        if (!stationsByName.has(normalizedName)) {
-          stationsByName.set(normalizedName, {
+        if (!stationsByName.has(gruppenKey)) {
+          stationsByName.set(gruppenKey, {
+            normName: normalizedName,
             originalNames: [station.stationName],
             stopIds: new Set(),
             directions: []
           });
         }
 
-        const entry = stationsByName.get(normalizedName);
+        const entry = stationsByName.get(gruppenKey);
         if (!entry.originalNames.includes(station.stationName)) {
           entry.originalNames.push(station.stationName);
         }
@@ -8804,7 +8844,8 @@ function showWienStationDropdown(inputValue) {
   // Nur an der Endstation selbst: unterwegs (z.B. Reumannplatz) bleibt "→ Oberlaa" die
   // richtige Fahrtrichtung. Würde nichts übrig bleiben (Ringlinie, die hier anfängt und
   // endet), bleibt alles stehen, sonst könnte man die Station gar nicht mehr nehmen.
-  let stationsList = Array.from(stationsByName.entries()).map(([normName, s]) => {
+  let stationsList = Array.from(stationsByName.values()).map((s) => {
+    const normName = s.normName;
     let dirs = s.directions;
     const abfahrend = dirs.filter(d => normalizeStationName(d.towards || '') !== normName);
     if (abfahrend.length) dirs = abfahrend;
