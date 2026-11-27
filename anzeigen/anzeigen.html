@@ -970,7 +970,9 @@ function dsSegment(c, zeilenZahl, fenster, sortierung, d) {
   if (k.kopfName && (!k.kopfOptional || fwNlFarben())) {
     const dKopf = d || displays.find(x => stilVon(x) === parseInt(c, 10));
     const kn = dKopf ? nlKopfText(dKopf) : '';
-    if (kn) seg += '|#' + kn;
+    // Bei 26/23/5 auch leer schreiben: "keine Stationszeile" ist eine Entscheidung, und
+    // ohne das Feld las die naechste Sitzung wieder die Vorgabe.
+    if (kn || k.kopfOptional) seg += '|#' + kn;
   }
   // Diese drei sind am Geraet von Haus aus aus, darum steht nur die 1 in der Zeile.
   if (k.fahrzeug && e.h) seg += '|h' + e.h;
@@ -4615,7 +4617,11 @@ function nlStationsNamenVoll(d) {
   ((d && d.richtungen) || []).forEach(k => {
     const r = richtungFinden(k);
     if (!r || !r.station) return;
-    const voll = String(r.station.name || '').trim();
+    // Nur der STARTBAHNHOF (Paul 27.11.2026). Die DB-Regio-Auswahl haengt ihre Wahl an den
+    // Namen ("München Hbf · nach Nürnberg Hbf"), die OEBB-Zuege ihr Ziel ("Wien Meidling →
+    // Linz Hbf"). Beides gehoert nicht in die Kopfzeile.
+    const voll = String(r.station.name || '').split(' \u00b7 ')[0].split(' \u2192 ')[0]
+                   .split(' -> ')[0].trim();
     if (voll && raus.indexOf(voll) < 0) raus.push(voll);
   });
   return raus;
@@ -4723,16 +4729,16 @@ function nlKopfFeld(d, di) {
   const k = STIL_KANN[parseInt(stilVon(d), 10)] || {};
   let h = '';
   if (k.kopfOptional) {
+    // Ein Schieber wie bei der Uhr: an, und darunter klappt der Name auf (Paul 27.11.2026).
     const an = !!jetzt;
-    h += '<label class="feld">Stationszeile</label><div class="schalter">'
-       + '<button class="' + (an ? '' : 'an') + '" onclick="kopfSchalten(' + di + ', false)">Aus</button>'
-       + '<button class="' + (an ? 'an' : '') + '" onclick="kopfSchalten(' + di + ', true)">An</button>'
-       + '</div>';
-    if (!an) {
-      return h + '<div class="hinweis">Mit Stationszeile steht der Name invertiert \u00fcber den '
-               + 'Abfahrten, und es bleiben h\u00f6chstens vier Zeilen. Bei mehreren Stationen auf '
-               + 'einem Display ist sie von Haus aus aus.</div>';
-    }
+    h += '<label class="feld">Stationszeile</label>'
+       + '<div class="schieber"><div class="wort">Stationsname oben'
+       + '<small>Steht invertiert \u00fcber den Abfahrten. Mit ihr bleiben h\u00f6chstens vier Zeilen.</small></div>'
+       + '<button class="schiene' + (an ? ' an' : '') + '" role="switch"'
+       + ' aria-checked="' + (an ? 'true' : 'false') + '"'
+       + ' onclick="kopfSchalten(' + di + ', ' + (an ? 'false' : 'true') + ')">'
+       + '<span class="kugel"></span></button></div>';
+    if (!an) return h;
   }
   h += '<label class="feld" for="nlKopfText">Name in der Kopfzeile</label>'
         + '<div class="kopfname"><input id="nlKopfText" type="text" maxlength="' + NL_KOPF_MAX + '"'
@@ -6839,7 +6845,12 @@ function aussehenUebernehmen(eintraege) {
   displays.forEach(d => {
     if (d.vomNutzer) return;
     d.stil = c;
+    const vorher = d.einst && d.einst.kopf;
     d.einst = Object.assign({}, mit[0].e);
+    // Der selbst getippte Stationsname gehoert zum DISPLAY, nicht zum Aussehen des Stils.
+    // Trug die uebernommene Zeile keinen, bleibt der bisherige stehen, sonst sprang er beim
+    // naechsten Laden auf die Vorgabe zurueck (Paul 27.11.2026: "testelli soll wieder passen").
+    if (d.einst.kopf == null && vorher != null) d.einst.kopf = vorher;
     if (d.einst.kopf) d.einst.kopf = nlKopfHeilen(d.einst.kopf, d);   // alter 12er-Schnitt
   });
   return true;
